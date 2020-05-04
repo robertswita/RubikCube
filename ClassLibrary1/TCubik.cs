@@ -32,6 +32,58 @@ namespace TGL
             }
         }
 
+        public int State;
+        public void UpdateState()
+        {
+            //State = 0;
+            //for (int i = 0; i < 2; i++)
+            //{
+            //    for (int j = 0; j < 3; j++)
+            //    {
+            //        var bit = Transform[4 * i + j];
+            //        if (bit > 0.1)
+            //        {
+            //            State |= 1 << j;
+            //            break;
+            //        }
+            //        if (bit < -0.1)
+            //        {
+            //            State |= 1 << j;
+            //            State = ~State & 7;
+            //            break;
+            //        }
+            //    }
+            //    if (i < 1)
+            //        State <<= 3;
+            //}
+
+            var gamma = GetAngle(Transform[0], Transform[1]);
+
+            var alpha = 0;
+            var beta = 0;
+
+            if (gamma == 0)
+            {
+                alpha = GetAngle(Transform[5], -Transform[9]);
+                beta = GetAngle(Transform[0], -Transform[2]);
+            } else
+            {
+                alpha = GetAngle(Transform[10], Transform[6]);
+            }
+
+            State = gamma << 4 | beta << 2 | alpha; 
+        }
+
+        public int GetAngle(double cosA, double sinA)
+        {
+            if (cosA > 0.1) return 0;
+            if (sinA > 0.1) return 1;
+            if (cosA < -0.1) return 2;
+            if (sinA < -0.1) return 3;
+
+            return -1;
+        }
+
         public TCubik(){
             var lbn = new TPoint3D(-1, -1, -1);
             var rtf = new TPoint3D(1, 1, 1);
