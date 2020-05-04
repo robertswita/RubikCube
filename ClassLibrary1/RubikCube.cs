@@ -11,13 +11,14 @@ namespace TGL
     {
         public static int N = 3;
         TCubik[,,] Cubiks = new TCubik[N, N, N];
-        public static double M = (N - 1) / 2.0;
+        public static double M;
         public double Size = 0.9 / 2;
         public List<TCubik> Selection;
         public TObject3D Wall;
 
         public RubikCube()
         {
+            M = (N - 1) / 2.0;
             Scale(1.0 / N, 1.0 / N, 1.0 / N);
             for (int z = 0; z < N; z++)
                 for (int y = 0; y < N; y++)
@@ -28,7 +29,39 @@ namespace TGL
                         cubik.Scale(Size, Size, Size);
                         cubik.Parent = this;
                         Cubiks[z, y, x] = cubik;
+                        cubik.UpdateState();
                     }
+        }
+
+        public RubikCube(RubikCube cube): this()
+        {
+            for (int z = 0; z < N; z++)
+                for (int y = 0; y < N; y++)
+                    for (int x = 0; x < N; x++)
+                    {
+                        var cubik = Cubiks[z, y, x];
+                        Array.Copy(cube.Cubiks[z, y, x].Transform, cubik.Transform, cubik.Transform.Length);
+                        cubik.UpdateState();
+                    }
+        }
+
+        public double Evaluate()
+        {
+            double result = 0;
+            double idx = 0;
+            foreach (var cubik in Cubiks)
+            {
+                idx++;
+
+                var weight = idx / (N * N * N);
+
+                if (cubik.State != 0)
+                {
+                    result += weight;
+                }
+
+            }
+            return result;
         }
 
         public void MakeMove(TMove move)
@@ -53,7 +86,8 @@ namespace TGL
             {
                 var cubic = Selection[i];
                 cubic.MultMatrix(group.Transform);
-                Cubiks[cubic.Z, cubic.Y, cubic.X] = cubic; 
+                Cubiks[cubic.Z, cubic.Y, cubic.X] = cubic;
+                cubic.UpdateState();
             }
         }
 
@@ -87,7 +121,7 @@ namespace TGL
 
         public void Ungroup()
         {
-            for (int i = Wall.Children.Count; i > 0 ; i--)
+            for (int i = Wall.Children.Count - 1; i >= 0 ; i--)
             {
                 Wall.Children[i].Parent = this;
             }

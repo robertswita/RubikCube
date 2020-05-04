@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using TGL;
+using Rubik;
 
 namespace Cyberiada3D
 {
@@ -16,6 +17,7 @@ namespace Cyberiada3D
         public RubikCube RubikCube;
         public List<TMove> Moves = new List<TMove>();
         public static Random Rnd = new Random();
+        public double HighScore = double.MaxValue;
 
         public Form1()
         {
@@ -65,7 +67,7 @@ namespace Cyberiada3D
 
         int MoveNo;
         int FrameNo;
-        int FrameCount = 25;
+        int FrameCount = 15;
 
         private void timer1_Tick(object sender, EventArgs e)
         {
@@ -79,8 +81,12 @@ namespace Cyberiada3D
                         RubikCube.Select(move);
                         RubikCube.Group();                 
                     }
+                    double angle = (move.Angle + 1) * 90;
+                    if (angle > 180)
+                        angle -= 360;
                     var ratio = (double) FrameNo / (FrameCount - 1);
-                    var angle = ratio * (move.Angle + 1) * 90;
+                    angle *= ratio;
+                    RubikCube.Wall.LoadIdentity();
                     if (move.Axis == 0)
                     {
                         RubikCube.Wall.RotateX(angle);
@@ -108,6 +114,10 @@ namespace Cyberiada3D
                 MoveTimer.Stop();
                 Moves.Clear();
                 MoveNo = 0;
+                if (HighScore > 0)
+                {
+                    Solve();
+                }
             }
         }
 
@@ -121,6 +131,74 @@ namespace Cyberiada3D
                 Moves.Add(move);
             }
             MoveTimer.Start();
+        }
+
+        private void SegCountBox_ValueChanged(object sender, EventArgs e)
+        {
+            RubikCube.N = (int)SegCountBox.Value;
+            RubikCube.Parent = null;
+            RubikCube = new RubikCube();
+            RubikCube.Parent = tglView1.Context.Root;
+            tglView1.Invalidate();
+        }
+
+        public double OnEvaluate(TChromosome specimen)
+        {
+            var cube = new RubikCube(RubikCube);
+            var bestFitness = double.MaxValue;
+            for (int len = 0; len < specimen.Genes.Length; len++)
+            {
+                var move = new TMove();
+                move.Decode((int)specimen.Genes[len]);
+                cube.MakeMove(move);
+                var fitness = cube.Evaluate();
+                if (fitness < bestFitness)
+                {
+                    bestFitness = fitness;
+                    (specimen as RubikGenome).MovesCount = len + 1;
+                }
+            }
+            specimen.UnFitness = bestFitness;
+            return bestFitness;
+        }
+
+        public void OnProgress(TChromosome best)
+        {
+            DataChart.Series[0].Points.AddY(best.UnFitness);
+            DataChart.Update();
+            ErrorLbl.Text = "Error: " + HighScore.ToString();
+            ErrorLbl.Refresh();
+        }
+
+        void Solve()
+        {
+            TChromosome.GenesLength = 30;
+            TChromosome.MinGenes = new double[TChromosome.GenesLength];
+            TChromosome.MaxGenes = new double[TChromosome.GenesLength];
+            for (int i = 0; i < TChromosome.MaxGenes.Length; i++)
+                TChromosome.MaxGenes[i] = 9 * RubikCube.N;
+            TGA<RubikGenome>.GenerationsCount = 100;
+            var ga = new TGA<RubikGenome>();
+            ga.Evaluate = OnEvaluate;
+            ga.Progress = OnProgress;
+            ga.Execute();
+            HighScore = ga.Best.UnFitness;
+            if (HighScore > 0)
+            {
+                Moves.Clear();
+                for (int i = 0; i < ga.Best.MovesCount; i++)
+                {
+                    var move = new TMove();
+                    move.Decode((int)ga.Best.Genes[i]);
+                    Moves.Add(move);
+                }
+                MoveTimer.Start();
+            }
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            Solve();
         }
     }
 }
