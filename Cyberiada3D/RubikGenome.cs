@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -25,6 +26,12 @@ namespace Rubik
             child.Correct();
 
             return child;
+        }
+
+        public override void Mutation(int idx)
+        {
+            base.Mutation(idx);
+            Correct();
         }
 
         private void RemoveGene(int i)
@@ -55,6 +62,8 @@ namespace Rubik
 
                     if (move.SegNo == pMove.SegNo)
                     {
+                        RemoveGene(i);
+                        i--;
                         var angle = (pMove.Angle + move.Angle + 2) % 4;
 
                         if (angle == 0)
@@ -65,9 +74,9 @@ namespace Rubik
                         } else
                         {
                             pMove.Angle = angle - 1;
+                            Genes[j] = pMove.Encode();
                         }
 
-                        RemoveGene(i);
                         break;
                     }
                 }

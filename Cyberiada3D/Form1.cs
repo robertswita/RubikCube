@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using TGL;
 using Rubik;
+using System.IO;
 
 namespace Cyberiada3D
 {
@@ -17,11 +18,51 @@ namespace Cyberiada3D
         public RubikCube RubikCube;
         public List<TMove> Moves = new List<TMove>();
         public static Random Rnd = new Random();
-        public double HighScore = double.MaxValue;
+        public double HighScore;
+        public string SolutionPath = "solutions.txt";
+        public Dictionary<string, List<TMove>> Solutions = new Dictionary<string, List<TMove>>();
 
         public Form1()
         {
             InitializeComponent();
+        }
+        public void SaveSolution(RubikGenome genome)
+        {
+            var code = RubikCube.Code;
+            if (!Solutions.ContainsKey(code))
+            {
+
+                var fs = new FileStream(SolutionPath, FileMode.Append);
+                var writer = new BinaryWriter(fs);
+                writer.Write(code);
+                writer.Write(genome.MovesCount);
+                for (var i=0; i<genome.MovesCount; i++)
+                {
+                    writer.Write((int)genome.Genes[i]);
+                }
+                fs.Close();
+            }
+
+        }
+
+        public void LoadSolutions()
+        {
+            var fs = new FileStream(SolutionPath, FileMode.OpenOrCreate);
+            var reader = new BinaryReader(fs);
+            while(reader.BaseStream.Position < reader.BaseStream.Length)
+            {
+                var key = reader.ReadString();
+                var movesCount = reader.ReadInt32();
+                var moves = new List<TMove>();
+                for(int i = 0; i< movesCount; i++)
+                {
+                    var move = new TMove();
+                    move.Decode(reader.ReadInt32());
+                    moves.Add(move);
+                }
+                Solutions.Add(key, moves);
+            }
+            fs.Close();
         }
 
         Point StartPos;
@@ -123,6 +164,8 @@ namespace Cyberiada3D
 
         private void button1_Click(object sender, EventArgs e)
         {
+            LoadSolutions();
+
             for (int i = 0; i < 25; i++)
             {
                 var code = Rnd.Next(9 * RubikCube.N);
@@ -158,13 +201,13 @@ namespace Cyberiada3D
                     (specimen as RubikGenome).MovesCount = len + 1;
                 }
             }
-            specimen.UnFitness = bestFitness;
+            specimen.Fitness = bestFitness;
             return bestFitness;
         }
 
         public void OnProgress(TChromosome best)
         {
-            DataChart.Series[0].Points.AddY(best.UnFitness);
+            DataChart.Series[0].Points.AddY(best.Fitness);
             DataChart.Update();
             ErrorLbl.Text = "Error: " + HighScore.ToString();
             ErrorLbl.Refresh();
@@ -172,32 +215,66 @@ namespace Cyberiada3D
 
         void Solve()
         {
-            TChromosome.GenesLength = 30;
-            TChromosome.MinGenes = new double[TChromosome.GenesLength];
-            TChromosome.MaxGenes = new double[TChromosome.GenesLength];
-            for (int i = 0; i < TChromosome.MaxGenes.Length; i++)
-                TChromosome.MaxGenes[i] = 9 * RubikCube.N;
-            TGA<RubikGenome>.GenerationsCount = 100;
-            var ga = new TGA<RubikGenome>();
-            ga.Evaluate = OnEvaluate;
-            ga.Progress = OnProgress;
-            ga.Execute();
-            HighScore = ga.Best.UnFitness;
-            if (HighScore > 0)
+            var best = new RubikGenome();
+            best.Fitness = HighScore;
+            foreach (var solution in Solutions)
+            {
+                var genome = new RubikGenome();
+                var cube = new RubikCube(RubikCube);
+                for (int i = 0; i < solution.Value.Count; i++)
+                {
+                    var move = solution.Value[i];
+                    cube.MakeMove(move);
+                    genome.Genes[i] = move.Encode();
+                }
+                genome.Fitness = cube.Evaluate();
+                if(genome.Fitness < best.Fitness)
+                {
+                    best = genome;
+                }
+            }
+
+            if(best.Fitness >= HighScore)
+            {
+                TChromosome.GenesLength = 30;
+                TChromosome.MinGenes = new double[TChromosome.GenesLength];
+                TChromosome.MaxGenes = new double[TChromosome.GenesLength];
+                for (int i = 0; i < TChromosome.MaxGenes.Length; i++)
+                    TChromosome.MaxGenes[i] = 9 * RubikCube.N;
+                TGA<RubikGenome>.GenerationsCount = 50;
+                TGA<RubikGenome>.MutationRatio = 0.2;
+                TGA<RubikGenome>.WinnerRatio = 0.1;
+                var ga = new TGA<RubikGenome>();
+                ga.Evaluate = OnEvaluate;
+                ga.Progress = OnProgress;
+                ga.Execute();
+                best = ga.Best;
+
+                if (best.Fitness == 0)
+                {
+                    SaveSolution(best);
+                }
+            }
+
+            if (best.Fitness < HighScore )
             {
                 Moves.Clear();
-                for (int i = 0; i < ga.Best.MovesCount; i++)
+                for (int i = 0; i < best.MovesCount; i++)
                 {
                     var move = new TMove();
-                    move.Decode((int)ga.Best.Genes[i]);
+                    move.Decode((int)best.Genes[i]);
                     Moves.Add(move);
                 }
-                MoveTimer.Start();
+
+                HighScore = best.Fitness;
             }
+           
+            MoveTimer.Start();
         }
 
         private void button2_Click(object sender, EventArgs e)
         {
+            HighScore = double.MaxValue;
             Solve();
         }
     }

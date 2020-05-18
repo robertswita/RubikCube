@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Rubik;
 
 namespace TGL
 {
@@ -81,7 +82,7 @@ namespace TGL
             if (cosA < -0.1) return 2;
             if (sinA < -0.1) return 3;
 
-            return -1;
+            return 0;
         }
 
         public TCubik(){

@@ -9,7 +9,7 @@ namespace Rubik
         public static double[] MaxGenes = new double[GenesLength];
         public static Random Rnd = new Random();
         public double[] Genes = new double[GenesLength];
-        public double UnFitness;
+        public double Fitness;
 
         public TChromosome()
         {
