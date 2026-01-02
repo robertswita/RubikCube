@@ -330,7 +330,7 @@ namespace RubikCube
                 TrySolutions = true;
             }
             //chart2.Series[0].Points.AddY(ga.IterCount);
-            if (TrySolutions)
+            if (TrySolutions && false)
             {
                 foreach (var solution in Solutions)
                 {
@@ -394,7 +394,7 @@ namespace RubikCube
         {
             if (MoveTimer.Enabled) return;
             IsPaused = true;
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 10; i++)
             {
                 var code = TChromosome.Rnd.Next(9 * TRubikCube.Size);
                 var move = TMove.Decode(code);

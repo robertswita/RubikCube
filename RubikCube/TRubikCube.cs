@@ -11,7 +11,7 @@ namespace RubikCube
     public class TRubikCube: TObject3D
     {
         public static int N = 3;
-        public static int Size = 5;
+        public static int Size = 3;
         public static float C;
         public TCubie[,,] Cubies = new TCubie[Size, Size, Size];
         //public TCubie[,,,] Cubies = new TCubie[Size, Size, Size, Size];
