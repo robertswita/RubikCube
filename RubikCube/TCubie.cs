@@ -39,14 +39,25 @@ namespace RubikCube
                 faceIndices.Add(axis2);
                 faceIndices.Add(axis1);
             }
-            for (int i = Faces.Count - 1; i >= 0; i--)
-                faceIndices.Add(7 - i);
+            for (int i = faceIndices.Count - 1; i >= 0; i--)
+                faceIndices.Add(7 - faceIndices[i]);
+            for (int i = 0; i < 6; i++)
+            {
+                var mat = new TMaterial();
+                var rgb = 0xff << (i % 3) * 8;
+                if (i > 2)
+                    rgb = ~rgb;
+                mat.Diffuse.Color = System.Drawing.Color.FromArgb(rgb);
+                Materials.Add(mat);
+            }
             for (int i = 0; i < faceIndices.Count; i += 3)
             {
                 var face = new TFace();
                 face.AddVertex(Vertices[faceIndices[i]]);
                 face.AddVertex(Vertices[faceIndices[i + 1]]);
                 face.AddVertex(Vertices[faceIndices[i + 2]]);
+                var matIdx = i / 6;
+                face.Material = Materials[matIdx];
                 Faces.Add(face);
             }
         }

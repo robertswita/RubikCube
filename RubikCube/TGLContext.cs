@@ -165,7 +165,7 @@ namespace TGL
                     continue;
                 lightsCount++;
                 light.WorldTransform = null;
-                var position = light.WorldTransform * light.Origin;
+                var position = light.WorldTransform.Cols[3];
                 if (light.IsDirectional)
                 {
                     position.Norm = 1;

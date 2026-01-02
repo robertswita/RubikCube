@@ -28,11 +28,15 @@ namespace RubikCube
         double HighScore;
         public TRubikCube RubikCube;// = new TRubikCube();
         public TScene Scene = new TScene();
-        public TCamera Camera = new TCamera();
+        public TCamera Camera;
         public TRubikForm()
         {
             InitializeComponent();
+            Camera = tglView1.Context.Camera;
             Camera.Parent = Scene.Root;
+            var light = new TLight();
+            light.Parent = Camera;
+            light.Origin = new TVector(0, 0, 1);
             //TransparencyBox.Checked = true;
         }
 
