@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35919.96 d17.13
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RubikCube", "RubikCube\RubikCube.csproj", "{A52218C4-5EBA-4777-9B82-EC1A075C4804}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RubikCubeND", "RubikCube\RubikCubeND.csproj", "{A52218C4-5EBA-4777-9B82-EC1A075C4804}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -28,5 +28,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {68900EFD-FC1B-4E70-A8A4-F8D596CFFC61}
 	EndGlobalSection
 EndGlobal

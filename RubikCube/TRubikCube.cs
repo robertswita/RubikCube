@@ -8,14 +8,20 @@ using TGL;
 
 namespace RubikCube
 {
-    public class TRubikCube : TObject3D
+    public class TRubikCube
     {
         public static int N = 3;
+        public static int Size = 5;
         public static double C;
-        public TCubie[,,] Cubies = new TCubie[N, N, N];
+        public TCubie[,,,] Cubies = new TCubie[Size, Size, Size, Size];
+        //public TCubie[] Cubies
         public List<TMove> Moves = new List<TMove>();
         public List<TCubie> ActCluster = new List<TCubie>();
         public TCubie ActCubie;
+        public TObject3D Create3DProjection(int axis)
+        {
+
+        }
         int[,] _StateGrid;
         public int[,] StateGrid
         {
@@ -23,12 +29,13 @@ namespace RubikCube
             {
                 if (_StateGrid == null)
                 {
-                    _StateGrid = new int[N * N * N, N * N * N];
-                    for (int x = 0; x < N; x++)
-                        for (int y = 0; y < N; y++)
-                            for (int z = 0; z < N; z++)
-                            {
-                                var cubie = Cubies[z, y, x];
+                    _StateGrid = new int[Size * Size * Size, Size * Size * Size];
+                    for (int x = 0; x < Size; x++)
+                        for (int y = 0; y < Size; y++)
+                            for (int z = 0; z < Size; z++)
+                                for (int w = 0; w < Size; w++)
+                                {
+                                    var cubie = Cubies[w, z, y, x];
                                 var transform = (double[])cubie.Transform.Clone();
                                 var alpha = cubie.State & 3;
                                 var beta = (cubie.State >> 2) & 3;
@@ -36,8 +43,8 @@ namespace RubikCube
                                 cubie.RotateZ(-90 * gamma);
                                 cubie.RotateY(-90 * beta);
                                 cubie.RotateX(-90 * alpha);
-                                var i = x * N * N + y * N + z;
-                                var idx = cubie.X * N * N + cubie.Y * N + cubie.Z;
+                                var i = x * Size * Size + y * Size + z;
+                                var idx = cubie.X * Size * Size + cubie.Y * Size + cubie.Z;
                                 cubie.Transform = transform;
                                 _StateGrid[i, idx] = cubie.State + (1 << 6);
                             }
@@ -48,12 +55,12 @@ namespace RubikCube
 
         public TRubikCube()
         {
-            C = (N - 1) / 2.0;
-            Scale(1.0 / N, 1.0 / N, 1.0 / N);
+            C = (Size - 1) / 2.0;
+            Scale(1.0 / Size, 1.0 / Size, 1.0 / Size);
             var cubieScale = 0.9 / 2;
-            for (int z = 0; z < N; z++)
-                for (int y = 0; y < N; y++)
-                    for (int x = 0; x < N; x++)
+            for (int z = 0; z < Size; z++)
+                for (int y = 0; y < Size; y++)
+                    for (int x = 0; x < Size; x++)
                     {
                         var cubie = new TCubie();
                         cubie.Scale(cubieScale, cubieScale, cubieScale);
@@ -66,9 +73,9 @@ namespace RubikCube
 
         public TRubikCube(TRubikCube src)
         {
-            for (int z = 0; z < N; z++)
-                for (int y = 0; y < N; y++)
-                    for (int x = 0; x < N; x++)
+            for (int z = 0; z < Size; z++)
+                for (int y = 0; y < Size; y++)
+                    for (int x = 0; x < Size; x++)
                     {
                         var cubie = src.Cubies[z, y, x].Copy();
                         cubie.Parent = this;
@@ -106,8 +113,8 @@ namespace RubikCube
         public List<TCubie> SelectSlice(TMove move)
         {
             var selection = new List<TCubie>();
-            for (int i = 0; i < N; i++)
-                for (int j = 0; j < N; j++)
+            for (int i = 0; i < Size; i++)
+                for (int j = 0; j < Size; j++)
                 {
                     var v = new int[3];
                     v[move.Axis] = move.Slice;
@@ -159,13 +166,13 @@ namespace RubikCube
                 for (int side = 0; side < 2; side++)
                 {
                     //for (int i = 0; i < N; i++)
-                        //for (int n = 0; n < N; n++)
-                        for (int i = restrict; i < N - restrict; i++)
-                            for (int n = restrict; n < N - restrict; n++)
+                    //for (int n = 0; n < N; n++)
+                    for (int i = restrict; i < Size - restrict; i++)
+                        for (int n = restrict; n < Size - restrict; n++)
                             for (int axis = 0; axis < 3; axis++)
                             {
                                 var v = new int[3];
-                                v[axis] = side == 0 ? restrict : N - 1 - restrict;
+                                v[axis] = side == 0 ? restrict : Size - 1 - restrict;
                                 v[(axis + 1) % 3] = i;
                                 v[(axis + 2) % 3] = n;
                                 var cubie = Cubies[v[2], v[1], v[0]];
@@ -292,7 +299,7 @@ namespace RubikCube
                         if (side == 0)
                             move.Slice = idx[i];
                         else
-                            move.Slice = N - 1 - idx[i];
+                            move.Slice = Size - 1 - idx[i];
                         var gene = move.Encode();
                         if (freeGenes.IndexOf(gene) < 0)
                         {

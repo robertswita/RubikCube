@@ -109,7 +109,8 @@ namespace RubikCube
                 label1.Text = Time.ToString();
                 label2.Text = HighScore.ToString();
                 label4.Text = RubikCube.Code.Count(x => x != '\0').ToString();
-                label6.Text = GACount++.ToString();
+                GACount++;
+                label6.Text = GACount.ToString();
                 MovesLbl.Text = MovesCount.ToString();
                 //DrawSolution(Moves);
                 //StateGridView.DataSource = RubikCube.StateGrid;
@@ -388,7 +389,7 @@ namespace RubikCube
             IsPaused = true;
             for (int i = 0; i < 100; i++)
             {
-                var code = TChromosome.Rnd.Next(9 * TRubikCube.N);
+                var code = TChromosome.Rnd.Next(9 * TRubikCube.Size);
                 var move = TMove.Decode(code);
                 Moves.Add(move);
             }
@@ -407,7 +408,7 @@ namespace RubikCube
                 var idx = map.IndexOf(move.Slice);
                 if (idx < 0)
                 {
-                    idx = map.IndexOf(TRubikCube.N - 1 - move.Slice);
+                    idx = map.IndexOf(TRubikCube.Size - 1 - move.Slice);
                     if (idx < 0)
                     {
                         idx = map.Count;
@@ -419,7 +420,7 @@ namespace RubikCube
                 if (idx < 3)
                     move.Slice = v[idx];
                 else
-                    move.Slice = TRubikCube.N - 1 - v[idx - 3];
+                    move.Slice = TRubikCube.Size - 1 - v[idx - 3];
                 result.Add(move);
             }
             return result;
@@ -566,7 +567,7 @@ namespace RubikCube
             using (S)
             {
                 var code = S.ReadLine();
-                TRubikCube.N = (int)Math.Round(Math.Pow(code.Length, 0.33));
+                TRubikCube.Size = (int)Math.Round(Math.Pow(code.Length, 0.33));
                 RubikCube.Parent = null;
                 RubikCube = new TRubikCube();
                 RubikCube.Parent = tglView1.Context.Root;
@@ -584,7 +585,7 @@ namespace RubikCube
 
         private void numericUpDown1_ValueChanged(object sender, EventArgs e)
         {
-            TRubikCube.N = (int)numericUpDown1.Value;
+            TRubikCube.Size = (int)numericUpDown1.Value;
             RubikCube.Parent = null;
             RubikCube = new TRubikCube();
             RubikCube.Parent = tglView1.Context.Root;
@@ -610,7 +611,7 @@ namespace RubikCube
 
         private void saveClustersToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            TRubikCube.N = 7;
+            TRubikCube.Size = 7;
             RubikCube.Parent = null;
             RubikCube = new TRubikCube();
             RubikCube.Parent = tglView1.Context.Root;
@@ -641,7 +642,7 @@ namespace RubikCube
 
         private void showClusterToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            TRubikCube.N = 5;
+            TRubikCube.Size = 5;
             RubikCube.Parent = null;
             RubikCube = new TRubikCube();
             RubikCube.Parent = tglView1.Context.Root;

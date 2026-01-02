@@ -33,6 +33,8 @@
             System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
             this.MoveTimer = new System.Windows.Forms.Timer(this.components);
             this.panel1 = new System.Windows.Forms.Panel();
+            this.MovesLbl = new System.Windows.Forms.Label();
+            this.label11 = new System.Windows.Forms.Label();
             this.StateBox = new System.Windows.Forms.PictureBox();
             this.TransparencyBox = new System.Windows.Forms.CheckBox();
             this.SolutionLbl = new System.Windows.Forms.Label();
@@ -66,8 +68,6 @@
             this.stateGridBindingSource = new System.Windows.Forms.BindingSource(this.components);
             this.tRubikCubeBindingSource = new System.Windows.Forms.BindingSource(this.components);
             this.tglView1 = new TGL.TGLView();
-            this.label11 = new System.Windows.Forms.Label();
-            this.MovesLbl = new System.Windows.Forms.Label();
             this.panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.StateBox)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
@@ -111,6 +111,24 @@
             this.panel1.Name = "panel1";
             this.panel1.Size = new System.Drawing.Size(445, 790);
             this.panel1.TabIndex = 8;
+            // 
+            // MovesLbl
+            // 
+            this.MovesLbl.AutoSize = true;
+            this.MovesLbl.Location = new System.Drawing.Point(358, 54);
+            this.MovesLbl.Name = "MovesLbl";
+            this.MovesLbl.Size = new System.Drawing.Size(16, 17);
+            this.MovesLbl.TabIndex = 32;
+            this.MovesLbl.Text = "0";
+            // 
+            // label11
+            // 
+            this.label11.AutoSize = true;
+            this.label11.Location = new System.Drawing.Point(252, 54);
+            this.label11.Name = "label11";
+            this.label11.Size = new System.Drawing.Size(90, 17);
+            this.label11.TabIndex = 31;
+            this.label11.Text = "Moves Count";
             // 
             // StateBox
             // 
@@ -321,48 +339,48 @@
             this.makeMovesToolStripMenuItem,
             this.undoMovesToolStripMenuItem});
             this.fileToolStripMenuItem.Name = "fileToolStripMenuItem";
-            this.fileToolStripMenuItem.Size = new System.Drawing.Size(44, 24);
+            this.fileToolStripMenuItem.Size = new System.Drawing.Size(46, 24);
             this.fileToolStripMenuItem.Text = "File";
             // 
             // openToolStripMenuItem
             // 
             this.openToolStripMenuItem.Name = "openToolStripMenuItem";
-            this.openToolStripMenuItem.Size = new System.Drawing.Size(170, 26);
+            this.openToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
             this.openToolStripMenuItem.Text = "Open";
             this.openToolStripMenuItem.Click += new System.EventHandler(this.openToolStripMenuItem_Click);
             // 
             // saveToolStripMenuItem
             // 
             this.saveToolStripMenuItem.Name = "saveToolStripMenuItem";
-            this.saveToolStripMenuItem.Size = new System.Drawing.Size(170, 26);
+            this.saveToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
             this.saveToolStripMenuItem.Text = "Save";
             this.saveToolStripMenuItem.Click += new System.EventHandler(this.saveToolStripMenuItem_Click);
             // 
             // saveClustersToolStripMenuItem
             // 
             this.saveClustersToolStripMenuItem.Name = "saveClustersToolStripMenuItem";
-            this.saveClustersToolStripMenuItem.Size = new System.Drawing.Size(170, 26);
+            this.saveClustersToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
             this.saveClustersToolStripMenuItem.Text = "Save Clusters";
             this.saveClustersToolStripMenuItem.Click += new System.EventHandler(this.saveClustersToolStripMenuItem_Click);
             // 
             // showClusterToolStripMenuItem
             // 
             this.showClusterToolStripMenuItem.Name = "showClusterToolStripMenuItem";
-            this.showClusterToolStripMenuItem.Size = new System.Drawing.Size(170, 26);
+            this.showClusterToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
             this.showClusterToolStripMenuItem.Text = "Show Cluster";
             this.showClusterToolStripMenuItem.Click += new System.EventHandler(this.showClusterToolStripMenuItem_Click);
             // 
             // makeMovesToolStripMenuItem
             // 
             this.makeMovesToolStripMenuItem.Name = "makeMovesToolStripMenuItem";
-            this.makeMovesToolStripMenuItem.Size = new System.Drawing.Size(170, 26);
+            this.makeMovesToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
             this.makeMovesToolStripMenuItem.Text = "Make Moves";
             this.makeMovesToolStripMenuItem.Click += new System.EventHandler(this.makeMovesToolStripMenuItem_Click);
             // 
             // undoMovesToolStripMenuItem
             // 
             this.undoMovesToolStripMenuItem.Name = "undoMovesToolStripMenuItem";
-            this.undoMovesToolStripMenuItem.Size = new System.Drawing.Size(170, 26);
+            this.undoMovesToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
             this.undoMovesToolStripMenuItem.Text = "Undo Moves";
             this.undoMovesToolStripMenuItem.Click += new System.EventHandler(this.undoMovesToolStripMenuItem_Click);
             // 
@@ -398,24 +416,6 @@
             this.tglView1.TabIndex = 0;
             this.tglView1.MouseDown += new System.Windows.Forms.MouseEventHandler(this.tglView1_MouseDown);
             this.tglView1.MouseMove += new System.Windows.Forms.MouseEventHandler(this.tglView1_MouseMove);
-            // 
-            // label11
-            // 
-            this.label11.AutoSize = true;
-            this.label11.Location = new System.Drawing.Point(252, 54);
-            this.label11.Name = "label11";
-            this.label11.Size = new System.Drawing.Size(90, 17);
-            this.label11.TabIndex = 31;
-            this.label11.Text = "Moves Count";
-            // 
-            // MovesLbl
-            // 
-            this.MovesLbl.AutoSize = true;
-            this.MovesLbl.Location = new System.Drawing.Point(358, 54);
-            this.MovesLbl.Name = "MovesLbl";
-            this.MovesLbl.Size = new System.Drawing.Size(16, 17);
-            this.MovesLbl.TabIndex = 32;
-            this.MovesLbl.Text = "0";
             // 
             // TRubikForm
             // 
