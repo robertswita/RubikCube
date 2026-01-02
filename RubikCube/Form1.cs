@@ -64,10 +64,10 @@ namespace RubikCube
         int FrameCount = 10;
         bool IsPaused = true;
 
-        TObject3D ActSlice;
+        TObject4D ActSlice;
         public void Group(List<TCubie> selection)
         {
-            ActSlice = new TObject3D();
+            ActSlice = new TObject4D();
             for (int i = 0; i < selection.Count; i++)
                 selection[i].Parent = ActSlice;
             ActSlice.Parent = RubikCube;
@@ -93,9 +93,9 @@ namespace RubikCube
                     if (angle > 180) angle -= 360;
                     angle *= (double)FrameNo / FrameCount;
                     //ActSlice.LoadIdentity();
-                    if (move.Axis == 0) ActSlice.Rotation.X = angle;
-                    if (move.Axis == 1) ActSlice.Rotation.Y = angle;
-                    if (move.Axis == 2) ActSlice.Rotation.Z = angle;
+                    if (move.Plane == 0) ActSlice.Rotation.X = angle;
+                    if (move.Plane == 1) ActSlice.Rotation.Y = angle;
+                    if (move.Plane == 2) ActSlice.Rotation.Z = angle;
                 }
                 else
                 {
@@ -207,7 +207,7 @@ namespace RubikCube
                 if (i == 0)
                 {
                     var idx = new int[3] { RubikCube.ActCubie.X, RubikCube.ActCubie.Y, RubikCube.ActCubie.Z };
-                    move.Slice = idx[move.Axis];
+                    move.Slice = idx[move.Plane];
                     specimen.Genes[0] = move.Encode();
                 }
                 cube.Turn(move);
@@ -682,9 +682,9 @@ namespace RubikCube
             var C = new TMove();
             var B = new TMove();
             var A = new TMove();
-            A.Axis = 0;
-            B.Axis = 1;
-            C.Axis = 2;
+            A.Plane = 0;
+            B.Plane = 1;
+            C.Plane = 2;
             A.Slice = 0;
             B.Slice = 0;
             C.Slice = 1;
@@ -692,15 +692,15 @@ namespace RubikCube
             B.Angle = 1;
             C.Angle = 0;
             var B_ = new TMove();
-            B_.Axis = B.Axis;
+            B_.Plane = B.Plane;
             B_.Slice = B.Slice;
             B_.Angle = 2 - B.Angle;
             var C_ = new TMove();
-            C_.Axis = C.Axis;
+            C_.Plane = C.Plane;
             C_.Slice = C.Slice;
             C_.Angle = 2 - C.Angle;
             var A_ = new TMove();
-            A_.Axis = A.Axis;
+            A_.Plane = A.Plane;
             A_.Slice = A.Slice;
             A_.Angle = 2 - A.Angle;
             //Moves.AddRange(new TMove[] { B, A, B_ });
@@ -721,10 +721,10 @@ namespace RubikCube
             var B = new TMove();
             var C = new TMove();
             for (int j = 1; j < 3; j++)
-                if (Math.Abs(idx[j] - TRubikCube.C) > Math.Abs(idx[A.Axis] - TRubikCube.C))
-                    A.Axis = j;
-            B.Axis = (A.Axis + 1) % 3;
-            C.Axis = (A.Axis + 2) % 3;
+                if (Math.Abs(idx[j] - TRubikCube.C) > Math.Abs(idx[A.Plane] - TRubikCube.C))
+                    A.Plane = j;
+            B.Plane = (A.Plane + 1) % 3;
+            C.Plane = (A.Plane + 2) % 3;
 
         }
 

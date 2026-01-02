@@ -8,13 +8,13 @@ using TGL;
 
 namespace RubikCube
 {
-    public class TRubikCube: TObject3D
+    public class TRubikCube: TObject4D
     {
         public static int N = 3;
         public static int Size = 3;
         public static float C;
-        public TCubie[,,] Cubies = new TCubie[Size, Size, Size];
-        //public TCubie[,,,] Cubies = new TCubie[Size, Size, Size, Size];
+        //public TCubie[,,] Cubies = new TCubie[Size, Size, Size];
+        public TCubie[,,,] Cubies = new TCubie[Size, Size, Size, Size];
         //public TCubie[] Cubies
         public List<TMove> Moves = new List<TMove>();
         public List<TCubie> ActCluster = new List<TCubie>();
@@ -34,9 +34,9 @@ namespace RubikCube
                     for (int x = 0; x < Size; x++)
                         for (int y = 0; y < Size; y++)
                             for (int z = 0; z < Size; z++)
-                                //for (int w = 0; w < Size; w++)
+                                for (int w = 0; w < Size; w++)
                                 {
-                                    var cubie = Cubies[z, y, x].Copy();
+                                    var cubie = Cubies[w, z, y, x].Copy();
                                 //var transform = (double[])cubie.Transform.Clone();
                                 var alpha = cubie.State & 3;
                                 var beta = (cubie.State >> 2) & 3;
@@ -60,39 +60,41 @@ namespace RubikCube
         public TRubikCube()
         {
             C = (Size - 1) / 2f;
-            Scale = new TVector(1f / Size, 1f / Size, 1f / Size);
+            Scale(new TVector(1f / Size, 1f / Size, 1f / Size, 1f / Size));
             var cubieScale = 0.9f / 2;
-            for (int z = 0; z < Size; z++)
-                for (int y = 0; y < Size; y++)
-                    for (int x = 0; x < Size; x++)
-                    {
-                        var cubie = new TCubie();
-                        cubie.Scale = new TVector(cubieScale, cubieScale, cubieScale);
-                        cubie.Origin = new TVector(x - C, y - C, z - C);
-                        cubie.Parent = this;
-                        Cubies[z, y, x] = cubie;
-                    }
+            for (int w = 0; w < Size; w++)
+                for (int z = 0; z < Size; z++)
+                    for (int y = 0; y < Size; y++)
+                        for (int x = 0; x < Size; x++)
+                        {
+                            var cubie = new TCubie();
+                            cubie.Scale(new TVector(cubieScale, cubieScale, cubieScale, cubieScale));
+                            cubie.Origin = new TVector(x - C, y - C, z - C, w - C);
+                            cubie.Parent = this;
+                            Cubies[w, z, y, x] = cubie;
+                        }
             //ActCubie = Cubies[(int)C, (int)C, (int)C];
         }
 
         public TRubikCube(TRubikCube src)
         {
-            for (int z = 0; z < Size; z++)
-                for (int y = 0; y < Size; y++)
-                    for (int x = 0; x < Size; x++)
-                    {
-                        var cubie = src.Cubies[z, y, x].Copy();
-                        cubie.Parent = this;
-                        Cubies[z, y, x] = cubie;
-                    }
+            for (int w = 0; w < Size; w++)
+                for (int z = 0; z < Size; z++)
+                    for (int y = 0; y < Size; y++)
+                        for (int x = 0; x < Size; x++)
+                        {
+                            var cubie = src.Cubies[w, z, y, x].Copy();
+                            cubie.Parent = this;
+                            Cubies[w, z, y, x] = cubie;
+                        }
             if (src.ActCubie != null)
             {
-                ActCubie = Cubies[src.ActCubie.Z, src.ActCubie.Y, src.ActCubie.X];
+                ActCubie = Cubies[src.ActCubie.W, src.ActCubie.Z, src.ActCubie.Y, src.ActCubie.X];
                 ActCluster = new List<TCubie>();
                 for (int i = 0; i < src.ActCluster.Count; i++)
                 {
                     var cubie = src.ActCluster[i];
-                    ActCluster.Add(Cubies[cubie.Z, cubie.Y, cubie.X]);
+                    ActCluster.Add(Cubies[cubie.W, cubie.Z, cubie.Y, cubie.X]);
                 }
             }
         }
@@ -117,13 +119,17 @@ namespace RubikCube
         public List<TCubie> SelectSlice(TMove move)
         {
             var selection = new List<TCubie>();
+            var axes = move.GetAxes();
             for (int i = 0; i < Size; i++)
                 for (int j = 0; j < Size; j++)
                 {
-                    var v = new int[3];
-                    v[move.Axis] = move.Slice;
-                    v[(move.Axis + 1) % 3] = i;
-                    v[(move.Axis + 2) % 3] = j;
+                    var v = new int[4];
+                    for (int k = 0; k < 4; k++)
+                    v[move.Plane] = move.Slice;
+
+                    v[axes[0]] = i;
+                    v[axes[1]] = j;
+
                     selection.Add(Cubies[v[2], v[1], v[0]]);
                 }
             return selection;
@@ -133,9 +139,9 @@ namespace RubikCube
         {
             var slice = new TObject3D();
             int angle = 90 * (move.Angle + 1);
-            if (move.Axis == 0)
+            if (move.Plane == 0)
                 slice.Pitch(angle);
-            else if (move.Axis == 1)
+            else if (move.Plane == 1)
                 slice.Yaw(angle);
             else
                 slice.Roll(angle);
@@ -300,7 +306,7 @@ namespace RubikCube
                     for (int side = 0; side < 2; side++)
                     {
                         var move = new TMove();
-                        move.Axis = axis;
+                        move.Plane = axis;
                         if (side == 0)
                             move.Slice = idx[i];
                         else
@@ -325,7 +331,7 @@ namespace RubikCube
             cubie = cube.Cubies[cubie.Z, cubie.Y, cubie.X];
             for (int alpha = 0; alpha < 4; alpha++)
             {
-                move.Axis = 0;
+                move.Plane = 0;
                 move.Slice = cubie.X;
                 cube.Turn(move);
                 var neigh = Cubies[cubie.Z, cubie.Y, cubie.X];
@@ -333,7 +339,7 @@ namespace RubikCube
                     cluster.Add(neigh);
                 for (int beta = 0; beta < 4; beta++)
                 {
-                    move.Axis = 1;
+                    move.Plane = 1;
                     move.Slice = cubie.Y;
                     cube.Turn(move);
                     neigh = Cubies[cubie.Z, cubie.Y, cubie.X];
@@ -341,7 +347,7 @@ namespace RubikCube
                         cluster.Add(neigh);
                     for (int gamma = 0; gamma < 4; gamma++)
                     {
-                        move.Axis = 2;
+                        move.Plane = 2;
                         move.Slice = cubie.Z;
                         cube.Turn(move);
                         neigh = Cubies[cubie.Z, cubie.Y, cubie.X];

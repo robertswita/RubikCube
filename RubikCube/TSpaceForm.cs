@@ -42,7 +42,7 @@ namespace RubikCube
                 {
                     var move = solution[j];
                     var scale = 20 * (move.Angle + 1);
-                    Size v = new Size((move.Slice - 1) * scale, (move.Axis - 1) * scale);
+                    Size v = new Size((move.Slice - 1) * scale, (move.Plane - 1) * scale);
                     actPos += v;
                     pts.Add(actPos);
                 }

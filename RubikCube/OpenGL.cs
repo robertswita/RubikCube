@@ -20,6 +20,9 @@ namespace TGL
         [DllImport(GL_DLL)] public static extern void glDeleteTextures(int n, int[] textures);
         [DllImport(GL_DLL)] public static extern void glDrawArrays(int mode, int first, int count);
         [DllImport(GL_DLL)] public static extern int glGetError();
+        [DllImport(GL_DLL)] public static extern void glLoadMatrixf(float[] m);
+        [DllImport(GL_DLL)] public static extern void glMultMatrixf(float[] m);
+        [DllImport(GL_DLL)] public static extern void glGetFloatv(int pname, float[] params_notkeyword);
 
 
         static Dictionary<string, Delegate> ExtFunctions = new Dictionary<string, Delegate>();
@@ -139,6 +142,7 @@ namespace TGL
         public const int GL_STENCIL_BUFFER_BIT = 0x00000400;
         public const int GL_COLOR_BUFFER_BIT = 0x00004000;
         public const int GL_DEPTH_TEST = 0x0B71;
+        public const int GL_MODELVIEW_MATRIX = 0x0BA6;
         public const int GL_TEXTURE_1D = 0x0DE0;
         public const int GL_TEXTURE_2D = 0x0DE1;
         public const int GL_TEXTURE0 = 0x84C0;
@@ -216,6 +220,5 @@ namespace TGL
         public const int WGL_TYPE_RGBA = 0x202B;
         public const int WGL_SAMPLE_BUFFERS = 0x2041;
         public const int WGL_SAMPLES = 0x2042;
-
     }
 }

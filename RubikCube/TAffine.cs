@@ -4,14 +4,16 @@ Politechnika Koszalińska
 Katedra Systemów Multimedialnych i Sztucznej Inteligencji
 ***********************************************************/
 using System;
+using System.Collections.Generic;
 
 namespace TGL
 {
     [Serializable]
     public class TAffine : TMatrix
     {
+        public static int N = 4;
         public TAffine() : base(4, 4) { LoadIdentity(); }
-        public TAffine(TMatrix src): base(4, 4) { Assign(src); }
+        public TAffine(TMatrix src) : base(4, 4) { Assign(src); }
         //public void Mult(TMatrix src)
         //{
         //    Assign(src * this);
@@ -117,6 +119,54 @@ namespace TGL
                 return new TAffine(base.Inv);
             }
         }
+
+        public TAffine Givens(int i, int j)
+        {
+            var a = this[j, j];
+            var b = this[i, j];
+            var r = (float)Math.Sqrt(a * a + b * b);
+            var cos = a / r;
+            var sin = -b / r;
+            var Q = new TAffine();
+            Q[j, j] = cos;
+            Q[i, j] = sin;
+            Q[j, i] = -sin;
+            Q[i, i] = cos;
+            return Q;
+        }
+
+        public List<TVector> GetEulerAngles()
+        {
+            //R = zeros(m * (m - 1) / 2, 1);
+            var angles = new List<TVector>();
+            var A = (TAffine)Clone();
+            //var idx = 1;
+            var Q = new TAffine();
+            for (int i = 1; i < N; i++)
+                for (int j = 0; j < i - 1; j++)
+                {
+                    var a = A[j, j];
+                    var b = A[i, j];
+                    //var phi = atan2(-b, a);
+                    var r = (float)Math.Sqrt(a * a + b * b);
+                    var cosA = a / r;
+                    var sinA = -b / r;
+                    angles.Add(new TVector(cosA, sinA));
+                    //var c = cos(phi);
+                    //var s = sin(phi);
+                    //R(idx) = -phi;
+                    //idx = idx + 1;
+                    var Qij = new TAffine();
+                    Qij[j, j] = cosA;
+                    Qij[i, j] = sinA;
+                    Qij[j, i] = -sinA;
+                    Qij[i, i] = cosA;
+                    A = Qij * A;
+                    Q = Q * Qij.Transpose();
+                }
+            return angles;
+        }
+
 
     };
 }
