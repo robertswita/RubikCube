@@ -59,5 +59,62 @@ namespace RubikCube.Properties {
                 resourceCulture = value;
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to #version 430 core
+        ///in vec2 fragTexCoord;
+        ///in vec3 fragPos;
+        ///in vec3 fragNormal;
+        ///in vec3 fragTangent;
+        ///in vec3 fragBitangent;
+        ///
+        ///layout (std140, binding = 0) uniform Camera {
+        ///    mat4 ViewProjectionMatrix;
+        ///    vec3 CameraPos;
+        ///};
+        ///struct Light {
+        ///    vec4 Pos;    
+        ///    vec3 Ambient;
+        ///    vec3 Diffuse;
+        ///    vec3 Specular;
+        ///    vec3 AttCoeff;
+        ///};
+        ///const int MAX_LIGHTS = 10;
+        ///layout (std140, binding = 2) uniform Lights {
+        ///    Light lights[MAX_LIGHTS];
+        ///    float LightsCount;
+        ///};
+        ///struct Material { 
+        ///    samp [rest of string was truncated]&quot;;.
+        /// </summary>
+        internal static string Fragment_glsl {
+            get {
+                return ResourceManager.GetString("Fragment_glsl", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to #version 430 core
+        ///layout(location = 0) in vec3 vertPos;
+        ///layout(location = 1) in vec2 vertTexCoord;
+        ///layout(location = 2) in vec4 vertBones;
+        ///layout(location = 3) in vec4 vertWeights;
+        ///layout(location = 4) in vec3 vertNormal;
+        ///layout(location = 5) in vec3 vertTangent;
+        ///layout(location = 6) in vec3 vertBitangent;
+        ///
+        ///layout(std140, binding = 0) uniform Camera {
+        ///    mat4 ViewProjectionMatrix;
+        ///    vec3 CameraPos;
+        ///};
+        /////layout(std430, binding = 1) buffer Bones
+        ///const int MAX_BONES_TRANSFORMS = 100;
+        ///layout(s [rest of string was truncated]&quot;;.
+        /// </summary>
+        internal static string Vertex_glsl {
+            get {
+                return ResourceManager.GetString("Vertex_glsl", resourceCulture);
+            }
+        }
     }
 }

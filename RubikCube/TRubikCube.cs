@@ -8,20 +8,21 @@ using TGL;
 
 namespace RubikCube
 {
-    public class TRubikCube
+    public class TRubikCube: TObject3D
     {
         public static int N = 3;
         public static int Size = 5;
-        public static double C;
-        public TCubie[,,,] Cubies = new TCubie[Size, Size, Size, Size];
+        public static float C;
+        public TCubie[,,] Cubies = new TCubie[Size, Size, Size];
+        //public TCubie[,,,] Cubies = new TCubie[Size, Size, Size, Size];
         //public TCubie[] Cubies
         public List<TMove> Moves = new List<TMove>();
         public List<TCubie> ActCluster = new List<TCubie>();
         public TCubie ActCubie;
-        public TObject3D Create3DProjection(int axis)
-        {
+        //public TObject3D Create3DProjection(int axis)
+        //{
 
-        }
+        //}
         int[,] _StateGrid;
         public int[,] StateGrid
         {
@@ -33,19 +34,22 @@ namespace RubikCube
                     for (int x = 0; x < Size; x++)
                         for (int y = 0; y < Size; y++)
                             for (int z = 0; z < Size; z++)
-                                for (int w = 0; w < Size; w++)
+                                //for (int w = 0; w < Size; w++)
                                 {
-                                    var cubie = Cubies[w, z, y, x];
-                                var transform = (double[])cubie.Transform.Clone();
+                                    var cubie = Cubies[z, y, x].Copy();
+                                //var transform = (double[])cubie.Transform.Clone();
                                 var alpha = cubie.State & 3;
                                 var beta = (cubie.State >> 2) & 3;
                                 var gamma = (cubie.State >> 4) & 3;
-                                cubie.RotateZ(-90 * gamma);
-                                cubie.RotateY(-90 * beta);
-                                cubie.RotateX(-90 * alpha);
+                                //cubie.RotateZ(-90 * gamma);
+                                //cubie.RotateY(-90 * beta);
+                                //cubie.RotateX(-90 * alpha);
+                                cubie.Roll(-90 * gamma);
+                                cubie.Yaw(-90 * beta);
+                                cubie.Pitch(-90 * alpha);
                                 var i = x * Size * Size + y * Size + z;
                                 var idx = cubie.X * Size * Size + cubie.Y * Size + cubie.Z;
-                                cubie.Transform = transform;
+                                //cubie.Transform = transform;
                                 _StateGrid[i, idx] = cubie.State + (1 << 6);
                             }
                 }
@@ -55,16 +59,16 @@ namespace RubikCube
 
         public TRubikCube()
         {
-            C = (Size - 1) / 2.0;
-            Scale(1.0 / Size, 1.0 / Size, 1.0 / Size);
-            var cubieScale = 0.9 / 2;
+            C = (Size - 1) / 2f;
+            Scale = new TVector(1f / Size, 1f / Size, 1f / Size);
+            var cubieScale = 0.9f / 2;
             for (int z = 0; z < Size; z++)
                 for (int y = 0; y < Size; y++)
                     for (int x = 0; x < Size; x++)
                     {
                         var cubie = new TCubie();
-                        cubie.Scale(cubieScale, cubieScale, cubieScale);
-                        cubie.Translate(x - C, y - C, z - C);
+                        cubie.Scale = new TVector(cubieScale, cubieScale, cubieScale);
+                        cubie.Origin = new TVector(x - C, y - C, z - C);
                         cubie.Parent = this;
                         Cubies[z, y, x] = cubie;
                     }
@@ -130,16 +134,17 @@ namespace RubikCube
             var slice = new TObject3D();
             int angle = 90 * (move.Angle + 1);
             if (move.Axis == 0)
-                slice.RotateX(angle);
+                slice.Pitch(angle);
             else if (move.Axis == 1)
-                slice.RotateY(angle);
+                slice.Yaw(angle);
             else
-                slice.RotateZ(angle);
+                slice.Roll(angle);
             var selection = SelectSlice(move);
             for (int i = 0; i < selection.Count; i++)
             {
                 var cubie = selection[i];
-                cubie.MultMatrix(slice.Transform);
+                cubie.Transform = slice.Transform * cubie.Transform;
+                //cubie.MultMatrix(slice.Transform);
                 Cubies[cubie.Z, cubie.Y, cubie.X] = cubie;
                 cubie.ValidState = false;
                 cubie.Transparent = false;

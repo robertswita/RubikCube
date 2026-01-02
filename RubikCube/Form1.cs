@@ -27,9 +27,12 @@ namespace RubikCube
         int MoveNo;
         double HighScore;
         public TRubikCube RubikCube;// = new TRubikCube();
+        public TScene Scene = new TScene();
+        public TCamera Camera = new TCamera();
         public TRubikForm()
         {
             InitializeComponent();
+            Camera.Parent = Scene.Root;
             //TransparencyBox.Checked = true;
         }
 
@@ -44,11 +47,11 @@ namespace RubikCube
             tglView1.Cursor = Cursors.Hand;
             if (e.Button == MouseButtons.Left)
             {
-                var rot = new TPoint3D();
+                var rot = new TVector();
                 rot.Y = 180 * (e.X - StartPos.X) / tglView1.Width;
                 rot.X = 180 * (e.Y - StartPos.Y) / tglView1.Height;
-                tglView1.Context.Root.RotateY(rot.Y);
-                tglView1.Context.Root.RotateX(rot.X);
+                Camera.Yaw(rot.Y);
+                Camera.Pitch(rot.X);
                 tglView1.Invalidate();
                 StartPos = e.Location;
             }
@@ -85,10 +88,10 @@ namespace RubikCube
                     double angle = 90 * (move.Angle + 1);
                     if (angle > 180) angle -= 360;
                     angle *= (double)FrameNo / FrameCount;
-                    ActSlice.LoadIdentity();
-                    if (move.Axis == 0) ActSlice.RotateX(angle);
-                    if (move.Axis == 1) ActSlice.RotateY(angle);
-                    if (move.Axis == 2) ActSlice.RotateZ(angle);
+                    //ActSlice.LoadIdentity();
+                    if (move.Axis == 0) ActSlice.Rotation.X = angle;
+                    if (move.Axis == 1) ActSlice.Rotation.Y = angle;
+                    if (move.Axis == 2) ActSlice.Rotation.Z = angle;
                 }
                 else
                 {
@@ -471,39 +474,39 @@ namespace RubikCube
             SolutionLbl.Text = Solutions.Count.ToString();
         }
 
-        void DrawState()
-        {
-            Pen pen = new Pen(Color.Red);
-            pen.Width = 2;
-            var bmp = new Bitmap(pictureBox1.Width, pictureBox1.Height);
-            var gc = Graphics.FromImage(bmp);
-            PointF actPos = new PointF(bmp.Width / 2, bmp.Height / 2);
-            var pts = new List<PointF>();
-            pts.Add(actPos);
-            var scale = pictureBox1.Width / RubikCube.Children.Count / 2;
-            for (int i = 0; i < RubikCube.Children.Count; i++)
-            {
-                var cubie = (RubikCube.Children[i] as TCubie).Copy();
-                var transform = cubie.Transform;
-                var gamma = Math.Atan2(transform[4], transform[0]) * 180 / Math.PI;
-                cubie.RotateZ(-gamma);
-                var beta = Math.Atan2(-transform[8], transform[0]) * 180 / Math.PI;
-                cubie.RotateY(-beta);
-                var alpha = Math.Atan2(transform[9], transform[5]) * 180 / Math.PI;
-                cubie.RotateX(-alpha);
-                var angle = (alpha + beta + gamma) / 3;
-                var v = new SizeF(scale * (float)Math.Cos(angle), scale * (float)Math.Sin(angle));
-                actPos += v;
-                pts.Add(actPos);
-            }
-            gc.DrawLines(pen, pts.ToArray());
-            pictureBox1.Image = bmp;
-        }
+        //void DrawState()
+        //{
+        //    Pen pen = new Pen(Color.Red);
+        //    pen.Width = 2;
+        //    var bmp = new Bitmap(pictureBox1.Width, pictureBox1.Height);
+        //    var gc = Graphics.FromImage(bmp);
+        //    PointF actPos = new PointF(bmp.Width / 2, bmp.Height / 2);
+        //    var pts = new List<PointF>();
+        //    pts.Add(actPos);
+        //    var scale = pictureBox1.Width / RubikCube.Children.Count / 2;
+        //    for (int i = 0; i < RubikCube.Children.Count; i++)
+        //    {
+        //        var cubie = (RubikCube.Children[i] as TCubie).Copy();
+        //        var transform = cubie.Transform;
+        //        var gamma = Math.Atan2(transform[4], transform[0]) * 180 / Math.PI;
+        //        cubie.RotateZ(-gamma);
+        //        var beta = Math.Atan2(-transform[8], transform[0]) * 180 / Math.PI;
+        //        cubie.RotateY(-beta);
+        //        var alpha = Math.Atan2(transform[9], transform[5]) * 180 / Math.PI;
+        //        cubie.RotateX(-alpha);
+        //        var angle = (alpha + beta + gamma) / 3;
+        //        var v = new SizeF(scale * (float)Math.Cos(angle), scale * (float)Math.Sin(angle));
+        //        actPos += v;
+        //        pts.Add(actPos);
+        //    }
+        //    gc.DrawLines(pen, pts.ToArray());
+        //    pictureBox1.Image = bmp;
+        //}
 
         private void TRubikForm_Load(object sender, EventArgs e)
         {
             RubikCube = new TRubikCube();
-            RubikCube.Parent = tglView1.Context.Root;
+            RubikCube.Parent = Scene.Root;
         }
 
         private void saveToolStripMenuItem_Click(object sender, EventArgs e)
@@ -570,7 +573,7 @@ namespace RubikCube
                 TRubikCube.Size = (int)Math.Round(Math.Pow(code.Length, 0.33));
                 RubikCube.Parent = null;
                 RubikCube = new TRubikCube();
-                RubikCube.Parent = tglView1.Context.Root;
+                RubikCube.Parent = Scene.Root;
                 RubikCube.Code = code;
                 tglView1.Invalidate();
             }
@@ -588,7 +591,7 @@ namespace RubikCube
             TRubikCube.Size = (int)numericUpDown1.Value;
             RubikCube.Parent = null;
             RubikCube = new TRubikCube();
-            RubikCube.Parent = tglView1.Context.Root;
+            RubikCube.Parent = Scene.Root;
             tglView1.Invalidate();
             StateBox.Invalidate();
             Moves.Clear();
@@ -614,7 +617,7 @@ namespace RubikCube
             TRubikCube.Size = 7;
             RubikCube.Parent = null;
             RubikCube = new TRubikCube();
-            RubikCube.Parent = tglView1.Context.Root;
+            RubikCube.Parent = Scene.Root;
 
             var cubies = new List<TCubie>();
             cubies.Add(RubikCube.Cubies[3, 3, 3]);
@@ -637,7 +640,7 @@ namespace RubikCube
 
         private void TransparencyBox_CheckedChanged(object sender, EventArgs e)
         {
-            tglView1.Context.IsTransparencyOn = TransparencyBox.Checked;
+            //tglView1.Context.IsTransparencyOn = TransparencyBox.Checked;
         }
 
         private void showClusterToolStripMenuItem_Click(object sender, EventArgs e)
@@ -645,8 +648,9 @@ namespace RubikCube
             TRubikCube.Size = 5;
             RubikCube.Parent = null;
             RubikCube = new TRubikCube();
-            RubikCube.Parent = tglView1.Context.Root;
-            tglView1.Context.Root.LoadIdentity();
+            RubikCube.Parent = Scene.Root;
+            //tglView1.Context.Root.LoadIdentity();
+            Camera.Rotation = new TVector();
             foreach (var cubie in RubikCube.Cubies)
             {
                 cubie.State = 3;
@@ -662,9 +666,9 @@ namespace RubikCube
                     ccubie.Transparent = false;
                 }
             }
-            tglView1.Context.Root.RotateZ(45);
+            Camera.Roll(45);
             //tglView1.Context.Root.RotateY(90);
-            tglView1.Context.Root.RotateX(225);
+            Camera.Pitch(225);
             tglView1.Invalidate();
         }
 

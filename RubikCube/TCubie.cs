@@ -16,29 +16,39 @@ namespace RubikCube
 
         public TCubie()
         {
-            var lbn = new TPoint3D(-1, -1, -1);
-            var rtf = new TPoint3D(+1, +1, +1);
+            var lbn = new TVector(-1, -1, -1);
+            var rtf = new TVector(+1, +1, +1);
             for (int i = 0; i < 8; i++)
             {
-                var p = lbn;
+                var p = new TVertex();
+                p.Assign(lbn.Clone());
                 if ((i & 1) == 1) p.X = rtf.X;
                 if ((i & 2) != 0) p.Y = rtf.Y;
                 if ((i & 4) != 0) p.Z = rtf.Z;
                 Vertices.Add(p);
             }
+            var faceIndices = new List<int>();
             for (int dim = 0; dim < 3; dim++)
             {
                 var axis1 = 1 << dim;
                 var axis2 = 1 << (dim + 1) % 3;
-                Faces.Add(axis1);
-                Faces.Add(axis2);
-                Faces.Add(0);
-                Faces.Add(axis1 + axis2);
-                Faces.Add(axis2);
-                Faces.Add(axis1);
+                faceIndices.Add(axis1);
+                faceIndices.Add(axis2);
+                faceIndices.Add(0);
+                faceIndices.Add(axis1 + axis2);
+                faceIndices.Add(axis2);
+                faceIndices.Add(axis1);
             }
             for (int i = Faces.Count - 1; i >= 0; i--)
-                Faces.Add(7 - Faces[i]);
+                faceIndices.Add(7 - i);
+            for (int i = 0; i < faceIndices.Count; i += 3)
+            {
+                var face = new TFace();
+                face.AddVertex(Vertices[faceIndices[i]]);
+                face.AddVertex(Vertices[faceIndices[i + 1]]);
+                face.AddVertex(Vertices[faceIndices[i + 2]]);
+                Faces.Add(face);
+            }
         }
 
         int GetAngle(double sinA, double cosA)
@@ -80,13 +90,13 @@ namespace RubikCube
                 var alpha = value & 3;
                 var beta = (value >> 2) & 3;
                 var gamma = (value >> 4) & 3;
-                var org = Origin;
-                LoadIdentity();
-                Scale(0.45, 0.45, 0.45);
-                RotateX(90 * alpha);
-                RotateY(90 * beta);
-                RotateZ(90 * gamma);
-                Translate(org.X, org.Y, org.Z);
+                //var org = Origin;
+                //LoadIdentity();
+                Scale = new TVector(0.45f, 0.45f, 0.45f);
+                Rotation.X = 90 * alpha;
+                Rotation.Y = 90 * beta;
+                Rotation.Z = 90 * gamma;
+                //Origin = new TVector(org.X, org.Y, org.Z);
                 _State = value;
                 ValidState = true;
                 if (_State != 0)
@@ -106,7 +116,10 @@ namespace RubikCube
         public TCubie Copy()
         {
             var dest = new TCubie();
-            Array.Copy(Transform, dest.Transform, Transform.Length);
+            //Array.Copy(Transform, dest.Transform, Transform.Length);
+            dest.Scale = Scale.Clone();
+            dest.Rotation = Rotation.Clone();
+            dest.Origin = Origin.Clone();
             dest.Vertices = Vertices;
             dest.Faces = Faces;
             dest._State = _State;
