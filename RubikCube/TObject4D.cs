@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -23,6 +24,20 @@ namespace RubikCube
         public List<TVector> TexVertices = new List<TVector>();
         public List<TMaterial> Materials = new List<TMaterial>();
         public List<TObject4D> Children = new List<TObject4D>();
+        //public static int[,] AxesIndices = new int[,] { { 0, 1 }, { 0, 2 }, { 0, 3 }, { 1, 2 }, { 1, 3 }, { 2, 3 } };
+
+        public static Point[] RotateAxes; 
+        static TObject4D()
+        {
+            var idx = 0;
+            RotateAxes = new Point[6];
+            for (int i = 0; i < 3; i++)
+                for (int j = i + 1; j < 4; j++)
+                {
+                    RotateAxes[idx] = new Point(i, j);
+                    idx++;
+                }
+        }
         TObject4D _Parent;
         public virtual TObject4D Parent
         {
@@ -63,14 +78,20 @@ namespace RubikCube
                 Transform[5 * i] = s[i];
             MultMatrix(transform);
         }
-        public void RotateXY(double angle) { RotateAxes(0, 1, angle); }
-        public void RotateXZ(double angle) { RotateAxes(0, 2, angle); }
-        public void RotateXW(double angle) { RotateAxes(0, 3, angle); }
-        public void RotateYZ(double angle) { RotateAxes(1, 2, angle); }
-        public void RotateYW(double angle) { RotateAxes(1, 3, angle); }
-        public void RotateZW(double angle) { RotateAxes(2, 3, angle); }
+        public void RotateXY(double angle) { RotatePlane(0, 1, angle); }
+        public void RotateXZ(double angle) { RotatePlane(0, 2, angle); }
+        public void RotateXW(double angle) { RotatePlane(0, 3, angle); }
+        public void RotateYZ(double angle) { RotatePlane(1, 2, angle); }
+        public void RotateYW(double angle) { RotatePlane(1, 3, angle); }
+        public void RotateZW(double angle) { RotatePlane(2, 3, angle); }
 
-        public void RotateAxes(int axis1, int axis2, double angle)
+        public void RotatePlane(int axis, double angle)
+        {
+            var plane = RotateAxes[axis];
+            RotatePlane(plane.X, plane.Y, angle);
+        }
+
+        public void RotatePlane(int axis1, int axis2, double angle)
         {
             angle *= Math.PI / 180;
             var cosA = (float)Math.Cos(angle);

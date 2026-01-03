@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,11 +10,14 @@ namespace RubikCube
 {
     public class TMove
     {
-        public int Slice;
+        public int SliceA;
+        public int SliceB;
         public int Plane; 
         public int Angle;
-        static int[,] AxesIndices = new int[,] { { 0, 1 }, { 0, 2 }, { 0, 3 }, { 1, 2 }, { 1, 3 }, { 2, 3 } };
-        public int[] GetAxes() { return new int[] { AxesIndices[Plane, 0], AxesIndices[Plane, 1] }; }
+        public int[] GetAxes() {
+            var plane = TObject4D.RotateAxes[Plane];
+            return new int[] { plane.X, plane.Y }; 
+        }
 
 //public void Assign(TMove move)
 //{
@@ -44,7 +48,10 @@ namespace RubikCube
         public static TMove Decode(int code)
         {
             var move = new TMove();
-            move.Slice = code / 18;
+            var size = 18 * TRubikCube.Size;
+            move.SliceA = code / size;
+            code = code % size;
+            move.SliceB = code / 18;
             code = code % 18;
             move.Plane = code / 3;
             move.Angle = code % 3;
@@ -53,7 +60,7 @@ namespace RubikCube
 
         public int Encode()
         {
-            return 18 * Slice + 3 * Plane + Angle;
+            return 18 * (TRubikCube.Size * SliceA + SliceB) + 3 * Plane + Angle;
         }
 
     }

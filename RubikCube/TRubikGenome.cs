@@ -7,11 +7,11 @@ namespace RubikCube
     public class TRubikGenome: TChromosome
     {
         public int MovesCount;
-        public static List<int> FreeGenes;
+        public static List<int> FreeMoves;
 
         public override void MutateGene(int idx)
         {
-            Genes[idx] = FreeGenes[Rnd.Next(FreeGenes.Count)];
+            Genes[idx] = FreeMoves[Rnd.Next(FreeMoves.Count)];
             //if (idx == GenesLength - 1)
             //{
             //    //Check();
@@ -75,7 +75,7 @@ namespace RubikCube
                 {
                     var prevMove = TMove.Decode((int)Genes[i]);
                     if (prevMove.Plane != move.Plane) break;
-                    if (prevMove.Slice == move.Slice)
+                    if (prevMove.SliceA == move.SliceA && prevMove.SliceB == move.SliceB)
                     {
                         move.Angle = (move.Angle + prevMove.Angle + 2) % 4 - 1;
                         Genes[i] = move.Encode();

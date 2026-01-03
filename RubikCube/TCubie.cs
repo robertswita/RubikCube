@@ -125,7 +125,7 @@ namespace RubikCube
                     for (int j = i + 1; j < 4; j++)
                     {
                         var angle = (value >> shift) & 3;
-                        RotateAxes(i, j, angle * 90);
+                        RotatePlane(i, j, angle * 90);
                         shift += 2;
                     }
 

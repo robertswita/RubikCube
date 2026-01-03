@@ -27,16 +27,18 @@ namespace RubikCube
         int MoveNo;
         double HighScore;
         public TRubikCube RubikCube;// = new TRubikCube();
-        public TScene Scene = new TScene();
-        public TCamera Camera;
+        //public TScene Scene = new TScene();
+        //public TCamera Camera;
+        TGA<TRubikGenome> Ga;
+        TObject4D Root = new TObject4D();
         public TRubikForm()
         {
             InitializeComponent();
-            Camera = tglView1.Context.Camera;
-            Camera.Parent = Scene.Root;
-            var light = new TLight();
-            light.Parent = Camera;
-            light.Origin = new TVector(0, 0, 1);
+            //Camera = tglView1.Context.Camera;
+            //Camera.Parent = Scene.Root;
+            //var light = new TLight();
+            //light.Parent = Camera;
+            //light.Origin = new TVector(0, 0, 1);
             //TransparencyBox.Checked = true;
         }
 
@@ -92,10 +94,11 @@ namespace RubikCube
                     double angle = 90 * (move.Angle + 1);
                     if (angle > 180) angle -= 360;
                     angle *= (double)FrameNo / FrameCount;
-                    //ActSlice.LoadIdentity();
-                    if (move.Plane == 0) ActSlice.Rotation.X = angle;
-                    if (move.Plane == 1) ActSlice.Rotation.Y = angle;
-                    if (move.Plane == 2) ActSlice.Rotation.Z = angle;
+                    ActSlice.LoadIdentity();
+                    ActSlice.RotatePlane(move.Plane, angle);
+                    //if (move.Plane == 0) ActSlice.Rotation.X = angle;
+                    //if (move.Plane == 1) ActSlice.Rotation.Y = angle;
+                    //if (move.Plane == 2) ActSlice.Rotation.Z = angle;
                 }
                 else
                 {
@@ -111,36 +114,28 @@ namespace RubikCube
                 MoveNo = 0;
                 Moves.Clear();
                 MoveTimer.Stop();
-                //DrawState();
-                //label2.Text = RubikCube.Evaluate().ToString();
                 label1.Text = Time.ToString();
                 label2.Text = HighScore.ToString();
                 label4.Text = RubikCube.Code.Count(x => x != '\0').ToString();
                 GACount++;
                 label6.Text = GACount.ToString();
                 MovesLbl.Text = MovesCount.ToString();
-                //DrawSolution(Moves);
-                //StateGridView.DataSource = RubikCube.StateGrid;
-                //DisplayState();
                 StateBox.Invalidate();
-                if (RubikCube.ActCubie != null)
-                    RubikCube.ActCubie.Selected = false;
-                RubikCube.GetActCubie();
-                HighScore = RubikCube.Evaluate();
-                //ActIdx++;
-                //if (ActIdx == RubikCube.Cubies.Length)
-                //    ActIdx = 0;
-                //var Z = ActIdx / (TRubikCube.N * TRubikCube.N);
-                //var Y = (ActIdx % (TRubikCube.N * TRubikCube.N)) / TRubikCube.N;
-                //var X = (ActIdx % (TRubikCube.N * TRubikCube.N)) % TRubikCube.N;
-                //RubikCube.ActCubie = RubikCube.Cubies[Z, Y, X];
-                if (HighScore > 0 && !IsPaused)
+                //if (RubikCube.ActiveCubie != null)
+                //    RubikCube.ActiveCubie.Selected = false;
+                //RubikCube.GetActCubie();
+                //HighScore = RubikCube.Evaluate();
+                //if (HighScore > 0 && !IsPaused)
+                //{
+                //    RubikCube.ActiveCubie.Selected = true;
+                //    Solve();
+                //}
+                //else
+                //    IsPaused = true;
+                if (Ga != null)
                 {
-                    RubikCube.ActCubie.Selected = true;
                     Solve();
                 }
-                else
-                    IsPaused = true;
             }
         }
 
@@ -204,12 +199,13 @@ namespace RubikCube
             for (int i = 0; i < specimen.Genes.Length; i++)
             {
                 var move = TMove.Decode((int)specimen.Genes[i]);
-                if (i == 0)
-                {
-                    var idx = new int[3] { RubikCube.ActCubie.X, RubikCube.ActCubie.Y, RubikCube.ActCubie.Z };
-                    move.Slice = idx[move.Plane];
-                    specimen.Genes[0] = move.Encode();
-                }
+                // Final optimalization
+                //if (i == 0)
+                //{
+                //    var idx = new int[3] { RubikCube.ActiveCubie.X, RubikCube.ActiveCubie.Y, RubikCube.ActiveCubie.Z };
+                //    move.Slice = idx[move.Plane];
+                //    specimen.Genes[0] = move.Encode();
+                //}
                 cube.Turn(move);
                 double fitness = cube.Evaluate();
                 if (fitness < specimen.Fitness && cube.Code != startCode)
@@ -226,167 +222,91 @@ namespace RubikCube
         Stopwatch Watch;
         void Solve()
         {
-            Watch = Stopwatch.StartNew();
-            IterElapsed = TimeSpan.Zero;
-            chart1.Series[0].Points.Clear();
-
-            TChromosome.GenesLength = 27;
-            var ga = new TGA<TRubikGenome>();
-            ga.GenerationsCount = 50;
-            ga.WinnerRatio = 0.1;
-            ga.MutationRatio = 1;
-            ga.SelectionType = TGA<TRubikGenome>.TSelectionType.Unique;
-            ga.Evaluate = OnEvaluate;
-            ga.Progress = OnProgress;
-            TRubikGenome.FreeGenes = RubikCube.GetFreeGenes();
-            ga.HighScore = HighScore;
-            ga.Execute();
-
-            //var actCubie = RubikCube.Cubies[0, 0, 0];
-            //var idx = new int[] { RubikCube.ActCubie.X, RubikCube.ActCubie.Y, RubikCube.ActCubie.Z };
-            //var A = new TMove();
-            //var B = new TMove();
-            //var C = new TMove();
-
-
-            
-            ////B.Axis = 2;
-            ////A.Axis = 1; 
-            //A.Slice = idx[A.Axis];
-            //B.Slice = idx[B.Axis];
-            //C.Slice = idx[C.Axis];
-            //var alpha = RubikCube.ActCubie.State & 3;
-            //var beta = (RubikCube.ActCubie.State >> 2) & 3;
-            //var gamma = (RubikCube.ActCubie.State >> 4) & 3;
-            //if (alpha == 0)
-            //{
-            //    A.Axis = 1;
-            //    B.Axis = 2;
-            //}
-            //else if (beta == 0)
-            //{
-            //    A.Axis = 0;
-            //    B.Axis = 2;
-            //}
-            //else
-            //{
-            //    A.Axis = 0;
-            //    B.Axis = 1;
-            //}
-            ////if (alpha == 0) alpha = 2;
-            ////if (beta == 0) beta = 2;
-            ////if (gamma == 0) gamma = 2;
-            //A.Axis = 0;
-            //for (int j = 1; j < 3; j++)
-            //    if (Math.Abs(idx[j] - TRubikCube.C) > Math.Abs(idx[A.Axis] - TRubikCube.C))
-            //        A.Axis = j;
-            ////B.Axis = (A.Axis + 1) % 3;
-            ////C.Axis = (B.Axis + 1) % 3;
-            //var angles = new int[] { alpha - 1, beta - 1, gamma - 1 };
-            //A.Angle = angles[A.Axis];
-            //B.Angle = angles[B.Axis];
-            //C.Angle = angles[C.Axis];
-
-            //var C_ = new TMove();
-            //C_.Axis = C.Axis;
-            //C_.Slice = C.Slice;
-            //C_.Angle = 2 - C.Angle;
-            //var B_ = new TMove();
-            //B_.Axis = B.Axis;
-            //B_.Slice = B.Slice; 
-            //B_.Angle = 2 - B.Angle;
-            //var A_ = new TMove();
-            //A_.Axis = A.Axis;
-            //A_.Slice = A.Slice;
-            //A_.Angle = 2 - A.Angle;
-            ////Moves.AddRange(new TMove[] { A, B, A_, B_, A, B, A_, B_ });
-            ////Moves.AddRange(new TMove[] { C, B, A, B_, C_ });
-            //if (A.Angle < 0)
-            //    A.Angle = 1;
-            //if (B.Angle < 0)
-            //{
-            //    B.Angle = 1;
-            //    //Moves.AddRange(new TMove[] { A_, B_, A, B });
-            //}
-            //if (RubikCube.StateGrid[ActIdx, ActIdx] == 0)
-            //{
-            //    if (B.Axis > A.Axis)
-            //        Moves.AddRange(new TMove[] { B_, A_, B, A });
-            //    else
-            //        Moves.AddRange(new TMove[] { A_, B_, A, B });
-            //    // Moves.AddRange(new TMove[] { C, B, A, B_, A_, C_ });
-            //}
-
-            //IterCount = ga.IterCount;
-            if (ga.HighScore == 0 && RubikCube.ActCluster.Count > 1)
+            if (HighScore == 0)
             {
-                SaveSolution(ga.Best);
+                RubikCube.NextCluster();
+                if (RubikCube.ActiveCubie != null)
+                    TRubikGenome.FreeMoves = RubikCube.GetFreeMoves();
+                HighScore = double.MaxValue;
             }
-            if (ga.HighScore < HighScore)
+            if (RubikCube.ActiveCluster != null)
             {
-                HighScore = ga.HighScore;
-                for (int i = 0; i < ga.Best.MovesCount; i++)
-                    Moves.Add(TMove.Decode((int)ga.Best.Genes[i]));
-                TrySolutions = true;
-            }
-            //chart2.Series[0].Points.AddY(ga.IterCount);
-            if (TrySolutions && false)
-            {
-                foreach (var solution in Solutions)
+                Watch = Stopwatch.StartNew();
+                IterElapsed = TimeSpan.Zero;
+                chart1.Series[0].Points.Clear();
+
+                TChromosome.GenesLength = 27;
+                Ga = new TGA<TRubikGenome>();
+                Ga.GenerationsCount = 50;
+                Ga.WinnerRatio = 0.1;
+                Ga.MutationRatio = 1;
+                Ga.SelectionType = TGA<TRubikGenome>.TSelectionType.Unique;
+                Ga.Evaluate = OnEvaluate;
+                Ga.Progress = OnProgress;
+                TRubikGenome.FreeMoves = RubikCube.GetFreeMoves();
+                Ga.HighScore = HighScore;
+                Ga.Execute();
+                if (Ga.HighScore == 0 && RubikCube.ActiveCluster.Count > 1)
                 {
-                    var tryMoves = DecodeSolution(solution.Value);
-                    for (int j = -1; j < TRubikGenome.FreeGenes.Count; j++)
-                    {
-                        var moves = new List<TMove>();
-                        if (j < 0)
-                            moves.AddRange(tryMoves);
-                        else
-                        {
-                            var move = TMove.Decode(TRubikGenome.FreeGenes[j]);
-                            moves.Add(move);
-                            moves.AddRange(tryMoves);
-                            move = TMove.Decode(TRubikGenome.FreeGenes[j]);
-                            move.Angle = 2 - move.Angle;
-                            moves.Add(move);
-                        }
-                        var cube = new TRubikCube(RubikCube);
-                        foreach (var move in moves)
-                            cube.Turn(move);
-                        var score = cube.Evaluate();
-                        if (score < HighScore)
-                        {
-                            HighScore = score;
-                            Moves = moves;
-                        }
-                    }
+                    SaveSolution(Ga.Best);
                 }
+                if (Ga.HighScore < HighScore)
+                {
+                    HighScore = Ga.HighScore;
+                    for (int i = 0; i < Ga.Best.MovesCount; i++)
+                        Moves.Add(TMove.Decode((int)Ga.Best.Genes[i]));
+                    TrySolutions = true;
+                }
+                //if (TrySolutions && false)
+                //{
+                //    foreach (var solution in Solutions)
+                //    {
+                //        var tryMoves = DecodeSolution(solution.Value);
+                //        for (int j = -1; j < TRubikGenome.FreeMoves.Count; j++)
+                //        {
+                //            var moves = new List<TMove>();
+                //            if (j < 0)
+                //                moves.AddRange(tryMoves);
+                //            else
+                //            {
+                //                var move = TMove.Decode(TRubikGenome.FreeMoves[j]);
+                //                moves.Add(move);
+                //                moves.AddRange(tryMoves);
+                //                move = TMove.Decode(TRubikGenome.FreeMoves[j]);
+                //                move.Angle = 2 - move.Angle;
+                //                moves.Add(move);
+                //            }
+                //            var cube = new TRubikCube(RubikCube);
+                //            foreach (var move in moves)
+                //                cube.Turn(move);
+                //            var score = cube.Evaluate();
+                //            if (score < HighScore)
+                //            {
+                //                HighScore = score;
+                //                Moves = moves;
+                //            }
+                //        }
+                //    }
+                //}
+                if (Moves.Count == 0)
+                    TrySolutions = false;
+                MovesCount += Moves.Count;
+                Time += Watch.Elapsed;
+                MoveTimer.Start();
             }
-            if (Moves.Count == 0)
-                TrySolutions = false;
-            //if (HighScore == 0 && RubikCube.ActCubie != null)
-            //    HighScore = double.MaxValue;
-            //if (HighScore == 0)
-            //{
-            //    PauseBtn.BackColor = Color.Red;
-            //    IsPaused = true;
-            //    //chart1.Series[0].Points.Clear();
-            //}
-            MovesCount += Moves.Count;
-            Time += Watch.Elapsed;
-            MoveTimer.Start();
         }
 
         private void button1_Click(object sender, EventArgs e)
         {
             if (MoveTimer.Enabled) return;
-            //Highscore = RubikCube.Evaluate();
             MovesCount = 0;
             Time = TimeSpan.Zero;
             GACount = 0;
             LoadSolutions();
             IsPaused = false;
-            RubikCube.GetActCubie();
-            HighScore = RubikCube.Evaluate();
+            //RubikCube.GetActCubie();
+            //HighScore = RubikCube.Evaluate();
+            HighScore = 0;
             Solve();
         }
 
@@ -404,34 +324,34 @@ namespace RubikCube
         }
 
         string SolutionPath = "solutions.bin";
-        List<TMove> DecodeSolution(List<int> solution)
-        {
-            var v = new int[] { RubikCube.ActCubie.X, RubikCube.ActCubie.Y, RubikCube.ActCubie.Z };
-            var map = new List<int>();
-            var result = new List<TMove>();
-            for (var i = 0; i < solution.Count; i++)
-            {
-                var move = TMove.Decode(solution[i]);
-                var idx = map.IndexOf(move.Slice);
-                if (idx < 0)
-                {
-                    idx = map.IndexOf(TRubikCube.Size - 1 - move.Slice);
-                    if (idx < 0)
-                    {
-                        idx = map.Count;
-                        map.Add(move.Slice);
-                    }
-                    else
-                        idx += 3;
-                }
-                if (idx < 3)
-                    move.Slice = v[idx];
-                else
-                    move.Slice = TRubikCube.Size - 1 - v[idx - 3];
-                result.Add(move);
-            }
-            return result;
-        }
+        //List<TMove> DecodeSolution(List<int> solution)
+        //{
+        //    var v = new int[] { RubikCube.ActiveCubie.X, RubikCube.ActiveCubie.Y, RubikCube.ActiveCubie.Z, RubikCube.ActiveCubie.W };
+        //    var map = new List<int>();
+        //    var result = new List<TMove>();
+        //    for (var i = 0; i < solution.Count; i++)
+        //    {
+        //        var move = TMove.Decode(solution[i]);
+        //        var idxA = map.IndexOf(move.SliceA);
+        //        if (idxA < 0)
+        //        {
+        //            idxA = map.IndexOf(TRubikCube.Size - 1 - move.SliceA);
+        //            if (idxA < 0)
+        //            {
+        //                idxA = map.Count;
+        //                map.Add(move.SliceA);
+        //            }
+        //            else
+        //                idxA += 4;
+        //        }
+        //        if (idxA < 4)
+        //            move.SliceA = v[idxA];
+        //        else
+        //            move.SliceA = TRubikCube.Size - 1 - v[idxA - 4];
+        //        result.Add(move);
+        //    }
+        //    return result;
+        //}
 
         void LoadSolutions()
         {
@@ -510,7 +430,9 @@ namespace RubikCube
         private void TRubikForm_Load(object sender, EventArgs e)
         {
             RubikCube = new TRubikCube();
-            RubikCube.Parent = Scene.Root;
+            //RubikCube.Parent = Scene.Root;
+            tglView1.Context.Root = Root;
+            RubikCube.Parent = Root;
         }
 
         private void saveToolStripMenuItem_Click(object sender, EventArgs e)
