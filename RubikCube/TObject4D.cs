@@ -32,7 +32,7 @@ namespace RubikCube
         /// Get 4D origin (position) from 4D transformation matrix
         /// Returns: TPoint4D with (x, y, z, w) coordinates
         /// </summary>
-        public new TPoint4D Origin4D
+        public TPoint4D Origin4D
         {
             get
             {

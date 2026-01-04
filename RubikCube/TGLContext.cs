@@ -1,4 +1,4 @@
-﻿/**********************************************************
+﻿﻿/**********************************************************
 Autor: Robert Świta
 Politechnika Koszalińska
 Katedra Systemów Multimedialnych i Sztucznej inteligencji
@@ -18,7 +18,6 @@ namespace TGL
         IntPtr HDC;
         IntPtr HRC;
         Win32.PIXELFORMATDESCRIPTOR pfd;
-        List<object> NameStack;
         public Rectangle Viewport;
         public TObject3D Root = new TObject3D();
         public IntPtr Handle

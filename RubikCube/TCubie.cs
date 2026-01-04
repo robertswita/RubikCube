@@ -34,7 +34,7 @@ namespace RubikCube
         };
 
         // Store color index for each face of the cube
-        // ACTUAL face order from geometry: -Z, -X, -Y, +Z, +X, +Y (6 faces)
+        // face order: Face 0=-Z(Back), 1=-X(Left), 2=-Y(Bottom), 3=+Z(Front), 4=+X(Right), 5=+Y(Top)
         public int[] FaceColors = new int[6] { -1, -1, -1, -1, -1, -1 };
 
         public TCubie()
@@ -204,6 +204,115 @@ namespace RubikCube
                    Math.Min(_state4D.PlaneYZ, 4 - _state4D.PlaneYZ) +
                    Math.Min(_state4D.PlaneYW, 4 - _state4D.PlaneYW) +
                    Math.Min(_state4D.PlaneZW, 4 - _state4D.PlaneZW);
+        }
+
+        /// <summary>
+        /// Debug method to understand face geometry mapping
+        /// </summary>
+        public string GetFaceDebugInfo()
+        {
+            var debug = new System.Text.StringBuilder();
+            debug.AppendLine("Face Geometry Analysis:");
+            debug.AppendLine($"Total faces: {Faces.Count / 6}"); // Each face uses 6 vertices (2 triangles)
+
+            for (int faceIdx = 0; faceIdx < Faces.Count / 6; faceIdx++)
+            {
+                debug.AppendLine($"Face {faceIdx}:");
+                debug.AppendLine($"  Color Index: {(faceIdx < FaceColors.Length ? FaceColors[faceIdx].ToString() : "N/A")}");
+                debug.AppendLine($"  Color: {(faceIdx < FaceColors.Length && FaceColors[faceIdx] >= 0 && FaceColors[faceIdx] < HyperFaceColors.Length ? GetColorName(FaceColors[faceIdx]) : "Gray")}");
+
+                // Analyze the vertices of this face to determine orientation
+                var vertices = new List<TPoint3D>();
+                for (int i = 0; i < 6; i++)
+                {
+                    int vertexIdx = Faces[faceIdx * 6 + i];
+                    vertices.Add(Vertices[vertexIdx]);
+                }
+
+                // Determine face orientation by checking if all vertices have the same coordinate on one axis
+                bool isXConstant = vertices.All(v => Math.Abs(v.X - vertices[0].X) < 0.1);
+                bool isYConstant = vertices.All(v => Math.Abs(v.Y - vertices[0].Y) < 0.1);
+                bool isZConstant = vertices.All(v => Math.Abs(v.Z - vertices[0].Z) < 0.1);
+
+                if (isXConstant)
+                    debug.AppendLine($"  Geometry: X={vertices[0].X:F1} face ({(vertices[0].X < 0 ? "-X" : "+X")})");
+                else if (isYConstant)
+                    debug.AppendLine($"  Geometry: Y={vertices[0].Y:F1} face ({(vertices[0].Y < 0 ? "-Y" : "+Y")})");
+                else if (isZConstant)
+                    debug.AppendLine($"  Geometry: Z={vertices[0].Z:F1} face ({(vertices[0].Z < 0 ? "-Z" : "+Z")})");
+                else
+                    debug.AppendLine($"  Geometry: Complex face");
+            }
+
+            return debug.ToString();
+        }
+
+        private string GetColorName(int colorIndex)
+        {
+            string[] colorNames = { "Red", "Orange", "White", "Yellow", "Blue", "Green", "Purple", "Magenta" };
+            return colorIndex >= 0 && colorIndex < colorNames.Length ? colorNames[colorIndex] : "Unknown";
+        }
+
+        /// <summary>
+        /// Determine the actual face order by analyzing cube geometry
+        /// This helps fix the color assignment bug
+        /// </summary>
+        public static string AnalyzeFaceOrder()
+        {
+            var testCubie = new TCubie();
+            var analysis = new System.Text.StringBuilder();
+
+            analysis.AppendLine("DETAILED Face Order Analysis:");
+            analysis.AppendLine("=============================");
+            analysis.AppendLine("Vertices (8 corners of cube):");
+            for (int i = 0; i < 8; i++)
+            {
+                var v = testCubie.Vertices[i];
+                analysis.AppendLine($"  Vertex {i}: ({v.X:F0}, {v.Y:F0}, {v.Z:F0})");
+            }
+            analysis.AppendLine();
+
+            // Analyze each face (each face uses 6 vertices = 2 triangles)
+            int numFaces = testCubie.Faces.Count / 6;
+            analysis.AppendLine($"Total faces: {numFaces}");
+            analysis.AppendLine();
+
+            for (int faceIdx = 0; faceIdx < numFaces; faceIdx++)
+            {
+                analysis.AppendLine($"Face {faceIdx}:");
+
+                // Get all 6 vertices for this face
+                var faceVertices = new List<int>();
+                var vertexPositions = new List<TPoint3D>();
+                for (int i = 0; i < 6; i++)
+                {
+                    int vertexIdx = testCubie.Faces[faceIdx * 6 + i];
+                    faceVertices.Add(vertexIdx);
+                    vertexPositions.Add(testCubie.Vertices[vertexIdx]);
+                }
+
+                analysis.AppendLine($"  Vertex indices: [{string.Join(", ", faceVertices)}]");
+
+                // Determine face normal by checking which coordinate is constant
+                var firstVertex = vertexPositions[0];
+                bool allSameX = vertexPositions.All(v => Math.Abs(v.X - firstVertex.X) < 0.01);
+                bool allSameY = vertexPositions.All(v => Math.Abs(v.Y - firstVertex.Y) < 0.01);
+                bool allSameZ = vertexPositions.All(v => Math.Abs(v.Z - firstVertex.Z) < 0.01);
+
+                string faceType = "Unknown";
+                if (allSameX)
+                    faceType = firstVertex.X < 0 ? "-X (Left)" : "+X (Right)";
+                else if (allSameY)
+                    faceType = firstVertex.Y < 0 ? "-Y (Bottom)" : "+Y (Top)";
+                else if (allSameZ)
+                    faceType = firstVertex.Z < 0 ? "-Z (Back)" : "+Z (Front)";
+
+                analysis.AppendLine($"  Face type: {faceType}");
+                analysis.AppendLine($"  Sample vertex: ({firstVertex.X:F0}, {firstVertex.Y:F0}, {firstVertex.Z:F0})");
+                analysis.AppendLine();
+            }
+
+            return analysis.ToString();
         }
     }
 }

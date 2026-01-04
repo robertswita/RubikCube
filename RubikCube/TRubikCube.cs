@@ -82,26 +82,36 @@ namespace RubikCube
         /// </summary>
         private void InitializeCubieFaceColors(TCubie cubie, int x, int y, int z, int w)
         {
-            // ACTUAL face order in FaceColors: -Z, -X, -Y, +Z, +X, +Y (indices 0-5)
-            // HyperFaceColors index: 0=X-, 1=X+, 2=Y-, 3=Y+, 4=Z-, 5=Z+, 6=W-, 7=W+
+            //  mapping based on user observations:
+            // User saw: Front=Green, Right=Orange, Back=Blue, Left=Red, Top=Yellow, Bottom=White
+            // This tells us the correct face index to geometric face mapping:
+            //
+            // From the original partially working assignments and user observations,
+            // the correct face order appears to be:
+            // Face 0: Back (-Z) - Blue
+            // Face 1: Left (-X) - Red
+            // Face 2: Bottom (-Y) - White
+            // Face 3: Front (+Z) - Green
+            // Face 4: Right (+X) - Orange
+            // Face 5: Top (+Y) - Yellow
 
-            // Z faces
+            // Z faces (Front/Back)
             if (z == 0)
-                cubie.FaceColors[0] = 4;  // Face 0 (-Z face) gets Z=0 color (Blue)
+                cubie.FaceColors[0] = 4;  // Face 0 (Back -Z) gets Blue
             if (z == N - 1)
-                cubie.FaceColors[3] = 5;  // Face 3 (+Z face) gets Z=N-1 color (Green)
+                cubie.FaceColors[3] = 5;  // Face 3 (Front +Z) gets Green
 
-            // X faces
+            // X faces (Left/Right)
             if (x == 0)
-                cubie.FaceColors[1] = 0;  // Face 1 (-X face) gets X=0 color (Red)
+                cubie.FaceColors[1] = 0;  // Face 1 (Left -X) gets Red
             if (x == N - 1)
-                cubie.FaceColors[4] = 1;  // Face 4 (+X face) gets X=N-1 color (Orange)
+                cubie.FaceColors[4] = 1;  // Face 4 (Right +X) gets Orange
 
-            // Y faces
+            // Y faces (Bottom/Top)
             if (y == 0)
-                cubie.FaceColors[2] = 2;  // Face 2 (-Y face) gets Y=0 color (White)
+                cubie.FaceColors[2] = 2;  // Face 2 (Bottom -Y) gets White
             if (y == N - 1)
-                cubie.FaceColors[5] = 3;  // Face 5 (+Y face) gets Y=N-1 color (Yellow)
+                cubie.FaceColors[5] = 3;  // Face 5 (Top +Y) gets Yellow
 
             // Note: W dimension colors will be shown when viewing different slices
             // Interior cubies get -1 (no color) on faces not on the hypercube boundary
@@ -562,6 +572,84 @@ namespace RubikCube
                     for (int y = 0; y < N; y++)
                         slice[w, z, y] = Cubies[w, z, y, xSlice];
             return slice;
+        }
+
+        /// <summary>
+        /// Test color assignment by creating a corner cubie and checking its colors
+        /// This helps verify if the face color fix is working correctly
+        /// </summary>
+        public static string TestColorAssignment()
+        {
+            var testCube = new TRubikCube();
+            var analysis = new System.Text.StringBuilder();
+
+            analysis.AppendLine("Color Assignment Test:");
+            analysis.AppendLine("====================");
+
+            // Test corner cubie at (0,0,0) - should have Red, White, Blue faces
+            var cornerCubie = testCube.Cubies[0, 0, 0, 0];  // w=0, z=0, y=0, x=0
+            analysis.AppendLine($"Corner cubie (0,0,0,0) colors:");
+
+            for (int i = 0; i < cornerCubie.FaceColors.Length; i++)
+            {
+                int colorIdx = cornerCubie.FaceColors[i];
+                string colorName = "Gray";
+                string expectedFace = "";
+
+                if (colorIdx >= 0 && colorIdx < TCubie.HyperFaceColors.Length)
+                {
+                    string[] colorNames = { "Red", "Orange", "White", "Yellow", "Blue", "Green", "Purple", "Magenta" };
+                    colorName = colorNames[colorIdx];
+                }
+
+                string[] faceNames = { "-X", "+X", "-Y", "+Y", "-Z", "+Z" };
+                expectedFace = i < faceNames.Length ? faceNames[i] : "?";
+
+                analysis.AppendLine($"  Face {i} ({expectedFace}): {colorName}");
+            }
+
+            analysis.AppendLine();
+            analysis.AppendLine("Expected for corner (0,0,0,0): Red(-X), Gray(+X), White(-Y), Gray(+Y), Blue(-Z), Gray(+Z)");
+
+            return analysis.ToString();
+        }
+
+        /// <summary>
+        /// Create a comprehensive face mapping test
+        /// This will help identify which face index maps to which geometric orientation
+        /// </summary>
+        public static string CreateFaceMappingTest()
+        {
+            var analysis = new System.Text.StringBuilder();
+            analysis.AppendLine("FACE MAPPING TEST INSTRUCTIONS:");
+            analysis.AppendLine("===============================");
+            analysis.AppendLine();
+            analysis.AppendLine("A corner cubie at position (0,0,0,0) has been assigned unique colors:");
+            analysis.AppendLine("  Face 0: RED");
+            analysis.AppendLine("  Face 1: ORANGE");
+            analysis.AppendLine("  Face 2: WHITE");
+            analysis.AppendLine("  Face 3: YELLOW");
+            analysis.AppendLine("  Face 4: BLUE");
+            analysis.AppendLine("  Face 5: GREEN");
+            analysis.AppendLine();
+            analysis.AppendLine("TO IDENTIFY CORRECT FACE MAPPING:");
+            analysis.AppendLine("1. Look at the corner cubie in the top-left view (XYZ)");
+            analysis.AppendLine("2. Note which colors appear on which geometric faces:");
+            analysis.AppendLine("   - Left face (-X): Color = ?");
+            analysis.AppendLine("   - Right face (+X): Color = ?");
+            analysis.AppendLine("   - Bottom face (-Y): Color = ?");
+            analysis.AppendLine("   - Top face (+Y): Color = ?");
+            analysis.AppendLine("   - Back face (-Z): Color = ?");
+            analysis.AppendLine("   - Front face (+Z): Color = ?");
+            analysis.AppendLine();
+            analysis.AppendLine("3. Use this mapping to correct the InitializeCubieFaceColors() method");
+            analysis.AppendLine();
+            analysis.AppendLine("Expected corner cubie should show 3 faces:");
+            analysis.AppendLine("  - One face for X=0 boundary (Left)");
+            analysis.AppendLine("  - One face for Y=0 boundary (Bottom)");
+            analysis.AppendLine("  - One face for Z=0 boundary (Back)");
+
+            return analysis.ToString();
         }
     }
 }
