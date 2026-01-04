@@ -897,6 +897,9 @@ namespace RubikCube
             sliceContainer.Parent = view.Context.Root;
 
             // Scale factor for spacing between cubies
+            double cubieSize = 1.0;
+            double spacing = 0.1;
+            double step = cubieSize + spacing;
 
             // Create visual copies of each cubie and reposition them in 3D grid
             for (int z = 0; z < TRubikCube.N; z++)
@@ -909,11 +912,26 @@ namespace RubikCube
                             // Create a visual copy of the cubie
                             var cubieCopy = originalCubie.Copy();
 
+                            // Reposition based on slice indices to form a proper 3D cube
+                            // Center the cube around origin
+                            double centerOffset = (TRubikCube.N - 1) * step / 2.0;
+                            cubieCopy.LoadIdentity();
+                            cubieCopy.Scale(cubieSize * 0.45, cubieSize * 0.45, cubieSize * 0.45);  // Scale down to avoid overlap
+                            cubieCopy.Translate(
+                                x * step - centerOffset,
+                                y * step - centerOffset,
+                                z * step - centerOffset
+                            );
+
+                            // Copy the color/state from original
+                            cubieCopy.State = originalCubie.State;
 
                             cubieCopy.Parent = sliceContainer;
                         }
                     }
 
+            // Move the container back a bit so it's visible in the camera view
+            //sliceContainer.Translate(0, 0, 0);
 
             // Invalidate the view to trigger redraw
             view.Invalidate();
