@@ -7,16 +7,15 @@ using TGL;
 
 namespace RubikCube
 {
-    public class TCubie : TObject3D
+    public class TCubie : TObject4D
     {
         public int X { get { return (int)Math.Round(Origin.X + TRubikCube.C); } }
         public int Y { get { return (int)Math.Round(Origin.Y + TRubikCube.C); } }
         public int Z { get { return (int)Math.Round(Origin.Z + TRubikCube.C); } }
 
-        // 4D support: W coordinate stored separately
-        private double _W = 0;
-        public int W { get { return (int)Math.Round(_W + TRubikCube.C); } }
-        public double WCoord { get { return _W; } set { _W = value; } }
+        // 4D support: W coordinate from 4D transformation matrix
+        public int W { get { return (int)Math.Round(Origin4D.W + TRubikCube.C); } }
+        public double WCoord { get { return Origin4D.W; } set { Translate4D(0, 0, 0, value - Origin4D.W); } }
 
         public int ClusterCount;
 
@@ -123,7 +122,7 @@ namespace RubikCube
             get
             {
                 // 4D Manhattan distance from center
-                var dist = Math.Abs(Origin.X) + Math.Abs(Origin.Y) + Math.Abs(Origin.Z) + Math.Abs(_W);
+                var dist = Math.Abs(Origin.X) + Math.Abs(Origin.Y) + Math.Abs(Origin.Z) + Math.Abs(Origin4D.W);
                 return (int)Math.Round(2 * dist);
             }
         }
@@ -131,13 +130,13 @@ namespace RubikCube
         public TCubie Copy()
         {
             var dest = new TCubie();
-            Array.Copy(Transform, dest.Transform, Transform.Length);
+            Array.Copy(Transform, dest.Transform, Transform.Length);  // Copy 3D transform (for rendering)
+            Array.Copy(Transform4D, dest.Transform4D, Transform4D.Length);  // Copy 4D transform
             dest.Vertices = Vertices;
             dest.Faces = Faces;
             dest._State = _State;
             dest.ValidState = ValidState;
             dest.ClusterCount = ClusterCount;
-            dest._W = _W;  // Copy 4D W coordinate
             Array.Copy(FaceColors, dest.FaceColors, FaceColors.Length);  // Copy face colors
             return dest;
         }

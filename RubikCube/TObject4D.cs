@@ -1,65 +1,61 @@
 using System;
 using System.Collections.Generic;
+using TGL;
 
 namespace RubikCube
 {
     /// <summary>
-    /// Base class for 4D objects with transformation matrix support
+    /// Base class for 4D objects - extends TObject3D with 4D transformation support
+    /// Inherits 3D rendering capabilities (Vertices, Faces, 4×4 Transform) from TObject3D
+    /// Adds 4D transformation matrix (5×5) for true 4D operations
     /// </summary>
-    public class TObject4D
+    public class TObject4D : TObject3D
     {
         /// <summary>
-        /// 5x5 transformation matrix (homogeneous 4D coordinates)
+        /// 5x5 transformation matrix for 4D operations (homogeneous 4D coordinates)
         /// Layout: [m00, m01, m02, m03, tx,
         ///          m10, m11, m12, m13, ty,
         ///          m20, m21, m22, m23, tz,
         ///          m30, m31, m32, m33, tw,
         ///          0,   0,   0,   0,   1]
+        /// Note: The 3D Transform (4×4) from base class is used for rendering
+        ///       The Transform4D (5×5) is used for 4D rotations and position tracking
         /// </summary>
-        public double[] Transform = new double[25];
-
-        /// <summary>
-        /// Parent object in scene hierarchy
-        /// </summary>
-        public TObject4D Parent;
-
-        /// <summary>
-        /// Child objects
-        /// </summary>
-        public List<TObject4D> Children = new List<TObject4D>();
+        public double[] Transform4D = new double[25];
 
         public TObject4D()
         {
-            TMatrix4D.LoadIdentity5x5(Transform);
+            TMatrix4D.LoadIdentity5x5(Transform4D);
         }
 
         /// <summary>
-        /// Get origin (position) from transformation matrix
+        /// Get 4D origin (position) from 4D transformation matrix
+        /// Returns: TPoint4D with (x, y, z, w) coordinates
         /// </summary>
-        public TPoint4D Origin
+        public new TPoint4D Origin4D
         {
             get
             {
-                return new TPoint4D(Transform[20], Transform[21], Transform[22], Transform[23]);
+                return new TPoint4D(Transform4D[4], Transform4D[9], Transform4D[14], Transform4D[19]);
             }
         }
 
         /// <summary>
-        /// Load identity transformation
+        /// Load identity transformation for 4D matrix
         /// </summary>
-        public void LoadIdentity()
+        public void LoadIdentity4D()
         {
-            TMatrix4D.LoadIdentity5x5(Transform);
+            TMatrix4D.LoadIdentity5x5(Transform4D);
         }
 
         /// <summary>
         /// Multiply this transformation by another 5x5 matrix
         /// </summary>
-        public void MultMatrix(double[] matrix)
+        public void MultMatrix4D(double[] matrix)
         {
             var result = new double[25];
-            TMatrix4D.Multiply5x5(Transform, matrix, result);
-            Array.Copy(result, Transform, 25);
+            TMatrix4D.Multiply5x5(Transform4D, matrix, result);
+            Array.Copy(result, Transform4D, 25);
         }
 
         /// <summary>
@@ -69,7 +65,7 @@ namespace RubikCube
         {
             var rotMatrix = new double[25];
             TMatrix4D.CreateRotationXY(angleDegrees, rotMatrix);
-            MultMatrix(rotMatrix);
+            MultMatrix4D(rotMatrix);
         }
 
         /// <summary>
@@ -79,7 +75,7 @@ namespace RubikCube
         {
             var rotMatrix = new double[25];
             TMatrix4D.CreateRotationXZ(angleDegrees, rotMatrix);
-            MultMatrix(rotMatrix);
+            MultMatrix4D(rotMatrix);
         }
 
         /// <summary>
@@ -89,7 +85,7 @@ namespace RubikCube
         {
             var rotMatrix = new double[25];
             TMatrix4D.CreateRotationXW(angleDegrees, rotMatrix);
-            MultMatrix(rotMatrix);
+            MultMatrix4D(rotMatrix);
         }
 
         /// <summary>
@@ -99,7 +95,7 @@ namespace RubikCube
         {
             var rotMatrix = new double[25];
             TMatrix4D.CreateRotationYZ(angleDegrees, rotMatrix);
-            MultMatrix(rotMatrix);
+            MultMatrix4D(rotMatrix);
         }
 
         /// <summary>
@@ -109,7 +105,7 @@ namespace RubikCube
         {
             var rotMatrix = new double[25];
             TMatrix4D.CreateRotationYW(angleDegrees, rotMatrix);
-            MultMatrix(rotMatrix);
+            MultMatrix4D(rotMatrix);
         }
 
         /// <summary>
@@ -119,7 +115,7 @@ namespace RubikCube
         {
             var rotMatrix = new double[25];
             TMatrix4D.CreateRotationZW(angleDegrees, rotMatrix);
-            MultMatrix(rotMatrix);
+            MultMatrix4D(rotMatrix);
         }
 
         /// <summary>
@@ -129,7 +125,7 @@ namespace RubikCube
         {
             var transMatrix = new double[25];
             TMatrix4D.CreateTranslation4D(x, y, z, w, transMatrix);
-            MultMatrix(transMatrix);
+            MultMatrix4D(transMatrix);
         }
 
         /// <summary>
@@ -139,7 +135,7 @@ namespace RubikCube
         {
             var scaleMatrix = new double[25];
             TMatrix4D.CreateScale4D(sx, sy, sz, sw, scaleMatrix);
-            MultMatrix(scaleMatrix);
+            MultMatrix4D(scaleMatrix);
         }
 
         /// <summary>

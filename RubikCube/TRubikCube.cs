@@ -59,9 +59,12 @@ namespace RubikCube
                         for (int x = 0; x < N; x++)
                         {
                             var cubie = new TCubie();
+                            // Initialize 3D transformation (for rendering)
                             cubie.Scale(cubieScale, cubieScale, cubieScale);
                             cubie.Translate(x - C, y - C, z - C);
-                            cubie.WCoord = w - C;  // Set 4D W coordinate
+                            // Initialize 4D transformation (for 4D position tracking)
+                            cubie.Scale4D(cubieScale, cubieScale, cubieScale, cubieScale);
+                            cubie.Translate4D(x - C, y - C, z - C, w - C);
                             InitializeCubieFaceColors(cubie, x, y, z, w);  // Set colors based on 4D position
                             cubie.Parent = this;
                             Cubies[w, z, y, x] = cubie;
@@ -210,32 +213,31 @@ namespace RubikCube
 
         public void Turn(TMove move)
         {
-            // For 4D: Use 3D rotations on the 3D projection
-            // The W coordinate is updated separately based on the plane rotation
-            var slice = new TObject3D();
+            // Apply proper 4D rotation using 5×5 transformation matrices
             int angle = 90 * (move.Angle + 1);
 
-            // Map plane rotations to 3D rotations
+            // Create 5×5 rotation matrix for the plane
             // Planes: 0=XY, 1=XZ, 2=XW, 3=YZ, 4=YW, 5=ZW
+            var rotationMatrix4D = new double[25];
             switch (move.Plane)
             {
-                case 0: // XY plane - rotate around Z axis
-                    slice.RotateZ(angle);
+                case 0: // XY plane
+                    TMatrix4D.CreateRotationXY(angle, rotationMatrix4D);
                     break;
-                case 1: // XZ plane - rotate around Y axis
-                    slice.RotateY(angle);
+                case 1: // XZ plane
+                    TMatrix4D.CreateRotationXZ(angle, rotationMatrix4D);
                     break;
-                case 2: // XW plane - rotate X and W
-                    slice.RotateX(angle); // Placeholder - needs 4D handling
+                case 2: // XW plane
+                    TMatrix4D.CreateRotationXW(angle, rotationMatrix4D);
                     break;
-                case 3: // YZ plane - rotate around X axis
-                    slice.RotateX(angle);
+                case 3: // YZ plane
+                    TMatrix4D.CreateRotationYZ(angle, rotationMatrix4D);
                     break;
-                case 4: // YW plane - rotate Y and W
-                    slice.RotateY(angle); // Placeholder - needs 4D handling
+                case 4: // YW plane
+                    TMatrix4D.CreateRotationYW(angle, rotationMatrix4D);
                     break;
-                case 5: // ZW plane - rotate Z and W
-                    slice.RotateZ(angle); // Placeholder - needs 4D handling
+                case 5: // ZW plane
+                    TMatrix4D.CreateRotationZW(angle, rotationMatrix4D);
                     break;
             }
 
@@ -244,13 +246,14 @@ namespace RubikCube
             {
                 var cubie = selection[i];
 
-                // Apply 4D rotation to W coordinate for planes involving W
-                if (move.Plane >= 2) // XW, YW, ZW involve W dimension
-                {
-                    Apply4DRotation(cubie, move.Plane, angle);
-                }
+                // Apply 4D rotation to cubie's 4D transformation matrix
+                cubie.MultMatrix4D(rotationMatrix4D);
 
-                cubie.MultMatrix(slice.Transform);
+                // Also update 3D transformation for rendering
+                // Extract 3D rotation from 4D and apply to 3D transform
+                Update3DTransformFromRotation(cubie, move.Plane, angle);
+
+                // Update cubie position in array
                 Cubies[cubie.W, cubie.Z, cubie.Y, cubie.X] = cubie;
                 cubie.ValidState = false;
                 cubie.Transparent = false;
@@ -261,27 +264,30 @@ namespace RubikCube
             _StateGrid = null;
         }
 
-        // Helper method to apply 4D rotation to W coordinate
-        private void Apply4DRotation(TCubie cubie, int plane, double angleDeg)
+        // Update 3D transformation matrix based on 4D rotation
+        private void Update3DTransformFromRotation(TCubie cubie, int plane, double angle)
         {
-            double angleRad = angleDeg * Math.PI / 180.0;
-            double cos = Math.Cos(angleRad);
-            double sin = Math.Sin(angleRad);
-            double x = cubie.Origin.X;
-            double y = cubie.Origin.Y;
-            double z = cubie.Origin.Z;
-            double w = cubie.WCoord;
-
+            // For planes that only affect 3D coordinates (XY, XZ, YZ), update 3D transform
+            // For planes involving W (XW, YW, ZW), the 3D rotation affects the visible axes
             switch (plane)
             {
-                case 2: // XW - rotate X and W
-                    cubie.WCoord = -sin * x + cos * w;
+                case 0: // XY plane - rotate around Z axis in 3D
+                    cubie.RotateZ(angle);
                     break;
-                case 4: // YW - rotate Y and W
-                    cubie.WCoord = -sin * y + cos * w;
+                case 1: // XZ plane - rotate around Y axis in 3D
+                    cubie.RotateY(angle);
                     break;
-                case 5: // ZW - rotate Z and W
-                    cubie.WCoord = -sin * z + cos * w;
+                case 2: // XW plane - rotate around X axis in 3D (as W is hidden)
+                    // X changes with W, so we don't rotate in visible 3D
+                    break;
+                case 3: // YZ plane - rotate around X axis in 3D
+                    cubie.RotateX(angle);
+                    break;
+                case 4: // YW plane - rotate around Y axis in 3D (as W is hidden)
+                    // Y changes with W, so we don't rotate in visible 3D
+                    break;
+                case 5: // ZW plane - rotate around Z axis in 3D (as W is hidden)
+                    // Z changes with W, so we don't rotate in visible 3D
                     break;
             }
         }
