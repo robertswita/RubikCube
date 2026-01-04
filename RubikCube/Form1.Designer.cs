@@ -73,6 +73,14 @@
             this.lblViewXYW = new System.Windows.Forms.Label();
             this.lblViewXZW = new System.Windows.Forms.Label();
             this.lblViewYZW = new System.Windows.Forms.Label();
+            this.trackBarXYZ = new System.Windows.Forms.TrackBar();
+            this.trackBarXYW = new System.Windows.Forms.TrackBar();
+            this.trackBarXZW = new System.Windows.Forms.TrackBar();
+            this.trackBarYZW = new System.Windows.Forms.TrackBar();
+            this.lblSliceXYZ = new System.Windows.Forms.Label();
+            this.lblSliceXYW = new System.Windows.Forms.Label();
+            this.lblSliceXZW = new System.Windows.Forms.Label();
+            this.lblSliceYZW = new System.Windows.Forms.Label();
             this.label11 = new System.Windows.Forms.Label();
             this.MovesLbl = new System.Windows.Forms.Label();
             this.panel1.SuspendLayout();
@@ -83,6 +91,10 @@
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.stateGridBindingSource)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.tRubikCubeBindingSource)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.trackBarXYZ)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.trackBarXYW)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.trackBarXZW)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.trackBarYZW)).BeginInit();
             this.SuspendLayout();
             // 
             // MoveTimer
@@ -474,7 +486,87 @@
             this.lblViewYZW.Size = new System.Drawing.Size(100, 17);
             this.lblViewYZW.TabIndex = 103;
             this.lblViewYZW.Text = "YZW (X=1)";
-            // 
+            //
+            // trackBarXYZ
+            //
+            this.trackBarXYZ.Location = new System.Drawing.Point(555, 28);
+            this.trackBarXYZ.Maximum = 1;
+            this.trackBarXYZ.Minimum = 0;
+            this.trackBarXYZ.Name = "trackBarXYZ";
+            this.trackBarXYZ.Size = new System.Drawing.Size(200, 45);
+            this.trackBarXYZ.TabIndex = 104;
+            this.trackBarXYZ.Value = 1;
+            this.trackBarXYZ.ValueChanged += new System.EventHandler(this.trackBarXYZ_ValueChanged);
+            //
+            // trackBarXYW
+            //
+            this.trackBarXYW.Location = new System.Drawing.Point(935, 28);
+            this.trackBarXYW.Maximum = 1;
+            this.trackBarXYW.Minimum = 0;
+            this.trackBarXYW.Name = "trackBarXYW";
+            this.trackBarXYW.Size = new System.Drawing.Size(200, 45);
+            this.trackBarXYW.TabIndex = 105;
+            this.trackBarXYW.Value = 1;
+            this.trackBarXYW.ValueChanged += new System.EventHandler(this.trackBarXYW_ValueChanged);
+            //
+            // trackBarXZW
+            //
+            this.trackBarXZW.Location = new System.Drawing.Point(555, 418);
+            this.trackBarXZW.Maximum = 1;
+            this.trackBarXZW.Minimum = 0;
+            this.trackBarXZW.Name = "trackBarXZW";
+            this.trackBarXZW.Size = new System.Drawing.Size(200, 45);
+            this.trackBarXZW.TabIndex = 106;
+            this.trackBarXZW.Value = 1;
+            this.trackBarXZW.ValueChanged += new System.EventHandler(this.trackBarXZW_ValueChanged);
+            //
+            // trackBarYZW
+            //
+            this.trackBarYZW.Location = new System.Drawing.Point(935, 418);
+            this.trackBarYZW.Maximum = 1;
+            this.trackBarYZW.Minimum = 0;
+            this.trackBarYZW.Name = "trackBarYZW";
+            this.trackBarYZW.Size = new System.Drawing.Size(200, 45);
+            this.trackBarYZW.TabIndex = 107;
+            this.trackBarYZW.Value = 1;
+            this.trackBarYZW.ValueChanged += new System.EventHandler(this.trackBarYZW_ValueChanged);
+            //
+            // lblSliceXYZ
+            //
+            this.lblSliceXYZ.AutoSize = true;
+            this.lblSliceXYZ.Location = new System.Drawing.Point(760, 28);
+            this.lblSliceXYZ.Name = "lblSliceXYZ";
+            this.lblSliceXYZ.Size = new System.Drawing.Size(40, 17);
+            this.lblSliceXYZ.TabIndex = 108;
+            this.lblSliceXYZ.Text = "W=1";
+            //
+            // lblSliceXYW
+            //
+            this.lblSliceXYW.AutoSize = true;
+            this.lblSliceXYW.Location = new System.Drawing.Point(1140, 28);
+            this.lblSliceXYW.Name = "lblSliceXYW";
+            this.lblSliceXYW.Size = new System.Drawing.Size(40, 17);
+            this.lblSliceXYW.TabIndex = 109;
+            this.lblSliceXYW.Text = "Z=1";
+            //
+            // lblSliceXZW
+            //
+            this.lblSliceXZW.AutoSize = true;
+            this.lblSliceXZW.Location = new System.Drawing.Point(760, 418);
+            this.lblSliceXZW.Name = "lblSliceXZW";
+            this.lblSliceXZW.Size = new System.Drawing.Size(40, 17);
+            this.lblSliceXZW.TabIndex = 110;
+            this.lblSliceXZW.Text = "Y=1";
+            //
+            // lblSliceYZW
+            //
+            this.lblSliceYZW.AutoSize = true;
+            this.lblSliceYZW.Location = new System.Drawing.Point(1140, 418);
+            this.lblSliceYZW.Name = "lblSliceYZW";
+            this.lblSliceYZW.Size = new System.Drawing.Size(40, 17);
+            this.lblSliceYZW.TabIndex = 111;
+            this.lblSliceYZW.Text = "X=1";
+            //
             // label11
             // 
             this.label11.AutoSize = true;
@@ -499,6 +591,14 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1202, 818);
             this.Controls.Add(this.pictureBox1);
+            this.Controls.Add(this.lblSliceYZW);
+            this.Controls.Add(this.lblSliceXZW);
+            this.Controls.Add(this.lblSliceXYW);
+            this.Controls.Add(this.lblSliceXYZ);
+            this.Controls.Add(this.trackBarYZW);
+            this.Controls.Add(this.trackBarXZW);
+            this.Controls.Add(this.trackBarXYW);
+            this.Controls.Add(this.trackBarXYZ);
             this.Controls.Add(this.lblViewYZW);
             this.Controls.Add(this.lblViewXZW);
             this.Controls.Add(this.lblViewXYW);
@@ -524,6 +624,10 @@
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.stateGridBindingSource)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.tRubikCubeBindingSource)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.trackBarXYZ)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.trackBarXYW)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.trackBarXZW)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.trackBarYZW)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -575,6 +679,14 @@
         private System.Windows.Forms.PictureBox StateBox;
         private System.Windows.Forms.Label MovesLbl;
         private System.Windows.Forms.Label label11;
+        private System.Windows.Forms.TrackBar trackBarXYZ;
+        private System.Windows.Forms.TrackBar trackBarXYW;
+        private System.Windows.Forms.TrackBar trackBarXZW;
+        private System.Windows.Forms.TrackBar trackBarYZW;
+        private System.Windows.Forms.Label lblSliceXYZ;
+        private System.Windows.Forms.Label lblSliceXYW;
+        private System.Windows.Forms.Label lblSliceXZW;
+        private System.Windows.Forms.Label lblSliceYZW;
     }
 }
 

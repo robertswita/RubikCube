@@ -121,24 +121,28 @@ namespace RubikCube
         private void trackBarXYZ_ValueChanged(object sender, EventArgs e)
         {
             lblSliceXYZ.Text = "W=" + trackBarXYZ.Value;
+            lblViewXYZ.Text = "XYZ (W=" + trackBarXYZ.Value + ")";
             UpdateAllViews();
         }
 
         private void trackBarXYW_ValueChanged(object sender, EventArgs e)
         {
             lblSliceXYW.Text = "Z=" + trackBarXYW.Value;
+            lblViewXYW.Text = "XYW (Z=" + trackBarXYW.Value + ")";
             UpdateAllViews();
         }
 
         private void trackBarXZW_ValueChanged(object sender, EventArgs e)
         {
             lblSliceXZW.Text = "Y=" + trackBarXZW.Value;
+            lblViewXZW.Text = "XZW (Y=" + trackBarXZW.Value + ")";
             UpdateAllViews();
         }
 
         private void trackBarYZW_ValueChanged(object sender, EventArgs e)
         {
             lblSliceYZW.Text = "X=" + trackBarYZW.Value;
+            lblViewYZW.Text = "YZW (X=" + trackBarYZW.Value + ")";
             UpdateAllViews();
         }
 
@@ -639,6 +643,14 @@ namespace RubikCube
         private void TRubikForm_Load(object sender, EventArgs e)
         {
             RubikCube = new TRubikCube();
+
+            // Initialize view labels with current slice values
+            int middleSlice = TRubikCube.N / 2;
+            lblViewXYZ.Text = "XYZ (W=" + middleSlice + ")";
+            lblViewXYW.Text = "XYW (Z=" + middleSlice + ")";
+            lblViewXZW.Text = "XZW (Y=" + middleSlice + ")";
+            lblViewYZW.Text = "YZW (X=" + middleSlice + ")";
+
             UpdateAllViews();
             LayoutViews();  // Initial layout
         }
@@ -657,9 +669,11 @@ namespace RubikCube
             int leftPanelWidth = 445;  // Width of the left control panel
             int margin = 10;
             int labelHeight = 25;
+            int sliderHeight = 45;
+            int sliderLabelWidth = 50;
 
             int availableWidth = this.ClientSize.Width - leftPanelWidth - margin * 3;
-            int availableHeight = this.ClientSize.Height - margin * 3 - labelHeight * 2;
+            int availableHeight = this.ClientSize.Height - margin * 3 - labelHeight * 2 - sliderHeight;
 
             // Calculate size for each view (half of available space)
             int viewWidth = (availableWidth - margin) / 2;
@@ -675,22 +689,47 @@ namespace RubikCube
             // Top-left: tglView1 (XYZ)
             tglView1.Location = new Point(startX, startY);
             tglView1.Size = new Size(viewSize, viewSize);
-            lblViewXYZ.Location = new Point(startX, startY - labelHeight);
+            lblViewXYZ.Location = new Point(startX + 5, startY + 5);
+            lblViewXYZ.BringToFront();
+
+            // Slider below view1
+            trackBarXYZ.Location = new Point(startX, startY + viewSize + 5);
+            trackBarXYZ.Size = new Size(viewSize - sliderLabelWidth, sliderHeight);
+            lblSliceXYZ.Location = new Point(startX + viewSize - sliderLabelWidth + 5, startY + viewSize + 10);
 
             // Top-right: tglView2 (XYW)
             tglView2.Location = new Point(startX + viewSize + margin, startY);
             tglView2.Size = new Size(viewSize, viewSize);
-            lblViewXYW.Location = new Point(startX + viewSize + margin, startY - labelHeight);
+            lblViewXYW.Location = new Point(startX + viewSize + margin + 5, startY + 5);
+            lblViewXYW.BringToFront();
+
+            // Slider below view2
+            trackBarXYW.Location = new Point(startX + viewSize + margin, startY + viewSize + 5);
+            trackBarXYW.Size = new Size(viewSize - sliderLabelWidth, sliderHeight);
+            lblSliceXYW.Location = new Point(startX + viewSize + margin + viewSize - sliderLabelWidth + 5, startY + viewSize + 10);
 
             // Bottom-left: tglView3 (XZW)
-            tglView3.Location = new Point(startX, startY + viewSize + margin);
+            int view3Y = startY + viewSize + margin + sliderHeight + 5;
+            tglView3.Location = new Point(startX, view3Y);
             tglView3.Size = new Size(viewSize, viewSize);
-            lblViewXZW.Location = new Point(startX, startY + viewSize + margin - labelHeight);
+            lblViewXZW.Location = new Point(startX + 5, view3Y + 5);
+            lblViewXZW.BringToFront();
+
+            // Slider below view3
+            trackBarXZW.Location = new Point(startX, view3Y + viewSize + 5);
+            trackBarXZW.Size = new Size(viewSize - sliderLabelWidth, sliderHeight);
+            lblSliceXZW.Location = new Point(startX + viewSize - sliderLabelWidth + 5, view3Y + viewSize + 10);
 
             // Bottom-right: tglView4 (YZW)
-            tglView4.Location = new Point(startX + viewSize + margin, startY + viewSize + margin);
+            tglView4.Location = new Point(startX + viewSize + margin, view3Y);
             tglView4.Size = new Size(viewSize, viewSize);
-            lblViewYZW.Location = new Point(startX + viewSize + margin, startY + viewSize + margin - labelHeight);
+            lblViewYZW.Location = new Point(startX + viewSize + margin + 5, view3Y + 5);
+            lblViewYZW.BringToFront();
+
+            // Slider below view4
+            trackBarYZW.Location = new Point(startX + viewSize + margin, view3Y + viewSize + 5);
+            trackBarYZW.Size = new Size(viewSize - sliderLabelWidth, sliderHeight);
+            lblSliceYZW.Location = new Point(startX + viewSize + margin + viewSize - sliderLabelWidth + 5, view3Y + viewSize + 10);
         }
 
         private void saveToolStripMenuItem_Click(object sender, EventArgs e)
@@ -774,6 +813,27 @@ namespace RubikCube
             TRubikCube.N = (int)numericUpDown1.Value;
             RubikCube.Parent = null;
             RubikCube = new TRubikCube();
+
+            // Update trackbar ranges for new N value
+            // For N=2, slices are 0-1; for N=3, slices are 0-2, etc.
+            trackBarXYZ.Maximum = TRubikCube.N - 1;
+            trackBarXYW.Maximum = TRubikCube.N - 1;
+            trackBarXZW.Maximum = TRubikCube.N - 1;
+            trackBarYZW.Maximum = TRubikCube.N - 1;
+
+            // Set to middle slice by default
+            int middleSlice = TRubikCube.N / 2;
+            trackBarXYZ.Value = middleSlice;
+            trackBarXYW.Value = middleSlice;
+            trackBarXZW.Value = middleSlice;
+            trackBarYZW.Value = middleSlice;
+
+            // Update view labels with current slice values
+            lblViewXYZ.Text = "XYZ (W=" + middleSlice + ")";
+            lblViewXYW.Text = "XYW (Z=" + middleSlice + ")";
+            lblViewXZW.Text = "XZW (Y=" + middleSlice + ")";
+            lblViewYZW.Text = "YZW (X=" + middleSlice + ")";
+
             UpdateAllViews();
             StateBox.Invalidate();
             Moves.Clear();
@@ -928,14 +988,16 @@ namespace RubikCube
         {
             if (RubikCube == null) return;
 
-            // Extract slices from 4D hypercube (using middle slice for each dimension)
-            int middleSlice = TRubikCube.N / 2;
+            // Extract slices from 4D hypercube using trackbar values
+            // XYZ view: Fix W dimension at trackBarXYZ value
+            // XYW view: Fix Z dimension at trackBarXYW value
+            // XZW view: Fix Y dimension at trackBarXZW value
+            // YZW view: Fix X dimension at trackBarYZW value
 
-            // All 4 views use the same approach - showing clean 3D slices
-            UpdateSliceView(tglView1, RubikCube.GetSliceXYZ(middleSlice), "XYZ");
-            UpdateSliceView(tglView2, RubikCube.GetSliceXYW(middleSlice), "XYW");
-            UpdateSliceView(tglView3, RubikCube.GetSliceXZW(middleSlice), "XZW");
-            UpdateSliceView(tglView4, RubikCube.GetSliceYZW(middleSlice), "YZW");
+            UpdateSliceView(tglView1, RubikCube.GetSliceXYZ(trackBarXYZ.Value), "XYZ");
+            UpdateSliceView(tglView2, RubikCube.GetSliceXYW(trackBarXYW.Value), "XYW");
+            UpdateSliceView(tglView3, RubikCube.GetSliceXZW(trackBarXZW.Value), "XZW");
+            UpdateSliceView(tglView4, RubikCube.GetSliceYZW(trackBarYZW.Value), "YZW");
         }
 
         /// <summary>
