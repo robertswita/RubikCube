@@ -66,6 +66,13 @@
             this.stateGridBindingSource = new System.Windows.Forms.BindingSource(this.components);
             this.tRubikCubeBindingSource = new System.Windows.Forms.BindingSource(this.components);
             this.tglView1 = new TGL.TGLView();
+            this.tglView2 = new TGL.TGLView();
+            this.tglView3 = new TGL.TGLView();
+            this.tglView4 = new TGL.TGLView();
+            this.lblViewXYZ = new System.Windows.Forms.Label();
+            this.lblViewXYW = new System.Windows.Forms.Label();
+            this.lblViewXZW = new System.Windows.Forms.Label();
+            this.lblViewYZW = new System.Windows.Forms.Label();
             this.label11 = new System.Windows.Forms.Label();
             this.MovesLbl = new System.Windows.Forms.Label();
             this.panel1.SuspendLayout();
@@ -388,16 +395,85 @@
             // 
             this.tRubikCubeBindingSource.DataSource = typeof(RubikCube.TRubikCube);
             // 
-            // tglView1
-            // 
+            // tglView1 (XYZ - top left)
+            //
             this.tglView1.BackColor = System.Drawing.Color.White;
-            this.tglView1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.tglView1.Location = new System.Drawing.Point(445, 28);
+            this.tglView1.Location = new System.Drawing.Point(445, 50);
             this.tglView1.Name = "tglView1";
-            this.tglView1.Size = new System.Drawing.Size(757, 790);
+            this.tglView1.Size = new System.Drawing.Size(370, 370);
             this.tglView1.TabIndex = 0;
             this.tglView1.MouseDown += new System.Windows.Forms.MouseEventHandler(this.tglView1_MouseDown);
             this.tglView1.MouseMove += new System.Windows.Forms.MouseEventHandler(this.tglView1_MouseMove);
+            //
+            // tglView2 (XYW - top right)
+            //
+            this.tglView2.BackColor = System.Drawing.Color.White;
+            this.tglView2.Location = new System.Drawing.Point(825, 50);
+            this.tglView2.Name = "tglView2";
+            this.tglView2.Size = new System.Drawing.Size(370, 370);
+            this.tglView2.TabIndex = 1;
+            this.tglView2.MouseDown += new System.Windows.Forms.MouseEventHandler(this.tglView2_MouseDown);
+            this.tglView2.MouseMove += new System.Windows.Forms.MouseEventHandler(this.tglView2_MouseMove);
+            //
+            // tglView3 (XZW - bottom left)
+            //
+            this.tglView3.BackColor = System.Drawing.Color.White;
+            this.tglView3.Location = new System.Drawing.Point(445, 440);
+            this.tglView3.Name = "tglView3";
+            this.tglView3.Size = new System.Drawing.Size(370, 370);
+            this.tglView3.TabIndex = 2;
+            this.tglView3.MouseDown += new System.Windows.Forms.MouseEventHandler(this.tglView3_MouseDown);
+            this.tglView3.MouseMove += new System.Windows.Forms.MouseEventHandler(this.tglView3_MouseMove);
+            //
+            // tglView4 (YZW - bottom right)
+            //
+            this.tglView4.BackColor = System.Drawing.Color.White;
+            this.tglView4.Location = new System.Drawing.Point(825, 440);
+            this.tglView4.Name = "tglView4";
+            this.tglView4.Size = new System.Drawing.Size(370, 370);
+            this.tglView4.TabIndex = 3;
+            this.tglView4.MouseDown += new System.Windows.Forms.MouseEventHandler(this.tglView4_MouseDown);
+            this.tglView4.MouseMove += new System.Windows.Forms.MouseEventHandler(this.tglView4_MouseMove);
+            //
+            // lblViewXYZ
+            //
+            this.lblViewXYZ.AutoSize = true;
+            this.lblViewXYZ.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Bold);
+            this.lblViewXYZ.Location = new System.Drawing.Point(445, 28);
+            this.lblViewXYZ.Name = "lblViewXYZ";
+            this.lblViewXYZ.Size = new System.Drawing.Size(100, 17);
+            this.lblViewXYZ.TabIndex = 100;
+            this.lblViewXYZ.Text = "XYZ (W=1)";
+            //
+            // lblViewXYW
+            //
+            this.lblViewXYW.AutoSize = true;
+            this.lblViewXYW.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Bold);
+            this.lblViewXYW.Location = new System.Drawing.Point(825, 28);
+            this.lblViewXYW.Name = "lblViewXYW";
+            this.lblViewXYW.Size = new System.Drawing.Size(100, 17);
+            this.lblViewXYW.TabIndex = 101;
+            this.lblViewXYW.Text = "XYW (Z=1)";
+            //
+            // lblViewXZW
+            //
+            this.lblViewXZW.AutoSize = true;
+            this.lblViewXZW.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Bold);
+            this.lblViewXZW.Location = new System.Drawing.Point(445, 418);
+            this.lblViewXZW.Name = "lblViewXZW";
+            this.lblViewXZW.Size = new System.Drawing.Size(100, 17);
+            this.lblViewXZW.TabIndex = 102;
+            this.lblViewXZW.Text = "XZW (Y=1)";
+            //
+            // lblViewYZW
+            //
+            this.lblViewYZW.AutoSize = true;
+            this.lblViewYZW.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Bold);
+            this.lblViewYZW.Location = new System.Drawing.Point(825, 418);
+            this.lblViewYZW.Name = "lblViewYZW";
+            this.lblViewYZW.Size = new System.Drawing.Size(100, 17);
+            this.lblViewYZW.TabIndex = 103;
+            this.lblViewYZW.Text = "YZW (X=1)";
             // 
             // label11
             // 
@@ -423,6 +499,13 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1202, 818);
             this.Controls.Add(this.pictureBox1);
+            this.Controls.Add(this.lblViewYZW);
+            this.Controls.Add(this.lblViewXZW);
+            this.Controls.Add(this.lblViewXYW);
+            this.Controls.Add(this.lblViewXYZ);
+            this.Controls.Add(this.tglView4);
+            this.Controls.Add(this.tglView3);
+            this.Controls.Add(this.tglView2);
             this.Controls.Add(this.tglView1);
             this.Controls.Add(this.panel1);
             this.Controls.Add(this.menuStrip1);
@@ -430,6 +513,7 @@
             this.Name = "TRubikForm";
             this.Text = "Rubik\'s Cube";
             this.Load += new System.EventHandler(this.TRubikForm_Load);
+            this.Resize += new System.EventHandler(this.TRubikForm_Resize);
             this.panel1.ResumeLayout(false);
             this.panel1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.StateBox)).EndInit();
@@ -448,6 +532,13 @@
         #endregion
 
         private TGL.TGLView tglView1;
+        private TGL.TGLView tglView2;
+        private TGL.TGLView tglView3;
+        private TGL.TGLView tglView4;
+        private System.Windows.Forms.Label lblViewXYZ;
+        private System.Windows.Forms.Label lblViewXYW;
+        private System.Windows.Forms.Label lblViewXZW;
+        private System.Windows.Forms.Label lblViewYZW;
         private System.Windows.Forms.Timer MoveTimer;
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.Label label4;
