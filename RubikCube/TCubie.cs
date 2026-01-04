@@ -35,7 +35,7 @@ namespace RubikCube
         };
 
         // Store color index for each face of the cube
-        // Face order: -X, +X, -Y, +Y, -Z, +Z (6 faces)
+        // ACTUAL face order from geometry: -Z, -X, -Y, +Z, +X, +Y (6 faces)
         public int[] FaceColors = new int[6] { -1, -1, -1, -1, -1, -1 };
 
         public TCubie()

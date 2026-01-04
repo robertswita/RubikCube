@@ -1035,43 +1035,43 @@ namespace RubikCube
                             var cubieCopy = originalCubie.Copy();
 
                             // Add W dimension colors based on view type
-                            // XYZ view (W=sliceValue): Show W colors on Z faces
-                            // XYW view (Z=sliceValue): Show W colors on Z faces
-                            // XZW view (Y=sliceValue): Show W colors on Y faces
-                            // YZW view (X=sliceValue): Show W colors on X faces
+                            // XYZ view (W=sliceValue): W is fixed/hidden, don't show W colors
+                            // XYW view (Z=sliceValue): W varies, show W colors where Z would be
+                            // XZW view (Y=sliceValue): W varies, show W colors where Y would be
+                            // YZW view (X=sliceValue): W varies, show W colors where X would be
                             int wValue = originalCubie.W;
-                            if (viewName == "XYZ")
+
+                            if (viewName == "XYW")
                             {
-                                // W is fixed, show W color on Z faces based on W position
-                                if (wValue == 0)
-                                    cubieCopy.FaceColors[4] = 6;  // -Z face shows W=0 color (Purple)
-                                else if (wValue == TRubikCube.N - 1)
-                                    cubieCopy.FaceColors[5] = 7;  // +Z face shows W=N-1 color (Magenta)
-                            }
-                            else if (viewName == "XYW")
-                            {
-                                // Z is fixed, W varies - show W colors on Z faces
-                                if (wValue == 0)
-                                    cubieCopy.FaceColors[4] = 6;  // -Z face (represents -W) shows Purple
-                                else if (wValue == TRubikCube.N - 1)
-                                    cubieCopy.FaceColors[5] = 7;  // +Z face (represents +W) shows Magenta
+                                // Z is fixed, W varies - show W colors on Z faces at W boundaries
+                                // Face 0=-Z, Face 3=+Z
+                                // Only set if face doesn't already have a color
+                                if (wValue == 0 && cubieCopy.FaceColors[0] == -1)
+                                    cubieCopy.FaceColors[0] = 6;  // -Z face (represents -W) shows Purple
+                                if (wValue == TRubikCube.N - 1 && cubieCopy.FaceColors[3] == -1)
+                                    cubieCopy.FaceColors[3] = 7;  // +Z face (represents +W) shows Magenta
                             }
                             else if (viewName == "XZW")
                             {
-                                // Y is fixed, W varies - show W colors on Y faces
-                                if (wValue == 0)
+                                // Y is fixed, W varies - show W colors on Y faces at W boundaries
+                                // Face 2=-Y, Face 5=+Y
+                                // Only set if face doesn't already have a color
+                                if (wValue == 0 && cubieCopy.FaceColors[2] == -1)
                                     cubieCopy.FaceColors[2] = 6;  // -Y face (represents -W) shows Purple
-                                else if (wValue == TRubikCube.N - 1)
-                                    cubieCopy.FaceColors[3] = 7;  // +Y face (represents +W) shows Magenta
+                                if (wValue == TRubikCube.N - 1 && cubieCopy.FaceColors[5] == -1)
+                                    cubieCopy.FaceColors[5] = 7;  // +Y face (represents +W) shows Magenta
                             }
                             else if (viewName == "YZW")
                             {
-                                // X is fixed, W varies - show W colors on X faces
-                                if (wValue == 0)
-                                    cubieCopy.FaceColors[0] = 6;  // -X face (represents -W) shows Purple
-                                else if (wValue == TRubikCube.N - 1)
-                                    cubieCopy.FaceColors[1] = 7;  // +X face (represents +W) shows Magenta
+                                // X is fixed, W varies - show W colors on X faces at W boundaries
+                                // Face 1=-X, Face 4=+X
+                                // Only set if face doesn't already have a color
+                                if (wValue == 0 && cubieCopy.FaceColors[1] == -1)
+                                    cubieCopy.FaceColors[1] = 6;  // -X face (represents -W) shows Purple
+                                if (wValue == TRubikCube.N - 1 && cubieCopy.FaceColors[4] == -1)
+                                    cubieCopy.FaceColors[4] = 7;  // +X face (represents +W) shows Magenta
                             }
+                            // XYZ view: W is fixed/hidden dimension, so no W colors are shown
 
                             // Reposition based on slice indices to form a proper 3D cube
                             // Center the cube around origin

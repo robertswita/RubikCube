@@ -74,26 +74,26 @@ namespace RubikCube
         /// </summary>
         private void InitializeCubieFaceColors(TCubie cubie, int x, int y, int z, int w)
         {
-            // Face order in FaceColors: -X, +X, -Y, +Y, -Z, +Z
+            // ACTUAL face order in FaceColors: -Z, -X, -Y, +Z, +X, +Y (indices 0-5)
             // HyperFaceColors index: 0=X-, 1=X+, 2=Y-, 3=Y+, 4=Z-, 5=Z+, 6=W-, 7=W+
-
-            // X faces
-            if (x == 0)
-                cubie.FaceColors[0] = 0;  // -X face gets X=0 color (Red)
-            if (x == N - 1)
-                cubie.FaceColors[1] = 1;  // +X face gets X=N-1 color (Orange)
-
-            // Y faces
-            if (y == 0)
-                cubie.FaceColors[2] = 2;  // -Y face gets Y=0 color (White)
-            if (y == N - 1)
-                cubie.FaceColors[3] = 3;  // +Y face gets Y=N-1 color (Yellow)
 
             // Z faces
             if (z == 0)
-                cubie.FaceColors[4] = 4;  // -Z face gets Z=0 color (Blue)
+                cubie.FaceColors[0] = 4;  // Face 0 (-Z face) gets Z=0 color (Blue)
             if (z == N - 1)
-                cubie.FaceColors[5] = 5;  // +Z face gets Z=N-1 color (Green)
+                cubie.FaceColors[3] = 5;  // Face 3 (+Z face) gets Z=N-1 color (Green)
+
+            // X faces
+            if (x == 0)
+                cubie.FaceColors[1] = 0;  // Face 1 (-X face) gets X=0 color (Red)
+            if (x == N - 1)
+                cubie.FaceColors[4] = 1;  // Face 4 (+X face) gets X=N-1 color (Orange)
+
+            // Y faces
+            if (y == 0)
+                cubie.FaceColors[2] = 2;  // Face 2 (-Y face) gets Y=0 color (White)
+            if (y == N - 1)
+                cubie.FaceColors[5] = 3;  // Face 5 (+Y face) gets Y=N-1 color (Yellow)
 
             // Note: W dimension colors will be shown when viewing different slices
             // Interior cubies get -1 (no color) on faces not on the hypercube boundary
