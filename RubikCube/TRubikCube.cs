@@ -62,10 +62,41 @@ namespace RubikCube
                             cubie.Scale(cubieScale, cubieScale, cubieScale);
                             cubie.Translate(x - C, y - C, z - C);
                             cubie.WCoord = w - C;  // Set 4D W coordinate
+                            InitializeCubieFaceColors(cubie, x, y, z, w);  // Set colors based on 4D position
                             cubie.Parent = this;
                             Cubies[w, z, y, x] = cubie;
                         }
             //ActCubie = Cubies[(int)C, (int)C, (int)C, (int)C];
+        }
+
+        /// <summary>
+        /// Initialize face colors for a cubie based on its position in the 4D hypercube
+        /// </summary>
+        private void InitializeCubieFaceColors(TCubie cubie, int x, int y, int z, int w)
+        {
+            // Face order in FaceColors: -X, +X, -Y, +Y, -Z, +Z
+            // HyperFaceColors index: 0=X-, 1=X+, 2=Y-, 3=Y+, 4=Z-, 5=Z+, 6=W-, 7=W+
+
+            // X faces
+            if (x == 0)
+                cubie.FaceColors[0] = 0;  // -X face gets X=0 color (Red)
+            if (x == N - 1)
+                cubie.FaceColors[1] = 1;  // +X face gets X=N-1 color (Orange)
+
+            // Y faces
+            if (y == 0)
+                cubie.FaceColors[2] = 2;  // -Y face gets Y=0 color (White)
+            if (y == N - 1)
+                cubie.FaceColors[3] = 3;  // +Y face gets Y=N-1 color (Yellow)
+
+            // Z faces
+            if (z == 0)
+                cubie.FaceColors[4] = 4;  // -Z face gets Z=0 color (Blue)
+            if (z == N - 1)
+                cubie.FaceColors[5] = 5;  // +Z face gets Z=N-1 color (Green)
+
+            // Note: W dimension colors will be shown when viewing different slices
+            // Interior cubies get -1 (no color) on faces not on the hypercube boundary
         }
 
         public TRubikCube(TRubikCube src)

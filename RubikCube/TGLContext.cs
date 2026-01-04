@@ -104,7 +104,33 @@ namespace TGL
             {
                 var vertex = obj.Vertices[obj.Faces[i]];
                 if (i % 6 == 0)
-                    OpenGL.glColor4d(vertex.X, vertex.Y, vertex.Z, alpha);
+                {
+                    // Use 4D hyperface colors if this is a TCubie
+                    var cubie = obj as RubikCube.TCubie;
+                    if (cubie != null)
+                    {
+                        int faceIndex = i / 6;  // Each face has 6 vertices (2 triangles)
+                        if (faceIndex < cubie.FaceColors.Length)
+                        {
+                            int colorIndex = cubie.FaceColors[faceIndex];
+                            if (colorIndex >= 0 && colorIndex < RubikCube.TCubie.HyperFaceColors.Length)
+                            {
+                                var color = RubikCube.TCubie.HyperFaceColors[colorIndex];
+                                OpenGL.glColor4d(color[0], color[1], color[2], alpha);
+                            }
+                            else
+                            {
+                                // Interior face (no color) - use dark gray
+                                OpenGL.glColor4d(0.2, 0.2, 0.2, alpha);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Fallback for non-cubie objects
+                        OpenGL.glColor4d(vertex.X, vertex.Y, vertex.Z, alpha);
+                    }
+                }
                 OpenGL.glVertex3d(vertex.X, vertex.Y, vertex.Z);
             }
             OpenGL.glEnd();

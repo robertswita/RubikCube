@@ -20,6 +20,24 @@ namespace RubikCube
 
         public int ClusterCount;
 
+        // 8 colors for 4D hypercube hyperfaces
+        // Index: 0=X-, 1=X+, 2=Y-, 3=Y+, 4=Z-, 5=Z+, 6=W-, 7=W+
+        public static readonly double[][] HyperFaceColors = new double[][]
+        {
+            new double[] { 1.0, 0.0, 0.0 },   // 0: X=0 (left) - Red
+            new double[] { 1.0, 0.5, 0.0 },   // 1: X=N-1 (right) - Orange
+            new double[] { 1.0, 1.0, 1.0 },   // 2: Y=0 (bottom) - White
+            new double[] { 1.0, 1.0, 0.0 },   // 3: Y=N-1 (top) - Yellow
+            new double[] { 0.0, 0.0, 1.0 },   // 4: Z=0 (back) - Blue
+            new double[] { 0.0, 1.0, 0.0 },   // 5: Z=N-1 (front) - Green
+            new double[] { 0.6, 0.0, 0.8 },   // 6: W=0 (ana) - Purple
+            new double[] { 1.0, 0.0, 1.0 }    // 7: W=N-1 (kata) - Magenta
+        };
+
+        // Store color index for each face of the cube
+        // Face order: -X, +X, -Y, +Y, -Z, +Z (6 faces)
+        public int[] FaceColors = new int[6] { -1, -1, -1, -1, -1, -1 };
+
         public TCubie()
         {
             var lbn = new TPoint3D(-1, -1, -1);
@@ -120,6 +138,7 @@ namespace RubikCube
             dest.ValidState = ValidState;
             dest.ClusterCount = ClusterCount;
             dest._W = _W;  // Copy 4D W coordinate
+            Array.Copy(FaceColors, dest.FaceColors, FaceColors.Length);  // Copy face colors
             return dest;
         }
     }

@@ -994,10 +994,10 @@ namespace RubikCube
             // XZW view: Fix Y dimension at trackBarXZW value
             // YZW view: Fix X dimension at trackBarYZW value
 
-            UpdateSliceView(tglView1, RubikCube.GetSliceXYZ(trackBarXYZ.Value), "XYZ");
-            UpdateSliceView(tglView2, RubikCube.GetSliceXYW(trackBarXYW.Value), "XYW");
-            UpdateSliceView(tglView3, RubikCube.GetSliceXZW(trackBarXZW.Value), "XZW");
-            UpdateSliceView(tglView4, RubikCube.GetSliceYZW(trackBarYZW.Value), "YZW");
+            UpdateSliceView(tglView1, RubikCube.GetSliceXYZ(trackBarXYZ.Value), "XYZ", trackBarXYZ.Value);
+            UpdateSliceView(tglView2, RubikCube.GetSliceXYW(trackBarXYW.Value), "XYW", trackBarXYW.Value);
+            UpdateSliceView(tglView3, RubikCube.GetSliceXZW(trackBarXZW.Value), "XZW", trackBarXZW.Value);
+            UpdateSliceView(tglView4, RubikCube.GetSliceYZW(trackBarYZW.Value), "YZW", trackBarYZW.Value);
         }
 
         /// <summary>
@@ -1005,8 +1005,9 @@ namespace RubikCube
         /// </summary>
         /// <param name="view">The TGLView control to update</param>
         /// <param name="slice">3D array of cubies to display</param>
-        /// <param name="viewName">Name of the view (for debugging)</param>
-        private void UpdateSliceView(TGLView view, TCubie[,,] slice, string viewName)
+        /// <param name="viewName">Name of the view (XYZ, XYW, XZW, or YZW)</param>
+        /// <param name="sliceValue">The value of the fixed dimension</param>
+        private void UpdateSliceView(TGLView view, TCubie[,,] slice, string viewName, int sliceValue)
         {
             if (view == null || slice == null) return;
 
@@ -1032,6 +1033,45 @@ namespace RubikCube
                         {
                             // Create a visual copy of the cubie
                             var cubieCopy = originalCubie.Copy();
+
+                            // Add W dimension colors based on view type
+                            // XYZ view (W=sliceValue): Show W colors on Z faces
+                            // XYW view (Z=sliceValue): Show W colors on Z faces
+                            // XZW view (Y=sliceValue): Show W colors on Y faces
+                            // YZW view (X=sliceValue): Show W colors on X faces
+                            int wValue = originalCubie.W;
+                            if (viewName == "XYZ")
+                            {
+                                // W is fixed, show W color on Z faces based on W position
+                                if (wValue == 0)
+                                    cubieCopy.FaceColors[4] = 6;  // -Z face shows W=0 color (Purple)
+                                else if (wValue == TRubikCube.N - 1)
+                                    cubieCopy.FaceColors[5] = 7;  // +Z face shows W=N-1 color (Magenta)
+                            }
+                            else if (viewName == "XYW")
+                            {
+                                // Z is fixed, W varies - show W colors on Z faces
+                                if (wValue == 0)
+                                    cubieCopy.FaceColors[4] = 6;  // -Z face (represents -W) shows Purple
+                                else if (wValue == TRubikCube.N - 1)
+                                    cubieCopy.FaceColors[5] = 7;  // +Z face (represents +W) shows Magenta
+                            }
+                            else if (viewName == "XZW")
+                            {
+                                // Y is fixed, W varies - show W colors on Y faces
+                                if (wValue == 0)
+                                    cubieCopy.FaceColors[2] = 6;  // -Y face (represents -W) shows Purple
+                                else if (wValue == TRubikCube.N - 1)
+                                    cubieCopy.FaceColors[3] = 7;  // +Y face (represents +W) shows Magenta
+                            }
+                            else if (viewName == "YZW")
+                            {
+                                // X is fixed, W varies - show W colors on X faces
+                                if (wValue == 0)
+                                    cubieCopy.FaceColors[0] = 6;  // -X face (represents -W) shows Purple
+                                else if (wValue == TRubikCube.N - 1)
+                                    cubieCopy.FaceColors[1] = 7;  // +X face (represents +W) shows Magenta
+                            }
 
                             // Reposition based on slice indices to form a proper 3D cube
                             // Center the cube around origin
