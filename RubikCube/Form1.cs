@@ -120,6 +120,7 @@ namespace RubikCube
         // Slice selector event handlers
         private void trackBarXYZ_ValueChanged(object sender, EventArgs e)
         {
+            if (RubikCube == null) return;  // Safety check
             lblSliceXYZ.Text = "W=" + trackBarXYZ.Value;
             lblViewXYZ.Text = "XYZ (W=" + trackBarXYZ.Value + ")";
             UpdateAllViews();
@@ -127,6 +128,7 @@ namespace RubikCube
 
         private void trackBarXYW_ValueChanged(object sender, EventArgs e)
         {
+            if (RubikCube == null) return;  // Safety check
             lblSliceXYW.Text = "Z=" + trackBarXYW.Value;
             lblViewXYW.Text = "XYW (Z=" + trackBarXYW.Value + ")";
             UpdateAllViews();
@@ -134,6 +136,7 @@ namespace RubikCube
 
         private void trackBarXZW_ValueChanged(object sender, EventArgs e)
         {
+            if (RubikCube == null) return;  // Safety check
             lblSliceXZW.Text = "Y=" + trackBarXZW.Value;
             lblViewXZW.Text = "XZW (Y=" + trackBarXZW.Value + ")";
             UpdateAllViews();
@@ -141,6 +144,7 @@ namespace RubikCube
 
         private void trackBarYZW_ValueChanged(object sender, EventArgs e)
         {
+            if (RubikCube == null) return;  // Safety check
             lblSliceYZW.Text = "X=" + trackBarYZW.Value;
             lblViewYZW.Text = "YZW (X=" + trackBarYZW.Value + ")";
             UpdateAllViews();
