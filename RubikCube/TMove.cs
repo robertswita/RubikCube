@@ -30,11 +30,11 @@ namespace RubikCube
             move.Slice = code / 3;
             move.Angle = code % 3;
 
-            // Validate and clamp to current cube size
+            // Validate and wrap to current cube size (better for genetic diversity)
             if (move.Slice >= TRubikCube.N)
-                move.Slice = TRubikCube.N - 1;  // Clamp to valid range
+                move.Slice = move.Slice % TRubikCube.N;  // Wrap to valid range
             if (move.Plane >= 6)
-                move.Plane = 0;  // Should never happen, but be safe
+                move.Plane = move.Plane % 6;  // Wrap to valid plane
 
             return move;
         }

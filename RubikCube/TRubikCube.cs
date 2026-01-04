@@ -32,9 +32,14 @@ namespace RubikCube
                                 {
                                     var cubie = Cubies[w, z, y, x];
                                     var transform = (double[])cubie.Transform.Clone();
-                                    var alpha = cubie.State & 3;
-                                    var beta = (cubie.State >> 2) & 3;
-                                    var gamma = (cubie.State >> 4) & 3;
+
+                                    // Legacy 3D state extraction for StateGrid compatibility
+                                    // Full 4D orientation tracking is implemented in TCubie.State4DOrientation
+                                    var alpha = cubie.State & 3;        // Legacy: X rotation
+                                    var beta = (cubie.State >> 2) & 3;  // Legacy: Y rotation
+                                    var gamma = (cubie.State >> 4) & 3; // Legacy: Z rotation
+
+                                    // Apply 3D rotations for rendering (legacy compatibility)
                                     cubie.RotateZ(-90 * gamma);
                                     cubie.RotateY(-90 * beta);
                                     cubie.RotateX(-90 * alpha);
@@ -249,13 +254,17 @@ namespace RubikCube
                 // Apply 4D rotation to cubie's 4D transformation matrix
                 cubie.MultMatrix4D(rotationMatrix4D);
 
+                // Track 4D state changes
+                cubie.ApplyPlaneRotation(move.Plane, move.Angle + 1);
+
                 // Also update 3D transformation for rendering
                 // Extract 3D rotation from 4D and apply to 3D transform
                 Update3DTransformFromRotation(cubie, move.Plane, angle);
 
                 // Update cubie position in array
                 Cubies[cubie.W, cubie.Z, cubie.Y, cubie.X] = cubie;
-                cubie.ValidState = false;
+                cubie.ValidState = false;  // Force 3D state recalculation
+                cubie.ValidState4D = true; // 4D state already updated above
                 cubie.Transparent = false;
                 if (cubie.State != 0)
                     cubie.Transparent = true;
@@ -416,6 +425,39 @@ namespace RubikCube
                 }
             }
             return result;
+        }
+
+        /// <summary>
+        /// Proper 4D evaluation function using all 6 rotation planes
+        /// This replaces the legacy 3D evaluation for better genetic algorithm performance
+        /// </summary>
+        public double Evaluate4D()
+        {
+            double totalDistance = 0;
+            int unsolvedCount = 0;
+
+            for (int w = 0; w < N; w++)
+                for (int z = 0; z < N; z++)
+                    for (int y = 0; y < N; y++)
+                        for (int x = 0; x < N; x++)
+                        {
+                            var cubie = Cubies[w, z, y, x];
+                            if (cubie.ValidState4D)
+                            {
+                                var distance = cubie.Get4DStateDistance();
+                                totalDistance += distance;
+                                if (distance > 0) unsolvedCount++;
+                            }
+                            else
+                            {
+                                // Fallback to 3D state if 4D not available
+                                totalDistance += cubie.State == 0 ? 0 : 10; // Heavy penalty for unknown state
+                                if (cubie.State != 0) unsolvedCount++;
+                            }
+                        }
+
+            // Return weighted fitness: distance + penalty for unsolved count
+            return totalDistance + (unsolvedCount * 0.5);
         }
 
         public List<int> GetFreeGenes()

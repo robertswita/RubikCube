@@ -140,5 +140,70 @@ namespace RubikCube
             Array.Copy(FaceColors, dest.FaceColors, FaceColors.Length);  // Copy face colors
             return dest;
         }
+
+        /// <summary>
+        /// Full 4D orientation state tracking
+        /// Since 4D rotations need 6 parameters (for 6 planes), we need more than 3 angles
+        /// </summary>
+        public struct State4D
+        {
+            public int PlaneXY;  // Rotation count in XY plane (0-3)
+            public int PlaneXZ;  // Rotation count in XZ plane (0-3)
+            public int PlaneXW;  // Rotation count in XW plane (0-3)
+            public int PlaneYZ;  // Rotation count in YZ plane (0-3)
+            public int PlaneYW;  // Rotation count in YW plane (0-3)
+            public int PlaneZW;  // Rotation count in ZW plane (0-3)
+
+            public bool IsSolved => PlaneXY == 0 && PlaneXZ == 0 && PlaneXW == 0 &&
+                                   PlaneYZ == 0 && PlaneYW == 0 && PlaneZW == 0;
+        }
+
+        private State4D _state4D;
+        public State4D State4DOrientation
+        {
+            get => _state4D;
+            set
+            {
+                _state4D = value;
+                ValidState4D = true;
+            }
+        }
+
+        public bool ValidState4D = false;
+
+        /// <summary>
+        /// Apply 4D rotation and track state change
+        /// </summary>
+        public void ApplyPlaneRotation(int plane, int rotationCount)
+        {
+            ValidState4D = false; // Force recalculation
+
+            switch (plane)
+            {
+                case 0: _state4D.PlaneXY = (_state4D.PlaneXY + rotationCount) % 4; break;
+                case 1: _state4D.PlaneXZ = (_state4D.PlaneXZ + rotationCount) % 4; break;
+                case 2: _state4D.PlaneXW = (_state4D.PlaneXW + rotationCount) % 4; break;
+                case 3: _state4D.PlaneYZ = (_state4D.PlaneYZ + rotationCount) % 4; break;
+                case 4: _state4D.PlaneYW = (_state4D.PlaneYW + rotationCount) % 4; break;
+                case 5: _state4D.PlaneZW = (_state4D.PlaneZW + rotationCount) % 4; break;
+            }
+
+            ValidState4D = true;
+        }
+
+        /// <summary>
+        /// Get 4D distance from solved state (better fitness function)
+        /// </summary>
+        public int Get4DStateDistance()
+        {
+            if (!ValidState4D) return int.MaxValue;
+
+            return Math.Min(_state4D.PlaneXY, 4 - _state4D.PlaneXY) +
+                   Math.Min(_state4D.PlaneXZ, 4 - _state4D.PlaneXZ) +
+                   Math.Min(_state4D.PlaneXW, 4 - _state4D.PlaneXW) +
+                   Math.Min(_state4D.PlaneYZ, 4 - _state4D.PlaneYZ) +
+                   Math.Min(_state4D.PlaneYW, 4 - _state4D.PlaneYW) +
+                   Math.Min(_state4D.PlaneZW, 4 - _state4D.PlaneZW);
+        }
     }
 }
