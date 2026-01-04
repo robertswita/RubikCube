@@ -931,7 +931,7 @@ namespace RubikCube
                     }
 
             // Move the container back a bit so it's visible in the camera view
-            //sliceContainer.Translate(0, 0, 0);
+            // sliceContainer.Translate(0, 0, 0);
 
             // Invalidate the view to trigger redraw
             view.Invalidate();

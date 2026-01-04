@@ -49,9 +49,31 @@ namespace TGL
                 OpenGL.glClear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
                 OpenGL.glViewport(Viewport.Left, Viewport.Top, Viewport.Width, Viewport.Height);
                 Init();
+                SetupCamera();
                 DrawScene();
                 Win32.SwapBuffers(HDC);
             }
+        }
+
+        void SetupCamera()
+        {
+            // Set up projection matrix
+            OpenGL.glMatrixMode(OpenGL.GL_PROJECTION);
+            OpenGL.glLoadIdentity();
+
+            // Use perspective projection for better 3D viewing
+            double aspect = Viewport.Width / (double)Viewport.Height;
+            OpenGL.gluPerspective(45.0, aspect, 0.1, 100.0);
+
+            // Position camera to view the scene
+            OpenGL.gluLookAt(
+                0, 0, 8,      // Camera position (looking from positive Z)
+                0, 0, 0,      // Look at origin
+                0, 1, 0       // Up vector
+            );
+
+            // Switch back to modelview matrix for object transformations
+            OpenGL.glMatrixMode(OpenGL.GL_MODELVIEW);
         }
 
         void DrawScene()
@@ -115,7 +137,7 @@ namespace TGL
             if (!IsInited)
             {
                 OpenGL.glEnable(OpenGL.GL_DEPTH_TEST);
-                OpenGL.glEnable(OpenGL.GL_CULL_FACE);
+                OpenGL.glDisable(OpenGL.GL_CULL_FACE);  // Disable face culling to show all faces
                 //OpenGL.glPolygonMode(OpenGL.GL_FRONT_AND_BACK, OpenGL.GL_LINE);
                 //OpenGL.glEnable(OpenGL.GL_TEXTURE_2D);
                 //OpenGL.glEnable(OpenGL.GL_LIGHTING);
