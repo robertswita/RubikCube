@@ -110,17 +110,9 @@ namespace RubikCube
 
         public List<TCubie> SelectSlice(TMove move)
         {
-            var selection = new List<TCubie>();
-            for (int i = 0; i < N; i++)
-                for (int j = 0; j < N; j++)
-                {
-                    var v = new int[3];
-                    v[move.Axis] = move.Slice;
-                    v[(move.Axis + 1) % 3] = i;
-                    v[(move.Axis + 2) % 3] = j;
-                    selection.Add(Cubies[0, v[2], v[1], v[0]]);  // W=0 for backward compatibility
-                }
-            return selection;
+            // Redirect to 4D version for all moves
+            // This ensures backward compatibility while supporting 4D
+            return SelectSlice4D(move);
         }
 
         // 4D slice selection
