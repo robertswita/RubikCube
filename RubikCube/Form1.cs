@@ -117,7 +117,7 @@ namespace RubikCube
             }
         }
         int FrameNo;
-        int FrameCount = 10;
+        int FrameCount = 0;  // 0 = no animation, instant moves
         bool IsPaused = true;
 
         TObject3D ActSlice;
@@ -149,9 +149,30 @@ namespace RubikCube
                     if (angle > 180) angle -= 360;
                     angle *= (double)FrameNo / FrameCount;
                     ActSlice.LoadIdentity();
-                    if (move.Axis == 0) ActSlice.RotateX(angle);
-                    if (move.Axis == 1) ActSlice.RotateY(angle);
-                    if (move.Axis == 2) ActSlice.RotateZ(angle);
+
+                    // Map 4D rotation planes to 3D rotations for XYZ view animation
+                    // Plane: 0=XY, 1=XZ, 2=XW, 3=YZ, 4=YW, 5=ZW
+                    switch (move.Plane)
+                    {
+                        case 0: // XY plane → rotate around Z axis
+                            ActSlice.RotateZ(angle);
+                            break;
+                        case 1: // XZ plane → rotate around Y axis
+                            ActSlice.RotateY(angle);
+                            break;
+                        case 2: // XW plane → rotate around Y axis (W not visible in XYZ)
+                            ActSlice.RotateY(angle);
+                            break;
+                        case 3: // YZ plane → rotate around X axis
+                            ActSlice.RotateX(angle);
+                            break;
+                        case 4: // YW plane → rotate around X axis (W not visible in XYZ)
+                            ActSlice.RotateX(angle);
+                            break;
+                        case 5: // ZW plane → rotate around Z axis (W not visible in XYZ)
+                            ActSlice.RotateZ(angle);
+                            break;
+                    }
                 }
                 else
                 {
@@ -266,8 +287,14 @@ namespace RubikCube
                 var move = TMove.Decode((int)specimen.Genes[i]);
                 if (i == 0)
                 {
-                    var idx = new int[3] { RubikCube.ActCubie.X, RubikCube.ActCubie.Y, RubikCube.ActCubie.Z };
-                    move.Slice = idx[move.Axis];
+                    // For 4D: Determine which axis is fixed and set slice to ActCubie's position on that axis
+                    var idx = new int[4] { RubikCube.ActCubie.X, RubikCube.ActCubie.Y, RubikCube.ActCubie.Z, RubikCube.ActCubie.W };
+
+                    // Get the fixed axis for this plane rotation
+                    int[] remainingAxes = RubikCube.GetRemainingAxes(move.Plane);
+                    int fixedAxisIdx = remainingAxes[move.FixedAxis];
+
+                    move.Slice = idx[fixedAxisIdx];
                     specimen.Genes[0] = move.Encode();
                 }
                 cube.Turn(move);
@@ -862,7 +889,7 @@ namespace RubikCube
             e.Graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.Half;
             DisplayState(e.Graphics);
         }
-
+        
         /// <summary>
         /// Updates all 4 viewport views with 3D slices of the 4D hypercube
         /// </summary>
@@ -873,6 +900,7 @@ namespace RubikCube
             // Extract slices from 4D hypercube (using middle slice for each dimension)
             int middleSlice = TRubikCube.N / 2;
 
+            // All 4 views use the same approach - showing clean 3D slices
             UpdateSliceView(tglView1, RubikCube.GetSliceXYZ(middleSlice), "XYZ");
             UpdateSliceView(tglView2, RubikCube.GetSliceXYW(middleSlice), "XYW");
             UpdateSliceView(tglView3, RubikCube.GetSliceXZW(middleSlice), "XZW");

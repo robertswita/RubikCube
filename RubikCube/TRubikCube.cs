@@ -163,7 +163,7 @@ namespace RubikCube
         }
 
         // Get the two axes NOT involved in the rotation plane
-        private int[] GetRemainingAxes(int plane)
+        public int[] GetRemainingAxes(int plane)
         {
             switch (plane)
             {
