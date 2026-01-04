@@ -74,7 +74,8 @@ namespace RubikCube
                 for (int i = idx - 1; i >= 0; i--)
                 {
                     var prevMove = TMove.Decode((int)Genes[i]);
-                    if (prevMove.Axis != move.Axis) break;
+                    // 4D: Check if same plane and fixed axis
+                    if (prevMove.Plane != move.Plane || prevMove.FixedAxis != move.FixedAxis) break;
                     if (prevMove.Slice == move.Slice)
                     {
                         move.Angle = (move.Angle + prevMove.Angle + 2) % 4 - 1;
@@ -97,7 +98,8 @@ namespace RubikCube
         {
             Array.Copy(Genes, idx + 1, Genes, idx, Genes.Length - 1 - idx);
             var move = TMove.Decode((int)Genes[Genes.Length - 2]);
-            move.Axis = (move.Axis + 1) % 3;
+            // 4D: Cycle through planes instead of axes
+            move.Plane = (move.Plane + 1) % 6;
             //move.Angle = 2 - move.Angle;
             Genes[Genes.Length - 1] = move.Encode();
             //MutateGene(Genes.Length - 1);
