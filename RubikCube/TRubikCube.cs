@@ -10,7 +10,7 @@ namespace RubikCube
 {
     public class TRubikCube : TObject3D
     {
-        public static int N = 2;  // Changed to 2 for 2x2x2x2 hypercube
+        public static int N = 3;  // 3x3x3x3 hypercube (81 hypercubies)
         public static double C;
         public TCubie[,,,] Cubies = new TCubie[N, N, N, N];  // 4D array
         public List<TMove> Moves = new List<TMove>();

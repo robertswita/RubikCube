@@ -199,8 +199,18 @@
             this.label9.Text = "Segment Count:";
             // 
             // numericUpDown1
-            // 
+            //
             this.numericUpDown1.Location = new System.Drawing.Point(329, 23);
+            this.numericUpDown1.Minimum = new decimal(new int[] {
+            2,
+            0,
+            0,
+            0});
+            this.numericUpDown1.Maximum = new decimal(new int[] {
+            5,
+            0,
+            0,
+            0});
             this.numericUpDown1.Name = "numericUpDown1";
             this.numericUpDown1.Size = new System.Drawing.Size(64, 22);
             this.numericUpDown1.TabIndex = 21;
@@ -490,7 +500,7 @@
             // trackBarXYZ
             //
             this.trackBarXYZ.Location = new System.Drawing.Point(555, 28);
-            this.trackBarXYZ.Maximum = 1;
+            this.trackBarXYZ.Maximum = 2;
             this.trackBarXYZ.Minimum = 0;
             this.trackBarXYZ.Name = "trackBarXYZ";
             this.trackBarXYZ.Size = new System.Drawing.Size(200, 45);
@@ -501,7 +511,7 @@
             // trackBarXYW
             //
             this.trackBarXYW.Location = new System.Drawing.Point(935, 28);
-            this.trackBarXYW.Maximum = 1;
+            this.trackBarXYW.Maximum = 2;
             this.trackBarXYW.Minimum = 0;
             this.trackBarXYW.Name = "trackBarXYW";
             this.trackBarXYW.Size = new System.Drawing.Size(200, 45);
@@ -512,7 +522,7 @@
             // trackBarXZW
             //
             this.trackBarXZW.Location = new System.Drawing.Point(555, 418);
-            this.trackBarXZW.Maximum = 1;
+            this.trackBarXZW.Maximum = 2;
             this.trackBarXZW.Minimum = 0;
             this.trackBarXZW.Name = "trackBarXZW";
             this.trackBarXZW.Size = new System.Drawing.Size(200, 45);
@@ -523,7 +533,7 @@
             // trackBarYZW
             //
             this.trackBarYZW.Location = new System.Drawing.Point(935, 418);
-            this.trackBarYZW.Maximum = 1;
+            this.trackBarYZW.Maximum = 2;
             this.trackBarYZW.Minimum = 0;
             this.trackBarYZW.Name = "trackBarYZW";
             this.trackBarYZW.Size = new System.Drawing.Size(200, 45);

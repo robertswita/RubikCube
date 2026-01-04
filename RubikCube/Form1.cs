@@ -347,11 +347,12 @@ namespace RubikCube
             IterElapsed = TimeSpan.Zero;
             chart1.Series[0].Points.Clear();
 
-            // 4D Genetic Algorithm Parameters (tuned for 2×2×2×2 hypercube)
-            TChromosome.GenesLength = 54;  // Doubled from 27 for 4D complexity (6 planes vs 3 axes)
+            // 4D Genetic Algorithm Parameters (scaled with N)
+            // Complexity grows with N, so scale parameters accordingly
+            TChromosome.GenesLength = 35 * TRubikCube.N;  // N=2: 70, N=3: 105, N=4: 140
             var ga = new TGA<TRubikGenome>();
-            ga.PopulationCount = 200;      // Increased from default ~100 for better exploration
-            ga.GenerationsCount = 100;     // Increased from 50 for thorough solving
+            ga.PopulationCount = 100 * TRubikCube.N;      // N=2: 200, N=3: 300, N=4: 400
+            ga.GenerationsCount = 50 * TRubikCube.N;      // N=2: 100, N=3: 150, N=4: 200
             ga.WinnerRatio = 0.1;          // Keep top 10% of population
             ga.MutationRatio = 1;          // 100% mutation rate for diversity
             ga.SelectionType = TGA<TRubikGenome>.TSelectionType.Unique;
