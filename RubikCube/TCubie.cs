@@ -12,6 +12,12 @@ namespace RubikCube
         public int X { get { return (int)Math.Round(Origin.X + TRubikCube.C); } }
         public int Y { get { return (int)Math.Round(Origin.Y + TRubikCube.C); } }
         public int Z { get { return (int)Math.Round(Origin.Z + TRubikCube.C); } }
+
+        // 4D support: W coordinate stored separately
+        private double _W = 0;
+        public int W { get { return (int)Math.Round(_W + TRubikCube.C); } }
+        public double WCoord { get { return _W; } set { _W = value; } }
+
         public int ClusterCount;
 
         public TCubie()
@@ -98,7 +104,8 @@ namespace RubikCube
         {
             get
             {
-                var dist = Math.Abs(Origin.X) + Math.Abs(Origin.Y) + Math.Abs(Origin.Z);
+                // 4D Manhattan distance from center
+                var dist = Math.Abs(Origin.X) + Math.Abs(Origin.Y) + Math.Abs(Origin.Z) + Math.Abs(_W);
                 return (int)Math.Round(2 * dist);
             }
         }
@@ -112,6 +119,7 @@ namespace RubikCube
             dest._State = _State;
             dest.ValidState = ValidState;
             dest.ClusterCount = ClusterCount;
+            dest._W = _W;  // Copy 4D W coordinate
             return dest;
         }
     }
