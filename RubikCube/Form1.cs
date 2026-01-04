@@ -388,8 +388,19 @@ namespace RubikCube
             IsPaused = true;
             for (int i = 0; i < 100; i++)
             {
-                var code = TChromosome.Rnd.Next(9 * TRubikCube.N);
-                var move = TMove.Decode(code);
+                // 4D move encoding: 18 * Plane + 9 * FixedAxis + 3 * Slice + Angle
+                // Max value: 18*5 + 9*1 + 3*(N-1) + 2 = 99 + 3*N
+                // For N=2: range is 0-104, so we need Rnd.Next(105)
+                var maxCode = 99 + 3 * TRubikCube.N;
+
+                // Keep generating until we get a valid move
+                TMove move;
+                do
+                {
+                    var code = TChromosome.Rnd.Next(maxCode);
+                    move = TMove.Decode(code);
+                } while (move.Slice >= TRubikCube.N);  // Reject moves with invalid slice
+
                 Moves.Add(move);
             }
             MoveTimer.Start();
@@ -616,12 +627,13 @@ namespace RubikCube
             RubikCube.Parent = tglView1.Context.Root;
 
             var cubies = new List<TCubie>();
-            cubies.Add(RubikCube.Cubies[3, 3, 3]);
-            cubies.Add(RubikCube.Cubies[0, 0, 0]);
-            cubies.Add(RubikCube.Cubies[3, 3, 0]);
-            cubies.Add(RubikCube.Cubies[0, 2, 0]);
-            cubies.Add(RubikCube.Cubies[2, 3, 0]);
-            cubies.Add(RubikCube.Cubies[1, 2, 0]);
+            // Updated for 4D: N=2, so valid indices are 0 or 1
+            cubies.Add(RubikCube.Cubies[1, 1, 1, 1]);  // Corner hypercubie
+            cubies.Add(RubikCube.Cubies[0, 0, 0, 0]);  // Opposite corner
+            cubies.Add(RubikCube.Cubies[1, 1, 0, 0]);  // Edge hypercubie
+            cubies.Add(RubikCube.Cubies[0, 0, 1, 1]);  // Edge hypercubie
+            cubies.Add(RubikCube.Cubies[1, 0, 1, 0]);  // Face hypercubie
+            cubies.Add(RubikCube.Cubies[0, 1, 0, 1]);  // Face hypercubie
 
             for (int i = 0; i < cubies.Count; i++)
             {
@@ -706,8 +718,8 @@ namespace RubikCube
 
         private void undoMovesToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            var actCubie = RubikCube.Cubies[0, 0, 0];
-            var idx = new int[] { actCubie.X, actCubie.Y, actCubie.Z };
+            var actCubie = RubikCube.Cubies[0, 0, 0, 0];  // Updated for 4D
+            var idx = new int[] { actCubie.X, actCubie.Y, actCubie.Z, actCubie.W };  // Include W
             var A = new TMove();
             var B = new TMove();
             var C = new TMove();
