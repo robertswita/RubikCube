@@ -116,6 +116,32 @@ namespace RubikCube
                 StartPos = e.Location;
             }
         }
+
+        // Slice selector event handlers
+        private void trackBarXYZ_ValueChanged(object sender, EventArgs e)
+        {
+            lblSliceXYZ.Text = "W=" + trackBarXYZ.Value;
+            UpdateAllViews();
+        }
+
+        private void trackBarXYW_ValueChanged(object sender, EventArgs e)
+        {
+            lblSliceXYW.Text = "Z=" + trackBarXYW.Value;
+            UpdateAllViews();
+        }
+
+        private void trackBarXZW_ValueChanged(object sender, EventArgs e)
+        {
+            lblSliceXZW.Text = "Y=" + trackBarXZW.Value;
+            UpdateAllViews();
+        }
+
+        private void trackBarYZW_ValueChanged(object sender, EventArgs e)
+        {
+            lblSliceYZW.Text = "X=" + trackBarYZW.Value;
+            UpdateAllViews();
+        }
+
         int FrameNo;
         int FrameCount = 0;  // 0 = no animation, instant moves
         bool IsPaused = true;
@@ -327,6 +353,9 @@ namespace RubikCube
             ga.SelectionType = TGA<TRubikGenome>.TSelectionType.Unique;
             ga.Evaluate = OnEvaluate;
             ga.Progress = OnProgress;
+
+            // Ensure ActCubie is set before getting free genes
+            RubikCube.GetActCubie();
             TRubikGenome.FreeGenes = RubikCube.GetFreeGenes();
             ga.HighScore = HighScore;
             ga.Execute();
