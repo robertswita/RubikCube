@@ -9,6 +9,7 @@ namespace TGL
     {
         public const string GL_DLL = "opengl32.dll";
         [DllImport(GL_DLL)] public static extern void glEnable(int cap);
+        [DllImport(GL_DLL)] public static extern void glDisable(int cap);
         [DllImport(GL_DLL)] public static extern void glPolygonMode(int face, int mode);
         [DllImport(GL_DLL)] public static extern void glViewport(int x, int y, int width, int height);
         [DllImport(GL_DLL)] public static extern void glClearColor(float red, float green, float blue, float alpha);
@@ -23,6 +24,10 @@ namespace TGL
         [DllImport(GL_DLL)] public static extern void glLoadMatrixf(float[] m);
         [DllImport(GL_DLL)] public static extern void glMultMatrixf(float[] m);
         [DllImport(GL_DLL)] public static extern void glGetFloatv(int pname, float[] params_notkeyword);
+        [DllImport(GL_DLL)] public static extern void glBegin(int mode);
+        [DllImport(GL_DLL)] public static extern void glEnd();
+        [DllImport(GL_DLL)] public static extern void glColor4ub(byte red, byte green, byte blue, byte alpha);
+        [DllImport(GL_DLL)] public static extern void glVertex3f(float x, float y, float z);
 
 
         static Dictionary<string, Delegate> ExtFunctions = new Dictionary<string, Delegate>();
@@ -136,6 +141,7 @@ namespace TGL
 
         //  Constants
         public const int GL_TRIANGLES = 0x0004;
+        public const int GL_QUADS = 0x0007;
         public const int GL_BLEND = 0x0BE2;
         public const int GL_DEPTH_BUFFER_BIT = 0x00000100;
         public const int GL_ACCUM_BUFFER_BIT = 0x00000200;

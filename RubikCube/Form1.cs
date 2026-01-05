@@ -30,7 +30,7 @@ namespace RubikCube
         //public TScene Scene = new TScene();
         //public TCamera Camera;
         TGA<TRubikGenome> Ga;
-        TObject4D Root = new TObject4D();
+        TShape Root = new TShape();
         public TRubikForm()
         {
             InitializeComponent();
@@ -56,8 +56,8 @@ namespace RubikCube
                 var rot = new TVector();
                 rot.Y = 180 * (e.X - StartPos.X) / tglView1.Width;
                 rot.X = 180 * (e.Y - StartPos.Y) / tglView1.Height;
-                Camera.Yaw(rot.Y);
-                Camera.Pitch(rot.X);
+                Root.Rotate(1, rot.Y);
+                Root.Rotate(0, rot.X);
                 tglView1.Invalidate();
                 StartPos = e.Location;
             }
@@ -66,10 +66,10 @@ namespace RubikCube
         int FrameCount = 10;
         bool IsPaused = true;
 
-        TObject4D ActSlice;
+        TShape ActSlice;
         public void Group(List<TCubie> selection)
         {
-            ActSlice = new TObject4D();
+            ActSlice = new TShape();
             for (int i = 0; i < selection.Count; i++)
                 selection[i].Parent = ActSlice;
             ActSlice.Parent = RubikCube;
@@ -94,8 +94,8 @@ namespace RubikCube
                     double angle = 90 * (move.Angle + 1);
                     if (angle > 180) angle -= 360;
                     angle *= (double)FrameNo / FrameCount;
-                    ActSlice.LoadIdentity();
-                    ActSlice.RotatePlane(move.Plane, angle);
+                    ActSlice.Transform.LoadIdentity();
+                    ActSlice.Rotate(move.Plane, angle);
                     //if (move.Plane == 0) ActSlice.Rotation.X = angle;
                     //if (move.Plane == 1) ActSlice.Rotation.Y = angle;
                     //if (move.Plane == 2) ActSlice.Rotation.Z = angle;
@@ -499,7 +499,7 @@ namespace RubikCube
                 TRubikCube.Size = (int)Math.Round(Math.Pow(code.Length, 0.33));
                 RubikCube.Parent = null;
                 RubikCube = new TRubikCube();
-                RubikCube.Parent = Scene.Root;
+                RubikCube.Parent = Root;
                 RubikCube.Code = code;
                 tglView1.Invalidate();
             }
@@ -517,7 +517,7 @@ namespace RubikCube
             TRubikCube.Size = (int)numericUpDown1.Value;
             RubikCube.Parent = null;
             RubikCube = new TRubikCube();
-            RubikCube.Parent = Scene.Root;
+            RubikCube.Parent = Root;
             tglView1.Invalidate();
             StateBox.Invalidate();
             Moves.Clear();
@@ -543,21 +543,22 @@ namespace RubikCube
             TRubikCube.Size = 7;
             RubikCube.Parent = null;
             RubikCube = new TRubikCube();
-            RubikCube.Parent = Scene.Root;
+            RubikCube.Parent = Root;
 
             var cubies = new List<TCubie>();
-            cubies.Add(RubikCube.Cubies[3, 3, 3]);
-            cubies.Add(RubikCube.Cubies[0, 0, 0]);
-            cubies.Add(RubikCube.Cubies[3, 3, 0]);
-            cubies.Add(RubikCube.Cubies[0, 2, 0]);
-            cubies.Add(RubikCube.Cubies[2, 3, 0]);
-            cubies.Add(RubikCube.Cubies[1, 2, 0]);
+            cubies.Add(RubikCube.Cubies[0, 3, 3, 3]);
+            cubies.Add(RubikCube.Cubies[0, 0, 0, 0]);
+            cubies.Add(RubikCube.Cubies[0, 3, 3, 0]);
+            cubies.Add(RubikCube.Cubies[0, 0, 2, 0]);
+            cubies.Add(RubikCube.Cubies[0, 2, 3, 0]);
+            cubies.Add(RubikCube.Cubies[0, 1, 2, 0]);
 
             for (int i = 0; i < cubies.Count; i++)
             {
                 foreach (var cubie in RubikCube.Cubies)
                     cubie.State = 3;
-                var cluster = RubikCube.GetCluster(cubies[i]);
+                RubikCube.ActiveCubie = cubies[i];
+                var cluster = RubikCube.ActiveCluster;
                 foreach (var cubie in cluster)
                     cubie.State = 0;
                 SaveConfig("Cluster" + i.ToString() + ".cfg");
@@ -571,73 +572,36 @@ namespace RubikCube
 
         private void showClusterToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            TRubikCube.Size = 5;
-            RubikCube.Parent = null;
-            RubikCube = new TRubikCube();
-            RubikCube.Parent = Scene.Root;
-            //tglView1.Context.Root.LoadIdentity();
-            Camera.Rotation = new TVector();
-            foreach (var cubie in RubikCube.Cubies)
-            {
-                cubie.State = 3;
-                cubie.Transparent = true;
-            }
-            //var ccubie = RubikCube.Cubies[0, 2, 0];
-            for (var level = 1; level <= 9; level++)
-            {
-                RubikCube.GetActCubie();
-                foreach (var ccubie in RubikCube.ActCluster)
-                {
-                    ccubie.State = 0;
-                    ccubie.Transparent = false;
-                }
-            }
-            Camera.Roll(45);
-            //tglView1.Context.Root.RotateY(90);
-            Camera.Pitch(225);
-            tglView1.Invalidate();
-        }
-
-        private void makeMovesToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            //RubikCube.Cubies[0, 0, 0].Selected = true;
-            var C = new TMove();
-            var B = new TMove();
-            var A = new TMove();
-            A.Plane = 0;
-            B.Plane = 1;
-            C.Plane = 2;
-            A.Slice = 0;
-            B.Slice = 0;
-            C.Slice = 1;
-            A.Angle = 0;
-            B.Angle = 1;
-            C.Angle = 0;
-            var B_ = new TMove();
-            B_.Plane = B.Plane;
-            B_.Slice = B.Slice;
-            B_.Angle = 2 - B.Angle;
-            var C_ = new TMove();
-            C_.Plane = C.Plane;
-            C_.Slice = C.Slice;
-            C_.Angle = 2 - C.Angle;
-            var A_ = new TMove();
-            A_.Plane = A.Plane;
-            A_.Slice = A.Slice;
-            A_.Angle = 2 - A.Angle;
-            //Moves.AddRange(new TMove[] { B, A, B_ });
-            //Moves.AddRange(new TMove[] { A, B, A_, C, B_, C_ });
-            //Moves.AddRange(new TMove[] { C, B, A, B_, C_, A_ });
-            //Moves.AddRange(new TMove[] { A, C, B, C_, B_, A_ });
-            Moves.AddRange(new TMove[] { C, B, C_, B_ });
-            //Moves.AddRange(new TMove[] { A, B, C });
-            //Moves.Add(B);
-            MoveTimer.Start();
+            //TRubikCube.Size = 5;
+            //RubikCube.Parent = null;
+            //RubikCube = new TRubikCube();
+            //RubikCube.Parent = Root;
+            ////tglView1.Context.Root.LoadIdentity();
+            //Root.Rotation = new TVector();
+            //foreach (var cubie in RubikCube.Cubies)
+            //{
+            //    cubie.State = 3;
+            //    cubie.Transparent = true;
+            //}
+            ////var ccubie = RubikCube.Cubies[0, 2, 0];
+            //for (var level = 1; level <= 9; level++)
+            //{
+            //    RubikCube.GetActCubie();
+            //    foreach (var ccubie in RubikCube.ActCluster)
+            //    {
+            //        ccubie.State = 0;
+            //        ccubie.Transparent = false;
+            //    }
+            //}
+            //Camera.Roll(45);
+            ////tglView1.Context.Root.RotateY(90);
+            //Camera.Pitch(225);
+            //tglView1.Invalidate();
         }
 
         private void undoMovesToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            var actCubie = RubikCube.Cubies[0, 0, 0];
+            var actCubie = RubikCube.Cubies[0, 0, 0, 0];
             var idx = new int[] { actCubie.X, actCubie.Y, actCubie.Z };
             var A = new TMove();
             var B = new TMove();

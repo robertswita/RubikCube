@@ -370,13 +370,6 @@
             this.showClusterToolStripMenuItem.Text = "Show Cluster";
             this.showClusterToolStripMenuItem.Click += new System.EventHandler(this.showClusterToolStripMenuItem_Click);
             // 
-            // makeMovesToolStripMenuItem
-            // 
-            this.makeMovesToolStripMenuItem.Name = "makeMovesToolStripMenuItem";
-            this.makeMovesToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
-            this.makeMovesToolStripMenuItem.Text = "Make Moves";
-            this.makeMovesToolStripMenuItem.Click += new System.EventHandler(this.makeMovesToolStripMenuItem_Click);
-            // 
             // undoMovesToolStripMenuItem
             // 
             this.undoMovesToolStripMenuItem.Name = "undoMovesToolStripMenuItem";

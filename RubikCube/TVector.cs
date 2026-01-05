@@ -100,10 +100,10 @@ namespace TGL
                 dest[i] /= value;
             return dest;
         }
-        public double X { get { return Data[0]; } set { Data[0] = (float)value; } }
-        public double Y { get { return Data[1]; } set { Data[1] = (float)value; } }
-        public double Z { get { return Data[2]; } set { Data[2] = (float)value; } }
-        public double W { get { return Data[3]; } set { Data[3] = (float)value; } }
+        public float X { get { return Data[0]; } set { Data[0] = (float)value; } }
+        public float Y { get { return Data[1]; } set { Data[1] = (float)value; } }
+        public float Z { get { return Data[2]; } set { Data[2] = (float)value; } }
+        public float W { get { return Data[3]; } set { Data[3] = (float)value; } }
         // Zdefiniujemy również przydatne operacje na dwóch wektorach – iloczyn skalarny (dot product) 
         // i wektorowy (cross product) oraz property X,Y,Z,W i Norm ułatwiające dostęp do składowych
         public float Dot(TVector v)

@@ -12,92 +12,67 @@ namespace TGL
     public class TAffine : TMatrix
     {
         public static int N = 4;
-        public TAffine() : base(4, 4) { LoadIdentity(); }
-        public TAffine(TMatrix src) : base(4, 4) { Assign(src); }
-        //public void Mult(TMatrix src)
-        //{
-        //    Assign(src * this);
-        //}
+        public TAffine() : base(N + 1, N + 1) { LoadIdentity(); }
+        public TAffine(TMatrix src) : base(N + 1, N + 1) { Assign(src); }
+        public static int[][] Planes = new int[N * (N - 1) / 2][];
+        static TAffine()
+        {
+            var idx = 0;
+            for (int i = 0; i < N - 1; i++)
+                for (int j = i + 1; j < N; j++)
+                {
+                    Planes[idx] = new int[] { i, j };
+                    idx++;
+                }
+        }
 
-        public static TAffine Scale(TVector scale)
+        public static TAffine CreateScale(TVector scale)
         {
             var S = new TAffine();
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < N; i++)
                 S[i, i] = scale[i];
             return S;
         }
 
-        public static TAffine Shear(TVector h)
+        public static TAffine CreateShear(TVector h)
         {
             var H = new TAffine();
-            H[0, 1] = h[0];
-            H[0, 2] = h[1];
-            H[1, 2] = h[2];
+            for (int i = 0; i < Planes.Length; i++)
+                H[Planes[i][0], Planes[i][1]] = h[i];
             return H;
         }
 
-        public static TAffine RotateX(double alpha)
+        public static TAffine CreateRotation(int axis1, int axis2, double angle)
         {
-            alpha *= Math.PI / 180;
-            var cosA = (float)Math.Cos(alpha);
-            var sinA = (float)Math.Sin(alpha);
+            angle *= Math.PI / 180;
+            var cosA = (float)Math.Cos(angle);
+            var sinA = (float)Math.Sin(angle);
             var R = new TAffine();
-            R.Cols[1] = new TVector(0, cosA, sinA);
-            R.Cols[2] = new TVector(0, -sinA, cosA);
+            R[axis1, axis1] = cosA;
+            R[axis2, axis2] = cosA;
+            R[axis1, axis2] = -sinA;
+            R[axis2, axis1] = sinA;
             return R;
         }
 
-        public static TAffine RotateY(double beta)
+        public static TAffine CreateRotation(int axis, double angle)
         {
-            beta *= Math.PI / 180;
-            var cosA = (float)Math.Cos(beta);
-            var sinA = (float)Math.Sin(beta);
-            var R = new TAffine();
-            R.Cols[0] = new TVector(cosA, 0, -sinA);
-            R.Cols[2] = new TVector(sinA, 0, cosA);
-            return R;
+            return CreateRotation(Planes[axis][0], Planes[axis][1], angle);
         }
 
-        public static TAffine RotateZ(double gamma)
-        {
-            gamma *= Math.PI / 180;
-            var cosA = (float)Math.Cos(gamma);
-            var sinA = (float)Math.Sin(gamma);
-            var R = new TAffine();
-            R.Cols[0] = new TVector(cosA, sinA, 0);
-            R.Cols[1] = new TVector(-sinA, cosA, 0);
-            return R;
-        }
-        public static TAffine Rotate(double angle, TVector v)
-        {
-            v.Norm = 1;
-            var m = CreateRotation(v);
-            return m * RotateX(angle) * m.Inv;
-        }
-
-        public static TAffine CreateRotation(TVector v)
-        {
-            var vX = new TVector();
-            vX.Assign(v);
-            var vY = new TVector(0, 1, 0);
-            var vZ = new TVector(0, 0, 1);
-            if (Math.Abs(vX.Y) < Math.Abs(vX.Z))
-                vY = Cross(vX, vY);
-            else
-                vY = Cross(vX, vZ);
-            vZ = Cross(vX, vY);
-            var m = new TAffine();
-            m.Cols[0] = vX;
-            m.Cols[1] = vY;
-            m.Cols[2] = vZ;
-            return m;
-        }
-
-        public static TAffine Translate(TVector t)
+        public static TAffine CreateTranslation(TVector t)
         {
             var T = new TAffine();
-            T.Cols[3] = t;
+            for (int i = 0; i < N; i++)
+                T[i, N] = t[i];
             return T;
+        }
+
+        public override TVector Clone()
+        {
+            TAffine result = new TAffine();
+            result.Assign(this);
+            return result;
         }
 
         public static TAffine operator *(TAffine affine, TMatrix M)
@@ -107,9 +82,14 @@ namespace TGL
 
         public static TVector operator *(TAffine m, TVector v)
         {
-            var p = new TVector(v[0], v[1], v[2], 1);
+            var p = new TVector(N + 1);
+            Array.Copy(v.Data, p.Data, N);
+            p[N] = 1;
             p = (TMatrix)m * p;
-            return new TVector(p[0] / p[3], p[1] / p[3], p[2] / p[3]);
+            p = p / p[N];
+            var v_ = new TVector(N);
+            Array.Copy(p.Data, v_.Data, N);
+            return v_;
         }
 
         public new TAffine Inv

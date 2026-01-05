@@ -8,9 +8,9 @@ using TGL;
 
 namespace RubikCube
 {
-    public class TRubikCube: TObject4D
+    public class TRubikCube: TShape
     {
-        public static int N = 3;
+        //public static int N = 3;
         public static int Size = 3;
         public static float C;
         //public TCubie[,,] Cubies = new TCubie[Size, Size, Size];
@@ -43,7 +43,7 @@ namespace RubikCube
                                     for (int axis = 0; axis < 6; axis++)
                                     {
                                         var angle = cubie.State >> 2 * axis & 3;
-                                        cubie.RotatePlane(axis, -90 * angle);
+                                        cubie.Rotate(axis, -90 * angle);
                                     }
                                     var idx = Size * (Size * (Size * cubie.X + cubie.Y) + cubie.Z) + cubie.W;
                                     _StateGrid[i, idx] = cubie.State + (1 << 6);
@@ -139,25 +139,19 @@ namespace RubikCube
 
         public void Turn(TMove move)
         {
-            var slice = new TObject3D();
+            var slice = new TShape();
             int angle = 90 * (move.Angle + 1);
-            if (move.Plane == 0)
-                slice.Pitch(angle);
-            else if (move.Plane == 1)
-                slice.Yaw(angle);
-            else
-                slice.Roll(angle);
+            slice.Rotate(move.Plane, angle);
             var selection = SelectSlice(move);
             for (int i = 0; i < selection.Count; i++)
             {
                 var cubie = selection[i];
                 cubie.Transform = slice.Transform * cubie.Transform;
-                //cubie.MultMatrix(slice.Transform);
                 Cubies[cubie.W, cubie.Z, cubie.Y, cubie.X] = cubie;
                 cubie.ValidState = false;
-                cubie.Transparent = false;
+                cubie.Transparency = 1;
                 if (cubie.State != 0)
-                    cubie.Transparent = true;
+                    cubie.Transparency = 0.5f;
                 cubie.Parent = this;
             }
             _StateGrid = null;
@@ -385,17 +379,17 @@ namespace RubikCube
                                             var cubie = Cubies[ActiveCubie.W, ActiveCubie.Z, ActiveCubie.Y, ActiveCubie.X];
                                             if (!activeCluster.Contains(cubie))
                                                 activeCluster.Add(cubie);
-                                            ActiveCubie.RotateXY(90);
+                                            ActiveCubie.Rotate(0, 90);
                                         }
-                                        ActiveCubie.RotateXZ(90);
+                                        ActiveCubie.Rotate(1, 90);
                                     }
-                                    ActiveCubie.RotateXZ(90);
+                                    ActiveCubie.Rotate(2, 90);
                                 }
-                                ActiveCubie.RotateYZ(90);
+                                ActiveCubie.Rotate(3, 90);
                             }
-                            ActiveCubie.RotateYW(90);
+                            ActiveCubie.Rotate(4, 90);
                         }
-                        ActiveCubie.RotateZW(90);
+                        ActiveCubie.Rotate(5, 90);
                     }
                 }
                 return activeCluster;

@@ -12,7 +12,7 @@ namespace TGL
         public TGLView()
         {
             InitializeComponent();
-            //ResizeRedraw = true;
+            ResizeRedraw = true;
             SetStyle(ControlStyles.Opaque, true);
             Context.View = this;
         }
@@ -22,12 +22,6 @@ namespace TGL
         {
             if (Context.Handle != IntPtr.Zero)
                 Context.DrawView();
-        }
-
-        protected override void OnResize(EventArgs e)
-        {
-            if (Context.Handle != IntPtr.Zero)
-                Context.Resize();
         }
 
         public void Recreate()

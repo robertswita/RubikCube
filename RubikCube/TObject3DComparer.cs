@@ -5,10 +5,10 @@ using RubikCube;
 
 namespace TGL
 {
-    class TObject3DComparer : IComparer<TObject3D>
+    class TObject3DComparer : IComparer<TShape>
     {
         //public TGLContext GLCanvas;
-        public int Compare(TObject3D first, TObject3D second)
+        public int Compare(TShape first, TShape second)
         {
             var projection = new double[16];
             var viewport = new int[4];

@@ -15,8 +15,7 @@ namespace RubikCube
         public int Plane; 
         public int Angle;
         public int[] GetAxes() {
-            var plane = TObject4D.RotateAxes[Plane];
-            return new int[] { plane.X, plane.Y }; 
+            return TAffine.Planes[Plane];
         }
 
 //public void Assign(TMove move)

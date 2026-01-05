@@ -58,11 +58,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TAffine.cs" />
-    <Compile Include="TAnimation.cs" />
-    <Compile Include="TCamera.cs" />
     <Compile Include="TChromosome.cs" />
-    <Compile Include="TCube.cs" />
-    <Compile Include="TFace.cs" />
     <Compile Include="TGA.cs" />
     <Compile Include="TGLContext.cs" />
     <Compile Include="TGLView.cs">
@@ -71,18 +67,14 @@
     <Compile Include="TGLView.Designer.cs">
       <DependentUpon>TGLView.cs</DependentUpon>
     </Compile>
-    <Compile Include="TLight.cs" />
-    <Compile Include="TMap.cs" />
     <Compile Include="TMaterial.cs" />
     <Compile Include="TMatrix.cs" />
-    <Compile Include="TObject3D.cs" />
     <Compile Include="TObject3DComparer.cs" />
-    <Compile Include="TObject4D.cs" />
+    <Compile Include="TShape.cs" />
     <Compile Include="TRubikGenome.cs" />
     <Compile Include="TMove.cs" />
     <Compile Include="TCubie.cs" />
     <Compile Include="TRubikCube.cs" />
-    <Compile Include="TScene.cs" />
     <Compile Include="TSpaceForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -90,7 +82,6 @@
       <DependentUpon>TSpaceForm.cs</DependentUpon>
     </Compile>
     <Compile Include="TVector.cs" />
-    <Compile Include="TVertex.cs" />
     <Compile Include="Win32.cs" />
     <EmbeddedResource Include="Form1.resx">
       <DependentUpon>Form1.cs</DependentUpon>
