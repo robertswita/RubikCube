@@ -66,7 +66,8 @@ namespace RubikCube
                         {
                             var cubie = new TCubie();
                             cubie.Scale(new TVector(cubieScale, cubieScale, cubieScale, cubieScale));
-                            cubie.Origin = new TVector(x - C, y - C, z - C, w - C);
+                            cubie.Origin = new TVector(x - C, y - C, z - C, w - C, 1);
+                            //cubie.Translate(new TVector(x - C, y - C, z - C, w - C));
                             cubie.Parent = this;
                             Cubies[w, z, y, x] = cubie;
                         }

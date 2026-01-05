@@ -40,6 +40,20 @@ namespace RubikCube
             //light.Parent = Camera;
             //light.Origin = new TVector(0, 0, 1);
             //TransparencyBox.Checked = true;
+            tglView1.MouseWheel += TglView1_MouseWheel;
+        }
+
+        private void TglView1_MouseWheel(object sender, MouseEventArgs e)
+        {
+            Root.Rotate(5, (float)e.Delta / 60);
+            tglView1.Invalidate();
+        }
+
+        private void TRubikForm_Load(object sender, EventArgs e)
+        {
+            tglView1.Context.Root = Root;
+            RubikCube = new TRubikCube();
+            RubikCube.Parent = Root;
         }
 
         Point StartPos;
@@ -426,14 +440,6 @@ namespace RubikCube
         //    gc.DrawLines(pen, pts.ToArray());
         //    pictureBox1.Image = bmp;
         //}
-
-        private void TRubikForm_Load(object sender, EventArgs e)
-        {
-            RubikCube = new TRubikCube();
-            //RubikCube.Parent = Scene.Root;
-            tglView1.Context.Root = Root;
-            RubikCube.Parent = Root;
-        }
 
         private void saveToolStripMenuItem_Click(object sender, EventArgs e)
         {
