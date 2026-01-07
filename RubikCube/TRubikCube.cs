@@ -96,7 +96,7 @@ namespace RubikCube
                 for (int i = 0; i < actCluster.Count; i++)
                 {
                     var cubie = actCluster[i];
-                    activeCluster.Add(Cubies[cubie.W, cubie.Z, cubie.Y, cubie.X]);
+                    ActiveCluster.Add(Cubies[cubie.W, cubie.Z, cubie.Y, cubie.X]);
                 }
             }
         }
@@ -121,20 +121,21 @@ namespace RubikCube
         public List<TCubie> SelectSlice(TMove move)
         {
             var selection = new List<TCubie>();
-            var axes = move.GetAxes();
-            var slices = new List<int>() { 0, 1, 2, 3 };
-            for (int dim = 0; dim < axes.Length; dim++)
-                slices.Remove(axes[dim]);
-            for (int i = 0; i < Size; i++)
-                for (int j = 0; j < Size; j++)
-                {
-                    var v = new int[4];
-                    v[axes[0]] = i;
-                    v[axes[1]] = j;
-                    v[slices[0]] = move.SliceA;
-                    v[slices[1]] = move.SliceB;
-                    selection.Add(Cubies[v[3], v[2], v[1], v[0]]);
-                }
+            var planeAxes = TAffine.Planes[move.Plane];
+            //var slices = new List<int>() { 0, 1, 2, 3 };
+            //for (int dim = 0; dim < axes.Length; dim++)
+            //    slices.Remove(axes[dim]);
+            //slices.Remove(move.Axis);
+            for (int segNo = 0; segNo < Size; segNo++)
+                for (int i = 0; i < Size; i++)
+                    for (int j = 0; j < Size; j++)
+                    {
+                        var v = new int[] { segNo, segNo, segNo, segNo };
+                        v[planeAxes[0]] = i;
+                        v[planeAxes[1]] = j;
+                        v[move.Axis] = move.Slice;
+                        selection.Add(Cubies[v[3], v[2], v[1], v[0]]);
+                    }
             return selection;
         }
 
@@ -292,31 +293,29 @@ namespace RubikCube
         {
             var freeGenes = new List<int>();
             var idx = new int[] { ActiveCubie.X, ActiveCubie.Y, ActiveCubie.Z, ActiveCubie.W };
-            for (int axis = 0; axis < 6; axis++)
+            for (int axis = 0; axis < 4; axis++)
                 for (int i = 0; i < 4; i++)
-                    for (int j = 0; j < 4; j++)
-                        for (int sideA = 0; sideA < 2; sideA++)
-                            for (int sideB = 0; sideB < 2; sideB++)
+                    for (int plane = 0; plane < 6; plane++)
+                        for (int side = 0; side < 2; side++)
+                        {
+                            var move = new TMove();
+                            move.Plane = plane;
+                            var planeAxes = move.GetPlaneAxes();
+                            if (planeAxes[0] == axis || planeAxes[1] == axis)
+                                continue;
+                            move.Axis = axis;
+                            if (side == 0)
+                                move.Slice = idx[i];
+                            else
+                                move.Slice = Size - 1 - idx[i];
+                            var gene = move.Encode();
+                            if (freeGenes.IndexOf(gene) < 0)
                             {
-                                //if (i == j) continue;
-                                var move = new TMove();
-                                move.Plane = axis;
-                                if (sideA == 0)
-                                    move.SliceA = idx[i];
-                                else
-                                    move.SliceA = Size - 1 - idx[i];
-                                if (sideB == 0)
-                                    move.SliceB = idx[j];
-                                else
-                                    move.SliceB = Size - 1 - idx[j];
-                                var gene = move.Encode();
-                                if (freeGenes.IndexOf(gene) < 0)
-                                {
-                                    freeGenes.Add(gene + 0);
-                                    freeGenes.Add(gene + 1);
-                                    freeGenes.Add(gene + 2);
-                                }
+                                freeGenes.Add(gene + 0);
+                                freeGenes.Add(gene + 1);
+                                freeGenes.Add(gene + 2);
                             }
+                        }
             return freeGenes;
         }
 

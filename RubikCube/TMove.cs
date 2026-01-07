@@ -10,47 +10,47 @@ namespace RubikCube
 {
     public class TMove
     {
-        public int SliceA;
-        public int SliceB;
+        public int Axis;
+        public int Slice;
         public int Plane; 
         public int Angle;
-        public int[] GetAxes() {
+        public int[] GetPlaneAxes()
+        {
             return TAffine.Planes[Plane];
         }
 
-//public void Assign(TMove move)
-//{
-//    Slice = move.Slice;
-//    Axis = move.Axis;
-//    Angle = move.Angle;
-//}
+        //public void Assign(TMove move)
+        //{
+        //    Slice = move.Slice;
+        //    Axis = move.Axis;
+        //    Angle = move.Angle;
+        //}
 
-// N = number of axes (4 for XYZW)
-        (int i, int j) FromIndex(int index, int N = 4)
-        {
-            int i = 0;
-            int rowCount = N - 1 - i; // elements in row 0 of upper triangle
+        // N = number of axes (4 for XYZW)
+        //(int i, int j) FromIndex(int index, int N = 4)
+        //{
+        //    int i = 0;
+        //    int rowCount = N - 1 - i; // elements in row 0 of upper triangle
 
-            int k = index; // we’ll consume this as we move down rows
+        //    int k = index; // we’ll consume this as we move down rows
 
-            while (k >= rowCount)
-            {
-                k -= rowCount;
-                i++;
-                rowCount = N - 1 - i;
-            }
+        //    while (k >= rowCount)
+        //    {
+        //        k -= rowCount;
+        //        i++;
+        //        rowCount = N - 1 - i;
+        //    }
 
-            int j = i + 1 + k;
-            return (i, j);
-        }
+        //    int j = i + 1 + k;
+        //    return (i, j);
+        //}
 
         public static TMove Decode(int code)
         {
             var move = new TMove();
-            var size = 18 * TRubikCube.Size;
-            move.SliceA = code / size;
-            code = code % size;
-            move.SliceB = code / 18;
+            move.Slice = code / 72;
+            code = code % 72;
+            move.Axis = code / 18;
             code = code % 18;
             move.Plane = code / 3;
             move.Angle = code % 3;
@@ -59,7 +59,7 @@ namespace RubikCube
 
         public int Encode()
         {
-            return 18 * (TRubikCube.Size * SliceA + SliceB) + 3 * Plane + Angle;
+            return 72 * Slice + 18 * Axis + 3 * Plane + Angle;
         }
 
     }

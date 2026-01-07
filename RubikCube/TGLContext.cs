@@ -135,7 +135,7 @@ namespace TGL
             {
                 OpenGL.glEnable(OpenGL.GL_DEPTH_TEST);
                 //OpenGL.glDisable(OpenGL.GL_CULL_FACE);  // Disable face culling to show all faces
-                ///OpenGL.glPolygonMode(OpenGL.GL_FRONT_AND_BACK, OpenGL.GL_LINE);
+                //OpenGL.glPolygonMode(OpenGL.GL_FRONT_AND_BACK, OpenGL.GL_LINE);
                 //OpenGL.glEnable(OpenGL.GL_TEXTURE_2D);
                 //OpenGL.glEnable(OpenGL.GL_LIGHTING);
                 //OpenGL.glEnable(OpenGL.GL_COLOR_MATERIAL);

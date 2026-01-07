@@ -74,8 +74,9 @@ namespace RubikCube
                 for (int i = idx - 1; i >= 0; i--)
                 {
                     var prevMove = TMove.Decode((int)Genes[i]);
+                    if (prevMove.Axis != move.Axis) break;
                     if (prevMove.Plane != move.Plane) break;
-                    if (prevMove.SliceA == move.SliceA && prevMove.SliceB == move.SliceB)
+                    if (prevMove.Slice == move.Slice)
                     {
                         move.Angle = (move.Angle + prevMove.Angle + 2) % 4 - 1;
                         Genes[i] = move.Encode();

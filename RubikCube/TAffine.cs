@@ -115,38 +115,72 @@ namespace TGL
             return Q;
         }
 
-        public List<TVector> GetEulerAngles()
+        public List<TVector> GetEulerAngles2()
         {
             //R = zeros(m * (m - 1) / 2, 1);
             var angles = new List<TVector>();
             var A = (TAffine)Clone();
+            //var A = new TMatrix(N, N);
+            //for (int x = 0; x < N; x++)
+            //{
+            //    var col = new TVector(N);
+            //    Array.Copy(Cols[x].Data, col.Data, N);
+            //    A.Cols[x] = col;
+            //}
             //var idx = 1;
-            var Q = new TAffine();
-            for (int i = 1; i < N; i++)
-                for (int j = 0; j < i - 1; j++)
+            //var Q = new TAffine();
+            for (int i = 0; i < N - 1; i++)
+                for (int j = i + 1; j < N; j++)
                 {
-                    var a = A[j, j];
-                    var b = A[i, j];
-                    //var phi = atan2(-b, a);
+                    var a = A[i, i];
+                    var b = A[j, i];
+                    //var phi = Math.Atan2(-b, a);
+
                     var r = (float)Math.Sqrt(a * a + b * b);
                     var cosA = a / r;
                     var sinA = -b / r;
+                    //var cosA = (float)Math.Cos(phi);
+                    //var sinA = (float)Math.Sin(phi);
                     angles.Add(new TVector(cosA, sinA));
-                    //var c = cos(phi);
-                    //var s = sin(phi);
                     //R(idx) = -phi;
                     //idx = idx + 1;
                     var Qij = new TAffine();
                     Qij[j, j] = cosA;
-                    Qij[i, j] = sinA;
-                    Qij[j, i] = -sinA;
+                    Qij[i, j] = -sinA;
+                    Qij[j, i] = sinA;
                     Qij[i, i] = cosA;
                     A = Qij * A;
-                    Q = Q * Qij.Transpose();
+                    //Q = Q * Qij.Transpose();
                 }
             return angles;
         }
 
+        public List<TVector> GetEulerAngles()
+        {
+            var angles = new List<TVector>();
+            var A = (TAffine)Clone();
+            //var Q = new TAffine();
+            for (int n = 0; n < N - 1; n++)
+                for (int m = n + 1; m < N; m++)
+                {
+                    var a = A[n, n];
+                    var b = A[m, n];
+                    var r = (float)Math.Sqrt(a * a + b * b);
+                    var cosA = a / r;
+                    var sinA = -b / r;
+                    angles.Add(new TVector(cosA, sinA));
+                    A.Rotate(n, m, cosA, sinA);
+                    //nRow = cosPhi * R(n,:) – sinPhi * R(m,:);
+                    //mRow = sinPhi * R(n,:) + cosPhi * R(m,:);
+                    //R(n,:) = nRow;
+                    //R(m,:) = mRow;
+                    //nCol = cosPhi * Q(:, n) – sinPhi * Q(:, m);
+                    //mCol = sinPhi * Q(:, n) + cosPhi * Q(:, m);
+                    //Q(:, n) = nCol;
+                    //Q(:, m) = mCol;
+                }
+            return angles;
+        }
 
     };
 }

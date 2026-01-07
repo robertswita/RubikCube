@@ -328,11 +328,17 @@ namespace RubikCube
         {
             if (MoveTimer.Enabled) return;
             IsPaused = true;
-            for (int i = 0; i < 10; i++)
+            var size = TRubikCube.Size;
+            var rnd = TChromosome.Rnd;
+            for (int i = 0; i < 1; i++)
             {
-                var code = TChromosome.Rnd.Next(9 * TRubikCube.Size);
+                //var code = TChromosome.Rnd.Next(9 * TRubikCube.Size);
+                RubikCube.ActiveCubie = RubikCube.Cubies[rnd.Next(size), rnd.Next(size), rnd.Next(size), rnd.Next(size)];
+                var freeMoves = RubikCube.GetFreeMoves();
+                var code = freeMoves[rnd.Next(freeMoves.Count)];
                 var move = TMove.Decode(code);
                 Moves.Add(move);
+                RubikCube.ActiveCubie.State = RubikCube.ActiveCubie.State;
             }
             MoveTimer.Start();
         }
@@ -573,7 +579,7 @@ namespace RubikCube
 
         private void TransparencyBox_CheckedChanged(object sender, EventArgs e)
         {
-            //tglView1.Context.IsTransparencyOn = TransparencyBox.Checked;
+            tglView1.Context.IsTransparencyOn = TransparencyBox.Checked;
         }
 
         private void showClusterToolStripMenuItem_Click(object sender, EventArgs e)

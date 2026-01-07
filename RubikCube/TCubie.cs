@@ -22,7 +22,7 @@ namespace RubikCube
             Colors = Cube.Colors;
         }
 
-        int GetAngle(double sinA, double cosA)
+        int GetAngle(double cosA, double sinA)
         {
             if (cosA > 0.1) return 0;
             if (sinA > 0.1) return 1;
@@ -39,35 +39,44 @@ namespace RubikCube
             {
                 if (!ValidState)
                 {
-                    var gamma = GetAngle(Transform[1], Transform[0]);
-                    var beta = 0;
-                    var alpha = 0;
-                    if (gamma != 0)
-                        alpha = GetAngle(Transform[6], Transform[10]);
-                    else
+                    //var gamma = GetAngle(Transform[1], Transform[0]);
+                    //var beta = 0;
+                    //var alpha = 0;
+                    //if (gamma != 0)
+                    //    alpha = GetAngle(Transform[6], Transform[10]);
+                    //else
+                    //{
+                    //    beta = GetAngle(-Transform[2], Transform[0]);
+                    //    alpha = GetAngle(-Transform[9], Transform[5]);
+                    //}
+                    //var moveCount = Math.Sign(alpha) + Math.Sign(beta) + Math.Sign(gamma);
+                    //_State = moveCount << 6 | gamma << 4 | beta << 2 | alpha;
+                    //if (alpha == 2 && gamma == 2) _State = 0x48;
+                    var shift = 0;
+                    var angles = Transform.GetEulerAngles();
+                    for (int i = 0; i < angles.Count; i++)
                     {
-                        beta = GetAngle(-Transform[2], Transform[0]);
-                        alpha = GetAngle(-Transform[9], Transform[5]);
+                        var angle = GetAngle(angles[i].X, angles[i].Y);
+                        _State |= angle << shift;
+                        shift += 2;
                     }
-                    var moveCount = Math.Sign(alpha) + Math.Sign(beta) + Math.Sign(gamma);
-                    _State = moveCount << 6 | gamma << 4 | beta << 2 | alpha;
-                    if (alpha == 2 && gamma == 2) _State = 0x48;
                     ValidState = true;
                 }
                 return _State;
             }
             set
             {
-                var alpha = value & 3;
-                var beta = (value >> 2) & 3;
-                var gamma = (value >> 4) & 3;
+                //var alpha = value & 3;
+                //var beta = (value >> 2) & 3;
+                //var gamma = (value >> 4) & 3;
                 var org = Origin;
                 Transform.LoadIdentity();
-                Scale(new TVector(0.45f, 0.45f, 0.45f));
-                Rotate(0, 90 * alpha);
-                Rotate(1, 90 * beta);
-                Rotate(2, 90 * gamma);
+                Scale(new TVector(0.45f, 0.45f, 0.45f, 0.45f));
+                for (int i = 0; i < TAffine.Planes.Length; i++)
+                    Rotate(i, 90 * (value >> 2 * i & 3));
                 Translate(org);
+                ValidState = false;
+                var state = State;
                 _State = value;
                 ValidState = true;
                 if (_State != 0)

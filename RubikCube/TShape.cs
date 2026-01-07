@@ -87,10 +87,10 @@ namespace TGL
                         //obj.Faces.Add(idx);
                         quad[j] = idx;
                     }
-                    obj.Faces.Add(quad[1]);
                     obj.Faces.Add(quad[0]);
-                    obj.Faces.Add(quad[2]);
+                    obj.Faces.Add(quad[1]);
                     obj.Faces.Add(quad[3]);
+                    obj.Faces.Add(quad[2]);
                 }
             }
             obj.Colors.AddRange(new Color[] {
