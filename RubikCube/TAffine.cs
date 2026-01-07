@@ -164,7 +164,7 @@ namespace TGL
                 for (int m = n + 1; m < N; m++)
                 {
                     var a = A[n, n];
-                    var b = A[m, n];
+                    var b = A[n, m];
                     var r = (float)Math.Sqrt(a * a + b * b);
                     var cosA = a / r;
                     var sinA = -b / r;

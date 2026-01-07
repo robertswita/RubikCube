@@ -214,12 +214,13 @@ namespace RubikCube
             {
                 var move = TMove.Decode((int)specimen.Genes[i]);
                 // Final optimalization
-                //if (i == 0)
-                //{
-                //    var idx = new int[3] { RubikCube.ActiveCubie.X, RubikCube.ActiveCubie.Y, RubikCube.ActiveCubie.Z };
-                //    move.Slice = idx[move.Plane];
-                //    specimen.Genes[0] = move.Encode();
-                //}
+                if (i == 0)
+                {
+                    var actCubie = RubikCube.ActiveCubie;
+                    var idx = new int[] { actCubie.X, actCubie.Y, actCubie.Z, actCubie.W };
+                    move.Slice = idx[move.Axis];
+                    specimen.Genes[0] = move.Encode();
+                }
                 cube.Turn(move);
                 double fitness = cube.Evaluate();
                 if (fitness < specimen.Fitness && cube.Code != startCode)
@@ -271,37 +272,37 @@ namespace RubikCube
                         Moves.Add(TMove.Decode((int)Ga.Best.Genes[i]));
                     TrySolutions = true;
                 }
-                //if (TrySolutions && false)
-                //{
-                //    foreach (var solution in Solutions)
-                //    {
-                //        var tryMoves = DecodeSolution(solution.Value);
-                //        for (int j = -1; j < TRubikGenome.FreeMoves.Count; j++)
-                //        {
-                //            var moves = new List<TMove>();
-                //            if (j < 0)
-                //                moves.AddRange(tryMoves);
-                //            else
-                //            {
-                //                var move = TMove.Decode(TRubikGenome.FreeMoves[j]);
-                //                moves.Add(move);
-                //                moves.AddRange(tryMoves);
-                //                move = TMove.Decode(TRubikGenome.FreeMoves[j]);
-                //                move.Angle = 2 - move.Angle;
-                //                moves.Add(move);
-                //            }
-                //            var cube = new TRubikCube(RubikCube);
-                //            foreach (var move in moves)
-                //                cube.Turn(move);
-                //            var score = cube.Evaluate();
-                //            if (score < HighScore)
-                //            {
-                //                HighScore = score;
-                //                Moves = moves;
-                //            }
-                //        }
-                //    }
-                //}
+                if (TrySolutions)
+                {
+                    foreach (var solution in Solutions)
+                    {
+                        var tryMoves = DecodeSolution(solution.Value);
+                        for (int j = -1; j < TRubikGenome.FreeMoves.Count; j++)
+                        {
+                            var moves = new List<TMove>();
+                            if (j < 0)
+                                moves.AddRange(tryMoves);
+                            else
+                            {
+                                var move = TMove.Decode(TRubikGenome.FreeMoves[j]);
+                                moves.Add(move);
+                                moves.AddRange(tryMoves);
+                                move = TMove.Decode(TRubikGenome.FreeMoves[j]);
+                                move.Angle = 2 - move.Angle;
+                                moves.Add(move);
+                            }
+                            var cube = new TRubikCube(RubikCube);
+                            foreach (var move in moves)
+                                cube.Turn(move);
+                            var score = cube.Evaluate();
+                            if (score < HighScore)
+                            {
+                                HighScore = score;
+                                Moves = moves;
+                            }
+                        }
+                    }
+                }
                 if (Moves.Count == 0)
                     TrySolutions = false;
                 MovesCount += Moves.Count;
@@ -344,34 +345,34 @@ namespace RubikCube
         }
 
         string SolutionPath = "solutions.bin";
-        //List<TMove> DecodeSolution(List<int> solution)
-        //{
-        //    var v = new int[] { RubikCube.ActiveCubie.X, RubikCube.ActiveCubie.Y, RubikCube.ActiveCubie.Z, RubikCube.ActiveCubie.W };
-        //    var map = new List<int>();
-        //    var result = new List<TMove>();
-        //    for (var i = 0; i < solution.Count; i++)
-        //    {
-        //        var move = TMove.Decode(solution[i]);
-        //        var idxA = map.IndexOf(move.SliceA);
-        //        if (idxA < 0)
-        //        {
-        //            idxA = map.IndexOf(TRubikCube.Size - 1 - move.SliceA);
-        //            if (idxA < 0)
-        //            {
-        //                idxA = map.Count;
-        //                map.Add(move.SliceA);
-        //            }
-        //            else
-        //                idxA += 4;
-        //        }
-        //        if (idxA < 4)
-        //            move.SliceA = v[idxA];
-        //        else
-        //            move.SliceA = TRubikCube.Size - 1 - v[idxA - 4];
-        //        result.Add(move);
-        //    }
-        //    return result;
-        //}
+        List<TMove> DecodeSolution(List<int> solution)
+        {
+            var v = new int[] { RubikCube.ActiveCubie.X, RubikCube.ActiveCubie.Y, RubikCube.ActiveCubie.Z, RubikCube.ActiveCubie.W };
+            var map = new List<int>();
+            var result = new List<TMove>();
+            for (var i = 0; i < solution.Count; i++)
+            {
+                var move = TMove.Decode(solution[i]);
+                var idx = map.IndexOf(move.Slice);
+                if (idx < 0)
+                {
+                    idx = map.IndexOf(TRubikCube.Size - 1 - move.Slice);
+                    if (idx < 0)
+                    {
+                        idx = map.Count;
+                        map.Add(move.Slice);
+                    }
+                    else
+                        idx += 4;
+                }
+                if (idx < 4)
+                    move.Slice = v[idx];
+                else
+                    move.Slice = TRubikCube.Size - 1 - v[idx - 4];
+                result.Add(move);
+            }
+            return result;
+        }
 
         void LoadSolutions()
         {

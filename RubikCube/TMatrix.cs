@@ -165,7 +165,7 @@ namespace TGL
                 this[i, i] = 1;
         }
 
-        public void Rotate(int i, int j, float cosL, float sinL)
+        public void Rotate(int i, int j, float cosA, float sinA)
         {
             int colA = i * RowsCount;
             int colB = j * RowsCount;
@@ -173,11 +173,15 @@ namespace TGL
             {
                 float a = Data[colA];
                 float b = Data[colB];
-                Data[colA] = cosL * a - sinL * b;
-                Data[colB] = sinL * a + cosL * b;
+                Data[colA] = cosA * a - sinA * b;
+                Data[colB] = sinA * a + cosA * b;
                 colA++;
                 colB++;
             }
+            //var iCol = Cols[i] * cosA - Cols[j] * sinA;
+            //var jCol = Cols[i] * sinA + Cols[j] * cosA;
+            //Cols[i] = iCol;
+            //Cols[j] = jCol;
         }
     };
 

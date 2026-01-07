@@ -93,10 +93,11 @@ namespace RubikCube
                     SolvedCubies.Add(Cubies[cubie.W, cubie.Z, cubie.Y, cubie.X]);
                 }
                 var actCluster = src.ActiveCluster;
+                activeCluster = new List<TCubie>();
                 for (int i = 0; i < actCluster.Count; i++)
                 {
                     var cubie = actCluster[i];
-                    ActiveCluster.Add(Cubies[cubie.W, cubie.Z, cubie.Y, cubie.X]);
+                    activeCluster.Add(Cubies[cubie.W, cubie.Z, cubie.Y, cubie.X]);
                 }
             }
         }
