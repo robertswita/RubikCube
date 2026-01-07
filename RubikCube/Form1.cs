@@ -272,37 +272,37 @@ namespace RubikCube
                         Moves.Add(TMove.Decode((int)Ga.Best.Genes[i]));
                     TrySolutions = true;
                 }
-                if (TrySolutions)
-                {
-                    foreach (var solution in Solutions)
-                    {
-                        var tryMoves = DecodeSolution(solution.Value);
-                        for (int j = -1; j < TRubikGenome.FreeMoves.Count; j++)
-                        {
-                            var moves = new List<TMove>();
-                            if (j < 0)
-                                moves.AddRange(tryMoves);
-                            else
-                            {
-                                var move = TMove.Decode(TRubikGenome.FreeMoves[j]);
-                                moves.Add(move);
-                                moves.AddRange(tryMoves);
-                                move = TMove.Decode(TRubikGenome.FreeMoves[j]);
-                                move.Angle = 2 - move.Angle;
-                                moves.Add(move);
-                            }
-                            var cube = new TRubikCube(RubikCube);
-                            foreach (var move in moves)
-                                cube.Turn(move);
-                            var score = cube.Evaluate();
-                            if (score < HighScore)
-                            {
-                                HighScore = score;
-                                Moves = moves;
-                            }
-                        }
-                    }
-                }
+                //if (TrySolutions)
+                //{
+                //    foreach (var solution in Solutions)
+                //    {
+                //        var tryMoves = DecodeSolution(solution.Value);
+                //        for (int j = -1; j < TRubikGenome.FreeMoves.Count; j++)
+                //        {
+                //            var moves = new List<TMove>();
+                //            if (j < 0)
+                //                moves.AddRange(tryMoves);
+                //            else
+                //            {
+                //                var move = TMove.Decode(TRubikGenome.FreeMoves[j]);
+                //                moves.Add(move);
+                //                moves.AddRange(tryMoves);
+                //                move = TMove.Decode(TRubikGenome.FreeMoves[j]);
+                //                move.Angle = 2 - move.Angle;
+                //                moves.Add(move);
+                //            }
+                //            var cube = new TRubikCube(RubikCube);
+                //            foreach (var move in moves)
+                //                cube.Turn(move);
+                //            var score = cube.Evaluate();
+                //            if (score < HighScore)
+                //            {
+                //                HighScore = score;
+                //                Moves = moves;
+                //            }
+                //        }
+                //    }
+                //}
                 if (Moves.Count == 0)
                     TrySolutions = false;
                 MovesCount += Moves.Count;

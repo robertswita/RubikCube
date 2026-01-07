@@ -52,14 +52,18 @@ namespace RubikCube
                     //var moveCount = Math.Sign(alpha) + Math.Sign(beta) + Math.Sign(gamma);
                     //_State = moveCount << 6 | gamma << 4 | beta << 2 | alpha;
                     //if (alpha == 2 && gamma == 2) _State = 0x48;
+                    _State = 0;
                     var shift = 0;
                     var angles = Transform.GetEulerAngles();
+                    var moveCount = 0;
                     for (int i = 0; i < angles.Count; i++)
                     {
                         var angle = GetAngle(angles[i].X, angles[i].Y);
                         _State |= angle << shift;
                         shift += 2;
+                        if (angle > 0) moveCount++;
                     }
+                    _State |= moveCount << 2 * angles.Count;
                     ValidState = true;
                 }
                 return _State;

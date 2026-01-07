@@ -166,10 +166,15 @@ namespace TGL
                     var a = A[n, n];
                     var b = A[n, m];
                     var r = (float)Math.Sqrt(a * a + b * b);
-                    var cosA = a / r;
-                    var sinA = -b / r;
-                    angles.Add(new TVector(cosA, sinA));
-                    A.Rotate(n, m, cosA, sinA);
+                    if (r < 0.1)
+                        angles.Add(new TVector(1, 0));
+                    else
+                    {
+                        var cosA = a / r;
+                        var sinA = -b / r;
+                        angles.Add(new TVector(cosA, sinA));
+                        A.Rotate(n, m, cosA, sinA);
+                    }
                     //nRow = cosPhi * R(n,:) – sinPhi * R(m,:);
                     //mRow = sinPhi * R(n,:) + cosPhi * R(m,:);
                     //R(n,:) = nRow;

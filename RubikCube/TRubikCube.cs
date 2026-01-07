@@ -154,7 +154,7 @@ namespace RubikCube
                 cubie.ValidState = false;
                 cubie.Transparency = 1;
                 if (cubie.State != 0)
-                    cubie.Transparency = 0.5f;
+                    cubie.Transparency = 0.1f;
                 cubie.Parent = this;
             }
             _StateGrid = null;
@@ -283,10 +283,10 @@ namespace RubikCube
             var score = 0d;
             foreach (var cubie in SolvedCubies)
                 if (cubie.State != 0)
-                    score += (1 + cubie.State / 4096f) * ActiveCluster.Count * 2;
+                    score += (1 + cubie.State / 4096f / 8) * ActiveCluster.Count * 2;
             foreach (var cubie in ActiveCluster)
                 if (cubie.State != 0)
-                    score += 1 + cubie.State / 4096f;
+                    score += 1 + cubie.State / 4096f / 8;
             return score;
         }
 
