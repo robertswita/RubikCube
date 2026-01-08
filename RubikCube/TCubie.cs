@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.NetworkInformation;
 using System.Text;
 using System.Threading.Tasks;
 using TGL;
@@ -10,10 +11,10 @@ namespace RubikCube
     public class TCubie : TShape
     {
         static TShape Cube = CreateTesseract();
-        public int X { get { return (int)Math.Round(Origin.X + TRubikCube.C); } }
-        public int Y { get { return (int)Math.Round(Origin.Y + TRubikCube.C); } }
-        public int Z { get { return (int)Math.Round(Origin.Z + TRubikCube.C); } }
-        public int W { get { return (int)Math.Round(Origin.W + TRubikCube.C); } }
+        public int X { get { return (int)Math.Round(Transform.Origin.X + TRubikCube.C); } }
+        public int Y { get { return (int)Math.Round(Transform.Origin.Y + TRubikCube.C); } }
+        public int Z { get { return (int)Math.Round(Transform.Origin.Z + TRubikCube.C); } }
+        public int W { get { return (int)Math.Round(Transform.Origin.W + TRubikCube.C); } }
 
         public TCubie()
         {
@@ -73,12 +74,12 @@ namespace RubikCube
                 //var alpha = value & 3;
                 //var beta = (value >> 2) & 3;
                 //var gamma = (value >> 4) & 3;
-                var org = Origin;
-                Transform.LoadIdentity();
-                Scale(new TVector(0.45f, 0.45f, 0.45f, 0.45f));
+                var org = Transform.Origin;
+                Transform = TAffine.CreateScale(new TVector(0.45f, 0.45f, 0.45f, 0.45f));
                 for (int i = 0; i < TAffine.Planes.Length; i++)
                     Rotate(i, 90 * (value >> 2 * i & 3));
-                Translate(org);
+                Transform.Origin = org;
+                //Translate(org);
                 ValidState = false;
                 var state = State;
                 _State = value;
@@ -101,7 +102,9 @@ namespace RubikCube
         public TCubie Copy()
         {
             var dest = new TCubie();
-            Array.Copy(Transform.Data, dest.Transform.Data, Transform.Data.Length);
+            //Array.Copy(Transform.M.Data, dest.Transform.M.Data, Transform.M.Data.Length);
+            //Array.Copy(Transform.Origin.Data, dest.Transform.Origin.Data, Transform.Origin.Data.Length);
+            dest.Transform = Transform.Clone();
             dest.Vertices = Vertices;
             dest.Faces = Faces;
             dest._State = _State;

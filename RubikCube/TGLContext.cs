@@ -78,14 +78,14 @@ namespace TGL
 
         void DrawScene()
         {
-            Transform.LoadIdentity();
+            Transform = new TAffine();
             DrawObject(Root);
         }
 
         //TObject3DComparer ZOrderComparer = new TObject3DComparer();
         protected void DrawObject(TShape obj)
         {
-            var transform = (TAffine)Transform.Clone();
+            var transform = Transform.Clone();
             Transform = Transform * obj.Transform;
 
             //var childrenList = new List<TObject3D>(obj.Children);

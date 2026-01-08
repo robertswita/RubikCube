@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using GA;
+using TGL;
 
 namespace RubikCube
 {
@@ -21,12 +22,20 @@ namespace RubikCube
 
         public override void Mutate()
         {
-            var idx = Rnd.Next(Genes.Length) / 2;
-            for (int i = 0; i < idx; i++)
+            //var idx = Rnd.Next(Genes.Length) / 2;
+            //for (int i = 0; i < idx; i++)
+            //{
+            //    var move = TMove.Decode((int)Genes[i]);
+            //    move.Angle = 2 - move.Angle;
+            //    Genes[2 * idx - i] = move.Encode();
+            //}
+            var geneIdx = Rnd.Next(Genes.Length / 2);
+
+            for (int i = 1; i <= geneIdx; i++)
             {
-                var move = TMove.Decode((int)Genes[i]);
+                var move = TMove.Decode((int)Genes[geneIdx - i]);
                 move.Angle = 2 - move.Angle;
-                Genes[2 * idx - i] = move.Encode();
+                Genes[geneIdx + i] = move.Encode();
             }
 
             //var key = TMove.Decode((int)Genes[idx]);
@@ -98,7 +107,13 @@ namespace RubikCube
         {
             Array.Copy(Genes, idx + 1, Genes, idx, Genes.Length - 1 - idx);
             var move = TMove.Decode((int)Genes[Genes.Length - 2]);
-            move.Plane = (move.Plane + 1) % 3;
+            move.Axis = (move.Axis + 1) % 4;
+            var planeAxes = move.GetPlaneAxes();
+            while (planeAxes[0] == move.Axis || planeAxes[1] == move.Axis)
+            {
+                move.Plane = (move.Plane + 1) % TAffine.Planes.Length;
+                planeAxes = TAffine.Planes[move.Plane];
+            }
             //move.Angle = 2 - move.Angle;
             Genes[Genes.Length - 1] = move.Encode();
             //MutateGene(Genes.Length - 1);

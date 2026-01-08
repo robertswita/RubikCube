@@ -108,11 +108,7 @@ namespace RubikCube
                     double angle = 90 * (move.Angle + 1);
                     if (angle > 180) angle -= 360;
                     angle *= (double)FrameNo / FrameCount;
-                    ActSlice.Transform.LoadIdentity();
-                    ActSlice.Rotate(move.Plane, angle);
-                    //if (move.Plane == 0) ActSlice.Rotation.X = angle;
-                    //if (move.Plane == 1) ActSlice.Rotation.Y = angle;
-                    //if (move.Plane == 2) ActSlice.Rotation.Z = angle;
+                    ActSlice.Transform = TAffine.CreateRotation(move.Plane, angle);
                 }
                 else
                 {
@@ -123,11 +119,10 @@ namespace RubikCube
                 }
                 tglView1.Invalidate();
             }
-            else
+            else if (MoveNo > 0)
             {
                 MoveNo = 0;
                 Moves.Clear();
-                MoveTimer.Stop();
                 label1.Text = Time.ToString();
                 label2.Text = HighScore.ToString();
                 label4.Text = RubikCube.Code.Count(x => x != '\0').ToString();
@@ -146,10 +141,16 @@ namespace RubikCube
                 //}
                 //else
                 //    IsPaused = true;
+                //if (Ga != null)
+                //{
+                //    Solve();
+                //}
+            }
+            else
+            {
+                MoveTimer.Stop();
                 if (Ga != null)
-                {
                     Solve();
-                }
             }
         }
 
@@ -250,11 +251,11 @@ namespace RubikCube
                 IterElapsed = TimeSpan.Zero;
                 chart1.Series[0].Points.Clear();
 
-                TChromosome.GenesLength = 27;
+                TChromosome.GenesLength = 40;
                 Ga = new TGA<TRubikGenome>();
                 Ga.GenerationsCount = 50;
                 Ga.WinnerRatio = 0.1;
-                Ga.MutationRatio = 1;
+                Ga.MutationRatio = 2;
                 Ga.SelectionType = TGA<TRubikGenome>.TSelectionType.Unique;
                 Ga.Evaluate = OnEvaluate;
                 Ga.Progress = OnProgress;
@@ -534,7 +535,7 @@ namespace RubikCube
             tglView1.Invalidate();
             StateBox.Invalidate();
             Moves.Clear();
-            MoveTimer.Start();
+            //MoveTimer.Start();
             //RubikCube.Cubies[0, 1, 2].Selected = true;
         }
 

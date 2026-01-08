@@ -29,11 +29,11 @@ namespace TGL
             }
         }
         public TAffine Transform = new TAffine();
-        public TVector Origin
-        {
-            get { return Transform.Cols[TAffine.N]; }
-            set { Transform.Cols[TAffine.N] = value; }
-        }
+        //public TVector Origin
+        //{
+        //    get { return Transform.Cols[TAffine.N]; }
+        //    set { Transform.Cols[TAffine.N] = value; }
+        //}
         public void Scale(TVector s)
         {
             Transform = TAffine.CreateScale(s) * Transform;
@@ -43,10 +43,11 @@ namespace TGL
             if (angle != 0)
                 Transform = TAffine.CreateRotation(axis, angle) * Transform;
         }
-        public void Translate(TVector t)
-        {
-            Transform = TAffine.CreateTranslation(t) * Transform;
-        }
+        //public void Translate(TVector t)
+        //{
+        //    //Transform = TAffine.CreateTranslation(t) * Transform;
+
+        //}
 
         public static TShape CreateTesseract()
         {

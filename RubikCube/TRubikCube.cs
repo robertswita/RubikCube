@@ -65,13 +65,11 @@ namespace RubikCube
                         for (int x = 0; x < Size; x++)
                         {
                             var cubie = new TCubie();
-                            cubie.Scale(new TVector(cubieScale, cubieScale, cubieScale, cubieScale));
-                            cubie.Origin = new TVector(x - C, y - C, z - C, w - C, 1);
-                            //cubie.Translate(new TVector(x - C, y - C, z - C, w - C));
+                            cubie.Transform = TAffine.CreateScale(new TVector(cubieScale, cubieScale, cubieScale, cubieScale));
+                            cubie.Transform.Origin = new TVector(x - C, y - C, z - C, w - C);
                             cubie.Parent = this;
                             Cubies[w, z, y, x] = cubie;
                         }
-            //ActCubie = Cubies[(int)C, (int)C, (int)C];
         }
 
         public TRubikCube(TRubikCube src)
@@ -142,19 +140,18 @@ namespace RubikCube
 
         public void Turn(TMove move)
         {
-            var slice = new TShape();
             int angle = 90 * (move.Angle + 1);
-            slice.Rotate(move.Plane, angle);
+            //var slice = new TShape();
+            //slice.Rotate(move.Plane, angle);
+            var rotation = TAffine.CreateRotation(move.Plane, angle);
             var selection = SelectSlice(move);
             for (int i = 0; i < selection.Count; i++)
             {
                 var cubie = selection[i];
-                cubie.Transform = slice.Transform * cubie.Transform;
+                cubie.Transform = rotation * cubie.Transform;
                 Cubies[cubie.W, cubie.Z, cubie.Y, cubie.X] = cubie;
                 cubie.ValidState = false;
-                cubie.Transparency = 1;
-                if (cubie.State != 0)
-                    cubie.Transparency = 0.1f;
+                cubie.Transparency = cubie.State != 0 ? 0.1f : 1;
                 cubie.Parent = this;
             }
             _StateGrid = null;
@@ -165,104 +162,6 @@ namespace RubikCube
             Turn(move);
             move.Angle = 2 - move.Angle;
         }
-
-        //public int GetActCubie()
-        //{
-        //    ActiveCubie = null;
-        //    var result = 0;
-        //    var minDist = double.MaxValue;
-        //    for (int restrict = (int)C; restrict >= 0; restrict--)
-        //    {
-        //        for (int side = 0; side < 2; side++)
-        //        {
-        //            //for (int i = 0; i < N; i++)
-        //            //for (int n = 0; n < N; n++)
-        //            for (int i = restrict; i < Size - restrict; i++)
-        //                for (int n = restrict; n < Size - restrict; n++)
-        //                    for (int axis = 0; axis < 3; axis++)
-        //                    {
-        //                        var v = new int[3];
-        //                        v[axis] = side == 0 ? restrict : Size - 1 - restrict;
-        //                        v[(axis + 1) % 3] = i;
-        //                        v[(axis + 2) % 3] = n;
-        //                        var cubie = Cubies[v[3], v[2], v[1], v[0]];
-        //                        if (cubie.State != 0)
-        //                        {
-        //                            //var freeGenes = GetFreeGenes(v);
-        //                            var dist = Math.Abs(C - v[2]) + Math.Abs(C - v[1]) + Math.Abs(C - v[0]);// / freeGenes.Count;
-        //                            if (dist < minDist)
-        //                            {
-        //                                minDist = dist;
-        //                                ActiveCubie = cubie;
-
-        //                                //if (result < 0)
-        //                                result = restrict;
-        //                                //return result;
-        //                            }
-        //                        }
-        //                    }
-        //        }
-        //        if (result > 0)
-        //            break;
-        //    }
-        //    if (ActiveCubie == null)
-        //        ActCluster = new List<TCubie>();
-        //    else if (!ActCluster.Contains(ActiveCubie))
-        //    {
-        //        var cluster = GetCluster(ActiveCubie);
-        //        foreach (var ccubie in cluster)
-        //            ccubie.ClusterCount = cluster.Count;
-        //        ActCluster.AddRange(cluster);
-        //    }
-        //    return result;
-        //}
-
-        //public int _GetActCubie()
-        //{
-        //    ActCubie = null;
-        //    var result = 0;
-        //    var minDist = double.MaxValue;
-        //    for (int restrict = (int)C; restrict >= 0; restrict--)
-        //    {
-        //        for (int side = 0; side < 2; side++)
-        //            for (int i = restrict; i < N - restrict; i++)
-        //                //for (int i = 0; i < N; i++)
-        //                //for (int n = 0; n < N; n++)
-        //                for (int n = restrict; n < N - restrict; n++)
-        //                    for (int axis = 0; axis < 3; axis++)
-        //                    {
-        //                        var v = new int[3];
-        //                        v[axis] = side == 0 ? restrict : N - 1 - restrict;
-        //                        v[(axis + 1) % 3] = i;
-        //                        v[(axis + 2) % 3] = n;
-        //                        var cubie = Cubies[v[2], v[1], v[0]];
-        //                        if (cubie.State != 0)
-        //                        {
-        //                            //var freeGenes = GetFreeGenes(v);
-        //                            var dist = Math.Abs(C - v[2]) + Math.Abs(C - v[1]) + Math.Abs(C - v[0]);// / freeGenes.Count;
-        //                            if (dist < minDist)
-        //                            {
-        //                                minDist = dist;
-        //                                ActCubie = cubie;
-
-        //                                //if (result < 0)
-        //                                result = restrict;
-        //                                //return result;
-        //                            }
-        //                        }
-        //                    }
-        //        if (result > 0)
-        //            break;
-        //    }
-        //    if (ActCubie != null && !ActCluster.Contains(ActCubie))
-        //    {
-        //        var cluster = GetCluster(ActCubie);
-        //        foreach (var ccubie in cluster)
-        //            ccubie.ClusterCount = cluster.Count;
-        //        ActCluster.AddRange(cluster);
-        //    }
-        //    return result;
-        //}
 
         public double Evaluate()
         {
@@ -320,42 +219,6 @@ namespace RubikCube
             return freeGenes;
         }
 
-        //public List<TCubie> GetCluster(TCubie cubie)
-        //{
-        //    var cluster = new List<TCubie>();
-        //    var move = new TMove();
-        //    var idx = new int[] { cubie.X, cubie.Y, cubie.Z };
-        //    var cube = new TRubikCube();
-        //    cubie = cube.Cubies[cubie.W, cubie.Z, cubie.Y, cubie.X];
-        //    for (int alpha = 0; alpha < 4; alpha++)
-        //    {
-        //        move.Plane = 0;
-        //        move.Slice = cubie.X;
-        //        cube.Turn(move);
-        //        var neigh = Cubies[cubie.W, cubie.Z, cubie.Y, cubie.X];
-        //        if (!cluster.Contains(neigh))
-        //            cluster.Add(neigh);
-        //        for (int beta = 0; beta < 4; beta++)
-        //        {
-        //            move.Plane = 1;
-        //            move.Slice = cubie.Y;
-        //            cube.Turn(move);
-        //            neigh = Cubies[cubie.Z, cubie.Y, cubie.X];
-        //            if (!cluster.Contains(neigh))
-        //                cluster.Add(neigh);
-        //            for (int gamma = 0; gamma < 4; gamma++)
-        //            {
-        //                move.Plane = 2;
-        //                move.Slice = cubie.Z;
-        //                cube.Turn(move);
-        //                neigh = Cubies[cubie.Z, cubie.Y, cubie.X];
-        //                if (!cluster.Contains(neigh))
-        //                    cluster.Add(neigh);
-        //            }
-        //        }
-        //    }
-        //    return cluster;
-        //}
         private List<TCubie> activeCluster;
         public List<TCubie> ActiveCluster
         {
