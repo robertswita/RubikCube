@@ -107,9 +107,9 @@
             this.panel1.Controls.Add(this.label1);
             this.panel1.Controls.Add(this.button1);
             this.panel1.Dock = System.Windows.Forms.DockStyle.Left;
-            this.panel1.Location = new System.Drawing.Point(0, 28);
+            this.panel1.Location = new System.Drawing.Point(0, 30);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(445, 790);
+            this.panel1.Size = new System.Drawing.Size(445, 788);
             this.panel1.TabIndex = 8;
             // 
             // MovesLbl
@@ -117,7 +117,7 @@
             this.MovesLbl.AutoSize = true;
             this.MovesLbl.Location = new System.Drawing.Point(358, 54);
             this.MovesLbl.Name = "MovesLbl";
-            this.MovesLbl.Size = new System.Drawing.Size(16, 17);
+            this.MovesLbl.Size = new System.Drawing.Size(14, 16);
             this.MovesLbl.TabIndex = 32;
             this.MovesLbl.Text = "0";
             // 
@@ -126,7 +126,7 @@
             this.label11.AutoSize = true;
             this.label11.Location = new System.Drawing.Point(252, 54);
             this.label11.Name = "label11";
-            this.label11.Size = new System.Drawing.Size(90, 17);
+            this.label11.Size = new System.Drawing.Size(85, 16);
             this.label11.TabIndex = 31;
             this.label11.Text = "Moves Count";
             // 
@@ -156,7 +156,7 @@
             this.SolutionLbl.AutoSize = true;
             this.SolutionLbl.Location = new System.Drawing.Point(358, 78);
             this.SolutionLbl.Name = "SolutionLbl";
-            this.SolutionLbl.Size = new System.Drawing.Size(16, 17);
+            this.SolutionLbl.Size = new System.Drawing.Size(14, 16);
             this.SolutionLbl.TabIndex = 28;
             this.SolutionLbl.Text = "0";
             // 
@@ -165,7 +165,7 @@
             this.label10.AutoSize = true;
             this.label10.Location = new System.Drawing.Point(252, 78);
             this.label10.Name = "label10";
-            this.label10.Size = new System.Drawing.Size(100, 17);
+            this.label10.Size = new System.Drawing.Size(92, 16);
             this.label10.TabIndex = 27;
             this.label10.Text = "Solution Count";
             // 
@@ -174,7 +174,7 @@
             this.IterTimeBox.AutoSize = true;
             this.IterTimeBox.Location = new System.Drawing.Point(243, 404);
             this.IterTimeBox.Name = "IterTimeBox";
-            this.IterTimeBox.Size = new System.Drawing.Size(62, 17);
+            this.IterTimeBox.Size = new System.Drawing.Size(56, 16);
             this.IterTimeBox.TabIndex = 26;
             this.IterTimeBox.Text = "Iter time:";
             // 
@@ -193,7 +193,7 @@
             this.label9.AutoSize = true;
             this.label9.Location = new System.Drawing.Point(320, 3);
             this.label9.Name = "label9";
-            this.label9.Size = new System.Drawing.Size(109, 17);
+            this.label9.Size = new System.Drawing.Size(101, 16);
             this.label9.TabIndex = 22;
             this.label9.Text = "Segment Count:";
             // 
@@ -215,7 +215,7 @@
             this.label8.AutoSize = true;
             this.label8.Location = new System.Drawing.Point(29, 78);
             this.label8.Name = "label8";
-            this.label8.Size = new System.Drawing.Size(38, 17);
+            this.label8.Size = new System.Drawing.Size(35, 16);
             this.label8.TabIndex = 20;
             this.label8.Text = "time:";
             // 
@@ -224,7 +224,7 @@
             this.label7.AutoSize = true;
             this.label7.Location = new System.Drawing.Point(24, 54);
             this.label7.Name = "label7";
-            this.label7.Size = new System.Drawing.Size(43, 17);
+            this.label7.Size = new System.Drawing.Size(38, 16);
             this.label7.TabIndex = 19;
             this.label7.Text = "error:";
             // 
@@ -233,7 +233,7 @@
             this.label6.AutoSize = true;
             this.label6.Location = new System.Drawing.Point(171, 404);
             this.label6.Name = "label6";
-            this.label6.Size = new System.Drawing.Size(46, 17);
+            this.label6.Size = new System.Drawing.Size(44, 16);
             this.label6.TabIndex = 18;
             this.label6.Text = "label6";
             // 
@@ -242,7 +242,7 @@
             this.label5.AutoSize = true;
             this.label5.Location = new System.Drawing.Point(136, 404);
             this.label5.Name = "label5";
-            this.label5.Size = new System.Drawing.Size(39, 17);
+            this.label5.Size = new System.Drawing.Size(35, 16);
             this.label5.TabIndex = 17;
             this.label5.Text = "iters:";
             // 
@@ -267,7 +267,7 @@
             this.label4.AutoSize = true;
             this.label4.Location = new System.Drawing.Point(59, 404);
             this.label4.Name = "label4";
-            this.label4.Size = new System.Drawing.Size(46, 17);
+            this.label4.Size = new System.Drawing.Size(44, 16);
             this.label4.TabIndex = 13;
             this.label4.Text = "label4";
             // 
@@ -276,7 +276,7 @@
             this.label3.AutoSize = true;
             this.label3.Location = new System.Drawing.Point(3, 404);
             this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(50, 17);
+            this.label3.Size = new System.Drawing.Size(46, 16);
             this.label3.TabIndex = 12;
             this.label3.Text = "states:";
             // 
@@ -285,7 +285,7 @@
             this.label2.AutoSize = true;
             this.label2.Location = new System.Drawing.Point(73, 54);
             this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(46, 17);
+            this.label2.Size = new System.Drawing.Size(44, 16);
             this.label2.TabIndex = 11;
             this.label2.Text = "label2";
             // 
@@ -304,7 +304,7 @@
             this.label1.AutoSize = true;
             this.label1.Location = new System.Drawing.Point(73, 78);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(46, 17);
+            this.label1.Size = new System.Drawing.Size(44, 16);
             this.label1.TabIndex = 9;
             this.label1.Text = "label1";
             // 
@@ -325,7 +325,7 @@
             this.fileToolStripMenuItem});
             this.menuStrip1.Location = new System.Drawing.Point(0, 0);
             this.menuStrip1.Name = "menuStrip1";
-            this.menuStrip1.Size = new System.Drawing.Size(1202, 28);
+            this.menuStrip1.Size = new System.Drawing.Size(1202, 30);
             this.menuStrip1.TabIndex = 9;
             this.menuStrip1.Text = "menuStrip1";
             // 
@@ -339,41 +339,46 @@
             this.makeMovesToolStripMenuItem,
             this.undoMovesToolStripMenuItem});
             this.fileToolStripMenuItem.Name = "fileToolStripMenuItem";
-            this.fileToolStripMenuItem.Size = new System.Drawing.Size(46, 24);
+            this.fileToolStripMenuItem.Size = new System.Drawing.Size(46, 26);
             this.fileToolStripMenuItem.Text = "File";
             // 
             // openToolStripMenuItem
             // 
             this.openToolStripMenuItem.Name = "openToolStripMenuItem";
-            this.openToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.openToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
             this.openToolStripMenuItem.Text = "Open";
             this.openToolStripMenuItem.Click += new System.EventHandler(this.openToolStripMenuItem_Click);
             // 
             // saveToolStripMenuItem
             // 
             this.saveToolStripMenuItem.Name = "saveToolStripMenuItem";
-            this.saveToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.saveToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
             this.saveToolStripMenuItem.Text = "Save";
             this.saveToolStripMenuItem.Click += new System.EventHandler(this.saveToolStripMenuItem_Click);
             // 
             // saveClustersToolStripMenuItem
             // 
             this.saveClustersToolStripMenuItem.Name = "saveClustersToolStripMenuItem";
-            this.saveClustersToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.saveClustersToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
             this.saveClustersToolStripMenuItem.Text = "Save Clusters";
             this.saveClustersToolStripMenuItem.Click += new System.EventHandler(this.saveClustersToolStripMenuItem_Click);
             // 
             // showClusterToolStripMenuItem
             // 
             this.showClusterToolStripMenuItem.Name = "showClusterToolStripMenuItem";
-            this.showClusterToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.showClusterToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
             this.showClusterToolStripMenuItem.Text = "Show Cluster";
             this.showClusterToolStripMenuItem.Click += new System.EventHandler(this.showClusterToolStripMenuItem_Click);
+            // 
+            // makeMovesToolStripMenuItem
+            // 
+            this.makeMovesToolStripMenuItem.Name = "makeMovesToolStripMenuItem";
+            this.makeMovesToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
             // 
             // undoMovesToolStripMenuItem
             // 
             this.undoMovesToolStripMenuItem.Name = "undoMovesToolStripMenuItem";
-            this.undoMovesToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.undoMovesToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
             this.undoMovesToolStripMenuItem.Text = "Undo Moves";
             this.undoMovesToolStripMenuItem.Click += new System.EventHandler(this.undoMovesToolStripMenuItem_Click);
             // 
@@ -403,9 +408,9 @@
             // 
             this.tglView1.BackColor = System.Drawing.Color.White;
             this.tglView1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.tglView1.Location = new System.Drawing.Point(445, 28);
+            this.tglView1.Location = new System.Drawing.Point(445, 30);
             this.tglView1.Name = "tglView1";
-            this.tglView1.Size = new System.Drawing.Size(757, 790);
+            this.tglView1.Size = new System.Drawing.Size(757, 788);
             this.tglView1.TabIndex = 0;
             this.tglView1.MouseDown += new System.Windows.Forms.MouseEventHandler(this.tglView1_MouseDown);
             this.tglView1.MouseMove += new System.Windows.Forms.MouseEventHandler(this.tglView1_MouseMove);

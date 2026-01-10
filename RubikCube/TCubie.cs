@@ -15,6 +15,8 @@ namespace RubikCube
         public int Y { get { return (int)Math.Round(Transform.Origin.Y + TRubikCube.C); } }
         public int Z { get { return (int)Math.Round(Transform.Origin.Z + TRubikCube.C); } }
         public int W { get { return (int)Math.Round(Transform.Origin.W + TRubikCube.C); } }
+        public double Error;
+        public int OriginalPos;
 
         public TCubie()
         {
@@ -65,6 +67,12 @@ namespace RubikCube
                         if (angle > 0) moveCount++;
                     }
                     _State |= moveCount << 2 * angles.Count;
+                    //var xform = TAffine.CreateScale(new TVector(0.45f, 0.45f, 0.45f, 0.45f));
+                    //for (int i = 0; i < TAffine.Planes.Length; i++)
+                    //    xform = TAffine.CreateRotation(i, 90 * (_State >> 2 * i & 3)) * xform;
+                    //Error = (xform.M - Transform.M).Norm;
+                    //if (Error > 0.01)
+                    //    ;
                     ValidState = true;
                 }
                 return _State;
@@ -109,6 +117,7 @@ namespace RubikCube
             dest.Faces = Faces;
             dest._State = _State;
             dest.ValidState = ValidState;
+            dest.OriginalPos = OriginalPos;
             return dest;
         }
 

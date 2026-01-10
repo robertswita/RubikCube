@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using GA;
 using TGL;
 
@@ -20,8 +21,23 @@ namespace RubikCube
             //}
         }
 
+        //public void Conjugate()
+        //{
+        //    var geneIdx = Rnd.Next(Genes.Length / 2);
+
+        //    for (int i = 1; i <= geneIdx; i++)
+        //    {
+        //        var move = TMove.Decode((int)Genes[geneIdx - i]);
+        //        move.Angle = 2 - move.Angle;
+        //        Genes[geneIdx + i] = move.Encode();
+        //    }
+        //}
+
+
         public override void Mutate()
         {
+            //MutateGene(Rnd.Next(Genes.Length));
+
             //var idx = Rnd.Next(Genes.Length) / 2;
             //for (int i = 0; i < idx; i++)
             //{
@@ -116,6 +132,8 @@ namespace RubikCube
             }
             //move.Angle = 2 - move.Angle;
             Genes[Genes.Length - 1] = move.Encode();
+            if (!TRubikGenome.FreeMoves.Contains((int)Genes[Genes.Length - 1]))
+                ;
             //MutateGene(Genes.Length - 1);
             //MovesCount--;
         }

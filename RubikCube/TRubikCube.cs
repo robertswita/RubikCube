@@ -34,10 +34,10 @@ namespace RubikCube
                     var gridSize = Size * Size * Size * Size;
                     _StateGrid = new int[gridSize, gridSize];
                     var i = 0;
-                    for (int x = 0; x < Size; x++)
-                        for (int y = 0; y < Size; y++)
-                            for (int z = 0; z < Size; z++)
-                                for (int w = 0; w < Size; w++)
+                    for (int w = 0; w < Size; w++)
+                        for (int z = 0; z < Size; z++)
+                            for (int y = 0; y < Size; y++)
+                                for (int x = 0; x < Size; x++)
                                 {
                                     var cubie = Cubies[w, z, y, x].Copy();
                                     for (int axis = 0; axis < 6; axis++)
@@ -45,7 +45,9 @@ namespace RubikCube
                                         var angle = cubie.State >> 2 * axis & 3;
                                         cubie.Rotate(axis, -90 * angle);
                                     }
-                                    var idx = Size * (Size * (Size * cubie.X + cubie.Y) + cubie.Z) + cubie.W;
+                                    var idx = Size * (Size * (Size * cubie.W + cubie.Z) + cubie.Y) + cubie.X;
+                                    if (idx != cubie.OriginalPos)
+                                        ;
                                     _StateGrid[i, idx] = cubie.State + (1 << 6);
                                     i++;
                                 }
@@ -59,6 +61,7 @@ namespace RubikCube
             C = (Size - 1) / 2f;
             Scale(new TVector(1f / Size, 1f / Size, 1f / Size, 1f / Size));
             var cubieScale = 0.9f / 2;
+            var pos = 0;
             for (int w = 0; w < Size; w++)
                 for (int z = 0; z < Size; z++)
                     for (int y = 0; y < Size; y++)
@@ -69,6 +72,8 @@ namespace RubikCube
                             cubie.Transform.Origin = new TVector(x - C, y - C, z - C, w - C);
                             cubie.Parent = this;
                             Cubies[w, z, y, x] = cubie;
+                            cubie.OriginalPos = pos;
+                            pos++;
                         }
         }
 
