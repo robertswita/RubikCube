@@ -66,8 +66,6 @@
       <DependentUpon>TGLView.cs</DependentUpon>
     </Compile>
     <Compile Include="TObject3D.cs" />
-    <Compile Include="TObject4D.cs" />
-    <Compile Include="TMatrix4D.cs" />
     <Compile Include="TObject3DComparer.cs" />
     <Compile Include="TRubikGenome.cs" />
     <Compile Include="TMove.cs" />
