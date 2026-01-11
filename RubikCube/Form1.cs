@@ -53,105 +53,8 @@ namespace RubikCube
                 StartPos = e.Location;
             }
         }
-
-        // Mouse handlers for tglView2 (XYW)
-        private void tglView2_MouseDown(object sender, MouseEventArgs e)
-        {
-            StartPos = e.Location;
-        }
-
-        private void tglView2_MouseMove(object sender, MouseEventArgs e)
-        {
-            tglView2.Cursor = Cursors.Hand;
-            if (e.Button == MouseButtons.Left)
-            {
-                var rot = new TPoint3D();
-                rot.Y = 180 * (e.X - StartPos.X) / tglView2.Width;
-                rot.X = 180 * (e.Y - StartPos.Y) / tglView2.Height;
-                tglView2.Context.Root.RotateY(rot.Y);
-                tglView2.Context.Root.RotateX(rot.X);
-                tglView2.Invalidate();
-                StartPos = e.Location;
-            }
-        }
-
-        // Mouse handlers for tglView3 (XZW)
-        private void tglView3_MouseDown(object sender, MouseEventArgs e)
-        {
-            StartPos = e.Location;
-        }
-
-        private void tglView3_MouseMove(object sender, MouseEventArgs e)
-        {
-            tglView3.Cursor = Cursors.Hand;
-            if (e.Button == MouseButtons.Left)
-            {
-                var rot = new TPoint3D();
-                rot.Y = 180 * (e.X - StartPos.X) / tglView3.Width;
-                rot.X = 180 * (e.Y - StartPos.Y) / tglView3.Height;
-                tglView3.Context.Root.RotateY(rot.Y);
-                tglView3.Context.Root.RotateX(rot.X);
-                tglView3.Invalidate();
-                StartPos = e.Location;
-            }
-        }
-
-        // Mouse handlers for tglView4 (YZW)
-        private void tglView4_MouseDown(object sender, MouseEventArgs e)
-        {
-            StartPos = e.Location;
-        }
-
-        private void tglView4_MouseMove(object sender, MouseEventArgs e)
-        {
-            tglView4.Cursor = Cursors.Hand;
-            if (e.Button == MouseButtons.Left)
-            {
-                var rot = new TPoint3D();
-                rot.Y = 180 * (e.X - StartPos.X) / tglView4.Width;
-                rot.X = 180 * (e.Y - StartPos.Y) / tglView4.Height;
-                tglView4.Context.Root.RotateY(rot.Y);
-                tglView4.Context.Root.RotateX(rot.X);
-                tglView4.Invalidate();
-                StartPos = e.Location;
-            }
-        }
-
-        // Slice selector event handlers
-        private void trackBarXYZ_ValueChanged(object sender, EventArgs e)
-        {
-            if (RubikCube == null) return;  // Safety check
-            lblSliceXYZ.Text = "W=" + trackBarXYZ.Value;
-            lblViewXYZ.Text = "XYZ (W=" + trackBarXYZ.Value + ")";
-            UpdateAllViews();
-        }
-
-        private void trackBarXYW_ValueChanged(object sender, EventArgs e)
-        {
-            if (RubikCube == null) return;  // Safety check
-            lblSliceXYW.Text = "Z=" + trackBarXYW.Value;
-            lblViewXYW.Text = "XYW (Z=" + trackBarXYW.Value + ")";
-            UpdateAllViews();
-        }
-
-        private void trackBarXZW_ValueChanged(object sender, EventArgs e)
-        {
-            if (RubikCube == null) return;  // Safety check
-            lblSliceXZW.Text = "Y=" + trackBarXZW.Value;
-            lblViewXZW.Text = "XZW (Y=" + trackBarXZW.Value + ")";
-            UpdateAllViews();
-        }
-
-        private void trackBarYZW_ValueChanged(object sender, EventArgs e)
-        {
-            if (RubikCube == null) return;  // Safety check
-            lblSliceYZW.Text = "X=" + trackBarYZW.Value;
-            lblViewYZW.Text = "YZW (X=" + trackBarYZW.Value + ")";
-            UpdateAllViews();
-        }
-
         int FrameNo;
-        int FrameCount = 0;  // 0 = no animation, instant moves
+        int FrameCount = 10;
         bool IsPaused = true;
 
         TObject3D ActSlice;
@@ -183,44 +86,18 @@ namespace RubikCube
                     if (angle > 180) angle -= 360;
                     angle *= (double)FrameNo / FrameCount;
                     ActSlice.LoadIdentity();
-
-                    // Map 4D rotation planes to 3D rotations for XYZ view animation
-                    // Plane: 0=XY, 1=XZ, 2=XW, 3=YZ, 4=YW, 5=ZW
-                    switch (move.Plane)
-                    {
-                        case 0: // XY plane → rotate around Z axis
-                            ActSlice.RotateZ(angle);
-                            break;
-                        case 1: // XZ plane → rotate around Y axis
-                            ActSlice.RotateY(angle);
-                            break;
-                        case 2: // XW plane → rotate around Y axis (W not visible in XYZ)
-                            ActSlice.RotateY(angle);
-                            break;
-                        case 3: // YZ plane → rotate around X axis
-                            ActSlice.RotateX(angle);
-                            break;
-                        case 4: // YW plane → rotate around X axis (W not visible in XYZ)
-                            ActSlice.RotateX(angle);
-                            break;
-                        case 5: // ZW plane → rotate around Z axis (W not visible in XYZ)
-                            ActSlice.RotateZ(angle);
-                            break;
-                    }
+                    if (move.Axis == 0) ActSlice.RotateX(angle);
+                    if (move.Axis == 1) ActSlice.RotateY(angle);
+                    if (move.Axis == 2) ActSlice.RotateZ(angle);
                 }
                 else
                 {
                     UnGroup();
                     RubikCube.Turn(move);
-                    UpdateAllViews();  // Update all 4 views after each move
                     FrameNo = 0;
                     MoveNo++;
                 }
-                // Invalidate all views during animation
                 tglView1.Invalidate();
-                tglView2.Invalidate();
-                tglView3.Invalidate();
-                tglView4.Invalidate();
             }
             else
             {
@@ -321,14 +198,8 @@ namespace RubikCube
                 var move = TMove.Decode((int)specimen.Genes[i]);
                 if (i == 0)
                 {
-                    // For 4D: Determine which axis is fixed and set slice to ActCubie's position on that axis
-                    var idx = new int[4] { RubikCube.ActCubie.X, RubikCube.ActCubie.Y, RubikCube.ActCubie.Z, RubikCube.ActCubie.W };
-
-                    // Get the fixed axis for this plane rotation
-                    int[] remainingAxes = RubikCube.GetRemainingAxes(move.Plane);
-                    int fixedAxisIdx = remainingAxes[move.FixedAxis];
-
-                    move.Slice = idx[fixedAxisIdx];
+                    var idx = new int[3] { RubikCube.ActCubie.X, RubikCube.ActCubie.Y, RubikCube.ActCubie.Z };
+                    move.Slice = idx[move.Axis];
                     specimen.Genes[0] = move.Encode();
                 }
                 cube.Turn(move);
@@ -351,20 +222,14 @@ namespace RubikCube
             IterElapsed = TimeSpan.Zero;
             chart1.Series[0].Points.Clear();
 
-            // 4D Genetic Algorithm Parameters (scaled with N)
-            // Complexity grows with N, so scale parameters accordingly
-            TChromosome.GenesLength = 35 * TRubikCube.N;  // N=2: 70, N=3: 105, N=4: 140
+            TChromosome.GenesLength = 27;
             var ga = new TGA<TRubikGenome>();
-            ga.PopulationCount = 100 * TRubikCube.N;      // N=2: 200, N=3: 300, N=4: 400
-            ga.GenerationsCount = 50 * TRubikCube.N;      // N=2: 100, N=3: 150, N=4: 200
-            ga.WinnerRatio = 0.1;          // Keep top 10% of population
-            ga.MutationRatio = 1;          // 100% mutation rate for diversity
+            ga.GenerationsCount = 50;
+            ga.WinnerRatio = 0.1;
+            ga.MutationRatio = 1;
             ga.SelectionType = TGA<TRubikGenome>.TSelectionType.Unique;
             ga.Evaluate = OnEvaluate;
             ga.Progress = OnProgress;
-
-            // Ensure ActCubie is set before getting free genes
-            RubikCube.GetActCubie();
             TRubikGenome.FreeGenes = RubikCube.GetFreeGenes();
             ga.HighScore = HighScore;
             ga.Execute();
@@ -523,19 +388,8 @@ namespace RubikCube
             IsPaused = true;
             for (int i = 0; i < 100; i++)
             {
-                // 4D move encoding: 18 * Plane + 9 * FixedAxis + 3 * Slice + Angle
-                // Max value: 18*5 + 9*1 + 3*(N-1) + 2 = 99 + 3*N
-                // For N=2: range is 0-104, so we need Rnd.Next(105)
-                var maxCode = 99 + 3 * TRubikCube.N;
-
-                // Keep generating until we get a valid move
-                TMove move;
-                do
-                {
-                    var code = TChromosome.Rnd.Next(maxCode);
-                    move = TMove.Decode(code);
-                } while (move.Slice >= TRubikCube.N);  // Reject moves with invalid slice
-
+                var code = TChromosome.Rnd.Next(9 * TRubikCube.N);
+                var move = TMove.Decode(code);
                 Moves.Add(move);
             }
             MoveTimer.Start();
@@ -648,93 +502,7 @@ namespace RubikCube
         private void TRubikForm_Load(object sender, EventArgs e)
         {
             RubikCube = new TRubikCube();
-
-            // Initialize view labels with current slice values
-            int middleSlice = TRubikCube.N / 2;
-            lblViewXYZ.Text = "XYZ (W=" + middleSlice + ")";
-            lblViewXYW.Text = "XYW (Z=" + middleSlice + ")";
-            lblViewXZW.Text = "XZW (Y=" + middleSlice + ")";
-            lblViewYZW.Text = "YZW (X=" + middleSlice + ")";
-
-            UpdateAllViews();
-            LayoutViews();  // Initial layout
-        }
-
-        private void TRubikForm_Resize(object sender, EventArgs e)
-        {
-            LayoutViews();
-        }
-
-        /// <summary>
-        /// Calculates and applies layout for the 4 viewport views in a 2x2 grid
-        /// </summary>
-        private void LayoutViews()
-        {
-            // Calculate available space for views (right side of the form)
-            int leftPanelWidth = 445;  // Width of the left control panel
-            int margin = 10;
-            int labelHeight = 25;
-            int sliderHeight = 45;
-            int sliderLabelWidth = 50;
-
-            int availableWidth = this.ClientSize.Width - leftPanelWidth - margin * 3;
-            int availableHeight = this.ClientSize.Height - margin * 3 - labelHeight * 2 - sliderHeight;
-
-            // Calculate size for each view (half of available space)
-            int viewWidth = (availableWidth - margin) / 2;
-            int viewHeight = (availableHeight - margin) / 2;
-
-            // Make views square (use smaller dimension)
-            int viewSize = Math.Min(viewWidth, viewHeight);
-
-            // Position views in 2x2 grid
-            int startX = leftPanelWidth + margin;
-            int startY = labelHeight + margin;
-
-            // Top-left: tglView1 (XYZ)
-            tglView1.Location = new Point(startX, startY);
-            tglView1.Size = new Size(viewSize, viewSize);
-            lblViewXYZ.Location = new Point(startX + 5, startY + 5);
-            lblViewXYZ.BringToFront();
-
-            // Slider below view1
-            trackBarXYZ.Location = new Point(startX, startY + viewSize + 5);
-            trackBarXYZ.Size = new Size(viewSize - sliderLabelWidth, sliderHeight);
-            lblSliceXYZ.Location = new Point(startX + viewSize - sliderLabelWidth + 5, startY + viewSize + 10);
-
-            // Top-right: tglView2 (XYW)
-            tglView2.Location = new Point(startX + viewSize + margin, startY);
-            tglView2.Size = new Size(viewSize, viewSize);
-            lblViewXYW.Location = new Point(startX + viewSize + margin + 5, startY + 5);
-            lblViewXYW.BringToFront();
-
-            // Slider below view2
-            trackBarXYW.Location = new Point(startX + viewSize + margin, startY + viewSize + 5);
-            trackBarXYW.Size = new Size(viewSize - sliderLabelWidth, sliderHeight);
-            lblSliceXYW.Location = new Point(startX + viewSize + margin + viewSize - sliderLabelWidth + 5, startY + viewSize + 10);
-
-            // Bottom-left: tglView3 (XZW)
-            int view3Y = startY + viewSize + margin + sliderHeight + 5;
-            tglView3.Location = new Point(startX, view3Y);
-            tglView3.Size = new Size(viewSize, viewSize);
-            lblViewXZW.Location = new Point(startX + 5, view3Y + 5);
-            lblViewXZW.BringToFront();
-
-            // Slider below view3
-            trackBarXZW.Location = new Point(startX, view3Y + viewSize + 5);
-            trackBarXZW.Size = new Size(viewSize - sliderLabelWidth, sliderHeight);
-            lblSliceXZW.Location = new Point(startX + viewSize - sliderLabelWidth + 5, view3Y + viewSize + 10);
-
-            // Bottom-right: tglView4 (YZW)
-            tglView4.Location = new Point(startX + viewSize + margin, view3Y);
-            tglView4.Size = new Size(viewSize, viewSize);
-            lblViewYZW.Location = new Point(startX + viewSize + margin + 5, view3Y + 5);
-            lblViewYZW.BringToFront();
-
-            // Slider below view4
-            trackBarYZW.Location = new Point(startX + viewSize + margin, view3Y + viewSize + 5);
-            trackBarYZW.Size = new Size(viewSize - sliderLabelWidth, sliderHeight);
-            lblSliceYZW.Location = new Point(startX + viewSize + margin + viewSize - sliderLabelWidth + 5, view3Y + viewSize + 10);
+            RubikCube.Parent = tglView1.Context.Root;
         }
 
         private void saveToolStripMenuItem_Click(object sender, EventArgs e)
@@ -801,8 +569,9 @@ namespace RubikCube
                 TRubikCube.N = (int)Math.Round(Math.Pow(code.Length, 0.33));
                 RubikCube.Parent = null;
                 RubikCube = new TRubikCube();
+                RubikCube.Parent = tglView1.Context.Root;
                 RubikCube.Code = code;
-                UpdateAllViews();
+                tglView1.Invalidate();
             }
         }
 
@@ -818,28 +587,8 @@ namespace RubikCube
             TRubikCube.N = (int)numericUpDown1.Value;
             RubikCube.Parent = null;
             RubikCube = new TRubikCube();
-
-            // Update trackbar ranges for new N value
-            // For N=2, slices are 0-1; for N=3, slices are 0-2, etc.
-            trackBarXYZ.Maximum = TRubikCube.N - 1;
-            trackBarXYW.Maximum = TRubikCube.N - 1;
-            trackBarXZW.Maximum = TRubikCube.N - 1;
-            trackBarYZW.Maximum = TRubikCube.N - 1;
-
-            // Set to middle slice by default
-            int middleSlice = TRubikCube.N / 2;
-            trackBarXYZ.Value = middleSlice;
-            trackBarXYW.Value = middleSlice;
-            trackBarXZW.Value = middleSlice;
-            trackBarYZW.Value = middleSlice;
-
-            // Update view labels with current slice values
-            lblViewXYZ.Text = "XYZ (W=" + middleSlice + ")";
-            lblViewXYW.Text = "XYW (Z=" + middleSlice + ")";
-            lblViewXZW.Text = "XZW (Y=" + middleSlice + ")";
-            lblViewYZW.Text = "YZW (X=" + middleSlice + ")";
-
-            UpdateAllViews();
+            RubikCube.Parent = tglView1.Context.Root;
+            tglView1.Invalidate();
             StateBox.Invalidate();
             Moves.Clear();
             MoveTimer.Start();
@@ -864,16 +613,15 @@ namespace RubikCube
             TRubikCube.N = 7;
             RubikCube.Parent = null;
             RubikCube = new TRubikCube();
-            UpdateAllViews();
+            RubikCube.Parent = tglView1.Context.Root;
 
             var cubies = new List<TCubie>();
-            // Updated for 4D: N=2, so valid indices are 0 or 1
-            cubies.Add(RubikCube.Cubies[1, 1, 1, 1]);  // Corner hypercubie
-            cubies.Add(RubikCube.Cubies[0, 0, 0, 0]);  // Opposite corner
-            cubies.Add(RubikCube.Cubies[1, 1, 0, 0]);  // Edge hypercubie
-            cubies.Add(RubikCube.Cubies[0, 0, 1, 1]);  // Edge hypercubie
-            cubies.Add(RubikCube.Cubies[1, 0, 1, 0]);  // Face hypercubie
-            cubies.Add(RubikCube.Cubies[0, 1, 0, 1]);  // Face hypercubie
+            cubies.Add(RubikCube.Cubies[3, 3, 3]);
+            cubies.Add(RubikCube.Cubies[0, 0, 0]);
+            cubies.Add(RubikCube.Cubies[3, 3, 0]);
+            cubies.Add(RubikCube.Cubies[0, 2, 0]);
+            cubies.Add(RubikCube.Cubies[2, 3, 0]);
+            cubies.Add(RubikCube.Cubies[1, 2, 0]);
 
             for (int i = 0; i < cubies.Count; i++)
             {
@@ -888,11 +636,7 @@ namespace RubikCube
 
         private void TransparencyBox_CheckedChanged(object sender, EventArgs e)
         {
-            // Apply transparency setting to all views
             tglView1.Context.IsTransparencyOn = TransparencyBox.Checked;
-            tglView2.Context.IsTransparencyOn = TransparencyBox.Checked;
-            tglView3.Context.IsTransparencyOn = TransparencyBox.Checked;
-            tglView4.Context.IsTransparencyOn = TransparencyBox.Checked;
         }
 
         private void showClusterToolStripMenuItem_Click(object sender, EventArgs e)
@@ -900,12 +644,8 @@ namespace RubikCube
             TRubikCube.N = 5;
             RubikCube.Parent = null;
             RubikCube = new TRubikCube();
-            UpdateAllViews();
-            // Reset all views to identity
+            RubikCube.Parent = tglView1.Context.Root;
             tglView1.Context.Root.LoadIdentity();
-            tglView2.Context.Root.LoadIdentity();
-            tglView3.Context.Root.LoadIdentity();
-            tglView4.Context.Root.LoadIdentity();
             foreach (var cubie in RubikCube.Cubies)
             {
                 cubie.State = 3;
@@ -966,8 +706,8 @@ namespace RubikCube
 
         private void undoMovesToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            var actCubie = RubikCube.Cubies[0, 0, 0, 0];  // Updated for 4D
-            var idx = new int[] { actCubie.X, actCubie.Y, actCubie.Z, actCubie.W };  // Include W
+            var actCubie = RubikCube.Cubies[0, 0, 0];
+            var idx = new int[] { actCubie.X, actCubie.Y, actCubie.Z };
             var A = new TMove();
             var B = new TMove();
             var C = new TMove();
@@ -984,123 +724,6 @@ namespace RubikCube
             e.Graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
             e.Graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.Half;
             DisplayState(e.Graphics);
-        }
-        
-        /// <summary>
-        /// Updates all 4 viewport views with 3D slices of the 4D hypercube
-        /// </summary>
-        private void UpdateAllViews()
-        {
-            if (RubikCube == null) return;
-
-            // Extract slices from 4D hypercube using trackbar values
-            // XYZ view: Fix W dimension at trackBarXYZ value
-            // XYW view: Fix Z dimension at trackBarXYW value
-            // XZW view: Fix Y dimension at trackBarXZW value
-            // YZW view: Fix X dimension at trackBarYZW value
-
-            UpdateSliceView(tglView1, RubikCube.GetSliceXYZ(trackBarXYZ.Value), "XYZ", trackBarXYZ.Value);
-            UpdateSliceView(tglView2, RubikCube.GetSliceXYW(trackBarXYW.Value), "XYW", trackBarXYW.Value);
-            UpdateSliceView(tglView3, RubikCube.GetSliceXZW(trackBarXZW.Value), "XZW", trackBarXZW.Value);
-            UpdateSliceView(tglView4, RubikCube.GetSliceYZW(trackBarYZW.Value), "YZW", trackBarYZW.Value);
-        }
-
-        /// <summary>
-        /// Updates a single viewport with a 3D slice from the 4D hypercube
-        /// </summary>
-        /// <param name="view">The TGLView control to update</param>
-        /// <param name="slice">3D array of cubies to display</param>
-        /// <param name="viewName">Name of the view (XYZ, XYW, XZW, or YZW)</param>
-        /// <param name="sliceValue">The value of the fixed dimension</param>
-        private void UpdateSliceView(TGLView view, TCubie[,,] slice, string viewName, int sliceValue)
-        {
-            if (view == null || slice == null) return;
-
-            // Clear existing content
-            view.Context.Root.Children.Clear();
-
-            // Create a container for this slice
-            var sliceContainer = new TObject3D();
-            sliceContainer.Parent = view.Context.Root;
-
-            // Scale factor for spacing between cubies
-            double cubieSize = 1.0;
-            double spacing = 0.1;
-            double step = cubieSize + spacing;
-
-            // Create visual copies of each cubie and reposition them in 3D grid
-            for (int z = 0; z < TRubikCube.N; z++)
-                for (int y = 0; y < TRubikCube.N; y++)
-                    for (int x = 0; x < TRubikCube.N; x++)
-                    {
-                        var originalCubie = slice[z, y, x];
-                        if (originalCubie != null)
-                        {
-                            // Create a visual copy of the cubie
-                            var cubieCopy = originalCubie.Copy();
-
-                            // Add W dimension colors based on view type
-                            // XYZ view (W=sliceValue): W is fixed/hidden, don't show W colors
-                            // XYW view (Z=sliceValue): W varies, show W colors where Z would be
-                            // XZW view (Y=sliceValue): W varies, show W colors where Y would be
-                            // YZW view (X=sliceValue): W varies, show W colors where X would be
-                            int wValue = originalCubie.W;
-
-                            if (viewName == "XYW")
-                            {
-                                // Z is fixed, W varies - show W colors on Z faces at W boundaries
-                                // Face 0=-Z, Face 3=+Z
-                                // Only set if face doesn't already have a color
-                                if (wValue == 0 && cubieCopy.FaceColors[0] == -1)
-                                    cubieCopy.FaceColors[0] = 6;  // -Z face (represents -W) shows Purple
-                                if (wValue == TRubikCube.N - 1 && cubieCopy.FaceColors[3] == -1)
-                                    cubieCopy.FaceColors[3] = 7;  // +Z face (represents +W) shows Magenta
-                            }
-                            else if (viewName == "XZW")
-                            {
-                                // Y is fixed, W varies - show W colors on Y faces at W boundaries
-                                // Face 2=-Y, Face 5=+Y
-                                // Only set if face doesn't already have a color
-                                if (wValue == 0 && cubieCopy.FaceColors[2] == -1)
-                                    cubieCopy.FaceColors[2] = 6;  // -Y face (represents -W) shows Purple
-                                if (wValue == TRubikCube.N - 1 && cubieCopy.FaceColors[5] == -1)
-                                    cubieCopy.FaceColors[5] = 7;  // +Y face (represents +W) shows Magenta
-                            }
-                            else if (viewName == "YZW")
-                            {
-                                // X is fixed, W varies - show W colors on X faces at W boundaries
-                                // Face 1=-X, Face 4=+X
-                                // Only set if face doesn't already have a color
-                                if (wValue == 0 && cubieCopy.FaceColors[1] == -1)
-                                    cubieCopy.FaceColors[1] = 6;  // -X face (represents -W) shows Purple
-                                if (wValue == TRubikCube.N - 1 && cubieCopy.FaceColors[4] == -1)
-                                    cubieCopy.FaceColors[4] = 7;  // +X face (represents +W) shows Magenta
-                            }
-                            // XYZ view: W is fixed/hidden dimension, so no W colors are shown
-
-                            // Reposition based on slice indices to form a proper 3D cube
-                            // Center the cube around origin
-                            double centerOffset = (TRubikCube.N - 1) * step / 2.0;
-                            cubieCopy.LoadIdentity();
-                            cubieCopy.Scale(cubieSize * 0.45, cubieSize * 0.45, cubieSize * 0.45);  // Scale down to avoid overlap
-                            cubieCopy.Translate(
-                                x * step - centerOffset,
-                                y * step - centerOffset,
-                                z * step - centerOffset
-                            );
-
-                            // Copy the color/state from original
-                            cubieCopy.State = originalCubie.State;
-
-                            cubieCopy.Parent = sliceContainer;
-                        }
-                    }
-
-            // Move the container back a bit so it's visible in the camera view
-            // sliceContainer.Translate(0, 0, 0);
-
-            // Invalidate the view to trigger redraw
-            view.Invalidate();
         }
     }
 }

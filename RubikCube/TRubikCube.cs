@@ -10,9 +10,9 @@ namespace RubikCube
 {
     public class TRubikCube : TObject3D
     {
-        public static int N = 3;  // 3x3x3x3 hypercube (81 hypercubies)
+        public static int N = 3;
         public static double C;
-        public TCubie[,,,] Cubies = new TCubie[N, N, N, N];  // 4D array
+        public TCubie[,,] Cubies = new TCubie[N, N, N];
         public List<TMove> Moves = new List<TMove>();
         public List<TCubie> ActCluster = new List<TCubie>();
         public TCubie ActCubie;
@@ -23,31 +23,24 @@ namespace RubikCube
             {
                 if (_StateGrid == null)
                 {
-                    int totalCubies = N * N * N * N;
-                    _StateGrid = new int[totalCubies, totalCubies];
-                    for (int w = 0; w < N; w++)
-                        for (int x = 0; x < N; x++)
-                            for (int y = 0; y < N; y++)
-                                for (int z = 0; z < N; z++)
-                                {
-                                    var cubie = Cubies[w, z, y, x];
-                                    var transform = (double[])cubie.Transform.Clone();
-
-                                    // Legacy 3D state extraction for StateGrid compatibility
-                                    // Full 4D orientation tracking is implemented in TCubie.State4DOrientation
-                                    var alpha = cubie.State & 3;        // Legacy: X rotation
-                                    var beta = (cubie.State >> 2) & 3;  // Legacy: Y rotation
-                                    var gamma = (cubie.State >> 4) & 3; // Legacy: Z rotation
-
-                                    // Apply 3D rotations for rendering (legacy compatibility)
-                                    cubie.RotateZ(-90 * gamma);
-                                    cubie.RotateY(-90 * beta);
-                                    cubie.RotateX(-90 * alpha);
-                                    var i = x * N * N * N + y * N * N + z * N + w;
-                                    var idx = cubie.X * N * N * N + cubie.Y * N * N + cubie.Z * N + cubie.W;
-                                    cubie.Transform = transform;
-                                    _StateGrid[i, idx] = cubie.State + (1 << 6);
-                                }
+                    _StateGrid = new int[N * N * N, N * N * N];
+                    for (int x = 0; x < N; x++)
+                        for (int y = 0; y < N; y++)
+                            for (int z = 0; z < N; z++)
+                            {
+                                var cubie = Cubies[z, y, x];
+                                var transform = (double[])cubie.Transform.Clone();
+                                var alpha = cubie.State & 3;
+                                var beta = (cubie.State >> 2) & 3;
+                                var gamma = (cubie.State >> 4) & 3;
+                                cubie.RotateZ(-90 * gamma);
+                                cubie.RotateY(-90 * beta);
+                                cubie.RotateX(-90 * alpha);
+                                var i = x * N * N + y * N + z;
+                                var idx = cubie.X * N * N + cubie.Y * N + cubie.Z;
+                                cubie.Transform = transform;
+                                _StateGrid[i, idx] = cubie.State + (1 << 6);
+                            }
                 }
                 return _StateGrid;
             }
@@ -58,84 +51,37 @@ namespace RubikCube
             C = (N - 1) / 2.0;
             Scale(1.0 / N, 1.0 / N, 1.0 / N);
             var cubieScale = 0.9 / 2;
-            for (int w = 0; w < N; w++)
-                for (int z = 0; z < N; z++)
-                    for (int y = 0; y < N; y++)
-                        for (int x = 0; x < N; x++)
-                        {
-                            var cubie = new TCubie();
-                            // Initialize 3D transformation (for rendering)
-                            cubie.Scale(cubieScale, cubieScale, cubieScale);
-                            cubie.Translate(x - C, y - C, z - C);
-                            // Initialize 4D transformation (for 4D position tracking)
-                            cubie.Scale4D(cubieScale, cubieScale, cubieScale, cubieScale);
-                            cubie.Translate4D(x - C, y - C, z - C, w - C);
-                            InitializeCubieFaceColors(cubie, x, y, z, w);  // Set colors based on 4D position
-                            cubie.Parent = this;
-                            Cubies[w, z, y, x] = cubie;
-                        }
-            //ActCubie = Cubies[(int)C, (int)C, (int)C, (int)C];
-        }
-
-        /// <summary>
-        /// Initialize face colors for a cubie based on its position in the 4D hypercube
-        /// </summary>
-        private void InitializeCubieFaceColors(TCubie cubie, int x, int y, int z, int w)
-        {
-            //  mapping based on user observations:
-            // User saw: Front=Green, Right=Orange, Back=Blue, Left=Red, Top=Yellow, Bottom=White
-            // This tells us the correct face index to geometric face mapping:
-            //
-            // From the original partially working assignments and user observations,
-            // the correct face order appears to be:
-            // Face 0: Back (-Z) - Blue
-            // Face 1: Left (-X) - Red
-            // Face 2: Bottom (-Y) - White
-            // Face 3: Front (+Z) - Green
-            // Face 4: Right (+X) - Orange
-            // Face 5: Top (+Y) - Yellow
-
-            // Z faces (Front/Back)
-            if (z == 0)
-                cubie.FaceColors[0] = 4;  // Face 0 (Back -Z) gets Blue
-            if (z == N - 1)
-                cubie.FaceColors[3] = 5;  // Face 3 (Front +Z) gets Green
-
-            // X faces (Left/Right)
-            if (x == 0)
-                cubie.FaceColors[1] = 0;  // Face 1 (Left -X) gets Red
-            if (x == N - 1)
-                cubie.FaceColors[4] = 1;  // Face 4 (Right +X) gets Orange
-
-            // Y faces (Bottom/Top)
-            if (y == 0)
-                cubie.FaceColors[2] = 2;  // Face 2 (Bottom -Y) gets White
-            if (y == N - 1)
-                cubie.FaceColors[5] = 3;  // Face 5 (Top +Y) gets Yellow
-
-            // Note: W dimension colors will be shown when viewing different slices
-            // Interior cubies get -1 (no color) on faces not on the hypercube boundary
+            for (int z = 0; z < N; z++)
+                for (int y = 0; y < N; y++)
+                    for (int x = 0; x < N; x++)
+                    {
+                        var cubie = new TCubie();
+                        cubie.Scale(cubieScale, cubieScale, cubieScale);
+                        cubie.Translate(x - C, y - C, z - C);
+                        cubie.Parent = this;
+                        Cubies[z, y, x] = cubie;
+                    }
+            //ActCubie = Cubies[(int)C, (int)C, (int)C];
         }
 
         public TRubikCube(TRubikCube src)
         {
-            for (int w = 0; w < N; w++)
-                for (int z = 0; z < N; z++)
-                    for (int y = 0; y < N; y++)
-                        for (int x = 0; x < N; x++)
-                        {
-                            var cubie = src.Cubies[w, z, y, x].Copy();
-                            cubie.Parent = this;
-                            Cubies[w, z, y, x] = cubie;
-                        }
+            for (int z = 0; z < N; z++)
+                for (int y = 0; y < N; y++)
+                    for (int x = 0; x < N; x++)
+                    {
+                        var cubie = src.Cubies[z, y, x].Copy();
+                        cubie.Parent = this;
+                        Cubies[z, y, x] = cubie;
+                    }
             if (src.ActCubie != null)
             {
-                ActCubie = Cubies[src.ActCubie.W, src.ActCubie.Z, src.ActCubie.Y, src.ActCubie.X];
+                ActCubie = Cubies[src.ActCubie.Z, src.ActCubie.Y, src.ActCubie.X];
                 ActCluster = new List<TCubie>();
                 for (int i = 0; i < src.ActCluster.Count; i++)
                 {
                     var cubie = src.ActCluster[i];
-                    ActCluster.Add(Cubies[cubie.W, cubie.Z, cubie.Y, cubie.X]);
+                    ActCluster.Add(Cubies[cubie.Z, cubie.Y, cubie.X]);
                 }
             }
         }
@@ -159,156 +105,42 @@ namespace RubikCube
 
         public List<TCubie> SelectSlice(TMove move)
         {
-            // Redirect to 4D version for all moves
-            // This ensures backward compatibility while supporting 4D
-            return SelectSlice4D(move);
-        }
-
-        // 4D slice selection
-        public List<TCubie> SelectSlice4D(TMove move)
-        {
             var selection = new List<TCubie>();
-
-            // Determine which axes are involved in the rotation plane
-            // Planes: 0=XY, 1=XZ, 2=XW, 3=YZ, 4=YW, 5=ZW
-            int[] planeAxes = GetPlaneAxes(move.Plane);
-            int axis1 = planeAxes[0];  // First rotating axis
-            int axis2 = planeAxes[1];  // Second rotating axis
-
-            // Determine which of the two remaining axes is fixed
-            int[] remainingAxes = GetRemainingAxes(move.Plane);
-            int fixedAxisIdx = remainingAxes[move.FixedAxis];
-
-            // Select all hypercubies in the slice
             for (int i = 0; i < N; i++)
                 for (int j = 0; j < N; j++)
-                    for (int k = 0; k < N; k++)
-                    {
-                        var v = new int[4];
-                        v[axis1] = i;
-                        v[axis2] = j;
-                        v[fixedAxisIdx] = move.Slice;
-                        v[remainingAxes[1 - move.FixedAxis]] = k;
-                        selection.Add(Cubies[v[3], v[2], v[1], v[0]]);
-                    }
+                {
+                    var v = new int[3];
+                    v[move.Axis] = move.Slice;
+                    v[(move.Axis + 1) % 3] = i;
+                    v[(move.Axis + 2) % 3] = j;
+                    selection.Add(Cubies[v[2], v[1], v[0]]);
+                }
             return selection;
-        }
-
-        // Get the two axes that define a rotation plane
-        private int[] GetPlaneAxes(int plane)
-        {
-            // Planes: 0=XY, 1=XZ, 2=XW, 3=YZ, 4=YW, 5=ZW
-            // Axes: 0=X, 1=Y, 2=Z, 3=W
-            switch (plane)
-            {
-                case 0: return new int[] { 0, 1 }; // XY
-                case 1: return new int[] { 0, 2 }; // XZ
-                case 2: return new int[] { 0, 3 }; // XW
-                case 3: return new int[] { 1, 2 }; // YZ
-                case 4: return new int[] { 1, 3 }; // YW
-                case 5: return new int[] { 2, 3 }; // ZW
-                default: return new int[] { 0, 1 };
-            }
-        }
-
-        // Get the two axes NOT involved in the rotation plane
-        public int[] GetRemainingAxes(int plane)
-        {
-            switch (plane)
-            {
-                case 0: return new int[] { 2, 3 }; // XY -> remaining: Z, W
-                case 1: return new int[] { 1, 3 }; // XZ -> remaining: Y, W
-                case 2: return new int[] { 1, 2 }; // XW -> remaining: Y, Z
-                case 3: return new int[] { 0, 3 }; // YZ -> remaining: X, W
-                case 4: return new int[] { 0, 2 }; // YW -> remaining: X, Z
-                case 5: return new int[] { 0, 1 }; // ZW -> remaining: X, Y
-                default: return new int[] { 2, 3 };
-            }
         }
 
         public void Turn(TMove move)
         {
-            // Apply proper 4D rotation using 5×5 transformation matrices
+            var slice = new TObject3D();
             int angle = 90 * (move.Angle + 1);
-
-            // Create 5×5 rotation matrix for the plane
-            // Planes: 0=XY, 1=XZ, 2=XW, 3=YZ, 4=YW, 5=ZW
-            var rotationMatrix4D = new double[25];
-            switch (move.Plane)
-            {
-                case 0: // XY plane
-                    TMatrix4D.CreateRotationXY(angle, rotationMatrix4D);
-                    break;
-                case 1: // XZ plane
-                    TMatrix4D.CreateRotationXZ(angle, rotationMatrix4D);
-                    break;
-                case 2: // XW plane
-                    TMatrix4D.CreateRotationXW(angle, rotationMatrix4D);
-                    break;
-                case 3: // YZ plane
-                    TMatrix4D.CreateRotationYZ(angle, rotationMatrix4D);
-                    break;
-                case 4: // YW plane
-                    TMatrix4D.CreateRotationYW(angle, rotationMatrix4D);
-                    break;
-                case 5: // ZW plane
-                    TMatrix4D.CreateRotationZW(angle, rotationMatrix4D);
-                    break;
-            }
-
-            var selection = SelectSlice4D(move);
+            if (move.Axis == 0)
+                slice.RotateX(angle);
+            else if (move.Axis == 1)
+                slice.RotateY(angle);
+            else
+                slice.RotateZ(angle);
+            var selection = SelectSlice(move);
             for (int i = 0; i < selection.Count; i++)
             {
                 var cubie = selection[i];
-
-                // Apply 4D rotation to cubie's 4D transformation matrix
-                cubie.MultMatrix4D(rotationMatrix4D);
-
-                // Track 4D state changes
-                cubie.ApplyPlaneRotation(move.Plane, move.Angle + 1);
-
-                // Also update 3D transformation for rendering
-                // Extract 3D rotation from 4D and apply to 3D transform
-                Update3DTransformFromRotation(cubie, move.Plane, angle);
-
-                // Update cubie position in array
-                Cubies[cubie.W, cubie.Z, cubie.Y, cubie.X] = cubie;
-                cubie.ValidState = false;  // Force 3D state recalculation
-                cubie.ValidState4D = true; // 4D state already updated above
+                cubie.MultMatrix(slice.Transform);
+                Cubies[cubie.Z, cubie.Y, cubie.X] = cubie;
+                cubie.ValidState = false;
                 cubie.Transparent = false;
                 if (cubie.State != 0)
                     cubie.Transparent = true;
                 cubie.Parent = this;
             }
             _StateGrid = null;
-        }
-
-        // Update 3D transformation matrix based on 4D rotation
-        private void Update3DTransformFromRotation(TCubie cubie, int plane, double angle)
-        {
-            // For planes that only affect 3D coordinates (XY, XZ, YZ), update 3D transform
-            // For planes involving W (XW, YW, ZW), the 3D rotation affects the visible axes
-            switch (plane)
-            {
-                case 0: // XY plane - rotate around Z axis in 3D
-                    cubie.RotateZ(angle);
-                    break;
-                case 1: // XZ plane - rotate around Y axis in 3D
-                    cubie.RotateY(angle);
-                    break;
-                case 2: // XW plane - rotate around X axis in 3D (as W is hidden)
-                    // X changes with W, so we don't rotate in visible 3D
-                    break;
-                case 3: // YZ plane - rotate around X axis in 3D
-                    cubie.RotateX(angle);
-                    break;
-                case 4: // YW plane - rotate around Y axis in 3D (as W is hidden)
-                    // Y changes with W, so we don't rotate in visible 3D
-                    break;
-                case 5: // ZW plane - rotate around Z axis in 3D (as W is hidden)
-                    // Z changes with W, so we don't rotate in visible 3D
-                    break;
-            }
         }
         public void ReTurn(TMove move)
         {
@@ -326,29 +158,32 @@ namespace RubikCube
             {
                 for (int side = 0; side < 2; side++)
                 {
-                    for (int i = restrict; i < N - restrict; i++)
-                        for (int j = restrict; j < N - restrict; j++)
-                            for (int k = restrict; k < N - restrict; k++)
-                                for (int axis = 0; axis < 4; axis++)  // Now 4 axes for 4D
+                    //for (int i = 0; i < N; i++)
+                        //for (int n = 0; n < N; n++)
+                        for (int i = restrict; i < N - restrict; i++)
+                            for (int n = restrict; n < N - restrict; n++)
+                            for (int axis = 0; axis < 3; axis++)
+                            {
+                                var v = new int[3];
+                                v[axis] = side == 0 ? restrict : N - 1 - restrict;
+                                v[(axis + 1) % 3] = i;
+                                v[(axis + 2) % 3] = n;
+                                var cubie = Cubies[v[2], v[1], v[0]];
+                                if (cubie.State != 0)
                                 {
-                                    var v = new int[4];
-                                    v[axis] = side == 0 ? restrict : N - 1 - restrict;
-                                    v[(axis + 1) % 4] = i;
-                                    v[(axis + 2) % 4] = j;
-                                    v[(axis + 3) % 4] = k;
-                                    var cubie = Cubies[v[3], v[2], v[1], v[0]];
-                                    if (cubie.State != 0)
+                                    //var freeGenes = GetFreeGenes(v);
+                                    var dist = Math.Abs(C - v[2]) + Math.Abs(C - v[1]) + Math.Abs(C - v[0]);// / freeGenes.Count;
+                                    if (dist < minDist)
                                     {
-                                        // 4D Manhattan distance from center
-                                        var dist = Math.Abs(C - v[0]) + Math.Abs(C - v[1]) + Math.Abs(C - v[2]) + Math.Abs(C - v[3]);
-                                        if (dist < minDist)
-                                        {
-                                            minDist = dist;
-                                            ActCubie = cubie;
-                                            result = restrict;
-                                        }
+                                        minDist = dist;
+                                        ActCubie = cubie;
+
+                                        //if (result < 0)
+                                        result = restrict;
+                                        //return result;
                                     }
                                 }
+                            }
                 }
                 if (result > 0)
                     break;
@@ -437,219 +272,73 @@ namespace RubikCube
             return result;
         }
 
-        /// <summary>
-        /// Proper 4D evaluation function using all 6 rotation planes
-        /// This replaces the legacy 3D evaluation for better genetic algorithm performance
-        /// </summary>
-        public double Evaluate4D()
-        {
-            double totalDistance = 0;
-            int unsolvedCount = 0;
-
-            for (int w = 0; w < N; w++)
-                for (int z = 0; z < N; z++)
-                    for (int y = 0; y < N; y++)
-                        for (int x = 0; x < N; x++)
-                        {
-                            var cubie = Cubies[w, z, y, x];
-                            if (cubie.ValidState4D)
-                            {
-                                var distance = cubie.Get4DStateDistance();
-                                totalDistance += distance;
-                                if (distance > 0) unsolvedCount++;
-                            }
-                            else
-                            {
-                                // Fallback to 3D state if 4D not available
-                                totalDistance += cubie.State == 0 ? 0 : 10; // Heavy penalty for unknown state
-                                if (cubie.State != 0) unsolvedCount++;
-                            }
-                        }
-
-            // Return weighted fitness: distance + penalty for unsolved count
-            return totalDistance + (unsolvedCount * 0.5);
-        }
-
         public List<int> GetFreeGenes()
         {
             var freeGenes = new List<int>();
-            var idx = new int[] { ActCubie.X, ActCubie.Y, ActCubie.Z, ActCubie.W };
-
-            // Iterate over all 6 rotation planes
-            for (int plane = 0; plane < 6; plane++)
-                for (int fixedAxis = 0; fixedAxis < 2; fixedAxis++)
-                    for (int i = 0; i < 4; i++)
-                        for (int side = 0; side < 2; side++)
+            var idx = new int[] { ActCubie.X, ActCubie.Y, ActCubie.Z };
+            //var max = 0;
+            //for (int j = 1; j < 3; j++)
+            //    if (Math.Abs(idx[j] - C) > Math.Abs(idx[max] - C))
+            //        max = j;
+            //var tmp = idx[0];
+            //idx[0] = idx[max];
+            //idx[max] = tmp;
+            for (int axis = 0; axis < 3; axis++)
+                for (int i = 0; i < 3; i++)
+                    for (int side = 0; side < 2; side++)
+                    {
+                        var move = new TMove();
+                        move.Axis = axis;
+                        if (side == 0)
+                            move.Slice = idx[i];
+                        else
+                            move.Slice = N - 1 - idx[i];
+                        var gene = move.Encode();
+                        if (freeGenes.IndexOf(gene) < 0)
                         {
-                            var move = new TMove();
-                            move.Plane = plane;
-                            move.FixedAxis = fixedAxis;
-                            if (side == 0)
-                                move.Slice = idx[i];
-                            else
-                                move.Slice = N - 1 - idx[i];
-                            var gene = move.Encode();
-                            if (freeGenes.IndexOf(gene) < 0)
-                            {
-                                freeGenes.Add(gene + 0);  // 90°
-                                freeGenes.Add(gene + 1);  // 180°
-                                freeGenes.Add(gene + 2);  // 270°
-                            }
+                            freeGenes.Add(gene + 0);
+                            freeGenes.Add(gene + 1);
+                            freeGenes.Add(gene + 2);
                         }
+                    }
             return freeGenes;
         }
 
         public List<TCubie> GetCluster(TCubie cubie)
         {
             var cluster = new List<TCubie>();
+            var move = new TMove();
+            var idx = new int[] { cubie.X, cubie.Y, cubie.Z };
             var cube = new TRubikCube();
-            var testCubie = cube.Cubies[cubie.W, cubie.Z, cubie.Y, cubie.X];
-
-            // Explore all 6 rotation planes to find cluster
-            for (int plane = 0; plane < 6; plane++)
+            cubie = cube.Cubies[cubie.Z, cubie.Y, cubie.X];
+            for (int alpha = 0; alpha < 4; alpha++)
             {
-                for (int angle = 0; angle < 4; angle++)  // 4 rotations: 0°, 90°, 180°, 270°
+                move.Axis = 0;
+                move.Slice = cubie.X;
+                cube.Turn(move);
+                var neigh = Cubies[cubie.Z, cubie.Y, cubie.X];
+                if (!cluster.Contains(neigh))
+                    cluster.Add(neigh);
+                for (int beta = 0; beta < 4; beta++)
                 {
-                    var move = new TMove();
-                    move.Plane = plane;
-                    move.FixedAxis = 0;  // Try first fixed axis option
-                    move.Slice = GetSliceForCubie(cubie, plane, 0);
-                    move.Angle = 0;  // 90° rotation
+                    move.Axis = 1;
+                    move.Slice = cubie.Y;
                     cube.Turn(move);
-
-                    var neigh = Cubies[testCubie.W, testCubie.Z, testCubie.Y, testCubie.X];
+                    neigh = Cubies[cubie.Z, cubie.Y, cubie.X];
                     if (!cluster.Contains(neigh))
                         cluster.Add(neigh);
+                    for (int gamma = 0; gamma < 4; gamma++)
+                    {
+                        move.Axis = 2;
+                        move.Slice = cubie.Z;
+                        cube.Turn(move);
+                        neigh = Cubies[cubie.Z, cubie.Y, cubie.X];
+                        if (!cluster.Contains(neigh))
+                            cluster.Add(neigh);
+                    }
                 }
             }
             return cluster;
-        }
-
-        // Helper to get appropriate slice for a cubie based on plane
-        private int GetSliceForCubie(TCubie cubie, int plane, int fixedAxis)
-        {
-            int[] remainingAxes = GetRemainingAxes(plane);
-            int[] coords = new int[] { cubie.X, cubie.Y, cubie.Z, cubie.W };
-            return coords[remainingAxes[fixedAxis]];
-        }
-
-        // Slice extraction methods for 4D visualization
-        public TCubie[,,] GetSliceXYZ(int wSlice)
-        {
-            var slice = new TCubie[N, N, N];
-            for (int z = 0; z < N; z++)
-                for (int y = 0; y < N; y++)
-                    for (int x = 0; x < N; x++)
-                        slice[z, y, x] = Cubies[wSlice, z, y, x];
-            return slice;
-        }
-
-        public TCubie[,,] GetSliceXYW(int zSlice)
-        {
-            var slice = new TCubie[N, N, N];
-            for (int w = 0; w < N; w++)
-                for (int y = 0; y < N; y++)
-                    for (int x = 0; x < N; x++)
-                        slice[w, y, x] = Cubies[w, zSlice, y, x];
-            return slice;
-        }
-
-        public TCubie[,,] GetSliceXZW(int ySlice)
-        {
-            var slice = new TCubie[N, N, N];
-            for (int w = 0; w < N; w++)
-                for (int z = 0; z < N; z++)
-                    for (int x = 0; x < N; x++)
-                        slice[w, z, x] = Cubies[w, z, ySlice, x];
-            return slice;
-        }
-
-        public TCubie[,,] GetSliceYZW(int xSlice)
-        {
-            var slice = new TCubie[N, N, N];
-            for (int w = 0; w < N; w++)
-                for (int z = 0; z < N; z++)
-                    for (int y = 0; y < N; y++)
-                        slice[w, z, y] = Cubies[w, z, y, xSlice];
-            return slice;
-        }
-
-        /// <summary>
-        /// Test color assignment by creating a corner cubie and checking its colors
-        /// This helps verify if the face color fix is working correctly
-        /// </summary>
-        public static string TestColorAssignment()
-        {
-            var testCube = new TRubikCube();
-            var analysis = new System.Text.StringBuilder();
-
-            analysis.AppendLine("Color Assignment Test:");
-            analysis.AppendLine("====================");
-
-            // Test corner cubie at (0,0,0) - should have Red, White, Blue faces
-            var cornerCubie = testCube.Cubies[0, 0, 0, 0];  // w=0, z=0, y=0, x=0
-            analysis.AppendLine($"Corner cubie (0,0,0,0) colors:");
-
-            for (int i = 0; i < cornerCubie.FaceColors.Length; i++)
-            {
-                int colorIdx = cornerCubie.FaceColors[i];
-                string colorName = "Gray";
-                string expectedFace = "";
-
-                if (colorIdx >= 0 && colorIdx < TCubie.HyperFaceColors.Length)
-                {
-                    string[] colorNames = { "Red", "Orange", "White", "Yellow", "Blue", "Green", "Purple", "Magenta" };
-                    colorName = colorNames[colorIdx];
-                }
-
-                string[] faceNames = { "-X", "+X", "-Y", "+Y", "-Z", "+Z" };
-                expectedFace = i < faceNames.Length ? faceNames[i] : "?";
-
-                analysis.AppendLine($"  Face {i} ({expectedFace}): {colorName}");
-            }
-
-            analysis.AppendLine();
-            analysis.AppendLine("Expected for corner (0,0,0,0): Red(-X), Gray(+X), White(-Y), Gray(+Y), Blue(-Z), Gray(+Z)");
-
-            return analysis.ToString();
-        }
-
-        /// <summary>
-        /// Create a comprehensive face mapping test
-        /// This will help identify which face index maps to which geometric orientation
-        /// </summary>
-        public static string CreateFaceMappingTest()
-        {
-            var analysis = new System.Text.StringBuilder();
-            analysis.AppendLine("FACE MAPPING TEST INSTRUCTIONS:");
-            analysis.AppendLine("===============================");
-            analysis.AppendLine();
-            analysis.AppendLine("A corner cubie at position (0,0,0,0) has been assigned unique colors:");
-            analysis.AppendLine("  Face 0: RED");
-            analysis.AppendLine("  Face 1: ORANGE");
-            analysis.AppendLine("  Face 2: WHITE");
-            analysis.AppendLine("  Face 3: YELLOW");
-            analysis.AppendLine("  Face 4: BLUE");
-            analysis.AppendLine("  Face 5: GREEN");
-            analysis.AppendLine();
-            analysis.AppendLine("TO IDENTIFY CORRECT FACE MAPPING:");
-            analysis.AppendLine("1. Look at the corner cubie in the top-left view (XYZ)");
-            analysis.AppendLine("2. Note which colors appear on which geometric faces:");
-            analysis.AppendLine("   - Left face (-X): Color = ?");
-            analysis.AppendLine("   - Right face (+X): Color = ?");
-            analysis.AppendLine("   - Bottom face (-Y): Color = ?");
-            analysis.AppendLine("   - Top face (+Y): Color = ?");
-            analysis.AppendLine("   - Back face (-Z): Color = ?");
-            analysis.AppendLine("   - Front face (+Z): Color = ?");
-            analysis.AppendLine();
-            analysis.AppendLine("3. Use this mapping to correct the InitializeCubieFaceColors() method");
-            analysis.AppendLine();
-            analysis.AppendLine("Expected corner cubie should show 3 faces:");
-            analysis.AppendLine("  - One face for X=0 boundary (Left)");
-            analysis.AppendLine("  - One face for Y=0 boundary (Bottom)");
-            analysis.AppendLine("  - One face for Z=0 boundary (Back)");
-
-            return analysis.ToString();
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿﻿/**********************************************************
+﻿/**********************************************************
 Autor: Robert Świta
 Politechnika Koszalińska
 Katedra Systemów Multimedialnych i Sztucznej inteligencji
@@ -18,6 +18,7 @@ namespace TGL
         IntPtr HDC;
         IntPtr HRC;
         Win32.PIXELFORMATDESCRIPTOR pfd;
+        List<object> NameStack;
         public Rectangle Viewport;
         public TObject3D Root = new TObject3D();
         public IntPtr Handle
@@ -48,31 +49,9 @@ namespace TGL
                 OpenGL.glClear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
                 OpenGL.glViewport(Viewport.Left, Viewport.Top, Viewport.Width, Viewport.Height);
                 Init();
-                SetupCamera();
                 DrawScene();
                 Win32.SwapBuffers(HDC);
             }
-        }
-
-        void SetupCamera()
-        {
-            // Set up projection matrix
-            OpenGL.glMatrixMode(OpenGL.GL_PROJECTION);
-            OpenGL.glLoadIdentity();
-
-            // Use perspective projection for better 3D viewing
-            double aspect = Viewport.Width / (double)Viewport.Height;
-            OpenGL.gluPerspective(45.0, aspect, 0.1, 100.0);
-
-            // Position camera to view the scene
-            OpenGL.gluLookAt(
-                0, 0, 8,      // Camera position (looking from positive Z)
-                0, 0, 0,      // Look at origin
-                0, 1, 0       // Up vector
-            );
-
-            // Switch back to modelview matrix for object transformations
-            OpenGL.glMatrixMode(OpenGL.GL_MODELVIEW);
         }
 
         void DrawScene()
@@ -103,33 +82,7 @@ namespace TGL
             {
                 var vertex = obj.Vertices[obj.Faces[i]];
                 if (i % 6 == 0)
-                {
-                    // Use 4D hyperface colors if this is a TCubie
-                    var cubie = obj as RubikCube.TCubie;
-                    if (cubie != null)
-                    {
-                        int faceIndex = i / 6;  // Each face has 6 vertices (2 triangles)
-                        if (faceIndex < cubie.FaceColors.Length)
-                        {
-                            int colorIndex = cubie.FaceColors[faceIndex];
-                            if (colorIndex >= 0 && colorIndex < RubikCube.TCubie.HyperFaceColors.Length)
-                            {
-                                var color = RubikCube.TCubie.HyperFaceColors[colorIndex];
-                                OpenGL.glColor4d(color[0], color[1], color[2], alpha);
-                            }
-                            else
-                            {
-                                // Interior face (no color) - use dark gray
-                                OpenGL.glColor4d(0.2, 0.2, 0.2, alpha);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // Fallback for non-cubie objects
-                        OpenGL.glColor4d(vertex.X, vertex.Y, vertex.Z, alpha);
-                    }
-                }
+                    OpenGL.glColor4d(vertex.X, vertex.Y, vertex.Z, alpha);
                 OpenGL.glVertex3d(vertex.X, vertex.Y, vertex.Z);
             }
             OpenGL.glEnd();
@@ -162,7 +115,7 @@ namespace TGL
             if (!IsInited)
             {
                 OpenGL.glEnable(OpenGL.GL_DEPTH_TEST);
-                OpenGL.glDisable(OpenGL.GL_CULL_FACE);  // Disable face culling to show all faces
+                OpenGL.glEnable(OpenGL.GL_CULL_FACE);
                 //OpenGL.glPolygonMode(OpenGL.GL_FRONT_AND_BACK, OpenGL.GL_LINE);
                 //OpenGL.glEnable(OpenGL.GL_TEXTURE_2D);
                 //OpenGL.glEnable(OpenGL.GL_LIGHTING);
