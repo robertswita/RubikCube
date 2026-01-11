@@ -1,6 +1,11 @@
 using System;
 using System.Collections.Generic;
+#if MAUI
+using Microsoft.Maui.Graphics;
+using MauiColors = Microsoft.Maui.Graphics.Colors;
+#else
 using System.Drawing;
+#endif
 
 namespace TGL
 {
@@ -94,6 +99,18 @@ namespace TGL
                     obj.Faces.Add(quad[2]);
                 }
             }
+#if MAUI
+            obj.Colors.AddRange(new Color[] {
+                MauiColors.Red, MauiColors.Green, MauiColors.Blue,
+                MauiColors.Cyan, MauiColors.Magenta, MauiColors.Yellow,
+                MauiColors.Orange, MauiColors.White, MauiColors.Pink,
+                MauiColors.Beige, MauiColors.Gray, MauiColors.Olive,
+                MauiColors.DarkRed, MauiColors.DarkGreen, MauiColors.DarkBlue,
+                MauiColors.LightCyan, MauiColors.Maroon, MauiColors.LightYellow,
+                MauiColors.SeaGreen, MauiColors.SkyBlue, MauiColors.Silver,
+                MauiColors.Sienna, MauiColors.Tomato, MauiColors.Aqua,
+            });
+#else
             obj.Colors.AddRange(new Color[] {
                 Color.Red, Color.Green, Color.Blue,
                 Color.Cyan, Color.Magenta, Color.Yellow,
@@ -104,6 +121,7 @@ namespace TGL
                 Color.SeaGreen, Color.SkyBlue, Color.Silver,
                 Color.Sienna, Color.Tomato, Color.Aqua,
             });
+#endif
             return obj;
         }
     }

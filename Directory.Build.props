@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <PropertyGroup>
+    <!-- Global properties to handle MacCatalyst build issues -->
+    <_XcodeVersionIgnore>true</_XcodeVersionIgnore>
+    <SkipXCodeVersionCheck>true</SkipXCodeVersionCheck>
+    <EnableCodeSigning>false</EnableCodeSigning>
+    <_RequireCodeSigning>false</_RequireCodeSigning>
+    <UseHardenedRuntime>false</UseHardenedRuntime>
+    <_SkipNativeLibraryBuild>true</_SkipNativeLibraryBuild>
+    <_EnableMacCatalystSupport>false</_EnableMacCatalystSupport>
+  </PropertyGroup>
+</Project>
+
