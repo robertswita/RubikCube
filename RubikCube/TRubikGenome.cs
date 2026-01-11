@@ -85,14 +85,14 @@ namespace RubikCube
             var child = new TRubikGenome();
             Array.Copy(Genes, child.Genes, splitIdx);
             Array.Copy(other.Genes, splitIdx, child.Genes, splitIdx, Genes.Length - splitIdx);
-            child.Check();
+            //child.Check();
             return child;
         }
 
-        bool IsChecked;
+        //bool IsChecked;
         public void Check()
         {
-            if (IsChecked) return;
+            //if (IsChecked) return;
             for (int idx = 1; idx < Genes.Length; idx++)
             {
                 var move = TMove.Decode((int)Genes[idx]);
@@ -116,7 +116,7 @@ namespace RubikCube
                     }
                 }
             }
-            IsChecked = true;
+            //IsChecked = true;
         }
 
         public void ShiftLeftAt(int idx)
@@ -132,8 +132,8 @@ namespace RubikCube
             }
             //move.Angle = 2 - move.Angle;
             Genes[Genes.Length - 1] = move.Encode();
-            if (!TRubikGenome.FreeMoves.Contains((int)Genes[Genes.Length - 1]))
-                ;
+            //if (!TRubikGenome.FreeMoves.Contains((int)Genes[Genes.Length - 1]))
+            //    ;
             //MutateGene(Genes.Length - 1);
             //MovesCount--;
         }

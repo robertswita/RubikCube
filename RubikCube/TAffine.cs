@@ -52,9 +52,9 @@ namespace TGL
             var sinA = (float)Math.Sin(angle);
             var R = new TAffine();
             R.M[axis1, axis1] = cosA;
-            R.M[axis2, axis2] = cosA;
-            R.M[axis1, axis2] = -sinA;
             R.M[axis2, axis1] = sinA;
+            R.M[axis1, axis2] = -sinA;
+            R.M[axis2, axis2] = cosA;
             return R;
         }
 
@@ -170,9 +170,11 @@ namespace TGL
         public List<TVector> GetEulerAngles()
         {
             var angles = new List<TVector>();
-            var A = (TMatrix)M.Clone();
+            var A = M.Transpose();
             for (int n = 0; n < N - 1; n++)
                 for (int m = n + 1; m < N; m++)
+                //for (int n = N - 2; n >= 0; n--)
+                //    for (int m = N - 1; m >= n + 1; m--)
                 {
                     var a = A[n, n];
                     var b = A[n, m];
@@ -182,7 +184,7 @@ namespace TGL
                     else
                     {
                         var cosA = a / r;
-                        var sinA = -b / r;
+                        var sinA = b / r;
                         angles.Add(new TVector(cosA, sinA));
                         A.Rotate(n, m, cosA, sinA);
                     }

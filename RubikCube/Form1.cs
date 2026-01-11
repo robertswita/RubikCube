@@ -178,9 +178,9 @@ namespace RubikCube
                         bmp.SetPixel(x, y, Color.White);
                     else
                     {
-                        var r = 255 / 4.0 * (1 + grid[y, x] & 3);
-                        var g = 255 / 4.0 * (1 + (grid[y, x] >> 2) & 3);
-                        var b = 255 / 4.0 * (1 + (grid[y, x] >> 4) & 3);
+                        var r = 255 / 16.0 * (1 + grid[y, x] & 0xF);
+                        var g = 255 / 16.0 * (1 + (grid[y, x] >> 4) & 0xF);
+                        var b = 255 / 16.0 * (1 + (grid[y, x] >> 8) & 0xF);
                         bmp.SetPixel(x, y, Color.FromArgb((int)r, (int)g, (int)b));
                     }
                 }
@@ -211,26 +211,26 @@ namespace RubikCube
             //specimen.Mutate(RubikCube.ActCubie);
             specimen.Fitness = double.MaxValue;
             var cube = new TRubikCube(RubikCube);
-            string startCode = cube.Code;
+            //string startCode = cube.Code;
             for (int i = 0; i < specimen.Genes.Length; i++)
             {
-                if (!TRubikGenome.FreeMoves.Contains((int)specimen.Genes[i]))
-                    ;
+                //if (!TRubikGenome.FreeMoves.Contains((int)specimen.Genes[i]))
+                //    ;
                 var move = TMove.Decode((int)specimen.Genes[i]);
                 // Final optimalization
-                if (i == 0)
-                {
-                    var actCubie = RubikCube.ActiveCubie;
-                    var idx = new int[] { actCubie.X, actCubie.Y, actCubie.Z, actCubie.W };
-                    move.Slice = idx[move.Axis];
-                    specimen.Genes[0] = move.Encode();
-                }
+                //if (i == 0)
+                //{
+                //    var actCubie = RubikCube.ActiveCubie;
+                //    var idx = new int[] { actCubie.X, actCubie.Y, actCubie.Z, actCubie.W };
+                //    move.Slice = idx[move.Axis];
+                //    specimen.Genes[0] = move.Encode();
+                //}
                 cube.Turn(move);
                 //var cubeCopy = new TRubikCube(cube);
                 //for (int j = i - 1; j >= 0; j--)
                 //    cube.ReTurn(TMove.Decode((int)specimen.Genes[j]));
                 double fitness = cube.Evaluate();
-                if (fitness < specimen.Fitness && cube.Code != startCode)
+                if (fitness < specimen.Fitness)// && cube.Code != startCode)
                 {
                     specimen.Fitness = fitness;
                     specimen.MovesCount = i + 1;
@@ -258,11 +258,11 @@ namespace RubikCube
                 IterElapsed = TimeSpan.Zero;
                 chart1.Series[0].Points.Clear();
 
-                TChromosome.GenesLength = 60;
+                TChromosome.GenesLength = 30;
                 Ga = new TGA<TRubikGenome>();
-                Ga.GenerationsCount = 60;
+                Ga.GenerationsCount = 100;
                 Ga.WinnerRatio = 0.1;
-                Ga.MutationRatio = 2;
+                Ga.MutationRatio = 1;
                 Ga.SelectionType = TGA<TRubikGenome>.TSelectionType.Unique;
                 Ga.Evaluate = OnEvaluate;
                 Ga.Progress = OnProgress;
@@ -345,14 +345,14 @@ namespace RubikCube
             IsPaused = true;
             var size = TRubikCube.Size;
             var rnd = TChromosome.Rnd;
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 10; i++)
             {
                 RubikCube.ActiveCubie = RubikCube.Cubies[rnd.Next(size), rnd.Next(size), rnd.Next(size), rnd.Next(size)];
                 var freeMoves = RubikCube.GetFreeMoves();
                 var code = freeMoves[rnd.Next(freeMoves.Count)];
                 var move = TMove.Decode(code);
                 Moves.Add(move);
-                //RubikCube.ActiveCubie.State = RubikCube.ActiveCubie.State;
+                RubikCube.ActiveCubie.State = RubikCube.ActiveCubie.State;
             }
             MoveTimer.Start();
         }

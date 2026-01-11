@@ -173,8 +173,8 @@ namespace TGL
             {
                 float a = Data[colA];
                 float b = Data[colB];
-                Data[colA] = cosA * a - sinA * b;
-                Data[colB] = sinA * a + cosA * b;
+                Data[colA] = cosA * a + sinA * b;
+                Data[colB] = -sinA * a + cosA * b;
                 colA++;
                 colB++;
             }

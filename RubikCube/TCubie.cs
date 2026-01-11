@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.NetworkInformation;
 using System.Text;
 using System.Threading.Tasks;
 using TGL;
@@ -60,6 +59,7 @@ namespace RubikCube
                     var angles = Transform.GetEulerAngles();
                     var moveCount = 0;
                     for (int i = 0; i < angles.Count; i++)
+                    //for (int i = angles.Count - 1; i >= 0; i--)
                     {
                         var angle = GetAngle(angles[i].X, angles[i].Y);
                         _State |= angle << shift;
@@ -84,7 +84,7 @@ namespace RubikCube
                 //var gamma = (value >> 4) & 3;
                 var org = Transform.Origin;
                 Transform = TAffine.CreateScale(new TVector(0.45f, 0.45f, 0.45f, 0.45f));
-                for (int i = 0; i < TAffine.Planes.Length; i++)
+                for (int i = TAffine.Planes.Length - 1; i >= 0; i--)
                     Rotate(i, 90 * (value >> 2 * i & 3));
                 Transform.Origin = org;
                 //Translate(org);

@@ -41,6 +41,7 @@ namespace RubikCube
                                 {
                                     var cubie = Cubies[w, z, y, x].Copy();
                                     for (int axis = 0; axis < 6; axis++)
+                                    //for (int axis = 5; axis >= 0; axis--)
                                     {
                                         var angle = cubie.State >> 2 * axis & 3;
                                         cubie.Rotate(axis, -90 * angle);
@@ -48,7 +49,7 @@ namespace RubikCube
                                     var idx = Size * (Size * (Size * cubie.W + cubie.Z) + cubie.Y) + cubie.X;
                                     if (idx != cubie.OriginalPos)
                                         ;
-                                    _StateGrid[i, idx] = cubie.State + (1 << 6);
+                                    _StateGrid[i, idx] = cubie.State | 1 << 31;
                                     i++;
                                 }
                 }
@@ -146,8 +147,6 @@ namespace RubikCube
         public void Turn(TMove move)
         {
             int angle = 90 * (move.Angle + 1);
-            //var slice = new TShape();
-            //slice.Rotate(move.Plane, angle);
             var rotation = TAffine.CreateRotation(move.Plane, angle);
             var selection = SelectSlice(move);
             for (int i = 0; i < selection.Count; i++)
