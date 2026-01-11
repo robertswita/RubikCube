@@ -1,4 +1,4 @@
-﻿/**********************************************************
+﻿﻿/**********************************************************
 Autor: Robert Świta
 Politechnika Koszalińska
 Katedra Systemów Multimedialnych i Sztucznej inteligencji
@@ -18,9 +18,9 @@ namespace TGL
         IntPtr HDC;
         IntPtr HRC;
         Win32.PIXELFORMATDESCRIPTOR pfd;
-        List<object> NameStack;
         public Rectangle Viewport;
-        public TObject3D Root = new TObject3D();
+        public TShape Root = new TShape();
+        public TAffine Transform = new TAffine();
         public IntPtr Handle
         {
             get
@@ -49,44 +49,63 @@ namespace TGL
                 OpenGL.glClear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
                 OpenGL.glViewport(Viewport.Left, Viewport.Top, Viewport.Width, Viewport.Height);
                 Init();
+                //SetupCamera();
                 DrawScene();
                 Win32.SwapBuffers(HDC);
             }
         }
 
+        //void SetupCamera()
+        //{
+        //    // Set up projection matrix
+        //    OpenGL.glMatrixMode(OpenGL.GL_PROJECTION);
+        //    OpenGL.glLoadIdentity();
+
+        //    // Use perspective projection for better 3D viewing
+        //    double aspect = Viewport.Width / (double)Viewport.Height;
+        //    OpenGL.gluPerspective(45.0, aspect, 0.1, 100.0);
+
+        //    // Position camera to view the scene
+        //    OpenGL.gluLookAt(
+        //        0, 0, 8,      // Camera position (looking from positive Z)
+        //        0, 0, 0,      // Look at origin
+        //        0, 1, 0       // Up vector
+        //    );
+
+        //    // Switch back to modelview matrix for object transformations
+        //    OpenGL.glMatrixMode(OpenGL.GL_MODELVIEW);
+        //}
+
         void DrawScene()
         {
-            OpenGL.glLoadIdentity();
+            Transform = new TAffine();
             DrawObject(Root);
         }
 
         //TObject3DComparer ZOrderComparer = new TObject3DComparer();
-        protected void DrawObject(TObject3D obj)
+        protected void DrawObject(TShape obj)
         {
-            OpenGL.glPushMatrix();
-            OpenGL.glMultMatrixd(obj.Transform);
+            var transform = Transform.Clone();
+            Transform = Transform * obj.Transform;
+
             //var childrenList = new List<TObject3D>(obj.Children);
             //childrenList.Sort(ZOrderComparer);
             for (int i = 0; i < obj.Children.Count; i++)
                 DrawObject(obj.Children[i]);
-            //var alpha = obj.Transform[0] > 0.1 && obj.Transform[5] > 0.1 && obj.Transform[10] > 0.1 ? 1 : 0.1;
-            var alpha = obj.Transparent ? 0.1: 1;
-            if (obj.Selected)
-                alpha = 0.5;
-            if (alpha < 0.5 && IsTransparencyOn)
-                OpenGL.glDisable(OpenGL.GL_DEPTH_TEST);
-            else
-                OpenGL.glEnable(OpenGL.GL_DEPTH_TEST);
-            OpenGL.glBegin(OpenGL.GL_TRIANGLES);
+            OpenGL.glBegin(OpenGL.GL_QUADS);
             for (int i = 0; i < obj.Faces.Count; i++)
             {
-                var vertex = obj.Vertices[obj.Faces[i]];
-                if (i % 6 == 0)
-                    OpenGL.glColor4d(vertex.X, vertex.Y, vertex.Z, alpha);
-                OpenGL.glVertex3d(vertex.X, vertex.Y, vertex.Z);
+                var v = obj.Vertices[obj.Faces[i]];
+                if (i % 4 == 0)
+                {
+                    var color = obj.Colors[i / 4];
+                    OpenGL.glColor4ub(color.R, color.G, color.B, (byte)(255 * obj.Transparency));
+                }
+                v = Transform * v;
+                OpenGL.glVertex3f(v.X, v.Y, v.Z);
             }
             OpenGL.glEnd();
-            OpenGL.glPopMatrix();
+            Transform = transform;
         }
 
         //void gluPickMatrix(double x, double y, double w, double h)
@@ -115,7 +134,7 @@ namespace TGL
             if (!IsInited)
             {
                 OpenGL.glEnable(OpenGL.GL_DEPTH_TEST);
-                OpenGL.glEnable(OpenGL.GL_CULL_FACE);
+                //OpenGL.glDisable(OpenGL.GL_CULL_FACE);  // Disable face culling to show all faces
                 //OpenGL.glPolygonMode(OpenGL.GL_FRONT_AND_BACK, OpenGL.GL_LINE);
                 //OpenGL.glEnable(OpenGL.GL_TEXTURE_2D);
                 //OpenGL.glEnable(OpenGL.GL_LIGHTING);
