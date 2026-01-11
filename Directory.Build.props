@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project>
   <PropertyGroup>
-    <!-- Global properties to handle MacCatalyst build issues -->
+    <!-- Global properties for Windows MAUI builds -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- Global MacCatalyst/Xcode bypass properties -->
     <_XcodeVersionIgnore>true</_XcodeVersionIgnore>
     <SkipXCodeVersionCheck>true</SkipXCodeVersionCheck>
     <EnableCodeSigning>false</EnableCodeSigning>
@@ -9,6 +11,8 @@
     <UseHardenedRuntime>false</UseHardenedRuntime>
     <_SkipNativeLibraryBuild>true</_SkipNativeLibraryBuild>
     <_EnableMacCatalystSupport>false</_EnableMacCatalystSupport>
+    <SkipValidation>true</SkipValidation>
+    <SkipCodeSigningValidation>true</SkipCodeSigningValidation>
   </PropertyGroup>
 </Project>
 
