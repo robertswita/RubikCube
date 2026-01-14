@@ -21,30 +21,9 @@ namespace RubikCube
             //}
         }
 
-        //public void Conjugate()
-        //{
-        //    var geneIdx = Rnd.Next(Genes.Length / 2);
-
-        //    for (int i = 1; i <= geneIdx; i++)
-        //    {
-        //        var move = TMove.Decode((int)Genes[geneIdx - i]);
-        //        move.Angle = 2 - move.Angle;
-        //        Genes[geneIdx + i] = move.Encode();
-        //    }
-        //}
-
-
-        public override void Mutate()
+        public void Conjugate()
         {
-            //MutateGene(Rnd.Next(Genes.Length));
-
-            //var idx = Rnd.Next(Genes.Length) / 2;
-            //for (int i = 0; i < idx; i++)
-            //{
-            //    var move = TMove.Decode((int)Genes[i]);
-            //    move.Angle = 2 - move.Angle;
-            //    Genes[2 * idx - i] = move.Encode();
-            //}
+            Check();
             var geneIdx = Rnd.Next(Genes.Length / 2);
 
             for (int i = 1; i <= geneIdx; i++)
@@ -53,31 +32,20 @@ namespace RubikCube
                 move.Angle = 2 - move.Angle;
                 Genes[geneIdx + i] = move.Encode();
             }
-
-            //var key = TMove.Decode((int)Genes[idx]);
-            ////key.Axis = max;
-            //if (key.Slice < TRubikCube.C)
-            //    key.Slice = FreeGenes[0] / 9;
-            //else
-            //    key.Slice = TRubikCube.N - 1 - FreeGenes[0] / 9;
-            //Genes[idx] = key.Encode();
+        }
 
 
-
-            //var idx = 2 + Rnd.Next(Genes.Length - 7) / 2;
-            //for (int i = 0; i < idx; i++)
-            //{
-            //    var move = TMove.Decode((int)Genes[i]);
-            //    move.Angle = 2 - move.Angle;
-            //    Genes[2 * idx + 3 - i] = move.Encode();
-            //}
-            //var tmp = Genes[idx];
-            //Genes[idx] = Genes[idx + 1];
-            //Genes[idx + 1] = tmp;
-            //for (int i = 0; i < 4; i++)
-            //{
-            //    Genes[idx + 2 + i] = Genes[idx - 2 + i];
-            //}
+        public override void Mutate()
+        {
+            //MutateGene(Rnd.Next(Genes.Length));
+            Check();
+            var geneIdx = Rnd.Next(Genes.Length / 2);
+            for (int i = 1; i <= geneIdx; i++)
+            {
+                var move = TMove.Decode((int)Genes[geneIdx - i]);
+                move.Angle = 2 - move.Angle;
+                Genes[geneIdx + i] = move.Encode();
+            }
         }
 
         public override TChromosome Crossover(TChromosome other, int splitIdx)
@@ -96,22 +64,27 @@ namespace RubikCube
             for (int idx = 1; idx < Genes.Length; idx++)
             {
                 var move = TMove.Decode((int)Genes[idx]);
-                for (int i = idx - 1; i >= 0; i--)
+                for (int prevIdx = idx - 1; prevIdx >= 0; prevIdx--)
                 {
-                    var prevMove = TMove.Decode((int)Genes[i]);
+                    var prevMove = TMove.Decode((int)Genes[prevIdx]);
                     if (prevMove.Axis != move.Axis) break;
                     if (prevMove.Plane != move.Plane) break;
                     if (prevMove.Slice == move.Slice)
                     {
-                        move.Angle = (move.Angle + prevMove.Angle + 2) % 4 - 1;
-                        Genes[i] = move.Encode();
-                        ShiftLeftAt(idx);
-                        idx--;
-                        if (move.Angle < 0)
+                        var angle = ((move.Angle + prevMove.Angle + 2) & 3) - 1;
+                        if (angle >= 0)
                         {
-                            ShiftLeftAt(i);
+                            prevMove.Angle = angle;
+                            Genes[prevIdx] = prevMove.Encode();
+                        }
+                        else
+                        {
+                            RemoveGene(prevIdx);
                             idx--;
                         }
+
+                        RemoveGene(idx);
+                        idx--;
                         break;
                     }
                 }
@@ -119,43 +92,20 @@ namespace RubikCube
             //IsChecked = true;
         }
 
-        public void ShiftLeftAt(int idx)
+        public void RemoveGene(int idx)
         {
             Array.Copy(Genes, idx + 1, Genes, idx, Genes.Length - 1 - idx);
-            var move = TMove.Decode((int)Genes[Genes.Length - 2]);
-            move.Axis = (move.Axis + 1) % 4;
-            var planeAxes = move.GetPlaneAxes();
-            while (planeAxes[0] == move.Axis || planeAxes[1] == move.Axis)
+            var lastMove = TMove.Decode((int)Genes[Genes.Length - 1]);
+            lastMove.Axis = (lastMove.Axis + 1) % TAffine.N;
+            var planeAxes = lastMove.GetPlaneAxes();
+            while (planeAxes[0] == lastMove.Axis || planeAxes[1] == lastMove.Axis)
             {
-                move.Plane = (move.Plane + 1) % TAffine.Planes.Length;
-                planeAxes = TAffine.Planes[move.Plane];
+                lastMove.Plane = (lastMove.Plane + 1) % TAffine.Planes.Length;
+                planeAxes = TAffine.Planes[lastMove.Plane];
             }
-            //move.Angle = 2 - move.Angle;
-            Genes[Genes.Length - 1] = move.Encode();
-            //if (!TRubikGenome.FreeMoves.Contains((int)Genes[Genes.Length - 1]))
-            //    ;
-            //MutateGene(Genes.Length - 1);
-            //MovesCount--;
+            Genes[Genes.Length - 1] = lastMove.Encode();
         }
 
-        //public List<TMove> Decode()
-        //{
-        //    var moves = new List<TMove>();
-        //    for (int i = 0; i < Genes.Length; i++)
-        //        moves.Add(TMove.Decode((int)Genes[i]));
-        //    return moves;
-        //}
-
-        //public string Code
-        //{
-        //    get
-        //    {
-        //        var code = "";
-        //        for (int i = 0; i < Genes.Length; i++)
-        //            code += (char)Genes[i];
-        //        return code;
-        //    }
-        //}
     }
 
 }

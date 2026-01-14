@@ -82,16 +82,18 @@ namespace TGL
             DrawObject(Root);
         }
 
-        //TObject3DComparer ZOrderComparer = new TObject3DComparer();
+        TObject3DComparer ZOrderComparer = new TObject3DComparer();
         protected void DrawObject(TShape obj)
         {
             var transform = Transform.Clone();
             Transform = Transform * obj.Transform;
+            obj.WorldTransform = Transform.Clone();
 
-            //var childrenList = new List<TObject3D>(obj.Children);
-            //childrenList.Sort(ZOrderComparer);
+            var childrenList = new List<TShape>(obj.Children);
+            if (obj.WorldTransform.Origin.Size > 2)
+                childrenList.Sort(ZOrderComparer);
             for (int i = 0; i < obj.Children.Count; i++)
-                DrawObject(obj.Children[i]);
+                DrawObject(childrenList[i]);
             OpenGL.glBegin(OpenGL.GL_QUADS);
             for (int i = 0; i < obj.Faces.Count; i++)
             {
@@ -102,7 +104,10 @@ namespace TGL
                     OpenGL.glColor4ub(color.R, color.G, color.B, (byte)(255 * obj.Transparency));
                 }
                 v = Transform * v;
-                OpenGL.glVertex3f(v.X, v.Y, v.Z);
+                if (v.Size == 2)
+                    OpenGL.glVertex2f(v.X, v.Y);
+                else
+                    OpenGL.glVertex3f(v.X, v.Y, v.Z);
             }
             OpenGL.glEnd();
             Transform = transform;
