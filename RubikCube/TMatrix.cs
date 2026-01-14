@@ -9,6 +9,7 @@ namespace TGL
         public int ColsCount;
         public int RowsCount;
         public TCols Cols;
+        public int[] DimSizes;
         public class TCols
         {
             public TMatrix M;
@@ -44,7 +45,31 @@ namespace TGL
             Cols.M = this;
             RowsCount = rowsCount;
             ColsCount = colsCount;
+            DimSizes = new int[] { RowsCount, ColsCount };
         }
+
+        public int Coords2Index(TVector coords)
+        {
+            var index = coords[0];
+            for (int i = 1; i < coords.Size; i++)
+                index = index * DimSizes[i] + coords[i];
+            return (int)index;
+        }
+
+        public TVector Index2Coords(int index)
+        {
+            var stride = Size;
+            var coords = new TVector(DimSizes.Length);
+            for (int i = 0; i < coords.Size; i++)
+            {
+                stride /= DimSizes[i];
+                var coord = index / stride;
+                index -= coord * stride;
+                coords[i] = coord;
+            }
+            return coords;
+        }
+
         public override TVector Clone()
         {
             TMatrix result = new TMatrix(RowsCount, ColsCount);
