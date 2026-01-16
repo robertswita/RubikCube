@@ -12,12 +12,14 @@ namespace RubikCube
     {
         public static TShape Cube;
         public static TMatrix SizeMatrix;
-        public int X { get { return (int)Math.Round(Transform.Origin.X + TRubikCube.C); } }
-        public int Y { get { return (int)Math.Round(Transform.Origin.Y + TRubikCube.C); } }
-        public int Z { get { return (int)Math.Round(Transform.Origin.Z + TRubikCube.C); } }
-        public int W { get { return (int)Math.Round(Transform.Origin.W + TRubikCube.C); } }
+        public static int MaxScore;
+        //public int X { get { return (int)Math.Round(Transform.Origin.X + TRubikCube.C); } }
+        //public int Y { get { return (int)Math.Round(Transform.Origin.Y + TRubikCube.C); } }
+        //public int Z { get { return (int)Math.Round(Transform.Origin.Z + TRubikCube.C); } }
+        //public int W { get { return (int)Math.Round(Transform.Origin.W + TRubikCube.C); } }
         //public double Error;
         public int StartIndex;
+        public int RotationCount;
 
         public TCubie()
         {
@@ -43,36 +45,22 @@ namespace RubikCube
             {
                 if (!ValidState)
                 {
-                    //var gamma = GetAngle(Transform[1], Transform[0]);
-                    //var beta = 0;
-                    //var alpha = 0;
-                    //if (gamma != 0)
-                    //    alpha = GetAngle(Transform[6], Transform[10]);
-                    //else
-                    //{
-                    //    beta = GetAngle(-Transform[2], Transform[0]);
-                    //    alpha = GetAngle(-Transform[9], Transform[5]);
-                    //}
-                    //var moveCount = Math.Sign(alpha) + Math.Sign(beta) + Math.Sign(gamma);
-                    //_State = moveCount << 6 | gamma << 4 | beta << 2 | alpha;
-                    //if (alpha == 2 && gamma == 2) _State = 0x48;
                     state = 0;
                     var shift = 0;
                     var angles = Transform.GetEulerAngles();
-                    var moveCount = 0;
+                    RotationCount = 0;
                     for (int i = 0; i < angles.Count; i++)
-                    //for (int i = angles.Count - 1; i >= 0; i--)
                     {
                         var angle = GetAngle(angles[i].X, angles[i].Y);
                         state |= angle << shift;
                         shift += 2;
-                        if (angle > 0) moveCount++;
+                        if (angle > 0) RotationCount++;
                     }
-                    state |= moveCount << 2 * angles.Count;
+                    //state |= moveCount << 2 * angles.Count;
                     //var xform = TAffine.CreateScale(new TVector(0.45f, 0.45f, 0.45f, 0.45f));
-                    //for (int i = 0; i < TAffine.Planes.Length; i++)
-                    //    xform = TAffine.CreateRotation(i, 90 * (_State >> 2 * i & 3)) * xform;
-                    //Error = (xform.M - Transform.M).Norm;
+                    //for (int i = TAffine.Planes.Length - 1; i >= 0; i--)
+                    //    xform = TAffine.CreateRotation(i, 90 * (state >> 2 * i & 3)) * xform;
+                    //var Error = (xform.M - Transform.M).Norm;
                     //if (Error > 0.01)
                     //    ;
                     ValidState = true;
@@ -97,35 +85,29 @@ namespace RubikCube
             }
         }
 
-        public TVector GetStartPos()
+        public double Score
         {
-            var cubie = Copy();
-            for (int axis = 0; axis < TAffine.Planes.Length; axis++)
-                cubie.Rotate(axis, -90 * (cubie.State >> 2 * axis & 3));
-            return cubie.Transform.Origin;
+            get { return (double)State / MaxScore; }
         }
 
-        //public int Orbit
+        //public TVector GetStartPos()
         //{
-        //    get
-        //    {
-        //        // 4D Manhattan distance from center
-        //        var dist = Math.Abs(Origin.X) + Math.Abs(Origin.Y) + Math.Abs(Origin.Z) + Math.Abs(Origin.W);
-        //        return (int)Math.Round(2 * dist);
-        //    }
+        //    var cubie = Copy();
+        //    for (int axis = 0; axis < TAffine.Planes.Length; axis++)
+        //        cubie.Rotate(axis, -90 * (cubie.State >> 2 * axis & 3));
+        //    return cubie.Transform.Origin;
         //}
 
         public TCubie Copy()
         {
             var dest = new TCubie();
-            //Array.Copy(Transform.M.Data, dest.Transform.M.Data, Transform.M.Data.Length);
-            //Array.Copy(Transform.Origin.Data, dest.Transform.Origin.Data, Transform.Origin.Data.Length);
             dest.Transform = Transform.Clone();
             dest.Vertices = Vertices;
             dest.Faces = Faces;
             dest.state = state;
             dest.ValidState = ValidState;
             dest.StartIndex = StartIndex;
+            dest.RotationCount = RotationCount;
             return dest;
         }
 
@@ -134,8 +116,7 @@ namespace RubikCube
         {
             get
             {
-                var pos = Transform.Origin + TRubikCube.C;
-                return SizeMatrix.Coords2Index(pos);
+                return SizeMatrix.Coords2Index(Position);
                 //var index = (int)pos[pos.Size - 1];
                 //for (int i = pos.Size - 2; i >= 0; i--)
                 //    index = index * TRubikCube.Size + (int)pos[i];
@@ -157,9 +138,16 @@ namespace RubikCube
             }
         }
 
-        public TVector GetPosition()
+        public int[] Position
         {
-            return Transform.Origin + TRubikCube.C;
+            get 
+            {
+                var pos = Transform.Origin + TRubikCube.C;
+                var position = new int[pos.Size];
+                for (int i = 0; i < pos.Size; i++)
+                    position[i] = (int)Math.Round(pos[i]);
+                return position;
+            }
         }
     }
 }

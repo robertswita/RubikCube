@@ -74,9 +74,9 @@ namespace TGL
             return R;
         }
 
-        public static TAffine CreateRotation(int axis, double angle)
+        public static TAffine CreateRotation(int plane, double angle)
         {
-            return CreateRotation(Planes[axis][0], Planes[axis][1], angle);
+            return CreateRotation(Planes[plane][0], Planes[plane][1], angle);
         }
 
         //public static TAffine CreateTranslation(TVector t)
@@ -205,6 +205,12 @@ namespace TGL
                         A.Rotate(n, m, cosA, sinA);
                     }
                 }
+            var scale = new TVector(N);
+            for (int i = 0; i < N; i++)
+                scale[i] = 0.45f;
+            var error = (A - TAffine.CreateScale(scale).M).Norm;
+            if (error > 1E-3)
+                ;
             return angles;
         }
 

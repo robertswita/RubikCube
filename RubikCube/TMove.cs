@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Forms.DataVisualization.Charting;
 using TGL;
 
 namespace RubikCube
@@ -28,30 +29,29 @@ namespace RubikCube
 
         public static TMove Decode(int code)
         {
-            var move = new TMove();
             var coords = SizeMatrix.Index2Coords(code);
+            var move = new TMove();
             move.Axis = (int)coords.X;
             move.Slice = (int)coords.Y;
             move.Plane = (int)coords.Z;
             move.Angle = (int)coords.W;
-            //move.Slice = code / 72;
-            //code -= move.Slice * 72;
-            //move.Axis = code / 18;
-            //code -= move.Axis * 18;
-            //move.Plane = code / 3;
-            //code -= move.Plane * 3;
-            //move.Angle = code;
             return move;
         }
 
         public int Encode()
         {
             //var tmp = ((TRubikCube.Size * Axis + Slice) * TAffine.Planes.Length + Plane) * 3 + Angle;
-            //var tmp = ((TAffine.N * Slice + Axis) * TAffine.Planes.Length + Plane) * 3 + Angle;
-            return SizeMatrix.Coords2Index(new TVector(Axis, Slice, Plane, Angle));
-            //return ((TRubikCube.Size * Axis + Slice) * TAffine.Planes.Length + Plane) * 3 + Angle;
-            //return Angle + 3 * (Plane + TAffine.Planes.Length * (Axis + 4 * Slice));
-            //72 * Slice + 18 * Axis + 3 * Plane + Angle;
+            return SizeMatrix.Coords2Index(new int[] { Axis, Slice, Plane, Angle });
+        }
+
+        public bool IsValid
+        {
+            get
+            {
+                if (Axis >= TAffine.N) return false;
+                if (Plane >= TAffine.Planes.Length) return false;
+                return true;
+            }
         }
 
     }
