@@ -5,28 +5,44 @@ Katedra Systemów Multimedialnych i Sztucznej Inteligencji
 ***********************************************************/
 using System;
 using System.Collections.Generic;
-using System.Net.NetworkInformation;
 
 namespace TGL
 {
     [Serializable]
     public class TAffine
     {
-        public static int N = 4;
+        static int n;
+        public static int N
+        {
+            get { return n; }
+            set
+            {
+                n = value;
+                Planes = new int[n * (n - 1) / 2][];
+                var idx = 0;
+                for (int i = 0; i < n - 1; i++)
+                    for (int j = i + 1; j < n; j++)
+                    {
+                        Planes[idx] = new int[] { i, j };
+                        idx++;
+                    }
+            }
+        }
         public TMatrix M = new TMatrix(N, N);
         public TVector Origin = new TVector(N);
         public TAffine() { M.LoadIdentity(); }
         //public TAffine(TMatrix src) : base(N + 1, N + 1) { Assign(src); }
-        public static int[][] Planes = new int[N * (N - 1) / 2][];
+        public static int[][] Planes;// = new int[N * (N - 1) / 2][];
         static TAffine()
         {
-            var idx = 0;
-            for (int i = 0; i < N - 1; i++)
-                for (int j = i + 1; j < N; j++)
-                {
-                    Planes[idx] = new int[] { i, j };
-                    idx++;
-                }
+            N = 3;
+            //var idx = 0;
+            //for (int i = 0; i < N - 1; i++)
+            //    for (int j = i + 1; j < N; j++)
+            //    {
+            //        Planes[idx] = new int[] { i, j };
+            //        idx++;
+            //    }
         }
 
         public static TAffine CreateScale(TVector scale)
@@ -63,20 +79,20 @@ namespace TGL
             return CreateRotation(Planes[axis][0], Planes[axis][1], angle);
         }
 
-        public static TAffine CreateTranslation(TVector t)
-        {
-            var T = new TAffine();
-            T.Origin.Assign(t);
-            //for (int i = 0; i < N; i++)
-            //    T[i, N] = t[i];
-            return T;
-        }
+        //public static TAffine CreateTranslation(TVector t)
+        //{
+        //    var T = new TAffine();
+        //    T.Origin.Assign(t);
+        //    //for (int i = 0; i < N; i++)
+        //    //    T[i, N] = t[i];
+        //    return T;
+        //}
 
         public TAffine Clone()
         {
             TAffine result = new TAffine();
-            result.M = (TMatrix)M.Clone();
-            result.Origin = Origin.Clone();
+            result.M.Assign(M);
+            result.Origin.Assign(Origin);
             return result;
         }
         //public override TVector Clone()

@@ -28,6 +28,7 @@ namespace TGL
         [DllImport(GL_DLL)] public static extern void glEnd();
         [DllImport(GL_DLL)] public static extern void glColor4ub(byte red, byte green, byte blue, byte alpha);
         [DllImport(GL_DLL)] public static extern void glVertex3f(float x, float y, float z);
+        [DllImport(GL_DLL)] public static extern void glVertex2f(float x, float y);
 
 
         static Dictionary<string, Delegate> ExtFunctions = new Dictionary<string, Delegate>();

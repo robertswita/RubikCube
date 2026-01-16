@@ -14,52 +14,44 @@ namespace RubikCube
         public int Slice;
         public int Plane; 
         public int Angle;
+        public static TMatrix SizeMatrix;
+        public static void UpdateSizeMatrix()
+        {
+            var sizes = new int[] { TAffine.N, TRubikCube.Size, TAffine.Planes.Length, 3 };
+            SizeMatrix = new TMatrix(sizes[0] * sizes[1], sizes[2] * sizes[3]);
+            SizeMatrix.DimSizes = sizes;
+        }
         public int[] GetPlaneAxes()
         {
             return TAffine.Planes[Plane];
         }
 
-        //public void Assign(TMove move)
-        //{
-        //    Slice = move.Slice;
-        //    Axis = move.Axis;
-        //    Angle = move.Angle;
-        //}
-
-        // N = number of axes (4 for XYZW)
-        //(int i, int j) FromIndex(int index, int N = 4)
-        //{
-        //    int i = 0;
-        //    int rowCount = N - 1 - i; // elements in row 0 of upper triangle
-
-        //    int k = index; // we’ll consume this as we move down rows
-
-        //    while (k >= rowCount)
-        //    {
-        //        k -= rowCount;
-        //        i++;
-        //        rowCount = N - 1 - i;
-        //    }
-
-        //    int j = i + 1 + k;
-        //    return (i, j);
-        //}
-
         public static TMove Decode(int code)
         {
             var move = new TMove();
-            move.Slice = code / 72;
-            code = code % 72;
-            move.Axis = code / 18;
-            code = code % 18;
-            move.Plane = code / 3;
-            move.Angle = code % 3;
+            var coords = SizeMatrix.Index2Coords(code);
+            move.Axis = (int)coords.X;
+            move.Slice = (int)coords.Y;
+            move.Plane = (int)coords.Z;
+            move.Angle = (int)coords.W;
+            //move.Slice = code / 72;
+            //code -= move.Slice * 72;
+            //move.Axis = code / 18;
+            //code -= move.Axis * 18;
+            //move.Plane = code / 3;
+            //code -= move.Plane * 3;
+            //move.Angle = code;
             return move;
         }
 
         public int Encode()
         {
-            return 72 * Slice + 18 * Axis + 3 * Plane + Angle;
+            //var tmp = ((TRubikCube.Size * Axis + Slice) * TAffine.Planes.Length + Plane) * 3 + Angle;
+            //var tmp = ((TAffine.N * Slice + Axis) * TAffine.Planes.Length + Plane) * 3 + Angle;
+            return SizeMatrix.Coords2Index(new TVector(Axis, Slice, Plane, Angle));
+            //return ((TRubikCube.Size * Axis + Slice) * TAffine.Planes.Length + Plane) * 3 + Angle;
+            //return Angle + 3 * (Plane + TAffine.Planes.Length * (Axis + 4 * Slice));
+            //72 * Slice + 18 * Axis + 3 * Plane + Angle;
         }
 
     }

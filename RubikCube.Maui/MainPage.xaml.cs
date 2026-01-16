@@ -142,7 +142,7 @@ public partial class MainPage : ContentPage
 
         for (int i = 0; i < 10; i++)
         {
-            _rubikCube.ActiveCubie = _rubikCube.Cubies[rnd.Next(size), rnd.Next(size), rnd.Next(size), rnd.Next(size)];
+            _rubikCube.ActiveCubie = _rubikCube.Cubies[rnd.Next(_rubikCube.Cubies.Length)];
             var freeMoves = _rubikCube.GetFreeMoves();
             var code = freeMoves[rnd.Next(freeMoves.Count)];
             var move = TMove.Decode(code);

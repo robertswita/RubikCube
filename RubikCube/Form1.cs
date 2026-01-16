@@ -45,7 +45,8 @@ namespace RubikCube
 
         private void TglView1_MouseWheel(object sender, MouseEventArgs e)
         {
-            Root.Rotate(5, (float)e.Delta / 60);
+            Root.Rotate(Math.Min(TAffine.Planes.Length - 1, 2), (float)e.Delta / 60);
+            Root.Rotate(Math.Min(TAffine.Planes.Length - 1, 3), (float)e.Delta / 60);
             tglView1.Invalidate();
         }
 
@@ -206,7 +207,7 @@ namespace RubikCube
 
         double OnEvaluate(TRubikGenome specimen)
         {
-            specimen.Check();
+            //specimen.Check();
             //specimen.Conjugate();
             //specimen.Mutate(RubikCube.ActCubie);
             specimen.Fitness = double.MaxValue;
@@ -258,11 +259,12 @@ namespace RubikCube
                 IterElapsed = TimeSpan.Zero;
                 chart1.Series[0].Points.Clear();
 
-                TChromosome.GenesLength = 30;
+                TChromosome.GenesLength = 50;
                 Ga = new TGA<TRubikGenome>();
-                Ga.GenerationsCount = 100;
+                Ga.GenerationsCount = 50;
+                Ga.PopulationCount = 400;
                 Ga.WinnerRatio = 0.1;
-                Ga.MutationRatio = 1;
+                Ga.MutationRatio = 20;
                 Ga.SelectionType = TGA<TRubikGenome>.TSelectionType.Unique;
                 Ga.Evaluate = OnEvaluate;
                 Ga.Progress = OnProgress;
@@ -323,6 +325,8 @@ namespace RubikCube
                 Time += Watch.Elapsed;
                 MoveTimer.Start();
             }
+            else
+                Ga = null;
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -345,11 +349,11 @@ namespace RubikCube
             IsPaused = true;
             var size = TRubikCube.Size;
             var rnd = TChromosome.Rnd;
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 30; i++)
             {
-                RubikCube.ActiveCubie = RubikCube.Cubies[rnd.Next(size), rnd.Next(size), rnd.Next(size), rnd.Next(size)];
-                var freeMoves = RubikCube.GetFreeMoves();
-                var code = freeMoves[rnd.Next(freeMoves.Count)];
+                RubikCube.ActiveCubie = RubikCube.Cubies[rnd.Next(RubikCube.Cubies.Length)];
+                TRubikGenome.FreeMoves = RubikCube.GetFreeMoves();
+                var code = TRubikGenome.FreeMoves[rnd.Next(TRubikGenome.FreeMoves.Count)];
                 var move = TMove.Decode(code);
                 Moves.Add(move);
                 RubikCube.ActiveCubie.State = RubikCube.ActiveCubie.State;
@@ -432,35 +436,6 @@ namespace RubikCube
             SolutionLbl.Text = Solutions.Count.ToString();
         }
 
-        //void DrawState()
-        //{
-        //    Pen pen = new Pen(Color.Red);
-        //    pen.Width = 2;
-        //    var bmp = new Bitmap(pictureBox1.Width, pictureBox1.Height);
-        //    var gc = Graphics.FromImage(bmp);
-        //    PointF actPos = new PointF(bmp.Width / 2, bmp.Height / 2);
-        //    var pts = new List<PointF>();
-        //    pts.Add(actPos);
-        //    var scale = pictureBox1.Width / RubikCube.Children.Count / 2;
-        //    for (int i = 0; i < RubikCube.Children.Count; i++)
-        //    {
-        //        var cubie = (RubikCube.Children[i] as TCubie).Copy();
-        //        var transform = cubie.Transform;
-        //        var gamma = Math.Atan2(transform[4], transform[0]) * 180 / Math.PI;
-        //        cubie.RotateZ(-gamma);
-        //        var beta = Math.Atan2(-transform[8], transform[0]) * 180 / Math.PI;
-        //        cubie.RotateY(-beta);
-        //        var alpha = Math.Atan2(transform[9], transform[5]) * 180 / Math.PI;
-        //        cubie.RotateX(-alpha);
-        //        var angle = (alpha + beta + gamma) / 3;
-        //        var v = new SizeF(scale * (float)Math.Cos(angle), scale * (float)Math.Sin(angle));
-        //        actPos += v;
-        //        pts.Add(actPos);
-        //    }
-        //    gc.DrawLines(pen, pts.ToArray());
-        //    pictureBox1.Image = bmp;
-        //}
-
         private void saveToolStripMenuItem_Click(object sender, EventArgs e)
         {
             //var S = new StreamWriter(Application.StartupPath + "\\Moves.txt");
@@ -540,15 +515,19 @@ namespace RubikCube
 
         private void numericUpDown1_ValueChanged(object sender, EventArgs e)
         {
-            TRubikCube.Size = (int)numericUpDown1.Value;
-            RubikCube.Parent = null;
+            TRubikCube.Size = (int)SlicesBox.Value;
+            UpdateView();
+        }
+
+        void UpdateView()
+        {
+            Root = new TShape();
             RubikCube = new TRubikCube();
             RubikCube.Parent = Root;
+            tglView1.Context.Root = Root;
             tglView1.Invalidate();
             StateBox.Invalidate();
             Moves.Clear();
-            //MoveTimer.Start();
-            //RubikCube.Cubies[0, 1, 2].Selected = true;
         }
 
         private void button3_Click_1(object sender, EventArgs e)
@@ -572,12 +551,12 @@ namespace RubikCube
             RubikCube.Parent = Root;
 
             var cubies = new List<TCubie>();
-            cubies.Add(RubikCube.Cubies[0, 3, 3, 3]);
-            cubies.Add(RubikCube.Cubies[0, 0, 0, 0]);
-            cubies.Add(RubikCube.Cubies[0, 3, 3, 0]);
-            cubies.Add(RubikCube.Cubies[0, 0, 2, 0]);
-            cubies.Add(RubikCube.Cubies[0, 2, 3, 0]);
-            cubies.Add(RubikCube.Cubies[0, 1, 2, 0]);
+            cubies.Add(RubikCube.Cubies[0]);
+            cubies.Add(RubikCube.Cubies[1]);
+            cubies.Add(RubikCube.Cubies[2]);
+            cubies.Add(RubikCube.Cubies[3]);
+            cubies.Add(RubikCube.Cubies[4]);
+            cubies.Add(RubikCube.Cubies[5]);
 
             for (int i = 0; i < cubies.Count; i++)
             {
@@ -627,7 +606,7 @@ namespace RubikCube
 
         private void undoMovesToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            var actCubie = RubikCube.Cubies[0, 0, 0, 0];
+            var actCubie = RubikCube.Cubies[0];
             var idx = new int[] { actCubie.X, actCubie.Y, actCubie.Z };
             var A = new TMove();
             var B = new TMove();
@@ -645,6 +624,12 @@ namespace RubikCube
             e.Graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
             e.Graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.Half;
             DisplayState(e.Graphics);
+        }
+
+        private void numericUpDown2_ValueChanged(object sender, EventArgs e)
+        {
+            TAffine.N = (int)DimsBox.Value;
+            UpdateView();
         }
     }
 }
