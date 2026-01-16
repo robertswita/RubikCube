@@ -15,6 +15,13 @@ public static class MauiProgram
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+            })
+            .ConfigureMauiHandlers(handlers =>
+            {
+#if MACCATALYST
+                handlers.AddHandler<Platforms.MacCatalyst.Rendering.MetalCubeView,
+                    Platforms.MacCatalyst.Rendering.MetalCubeViewHandler>();
+#endif
             });
 
 #if DEBUG

@@ -67,15 +67,15 @@
             </VerticalStackLayout>
         </ScrollView>
 
-        <!-- Right Panel - Cube View -->
-        <controls:CubeView x:Name="CubeViewControl"
-                           Grid.Column="1"
-                           BackgroundColor="DarkSlateGray">
-            <controls:CubeView.GestureRecognizers>
+        <!-- Right Panel - Cube View (Native GPU rendering: Metal on macOS, OpenGL on Windows) -->
+        <controls:NativeCubeView x:Name="CubeViewControl"
+                                 Grid.Column="1"
+                                 BackgroundColor="DarkSlateGray">
+            <controls:NativeCubeView.GestureRecognizers>
                 <PanGestureRecognizer PanUpdated="OnCubeViewPanUpdated" />
                 <PinchGestureRecognizer PinchUpdated="OnCubeViewPinchUpdated" />
-            </controls:CubeView.GestureRecognizers>
-        </controls:CubeView>
+            </controls:NativeCubeView.GestureRecognizers>
+        </controls:NativeCubeView>
 
     </Grid>
 </ContentPage>

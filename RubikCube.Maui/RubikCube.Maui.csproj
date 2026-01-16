@@ -51,6 +51,12 @@
     <PackageReference Include="LiveChartsCore.SkiaSharpView.Maui" Version="2.0.0-rc2" />
   </ItemGroup>
 
+  <!-- Windows-only: Silk.NET for OpenGL -->
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+    <PackageReference Include="Silk.NET.OpenGL" Version="2.21.0" />
+    <PackageReference Include="Silk.NET.Core" Version="2.21.0" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- Raw assets for shaders -->
     <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
@@ -75,6 +81,9 @@
 
     <!-- TShape.cs - modified with #if MAUI for color compatibility -->
     <Compile Include="..\RubikCube\TShape.cs" Link="Core\TShape.cs" />
+
+    <!-- Z-order comparer for depth sorting -->
+    <Compile Include="..\RubikCube\TObject3DComparer.cs" Link="Core\TObject3DComparer.cs" />
   </ItemGroup>
 
 </Project>
