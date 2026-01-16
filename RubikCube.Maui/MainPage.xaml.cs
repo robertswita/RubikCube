@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using GA;
@@ -8,22 +9,49 @@ using TGL;
 
 namespace RubikCube.Maui;
 
+public static class DebugLog
+{
+    // Save to app data directory
+    public static readonly string LogPath = Path.Combine(FileSystem.AppDataDirectory, "debug.log");
+
+    public static void WriteLine(string message)
+    {
+        try
+        {
+            File.AppendAllText(LogPath, $"{DateTime.Now:HH:mm:ss.fff} {message}\n");
+        }
+        catch { }
+    }
+
+    public static void Clear()
+    {
+        try { File.Delete(LogPath); } catch { }
+    }
+}
+
 public partial class MainPage : ContentPage
 {
     // GA and cube state
     private TGA<TRubikGenome>? _ga;
     private TRubikCube _rubikCube = null!;
+    private TRubikCube _gaCube = null!; // Separate cube for GA calculations
     private TShape _root = new TShape();
-    private List<TMove> _moves = new();
     private Dictionary<string, List<int>> _solutions = new();
 
+    // Thread-safe move queue
+    private readonly ConcurrentQueue<TMove> _moveQueue = new();
+    private TMove? _currentMove;
+
     // Animation state
-    private int _moveNo;
     private int _frameNo;
     private const int FrameCount = 10;
     private TShape? _actSlice;
-    private bool _isPaused = true;
     private IDispatcherTimer? _moveTimer;
+
+    // GA background task
+    private CancellationTokenSource? _gaCts;
+    private Task? _gaTask;
+    private bool _isGaRunning;
 
     // Statistics
     private int _gaCount;
@@ -59,6 +87,10 @@ public partial class MainPage : ContentPage
 
         BindingContext = this;
 
+        // Log startup
+        DebugLog.Clear();
+        DebugLog.WriteLine($"App started. Log path: {DebugLog.LogPath}");
+
         // Initialize cube
         InitializeCube();
 
@@ -83,8 +115,10 @@ public partial class MainPage : ContentPage
 
     private void InitializeCube()
     {
+        // Create both cubes fresh - they start in the same solved state
         _rubikCube = new TRubikCube();
         _rubikCube.Parent = _root;
+        _gaCube = new TRubikCube(); // Separate cube for GA, same initial state
         CubeViewControl.Root = _root;
         CubeViewControl.Invalidate();
     }
@@ -133,49 +167,103 @@ public partial class MainPage : ContentPage
 
     private void OnSolveClicked(object? sender, EventArgs e)
     {
-        if (_moveTimer?.IsRunning == true) return;
+        if (_isGaRunning) return;
 
+        // Reset statistics but don't touch animation - it can continue
         _movesCount = 0;
         _time = TimeSpan.Zero;
         _gaCount = 0;
-        _isPaused = false;
         _highScore = 0;
+        _fitnessValues.Clear();
+        _evalCount = 0; // Reset debug counter
+        DebugLog.Clear(); // Clear previous log
+
+        // Debug: log cube state before solving
+        DebugLog.WriteLine($"OnSolve: _gaCube unsolved={_gaCube.Cubies.Count(c => c.State != 0)}, " +
+            $"_rubikCube unsolved={_rubikCube.Cubies.Count(c => c.State != 0)}");
 
         LoadSolutions();
-        Solve();
+        StartGaBackground();
     }
 
     private void OnShuffleClicked(object? sender, EventArgs e)
     {
-        if (_moveTimer?.IsRunning == true) return;
+        // Stop GA if running
+        StopGa();
 
-        _isPaused = true;
-        var size = TRubikCube.Size;
+        DebugLog.WriteLine($"Shuffle START: _gaCube unsolved={_gaCube.Cubies.Count(c => c.State != 0)}");
+
         var rnd = TChromosome.Rnd;
 
+        // Generate shuffle moves using _gaCube (which is always "ahead")
+        // Apply each move to _gaCube immediately, queue for _rubikCube animation
         for (int i = 0; i < 10; i++)
         {
-            _rubikCube.ActiveCubie = _rubikCube.Cubies[rnd.Next(_rubikCube.Cubies.Length)];
-            var freeMoves = _rubikCube.GetFreeMoves();
+            _gaCube.ActiveCubie = _gaCube.Cubies[rnd.Next(_gaCube.Cubies.Length)];
+            var freeMoves = _gaCube.GetFreeMoves();
             var code = freeMoves[rnd.Next(freeMoves.Count)];
             var move = TMove.Decode(code);
-            _moves.Add(move);
-            _rubikCube.ActiveCubie.State = _rubikCube.ActiveCubie.State;
+
+            // Apply to _gaCube immediately
+            _gaCube.Turn(move);
+
+            // Queue for _rubikCube animation
+            _moveQueue.Enqueue(move);
         }
 
-        _moveTimer?.Start();
+        DebugLog.WriteLine($"Shuffle END: _gaCube unsolved={_gaCube.Cubies.Count(c => c.State != 0)}");
+
+        // Start animation if not running
+        if (_moveTimer?.IsRunning != true)
+            _moveTimer?.Start();
     }
 
-    private void OnPauseClicked(object? sender, EventArgs e)
+    private void OnStopClicked(object? sender, EventArgs e)
     {
-        _isPaused = !_isPaused;
-        PauseBtn.BackgroundColor = _isPaused ? Colors.Red : Colors.LightGray;
+        StopGa();
+    }
 
-        if (!_isPaused)
+    private void OnResetClicked(object? sender, EventArgs e)
+    {
+        // Stop everything
+        StopGa();
+        _moveTimer?.Stop();
+
+        // Clear the move queue
+        while (_moveQueue.TryDequeue(out _)) { }
+
+        // Reset animation state
+        if (_actSlice != null)
         {
-            _fitnessValues.Clear();
-            _moveTimer?.Start();
+            UnGroup();
         }
+        _currentMove = null;
+        _frameNo = 0;
+
+        // Recreate both cubes fresh - they start in the same solved state
+        RecreateCube();
+
+        // Reset statistics
+        _movesCount = 0;
+        _time = TimeSpan.Zero;
+        _gaCount = 0;
+        _highScore = 0;
+        _fitnessValues.Clear();
+
+        // Update UI
+        ErrorLabel.Text = "0";
+        TimeLabel.Text = "00:00:00";
+        MovesLabel.Text = "0";
+        SolutionLabel.Text = "0";
+        GACountLabel.Text = "0";
+    }
+
+    private void StopGa()
+    {
+        _gaCts?.Cancel();
+        _isGaRunning = false;
+        SolveBtn.IsEnabled = true;
+        StopBtn.BackgroundColor = Colors.OrangeRed;
     }
 
     private void OnDimensionSliderChanged(object? sender, ValueChangedEventArgs e)
@@ -205,12 +293,13 @@ public partial class MainPage : ContentPage
     private void RecreateCube()
     {
         _root = new TShape();
+        // Create both cubes fresh - they start in the same solved state
         _rubikCube = new TRubikCube();
         _rubikCube.Parent = _root;
+        _gaCube = new TRubikCube(); // Separate cube for GA, same initial state
         CubeViewControl.Root = _root;
         CubeViewControl.Invalidate();
         StateGridView.Invalidate();
-        _moves.Clear();
     }
 
     private void OnTransparencyChanged(object? sender, CheckedChangedEventArgs e)
@@ -225,51 +314,56 @@ public partial class MainPage : ContentPage
 
     private void OnMoveTimerTick(object? sender, EventArgs e)
     {
-        if (_moveNo < _moves.Count)
+        // If we have a current move being animated
+        if (_currentMove != null)
         {
-            TMove move = _moves[_moveNo];
-
-            if (_frameNo == 0)
-                Group(_rubikCube.SelectSlice(move));
-
             _frameNo++;
 
             if (_frameNo <= FrameCount)
             {
-                double angle = 90 * (move.Angle + 1);
+                double angle = 90 * (_currentMove.Angle + 1);
                 if (angle > 180) angle -= 360;
                 angle *= (double)_frameNo / FrameCount;
-                _actSlice!.Transform = TAffine.CreateRotation(move.Plane, angle);
+                _actSlice!.Transform = TAffine.CreateRotation(_currentMove.Plane, angle);
             }
             else
             {
+                // Animation complete for this move
                 UnGroup();
-                _rubikCube.Turn(move);
+                _rubikCube.Turn(_currentMove);
+                _currentMove = null;
                 _frameNo = 0;
-                _moveNo++;
+                _movesCount++;
+
+                // Update UI
+                MovesLabel.Text = _movesCount.ToString();
+                StateGridView.Invalidate();
             }
 
             CubeViewControl.Invalidate();
         }
-        else if (_moveNo > 0)
+        // Try to get next move from queue
+        else if (_moveQueue.TryDequeue(out var nextMove))
         {
-            _moveNo = 0;
-            _moves.Clear();
-
-            ErrorLabel.Text = _highScore.ToString("F2");
-            var unsolved = _rubikCube.Code.Count(x => x != '\0');
-            MovesLabel.Text = _movesCount.ToString();
-            SolutionLabel.Text = unsolved.ToString();
-            GACountLabel.Text = (++_gaCount).ToString();
-            StateGridView.Invalidate();
+            _currentMove = nextMove;
+            _frameNo = 0;
+            Group(_rubikCube.SelectSlice(nextMove));
+            CubeViewControl.Invalidate();
         }
+        // Queue is empty
         else
         {
-            TimeLabel.Text = _time.ToString(@"hh\:mm\:ss");
-            _moveTimer?.Stop();
+            // Update time display
+            if (_watch != null)
+            {
+                TimeLabel.Text = _time.ToString(@"hh\:mm\:ss");
+            }
 
-            if (_ga != null && !_isPaused)
-                Solve();
+            // Stop timer if GA is not running and queue is empty
+            if (!_isGaRunning)
+            {
+                _moveTimer?.Stop();
+            }
         }
     }
 
@@ -293,21 +387,59 @@ public partial class MainPage : ContentPage
 
     #region GA Solver
 
-    private void Solve()
+    private void StartGaBackground()
     {
-        if (_highScore == 0)
-        {
-            _rubikCube.NextCluster();
-            if (_rubikCube.ActiveCubie != null)
-                TRubikGenome.FreeMoves = _rubikCube.GetFreeMoves();
-            _highScore = double.MaxValue;
-        }
+        if (_isGaRunning) return;
 
-        if (_rubikCube.ActiveCluster != null)
+        _isGaRunning = true;
+        _gaCts = new CancellationTokenSource();
+        var token = _gaCts.Token;
+
+        // Update UI
+        SolveBtn.IsEnabled = false;
+        StopBtn.BackgroundColor = Colors.Red;
+
+        // _gaCube is already in the correct state (shuffle moves were applied to it)
+        // No need to copy - both cubes started from same state and receive same moves
+        _highScore = 0;
+
+        // Start animation timer if not already running
+        if (_moveTimer?.IsRunning != true)
+            _moveTimer?.Start();
+
+        // Run GA on background thread
+        _gaTask = Task.Run(() => RunGaLoop(token), token);
+    }
+
+    private void RunGaLoop(CancellationToken token)
+    {
+        _watch = Stopwatch.StartNew();
+
+        while (!token.IsCancellationRequested)
         {
-            _watch = Stopwatch.StartNew();
+            // Find next cluster to solve
+            if (_highScore == 0)
+            {
+                _gaCube.NextCluster();
+                if (_gaCube.ActiveCubie != null)
+                    TRubikGenome.FreeMoves = _gaCube.GetFreeMoves();
+                _highScore = double.MaxValue;
+
+                // Debug: log cluster info
+                DebugLog.WriteLine($"NextCluster: ActiveCubie={_gaCube.ActiveCubie != null}, " +
+                    $"ActiveCluster={((_gaCube.ActiveCluster?.Count) ?? 0)}, " +
+                    $"FreeMoves={TRubikGenome.FreeMoves?.Count ?? 0}, " +
+                    $"UnsolvedCount={_gaCube.Cubies.Count(c => c.State != 0)}");
+            }
+
+            if (_gaCube.ActiveCluster == null)
+            {
+                // All clusters solved
+                DebugLog.WriteLine("All clusters solved - exiting GA loop");
+                break;
+            }
+
             _iterElapsed = TimeSpan.Zero;
-            _fitnessValues.Clear();
 
             TChromosome.GenesLength = 30;
             _ga = new TGA<TRubikGenome>
@@ -321,10 +453,20 @@ public partial class MainPage : ContentPage
                 HighScore = _highScore
             };
 
-            TRubikGenome.FreeMoves = _rubikCube.GetFreeMoves();
-            _ga.Execute();
+            TRubikGenome.FreeMoves = _gaCube.GetFreeMoves();
 
-            if (_ga.HighScore == 0 && _rubikCube.ActiveCluster.Count > 1)
+            try
+            {
+                _ga.Execute();
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+
+            if (token.IsCancellationRequested) break;
+
+            if (_ga.HighScore == 0 && _gaCube.ActiveCluster.Count > 1)
             {
                 SaveSolution(_ga.Best);
             }
@@ -332,14 +474,41 @@ public partial class MainPage : ContentPage
             if (_ga.HighScore < _highScore)
             {
                 _highScore = _ga.HighScore;
+
+                // Queue moves for animation
                 for (int i = 0; i < _ga.Best.MovesCount; i++)
-                    _moves.Add(TMove.Decode((int)_ga.Best.Genes[i]));
+                {
+                    var move = TMove.Decode((int)_ga.Best.Genes[i]);
+                    _moveQueue.Enqueue(move);
+                    // Also apply to GA cube immediately
+                    _gaCube.Turn(move);
+                }
+
+                // Only move to next cluster when this one is fully solved (fitness = 0)
+                // _highScore is already set to _ga.HighScore above
+                // If it's 0, NextCluster() will be called on next iteration
+                // If it's > 0, we continue trying to improve this cluster
             }
 
-            _movesCount += _moves.Count;
             _time += _watch.Elapsed;
-            _moveTimer?.Start();
+            _watch.Restart();
+
+            // Update UI on main thread
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                ErrorLabel.Text = _ga.HighScore.ToString("F2");
+                GACountLabel.Text = (++_gaCount).ToString();
+                TimeLabel.Text = _time.ToString(@"hh\:mm\:ss");
+            });
         }
+
+        // GA finished or cancelled
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            _isGaRunning = false;
+            SolveBtn.IsEnabled = true;
+            StopBtn.BackgroundColor = Colors.OrangeRed;
+        });
     }
 
     private void OnProgress(TRubikGenome specimen)
@@ -354,12 +523,30 @@ public partial class MainPage : ContentPage
         });
     }
 
+    private static int _evalCount = 0;
     private double OnEvaluate(TRubikGenome specimen)
     {
+        // Check for cancellation to allow stopping mid-GA
+        if (_gaCts?.Token.IsCancellationRequested == true)
+            throw new OperationCanceledException();
+
         specimen.Check();
         specimen.Fitness = double.MaxValue;
 
-        var cube = new TRubikCube(_rubikCube);
+        // Use the GA cube copy for evaluation
+        var cube = new TRubikCube(_gaCube);
+
+        // Debug first few evaluations
+        if (_evalCount < 3)
+        {
+            DebugLog.WriteLine($"OnEvaluate #{_evalCount}: " +
+                $"_gaCube.ActiveCubie={_gaCube.ActiveCubie != null}, " +
+                $"cube.ActiveCubie={cube.ActiveCubie != null}, " +
+                $"cube.ActiveCluster={cube.ActiveCluster?.Count ?? 0}, " +
+                $"cube.SolvedCubies count={cube.Cubies.Count(c => c.State == 0)}");
+        }
+
+        double initialFitness = cube.Evaluate();
 
         for (int i = 0; i < specimen.Genes.Length; i++)
         {
@@ -372,6 +559,12 @@ public partial class MainPage : ContentPage
                 specimen.Fitness = fitness;
                 specimen.MovesCount = i + 1;
             }
+        }
+
+        if (_evalCount < 3)
+        {
+            DebugLog.WriteLine($"  Initial fitness: {initialFitness}, Best found: {specimen.Fitness}");
+            _evalCount++;
         }
 
         return specimen.Fitness;
@@ -410,7 +603,7 @@ public partial class MainPage : ContentPage
 
     private void SaveSolution(TRubikGenome solution)
     {
-        var code = _rubikCube.Code;
+        var code = _gaCube.Code;
         if (!_solutions.ContainsKey(code))
         {
             try
@@ -430,7 +623,12 @@ public partial class MainPage : ContentPage
             catch { /* Ignore errors */ }
         }
 
-        SolutionLabel.Text = _solutions.Count.ToString();
+        // Update UI on main thread
+        var count = _solutions.Count;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            SolutionLabel.Text = count.ToString();
+        });
     }
 
     #endregion

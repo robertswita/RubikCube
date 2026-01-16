@@ -12,11 +12,12 @@
         <ScrollView Grid.Column="0" Padding="10">
             <VerticalStackLayout Spacing="10">
 
-                <!-- Control Buttons -->
+                <!-- Control Buttons Row 1 -->
                 <HorizontalStackLayout Spacing="5">
                     <Button x:Name="ShuffleBtn" Text="Shuffle" Clicked="OnShuffleClicked" WidthRequest="80" />
                     <Button x:Name="SolveBtn" Text="Solve!" Clicked="OnSolveClicked" WidthRequest="80" />
-                    <Button x:Name="PauseBtn" Text="Pause" Clicked="OnPauseClicked" WidthRequest="80" />
+                    <Button x:Name="StopBtn" Text="Stop" Clicked="OnStopClicked" WidthRequest="80" BackgroundColor="OrangeRed" />
+                    <Button x:Name="ResetBtn" Text="Reset" Clicked="OnResetClicked" WidthRequest="80" />
                 </HorizontalStackLayout>
 
                 <!-- Dimension Control (3D to 5D) -->
