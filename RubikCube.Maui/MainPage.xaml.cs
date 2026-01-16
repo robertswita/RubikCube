@@ -108,6 +108,9 @@ public partial class MainPage : ContentPage
         DimensionLabel.Text = TAffine.N.ToString();
         SizeSlider.Value = TRubikCube.Size;
         SizeLabel.Text = TRubikCube.Size.ToString();
+
+        // Subscribe to scroll wheel events
+        CubeViewControl.ScrollWheelChanged += OnCubeViewScrollWheelChanged;
     }
 
     // State grid drawable
@@ -159,6 +162,16 @@ public partial class MainPage : ContentPage
             _root.Rotate(5, (e.Scale - 1) * 30);
             CubeViewControl.Invalidate();
         }
+    }
+
+    private void OnCubeViewScrollWheelChanged(object? sender, Controls.ScrollWheelEventArgs e)
+    {
+        // Rotate on axes 2 and 3 (XW and YW planes in 4D) like the original WinForms
+        // deltaY is the main scroll direction
+        var rotationAmount = e.DeltaY / 5f;
+        _root.Rotate(Math.Min(TAffine.Planes.Length - 1, 2), rotationAmount);
+        _root.Rotate(Math.Min(TAffine.Planes.Length - 1, 3), rotationAmount);
+        CubeViewControl.Invalidate();
     }
 
     #endregion

@@ -41,6 +41,10 @@ public class VertexBufferBuilder
         var transform = parentTransform * obj.Transform;
         obj.WorldTransform = transform.Clone();
 
+        // Update children's WorldTransform BEFORE sorting so comparer uses current values
+        foreach (var child in obj.Children)
+            child.WorldTransform = (transform * child.Transform).Clone();
+
         // Sort children by Z for proper draw order (back to front)
         var childrenList = new List<TShape>(obj.Children);
         if (obj.WorldTransform.Origin.Size > 2)

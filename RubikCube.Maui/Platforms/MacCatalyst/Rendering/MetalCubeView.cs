@@ -6,6 +6,7 @@ using CoreGraphics;
 using Foundation;
 using TGL;
 using RubikCube.Maui.Rendering;
+using RubikCube.Maui.Controls;
 using Microsoft.Maui.Handlers;
 
 namespace RubikCube.Maui.Platforms.MacCatalyst.Rendering;
@@ -19,6 +20,7 @@ public class MetalCubeView : Microsoft.Maui.Controls.View
     public TShape Root { get; set; } = new TShape();
     public bool IsTransparencyOn { get; set; }
     public new Color BackgroundColor { get; set; } = Colors.DarkSlateGray;
+    public NativeCubeView? NativeViewParent { get; set; }
 
     private MetalCubeViewHandler? _handler;
 
@@ -26,6 +28,7 @@ public class MetalCubeView : Microsoft.Maui.Controls.View
     {
         base.OnHandlerChanged();
         _handler = Handler as MetalCubeViewHandler;
+        _handler?.SetNativeViewParent(NativeViewParent);
         Invalidate();
     }
 
@@ -43,6 +46,62 @@ public class MetalCubeView : Microsoft.Maui.Controls.View
 }
 
 /// <summary>
+/// Custom MTKView that captures scroll wheel events via UIPanGestureRecognizer.
+/// </summary>
+class ScrollableMTKView : MTKView
+{
+    public event Action<float, float>? ScrollWheelChanged;
+    private UIPanGestureRecognizer? _scrollGesture;
+    private CGPoint _lastTranslation;
+
+    public ScrollableMTKView(CGRect frame, IMTLDevice device) : base(frame, device)
+    {
+        // Create a pan gesture recognizer configured to handle scroll wheel/trackpad
+        _scrollGesture = new UIPanGestureRecognizer(HandleScrollGesture);
+        _scrollGesture.AllowedScrollTypesMask = UIScrollTypeMask.All;
+        _scrollGesture.MaximumNumberOfTouches = 0; // No touch, only scroll wheel/trackpad
+        AddGestureRecognizer(_scrollGesture);
+    }
+
+    private void HandleScrollGesture(UIPanGestureRecognizer gesture)
+    {
+        var translation = gesture.TranslationInView(this);
+
+        if (gesture.State == UIGestureRecognizerState.Began)
+        {
+            _lastTranslation = CGPoint.Empty;
+        }
+
+        // Calculate delta from last position
+        float deltaX = (float)(translation.X - _lastTranslation.X);
+        float deltaY = (float)(translation.Y - _lastTranslation.Y);
+        _lastTranslation = translation;
+
+        if (gesture.State == UIGestureRecognizerState.Changed)
+        {
+            ScrollWheelChanged?.Invoke(deltaX, deltaY);
+        }
+
+        if (gesture.State == UIGestureRecognizerState.Ended ||
+            gesture.State == UIGestureRecognizerState.Cancelled)
+        {
+            _lastTranslation = CGPoint.Empty;
+        }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing && _scrollGesture != null)
+        {
+            RemoveGestureRecognizer(_scrollGesture);
+            _scrollGesture.Dispose();
+            _scrollGesture = null;
+        }
+        base.Dispose(disposing);
+    }
+}
+
+/// <summary>
 /// Handler for MetalCubeView that creates the MTKView and manages Metal rendering.
 /// Uses MTKViewDelegate for proper render cycle integration.
 /// </summary>
@@ -56,6 +115,7 @@ public class MetalCubeViewHandler : ViewHandler<MetalCubeView, MTKView>
     private IMTLBuffer? _vertexBuffer;
     private readonly VertexBufferBuilder _bufferBuilder = new();
     private MetalViewDelegate? _delegate;
+    private NativeCubeView? _nativeViewParent;
 
     // Render state - updated by UpdateRenderState, read during Draw
     private TShape _root = new TShape();
@@ -97,6 +157,11 @@ fragment float4 fragment_main(VertexOut in [[stage_in]]) {
 
     public MetalCubeViewHandler() : base(PropertyMapper) { }
 
+    public void SetNativeViewParent(NativeCubeView? parent)
+    {
+        _nativeViewParent = parent;
+    }
+
     protected override MTKView CreatePlatformView()
     {
         _device = MTLDevice.SystemDefault;
@@ -107,7 +172,7 @@ fragment float4 fragment_main(VertexOut in [[stage_in]]) {
 
         _commandQueue = _device.CreateCommandQueue();
 
-        var view = new MTKView(CGRect.Empty, _device)
+        var view = new ScrollableMTKView(CGRect.Empty, _device)
         {
             ColorPixelFormat = MTLPixelFormat.BGRA8Unorm,
             DepthStencilPixelFormat = MTLPixelFormat.Depth32Float,
@@ -118,6 +183,9 @@ fragment float4 fragment_main(VertexOut in [[stage_in]]) {
             PreferredFramesPerSecond = 60
         };
 
+        // Subscribe to scroll wheel events
+        view.ScrollWheelChanged += OnScrollWheelChanged;
+
         CreatePipeline();
         CreateDepthStencilState();
 
@@ -126,6 +194,11 @@ fragment float4 fragment_main(VertexOut in [[stage_in]]) {
         view.Delegate = _delegate;
 
         return view;
+    }
+
+    private void OnScrollWheelChanged(float deltaX, float deltaY)
+    {
+        _nativeViewParent?.RaiseScrollWheelChanged(deltaX, deltaY);
     }
 
     private void CreatePipeline()
@@ -280,6 +353,10 @@ fragment float4 fragment_main(VertexOut in [[stage_in]]) {
 
     protected override void DisconnectHandler(MTKView platformView)
     {
+        if (platformView is ScrollableMTKView scrollableView)
+        {
+            scrollableView.ScrollWheelChanged -= OnScrollWheelChanged;
+        }
         platformView.Paused = true;
         platformView.Delegate = null;
         _delegate = null;

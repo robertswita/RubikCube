@@ -3,6 +3,21 @@ using TGL;
 namespace RubikCube.Maui.Controls;
 
 /// <summary>
+/// Event args for scroll wheel events.
+/// </summary>
+public class ScrollWheelEventArgs : EventArgs
+{
+    public float DeltaX { get; }
+    public float DeltaY { get; }
+
+    public ScrollWheelEventArgs(float deltaX, float deltaY)
+    {
+        DeltaX = deltaX;
+        DeltaY = deltaY;
+    }
+}
+
+/// <summary>
 /// Cross-platform wrapper for native GPU-based cube rendering.
 /// Uses Metal on macOS and OpenGL on Windows.
 /// Falls back to SkiaSharp on other platforms.
@@ -16,11 +31,21 @@ public class NativeCubeView : ContentView
     public bool IsTransparencyOn { get; set; }
     public new Color BackgroundColor { get; set; } = Colors.DarkSlateGray;
 
+    /// <summary>
+    /// Event raised when the scroll wheel is used over the view.
+    /// </summary>
+    public event EventHandler<ScrollWheelEventArgs>? ScrollWheelChanged;
+
     public NativeCubeView()
     {
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
         SizeChanged += OnSizeChanged;
+    }
+
+    internal void RaiseScrollWheelChanged(float deltaX, float deltaY)
+    {
+        ScrollWheelChanged?.Invoke(this, new ScrollWheelEventArgs(deltaX, deltaY));
     }
 
     private void OnLoaded(object? sender, EventArgs e)
@@ -48,7 +73,8 @@ public class NativeCubeView : ContentView
         {
             Root = Root,
             IsTransparencyOn = IsTransparencyOn,
-            BackgroundColor = BackgroundColor
+            BackgroundColor = BackgroundColor,
+            NativeViewParent = this
         };
         _platformView = metalView;
         Content = metalView;
@@ -57,7 +83,8 @@ public class NativeCubeView : ContentView
         {
             Root = Root,
             IsTransparencyOn = IsTransparencyOn,
-            BackgroundColor = BackgroundColor
+            BackgroundColor = BackgroundColor,
+            NativeViewParent = this
         };
         _platformView = openGLView;
         Content = openGLView;

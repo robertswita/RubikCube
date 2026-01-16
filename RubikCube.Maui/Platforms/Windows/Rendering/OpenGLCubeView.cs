@@ -8,6 +8,7 @@ using Silk.NET.Windowing;
 using System.Runtime.InteropServices;
 using TGL;
 using RubikCube.Maui.Rendering;
+using RubikCube.Maui.Controls;
 using Microsoft.Maui.Controls;
 
 namespace RubikCube.Maui.Platforms.Windows.Rendering;
@@ -28,6 +29,7 @@ public class OpenGLCubeView : ContentView
     public TShape Root { get; set; } = new TShape();
     public bool IsTransparencyOn { get; set; }
     public new Color BackgroundColor { get; set; } = Colors.DarkSlateGray;
+    public NativeCubeView? NativeViewParent { get; set; }
 
     public OpenGLCubeView()
     {
