@@ -19,11 +19,24 @@
                     <Button x:Name="PauseBtn" Text="Pause" Clicked="OnPauseClicked" WidthRequest="80" />
                 </HorizontalStackLayout>
 
-                <!-- Size Control -->
+                <!-- Dimension Control (3D to 5D) -->
                 <HorizontalStackLayout Spacing="10" VerticalOptions="Center">
-                    <Label Text="Cube Size:" VerticalOptions="Center" />
-                    <Entry x:Name="SizeEntry" Text="3" Keyboard="Numeric" WidthRequest="60" />
-                    <Button Text="Apply" Clicked="OnSizeChanged" WidthRequest="70" />
+                    <Label Text="Dimension:" VerticalOptions="Center" WidthRequest="75" />
+                    <Slider x:Name="DimensionSlider"
+                            Minimum="3" Maximum="5" Value="3"
+                            WidthRequest="150"
+                            ValueChanged="OnDimensionSliderChanged" />
+                    <Label x:Name="DimensionLabel" Text="3" VerticalOptions="Center" WidthRequest="30" />
+                </HorizontalStackLayout>
+
+                <!-- Size Control (2 to 12) -->
+                <HorizontalStackLayout Spacing="10" VerticalOptions="Center">
+                    <Label Text="Size:" VerticalOptions="Center" WidthRequest="75" />
+                    <Slider x:Name="SizeSlider"
+                            Minimum="2" Maximum="12" Value="3"
+                            WidthRequest="150"
+                            ValueChanged="OnSizeSliderChanged" />
+                    <Label x:Name="SizeLabel" Text="3" VerticalOptions="Center" WidthRequest="30" />
                 </HorizontalStackLayout>
 
                 <!-- Transparency Toggle -->
@@ -63,6 +76,19 @@
 
                 <!-- Iteration Time -->
                 <Label x:Name="IterTimeLabel" Text="Iter time: 0ms" />
+
+                <!-- State Grid Visualization (always square) -->
+                <VerticalStackLayout>
+                    <Label Text="State Grid:" />
+                    <Border Stroke="Gray"
+                            StrokeThickness="1"
+                            HeightRequest="250"
+                            WidthRequest="250"
+                            HorizontalOptions="Start"
+                            VerticalOptions="Start">
+                        <GraphicsView x:Name="StateGridView" />
+                    </Border>
+                </VerticalStackLayout>
 
             </VerticalStackLayout>
         </ScrollView>

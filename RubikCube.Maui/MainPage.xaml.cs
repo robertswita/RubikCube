@@ -66,7 +66,20 @@ public partial class MainPage : ContentPage
         _moveTimer = Dispatcher.CreateTimer();
         _moveTimer.Interval = TimeSpan.FromMilliseconds(16); // ~60 FPS
         _moveTimer.Tick += OnMoveTimerTick;
+
+        // Initialize state grid drawable
+        _stateGridDrawable = new StateGridDrawable(() => _rubikCube);
+        StateGridView.Drawable = _stateGridDrawable;
+
+        // Set initial slider values
+        DimensionSlider.Value = TAffine.N;
+        DimensionLabel.Text = TAffine.N.ToString();
+        SizeSlider.Value = TRubikCube.Size;
+        SizeLabel.Text = TRubikCube.Size.ToString();
     }
+
+    // State grid drawable
+    private StateGridDrawable _stateGridDrawable = null!;
 
     private void InitializeCube()
     {
@@ -165,17 +178,39 @@ public partial class MainPage : ContentPage
         }
     }
 
-    private void OnSizeChanged(object? sender, EventArgs e)
+    private void OnDimensionSliderChanged(object? sender, ValueChangedEventArgs e)
     {
-        if (int.TryParse(SizeEntry.Text, out int size) && size >= 2 && size <= 7)
+        int dimension = (int)Math.Round(e.NewValue);
+        DimensionLabel.Text = dimension.ToString();
+
+        if (TAffine.N != dimension)
+        {
+            TAffine.N = dimension;
+            RecreateCube();
+        }
+    }
+
+    private void OnSizeSliderChanged(object? sender, ValueChangedEventArgs e)
+    {
+        int size = (int)Math.Round(e.NewValue);
+        SizeLabel.Text = size.ToString();
+
+        if (TRubikCube.Size != size)
         {
             TRubikCube.Size = size;
-            _rubikCube.Parent = null;
-            _rubikCube = new TRubikCube();
-            _rubikCube.Parent = _root;
-            CubeViewControl.Invalidate();
-            _moves.Clear();
+            RecreateCube();
         }
+    }
+
+    private void RecreateCube()
+    {
+        _root = new TShape();
+        _rubikCube = new TRubikCube();
+        _rubikCube.Parent = _root;
+        CubeViewControl.Root = _root;
+        CubeViewControl.Invalidate();
+        StateGridView.Invalidate();
+        _moves.Clear();
     }
 
     private void OnTransparencyChanged(object? sender, CheckedChangedEventArgs e)
@@ -226,6 +261,7 @@ public partial class MainPage : ContentPage
             MovesLabel.Text = _movesCount.ToString();
             SolutionLabel.Text = unsolved.ToString();
             GACountLabel.Text = (++_gaCount).ToString();
+            StateGridView.Invalidate();
         }
         else
         {
@@ -398,4 +434,65 @@ public partial class MainPage : ContentPage
     }
 
     #endregion
+}
+
+/// <summary>
+/// Drawable for rendering the cube's state grid visualization.
+/// Displays a colored bitmap based on RubikCube.StateGrid.
+/// </summary>
+public class StateGridDrawable : IDrawable
+{
+    private readonly Func<TRubikCube> _getCube;
+
+    public StateGridDrawable(Func<TRubikCube> getCube)
+    {
+        _getCube = getCube;
+    }
+
+    public void Draw(ICanvas canvas, RectF dirtyRect)
+    {
+        var cube = _getCube();
+        if (cube == null) return;
+
+        var grid = cube.StateGrid;
+        if (grid == null) return;
+
+        int rows = grid.GetLength(0);
+        int cols = grid.GetLength(1);
+
+        if (rows == 0 || cols == 0) return;
+
+        // Use square area (minimum of width/height)
+        float size = Math.Min(dirtyRect.Width, dirtyRect.Height);
+        float cellSize = size / Math.Max(rows, cols);
+
+        // Center the grid in the available space
+        float offsetX = (dirtyRect.Width - cellSize * cols) / 2;
+        float offsetY = (dirtyRect.Height - cellSize * rows) / 2;
+
+        for (int y = 0; y < rows; y++)
+        {
+            for (int x = 0; x < cols; x++)
+            {
+                Color color;
+                int value = grid[y, x];
+
+                if (value == 0)
+                {
+                    color = Colors.White;
+                }
+                else
+                {
+                    // Extract RGB components from the value (same as WinForms)
+                    float r = (float)(255.0 / 16.0 * (1 + (value & 0xF))) / 255f;
+                    float g = (float)(255.0 / 16.0 * (1 + ((value >> 4) & 0xF))) / 255f;
+                    float b = (float)(255.0 / 16.0 * (1 + ((value >> 8) & 0xF))) / 255f;
+                    color = new Color(r, g, b);
+                }
+
+                canvas.FillColor = color;
+                canvas.FillRectangle(offsetX + x * cellSize, offsetY + y * cellSize, cellSize, cellSize);
+            }
+        }
+    }
 }
