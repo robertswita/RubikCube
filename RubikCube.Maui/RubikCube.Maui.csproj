@@ -1,7 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <!-- Desktop only: Windows and macOS -->
     <TargetFrameworks>net9.0-windows10.0.19041.0;net9.0-maccatalyst</TargetFrameworks>
+
+    <!-- Explicitly disable mobile platforms -->
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'"></SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'"></SupportedOSPlatformVersion>
     <OutputType>Exe</OutputType>
     <RootNamespace>RubikCube.Maui</RootNamespace>
     <UseMaui>true</UseMaui>

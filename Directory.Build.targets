@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project>
   <PropertyGroup>
+    <!-- Disable mobile platforms - desktop only -->
+    <SupportedPlatform Remove="Android" />
+    <SupportedPlatform Remove="iOS" />
+    <SupportedPlatform Remove="Tizen" />
+
     <!-- Runtime-specific MacCatalyst bypass properties -->
     <_XcodeVersionIgnore Condition="'$(TargetFramework)' == 'net9.0-maccatalyst'">true</_XcodeVersionIgnore>
     <SkipXCodeVersionCheck Condition="'$(TargetFramework)' == 'net9.0-maccatalyst'">true</SkipXCodeVersionCheck>
   </PropertyGroup>
-  
+
   <!-- Override Xcode version check target -->
   <Target Name="SkipXcodeVersionCheck" BeforeTargets="Build;Restore;Run" />
 </Project>
