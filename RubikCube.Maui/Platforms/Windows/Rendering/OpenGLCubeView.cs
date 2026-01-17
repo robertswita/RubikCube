@@ -1,82 +1,149 @@
 #if WINDOWS
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
+using Microsoft.Maui.Handlers;
 using Silk.NET.Core.Contexts;
 using Silk.NET.OpenGL;
-using Silk.NET.Windowing;
 using System.Runtime.InteropServices;
 using TGL;
 using RubikCube.Maui.Rendering;
 using RubikCube.Maui.Controls;
-using Microsoft.Maui.Controls;
 
 namespace RubikCube.Maui.Platforms.Windows.Rendering;
 
 /// <summary>
-/// MAUI-compatible view that renders the Rubik's Cube using OpenGL via Silk.NET.
-/// Uses a native HWND for OpenGL context.
+/// MAUI view that renders the Rubik's Cube using OpenGL via Silk.NET.
+/// Uses a custom handler to create the platform view with OpenGL context.
 /// </summary>
-public class OpenGLCubeView : ContentView
+public class OpenGLCubeView : Microsoft.Maui.Controls.View
 {
-    private OpenGLRenderer? _renderer;
-    private GL? _gl;
-    private nint _hwnd;
-    private nint _hdc;
-    private nint _hglrc;
-    private bool _contextCreated;
-
     public TShape Root { get; set; } = new TShape();
     public bool IsTransparencyOn { get; set; }
     public new Color BackgroundColor { get; set; } = Colors.DarkSlateGray;
     public NativeCubeView? NativeViewParent { get; set; }
 
-    public OpenGLCubeView()
+    private OpenGLCubeViewHandler? _handler;
+
+    protected override void OnHandlerChanged()
+    {
+        base.OnHandlerChanged();
+        _handler = Handler as OpenGLCubeViewHandler;
+        _handler?.SetNativeViewParent(NativeViewParent);
+        Invalidate();
+    }
+
+    protected override void OnSizeAllocated(double width, double height)
+    {
+        base.OnSizeAllocated(width, height);
+        _handler?.Resize((float)width, (float)height);
+        Invalidate();
+    }
+
+    public void Invalidate()
+    {
+        _handler?.UpdateRenderState(Root, IsTransparencyOn, BackgroundColor);
+    }
+}
+
+/// <summary>
+/// Custom SwapChainPanel that hosts OpenGL rendering.
+/// </summary>
+class OpenGLPanel : SwapChainPanel
+{
+    public nint Hwnd { get; private set; }
+
+    public OpenGLPanel()
     {
         Loaded += OnLoaded;
-        Unloaded += OnUnloaded;
-        SizeChanged += OnSizeChanged;
     }
 
-    private void OnLoaded(object? sender, EventArgs e)
+    private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        InitializeOpenGL();
-    }
-
-    private void OnUnloaded(object? sender, EventArgs e)
-    {
-        CleanupOpenGL();
-    }
-
-    private void OnSizeChanged(object? sender, EventArgs e)
-    {
-        if (_renderer != null && Width > 0 && Height > 0)
+        // Get the HWND for this control
+        try
         {
-            _renderer.Resize((float)Width, (float)Height);
-            RequestRender();
+            var windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(
+                Microsoft.Maui.MauiWinUIApplication.Current.Application.Windows[0].Handler?.PlatformView as Microsoft.UI.Xaml.Window);
+            Hwnd = windowHandle;
+        }
+        catch
+        {
+            Hwnd = IntPtr.Zero;
+        }
+    }
+}
+
+/// <summary>
+/// Handler for OpenGLCubeView that creates the SwapChainPanel and manages OpenGL rendering.
+/// </summary>
+public class OpenGLCubeViewHandler : ViewHandler<OpenGLCubeView, SwapChainPanel>
+{
+    private GL? _gl;
+    private nint _hwnd;
+    private nint _hdc;
+    private nint _hglrc;
+    private OpenGLRenderer? _renderer;
+    private NativeCubeView? _nativeViewParent;
+    private DispatcherTimer? _renderTimer;
+
+    // Render state
+    private TShape _root = new TShape();
+    private bool _isTransparencyOn;
+    private float _bgR = 0.18f, _bgG = 0.31f, _bgB = 0.31f, _bgA = 1.0f;
+    private bool _contextCreated;
+
+    public static IPropertyMapper<OpenGLCubeView, OpenGLCubeViewHandler> PropertyMapper =
+        new PropertyMapper<OpenGLCubeView, OpenGLCubeViewHandler>(ViewMapper);
+
+    public OpenGLCubeViewHandler() : base(PropertyMapper) { }
+
+    public void SetNativeViewParent(NativeCubeView? parent)
+    {
+        _nativeViewParent = parent;
+    }
+
+    protected override SwapChainPanel CreatePlatformView()
+    {
+        var panel = new OpenGLPanel
+        {
+            HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Stretch,
+            VerticalAlignment = Microsoft.UI.Xaml.VerticalAlignment.Stretch
+        };
+
+        // Wait for panel to be loaded and initialized
+        panel.Loaded += OnPanelLoaded;
+
+        return panel;
+    }
+
+    private void OnPanelLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is OpenGLPanel panel)
+        {
+            InitializeOpenGL(panel);
+            StartRenderLoop();
         }
     }
 
-    private void InitializeOpenGL()
+    private void InitializeOpenGL(OpenGLPanel panel)
     {
         if (_contextCreated) return;
 
         try
         {
-            // Get the platform view's HWND
-            var platformView = Handler?.PlatformView as Microsoft.UI.Xaml.FrameworkElement;
-            if (platformView == null) return;
+            _hwnd = panel.Hwnd;
+            if (_hwnd == IntPtr.Zero)
+            {
+                System.Diagnostics.Debug.WriteLine("Failed to get HWND for OpenGL panel");
+                return;
+            }
 
-            // For WinUI3, we need to get the HWND of the window
-            var windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(
-                Microsoft.Maui.MauiWinUIApplication.Current.Application.Windows[0].Handler?.PlatformView as Microsoft.UI.Xaml.Window);
-
-            if (windowHandle == IntPtr.Zero) return;
-
-            _hwnd = windowHandle;
             _hdc = GetDC(_hwnd);
-
-            if (_hdc == IntPtr.Zero) return;
+            if (_hdc == IntPtr.Zero)
+            {
+                System.Diagnostics.Debug.WriteLine("Failed to get DC");
+                return;
+            }
 
             // Set pixel format
             var pfd = new PIXELFORMATDESCRIPTOR
@@ -92,14 +159,30 @@ public class OpenGLCubeView : ContentView
             };
 
             int pixelFormat = ChoosePixelFormat(_hdc, ref pfd);
-            if (pixelFormat == 0) return;
+            if (pixelFormat == 0)
+            {
+                System.Diagnostics.Debug.WriteLine("Failed to choose pixel format");
+                return;
+            }
 
-            if (!SetPixelFormat(_hdc, pixelFormat, ref pfd)) return;
+            if (!SetPixelFormat(_hdc, pixelFormat, ref pfd))
+            {
+                System.Diagnostics.Debug.WriteLine("Failed to set pixel format");
+                return;
+            }
 
             _hglrc = wglCreateContext(_hdc);
-            if (_hglrc == IntPtr.Zero) return;
+            if (_hglrc == IntPtr.Zero)
+            {
+                System.Diagnostics.Debug.WriteLine("Failed to create WGL context");
+                return;
+            }
 
-            if (!wglMakeCurrent(_hdc, _hglrc)) return;
+            if (!wglMakeCurrent(_hdc, _hglrc))
+            {
+                System.Diagnostics.Debug.WriteLine("Failed to make WGL context current");
+                return;
+            }
 
             // Create Silk.NET GL context
             _gl = GL.GetApi(new WglContext(_hdc, _hglrc));
@@ -108,26 +191,79 @@ public class OpenGLCubeView : ContentView
             _renderer = new OpenGLRenderer();
             _renderer.SetGL(_gl);
 
-            var width = (float)Math.Max(Width, 100);
-            var height = (float)Math.Max(Height, 100);
+            var width = (float)Math.Max(panel.ActualWidth, 100);
+            var height = (float)Math.Max(panel.ActualHeight, 100);
             _renderer.Initialize(width, height);
-            _renderer.SetBackgroundColor(
-                BackgroundColor.Red,
-                BackgroundColor.Green,
-                BackgroundColor.Blue,
-                BackgroundColor.Alpha);
+            _renderer.SetBackgroundColor(_bgR, _bgG, _bgB, _bgA);
 
             _contextCreated = true;
-            RequestRender();
+            System.Diagnostics.Debug.WriteLine($"OpenGL initialized successfully: {width}x{height}");
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"OpenGL initialization failed: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"OpenGL initialization failed: {ex.Message}\n{ex.StackTrace}");
         }
     }
 
-    private void CleanupOpenGL()
+    private void StartRenderLoop()
     {
+        if (_renderTimer != null) return;
+
+        _renderTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(16) // ~60 FPS
+        };
+        _renderTimer.Tick += (s, e) => Draw();
+        _renderTimer.Start();
+    }
+
+    public void Resize(float width, float height)
+    {
+        if (_renderer != null && width > 0 && height > 0)
+        {
+            _renderer.Resize(width, height);
+        }
+    }
+
+    public void UpdateRenderState(TShape root, bool isTransparencyOn, Color backgroundColor)
+    {
+        _root = root;
+        _isTransparencyOn = isTransparencyOn;
+        _bgR = backgroundColor.Red;
+        _bgG = backgroundColor.Green;
+        _bgB = backgroundColor.Blue;
+        _bgA = backgroundColor.Alpha;
+
+        if (_renderer != null)
+        {
+            _renderer.SetBackgroundColor(_bgR, _bgG, _bgB, _bgA);
+        }
+    }
+
+    internal void Draw()
+    {
+        if (!_contextCreated || _renderer == null || _gl == null || _hdc == IntPtr.Zero || _hglrc == IntPtr.Zero)
+            return;
+
+        try
+        {
+            if (!wglMakeCurrent(_hdc, _hglrc))
+                return;
+
+            _renderer.Render(_root, _isTransparencyOn);
+            SwapBuffers(_hdc);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"OpenGL render failed: {ex.Message}");
+        }
+    }
+
+    protected override void DisconnectHandler(SwapChainPanel platformView)
+    {
+        _renderTimer?.Stop();
+        _renderTimer = null;
+
         _renderer?.Dispose();
         _renderer = null;
 
@@ -145,31 +281,13 @@ public class OpenGLCubeView : ContentView
         }
 
         _contextCreated = false;
-    }
 
-    public void Invalidate()
-    {
-        RequestRender();
-    }
-
-    private void RequestRender()
-    {
-        if (!_contextCreated || _renderer == null || _gl == null) return;
-
-        MainThread.BeginInvokeOnMainThread(() =>
+        if (platformView is OpenGLPanel panel)
         {
-            try
-            {
-                if (!wglMakeCurrent(_hdc, _hglrc)) return;
+            panel.Loaded -= OnPanelLoaded;
+        }
 
-                _renderer.Render(Root, IsTransparencyOn);
-                SwapBuffers(_hdc);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"OpenGL render failed: {ex.Message}");
-            }
-        });
+        base.DisconnectHandler(platformView);
     }
 
     #region Win32 P/Invoke
@@ -278,7 +396,7 @@ public class OpenGLCubeView : ContentView
         }
 
         public void SwapInterval(int interval) { }
-        public void SwapBuffers() => OpenGLCubeView.SwapBuffers(_hdc);
+        public void SwapBuffers() => OpenGLCubeViewHandler.SwapBuffers(_hdc);
         public void MakeCurrent() => wglMakeCurrent(_hdc, _hglrc);
         public void Clear() => wglMakeCurrent(IntPtr.Zero, IntPtr.Zero);
         public void Dispose() { }

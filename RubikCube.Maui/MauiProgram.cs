@@ -21,6 +21,9 @@ public static class MauiProgram
 #if MACCATALYST
                 handlers.AddHandler<Platforms.MacCatalyst.Rendering.MetalCubeView,
                     Platforms.MacCatalyst.Rendering.MetalCubeViewHandler>();
+#elif WINDOWS
+                handlers.AddHandler<Platforms.Windows.Rendering.OpenGLCubeView,
+                    Platforms.Windows.Rendering.OpenGLCubeViewHandler>();
 #endif
             });
 
