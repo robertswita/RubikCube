@@ -2,9 +2,6 @@
 <Project>
   <PropertyGroup>
     <!-- Disable mobile platforms - desktop only -->
-    <SupportedPlatform Remove="Android" />
-    <SupportedPlatform Remove="iOS" />
-    <SupportedPlatform Remove="Tizen" />
 
     <!-- Runtime-specific MacCatalyst bypass properties -->
     <_XcodeVersionIgnore Condition="'$(TargetFramework)' == 'net9.0-maccatalyst'">true</_XcodeVersionIgnore>
