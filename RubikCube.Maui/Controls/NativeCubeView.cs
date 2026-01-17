@@ -1,4 +1,5 @@
 using TGL;
+using Microsoft.Maui.Controls;
 
 namespace RubikCube.Maui.Controls;
 
@@ -78,17 +79,17 @@ public class NativeCubeView : ContentView
             NativeViewParent = this
         };
         _platformView = metalView;
-        Content = metalView;
+        this.Content = metalView;
 #elif WINDOWS
         var openGLView = new Platforms.Windows.Rendering.OpenGLCubeView
         {
             Root = Root,
             IsTransparencyOn = IsTransparencyOn,
-            BackgroundColor = BackgroundColor,
+            ClearColor = BackgroundColor,
             NativeViewParent = this
         };
         _platformView = openGLView;
-        Content = openGLView;
+        this.Content = openGLView;
 #else
         // Fallback to the SkiaSharp-based CubeView
         var skiaView = new CubeView
@@ -121,7 +122,7 @@ public class NativeCubeView : ContentView
         {
             openGLView.Root = Root;
             openGLView.IsTransparencyOn = IsTransparencyOn;
-            openGLView.BackgroundColor = BackgroundColor;
+            openGLView.ClearColor = BackgroundColor;
             openGLView.Invalidate();
         }
 #else

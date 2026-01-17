@@ -19,7 +19,7 @@ public class OpenGLCubeView : Microsoft.Maui.Controls.View
 {
     public TShape Root { get; set; } = new TShape();
     public bool IsTransparencyOn { get; set; }
-    public new Color BackgroundColor { get; set; } = Colors.DarkSlateGray;
+    public Color ClearColor { get; set; } = Colors.DarkSlateGray;
     public NativeCubeView? NativeViewParent { get; set; }
 
     private OpenGLCubeViewHandler? _handler;
@@ -41,7 +41,7 @@ public class OpenGLCubeView : Microsoft.Maui.Controls.View
 
     public void Invalidate()
     {
-        _handler?.UpdateRenderState(Root, IsTransparencyOn, BackgroundColor);
+        _handler?.UpdateRenderState(Root, IsTransparencyOn, ClearColor);
     }
 }
 
@@ -93,7 +93,11 @@ public class OpenGLCubeViewHandler : ViewHandler<OpenGLCubeView, SwapChainPanel>
     private bool _contextCreated;
 
     public static IPropertyMapper<OpenGLCubeView, OpenGLCubeViewHandler> PropertyMapper =
-        new PropertyMapper<OpenGLCubeView, OpenGLCubeViewHandler>(ViewMapper);
+        new PropertyMapper<OpenGLCubeView, OpenGLCubeViewHandler>(ViewMapper) {
+            [nameof(IView.Background)] = MapBackground
+        };
+
+    static void MapBackground(OpenGLCubeViewHandler handler, OpenGLCubeView view) { }
 
     public OpenGLCubeViewHandler() : base(PropertyMapper) { }
 
