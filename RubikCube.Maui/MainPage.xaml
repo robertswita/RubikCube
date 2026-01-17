@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:RubikCube.Maui.Controls"
+             xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.Maui;assembly=LiveChartsCore.SkiaSharpView.Maui"
+             x:Class="RubikCube.Maui.MainPage"
+             Title="Rubik's Cube 4D Solver">
+
+    <Grid ColumnDefinitions="400,*" RowDefinitions="*">
+
+        <!-- Left Panel - Controls -->
+        <ScrollView Grid.Column="0" Padding="10">
+            <VerticalStackLayout Spacing="10">
+
+                <!-- Control Buttons Row 1 -->
+                <HorizontalStackLayout Spacing="5">
+                    <Button x:Name="ShuffleBtn" Text="Shuffle" Clicked="OnShuffleClicked" WidthRequest="80" />
+                    <Button x:Name="SolveBtn" Text="Solve!" Clicked="OnSolveClicked" WidthRequest="80" />
+                    <Button x:Name="StopBtn" Text="Stop" Clicked="OnStopClicked" WidthRequest="80" BackgroundColor="OrangeRed" />
+                    <Button x:Name="ResetBtn" Text="Reset" Clicked="OnResetClicked" WidthRequest="80" />
+                </HorizontalStackLayout>
+
+                <!-- Dimension Control (3D to 5D) -->
+                <HorizontalStackLayout Spacing="10" VerticalOptions="Center">
+                    <Label Text="Dimension:" VerticalOptions="Center" WidthRequest="75" />
+                    <Slider x:Name="DimensionSlider"
+                            Minimum="3" Maximum="5" Value="3"
+                            WidthRequest="150"
+                            ValueChanged="OnDimensionSliderChanged" />
+                    <Label x:Name="DimensionLabel" Text="3" VerticalOptions="Center" WidthRequest="30" />
+                </HorizontalStackLayout>
+
+                <!-- Size Control (2 to 12) -->
+                <HorizontalStackLayout Spacing="10" VerticalOptions="Center">
+                    <Label Text="Size:" VerticalOptions="Center" WidthRequest="75" />
+                    <Slider x:Name="SizeSlider"
+                            Minimum="2" Maximum="12" Value="3"
+                            WidthRequest="150"
+                            ValueChanged="OnSizeSliderChanged" />
+                    <Label x:Name="SizeLabel" Text="3" VerticalOptions="Center" WidthRequest="30" />
+                </HorizontalStackLayout>
+
+                <!-- Transparency Toggle -->
+                <HorizontalStackLayout Spacing="10">
+                    <Label Text="Transparency:" VerticalOptions="Center" />
+                    <CheckBox x:Name="TransparencyBox" CheckedChanged="OnTransparencyChanged" />
+                </HorizontalStackLayout>
+
+                <!-- Statistics -->
+                <Frame BorderColor="Gray" Padding="10">
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="5">
+                        <Label Text="Error:" Grid.Row="0" Grid.Column="0" />
+                        <Label x:Name="ErrorLabel" Text="0" Grid.Row="0" Grid.Column="1" />
+
+                        <Label Text="Time:" Grid.Row="1" Grid.Column="0" />
+                        <Label x:Name="TimeLabel" Text="00:00:00" Grid.Row="1" Grid.Column="1" />
+
+                        <Label Text="Moves:" Grid.Row="2" Grid.Column="0" />
+                        <Label x:Name="MovesLabel" Text="0" Grid.Row="2" Grid.Column="1" />
+
+                        <Label Text="Solutions:" Grid.Row="3" Grid.Column="0" />
+                        <Label x:Name="SolutionLabel" Text="0" Grid.Row="3" Grid.Column="1" />
+
+                        <Label Text="GA Iterations:" Grid.Row="4" Grid.Column="0" />
+                        <Label x:Name="GACountLabel" Text="0" Grid.Row="4" Grid.Column="1" />
+                    </Grid>
+                </Frame>
+
+                <!-- Fitness Chart -->
+                <Frame BorderColor="Gray" Padding="5">
+                    <lvc:CartesianChart x:Name="FitnessChart"
+                                        HeightRequest="200"
+                                        Series="{Binding Series}"
+                                        XAxes="{Binding XAxes}"
+                                        YAxes="{Binding YAxes}" />
+                </Frame>
+
+                <!-- Iteration Time -->
+                <Label x:Name="IterTimeLabel" Text="Iter time: 0ms" />
+
+                <!-- State Grid Visualization (always square) -->
+                <VerticalStackLayout>
+                    <Label Text="State Grid:" />
+                    <Border Stroke="Gray"
+                            StrokeThickness="1"
+                            HeightRequest="250"
+                            WidthRequest="250"
+                            HorizontalOptions="Start"
+                            VerticalOptions="Start">
+                        <GraphicsView x:Name="StateGridView" />
+                    </Border>
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Right Panel - Cube View (Native GPU rendering: Metal on macOS, OpenGL on Windows) -->
+        <controls:NativeCubeView x:Name="CubeViewControl"
+                                 Grid.Column="1"
+                                 BackgroundColor="DarkSlateGray">
+            <controls:NativeCubeView.GestureRecognizers>
+                <PanGestureRecognizer PanUpdated="OnCubeViewPanUpdated" />
+                <PinchGestureRecognizer PinchUpdated="OnCubeViewPinchUpdated" />
+            </controls:NativeCubeView.GestureRecognizers>
+        </controls:NativeCubeView>
+
+    </Grid>
+</ContentPage>

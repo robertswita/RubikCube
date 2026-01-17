@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git merge:*)",
+      "Bash(dotnet build:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nMerge masterND into using-MAUI branch\n\n- Resolved merge conflict in TShape.cs for MAUI Color compatibility\n- Added System.Numerics for Vector3 support in both MAUI and non-MAUI builds\n- Fixed CreatePalette\\(\\) to use Color.FromRgba for MAUI\n- Updated MainPage.xaml.cs to use 1D Cubies array \\(N-D support\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+    ]
+  }
+}

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -7,41 +8,27 @@ using TGL;
 
 namespace RubikCube
 {
-    public class TCubie : TObject3D
+    public class TCubie : TShape
     {
-        public int X { get { return (int)Math.Round(Origin.X + TRubikCube.C); } }
-        public int Y { get { return (int)Math.Round(Origin.Y + TRubikCube.C); } }
-        public int Z { get { return (int)Math.Round(Origin.Z + TRubikCube.C); } }
-        public int ClusterCount;
+        public static TShape Cube;
+        public static TMatrix SizeMatrix;
+        public static int MaxScore;
+        //public int X { get { return (int)Math.Round(Transform.Origin.X + TRubikCube.C); } }
+        //public int Y { get { return (int)Math.Round(Transform.Origin.Y + TRubikCube.C); } }
+        //public int Z { get { return (int)Math.Round(Transform.Origin.Z + TRubikCube.C); } }
+        //public int W { get { return (int)Math.Round(Transform.Origin.W + TRubikCube.C); } }
+        //public double Error;
+        public int StartIndex;
+        public int RotationCount;
 
         public TCubie()
         {
-            var lbn = new TPoint3D(-1, -1, -1);
-            var rtf = new TPoint3D(+1, +1, +1);
-            for (int i = 0; i < 8; i++)
-            {
-                var p = lbn;
-                if ((i & 1) == 1) p.X = rtf.X;
-                if ((i & 2) != 0) p.Y = rtf.Y;
-                if ((i & 4) != 0) p.Z = rtf.Z;
-                Vertices.Add(p);
-            }
-            for (int dim = 0; dim < 3; dim++)
-            {
-                var axis1 = 1 << dim;
-                var axis2 = 1 << (dim + 1) % 3;
-                Faces.Add(axis1);
-                Faces.Add(axis2);
-                Faces.Add(0);
-                Faces.Add(axis1 + axis2);
-                Faces.Add(axis2);
-                Faces.Add(axis1);
-            }
-            for (int i = Faces.Count - 1; i >= 0; i--)
-                Faces.Add(7 - Faces[i]);
+            Vertices = Cube.Vertices;
+            Faces = Cube.Faces;
+            Colors = Cube.Colors;
         }
 
-        int GetAngle(double sinA, double cosA)
+        int GetAngle(double cosA, double sinA)
         {
             if (cosA > 0.1) return 0;
             if (sinA > 0.1) return 1;
@@ -51,68 +38,116 @@ namespace RubikCube
         }
 
         public bool ValidState;
-        int _State;
+        int state;
         public int State
         {
             get
             {
                 if (!ValidState)
                 {
-                    var gamma = GetAngle(Transform[1], Transform[0]);
-                    var beta = 0;
-                    var alpha = 0;
-                    if (gamma != 0)
-                        alpha = GetAngle(Transform[6], Transform[10]);
-                    else
+                    state = 0;
+                    var shift = 0;
+                    var angles = Transform.GetEulerAngles();
+                    RotationCount = 0;
+                    for (int i = 0; i < angles.Count; i++)
                     {
-                        beta = GetAngle(-Transform[2], Transform[0]);
-                        alpha = GetAngle(-Transform[9], Transform[5]);
+                        var angle = GetAngle(angles[i].X, angles[i].Y);
+                        state |= angle << shift;
+                        shift += 2;
+                        if (angle > 0) RotationCount++;
                     }
-                    var moveCount = Math.Sign(alpha) + Math.Sign(beta) + Math.Sign(gamma);
-                    _State = moveCount << 6 | gamma << 4 | beta << 2 | alpha;
-                    if (alpha == 2 && gamma == 2) _State = 0x48;
+                    //state |= moveCount << 2 * angles.Count;
+                    //var xform = TAffine.CreateScale(new TVector(0.45f, 0.45f, 0.45f, 0.45f));
+                    //for (int i = TAffine.Planes.Length - 1; i >= 0; i--)
+                    //    xform = TAffine.CreateRotation(i, 90 * (state >> 2 * i & 3)) * xform;
+                    //var Error = (xform.M - Transform.M).Norm;
+                    //if (Error > 0.01)
+                    //    ;
                     ValidState = true;
                 }
-                return _State;
+                return state;
             }
             set
             {
-                var alpha = value & 3;
-                var beta = (value >> 2) & 3;
-                var gamma = (value >> 4) & 3;
-                var org = Origin;
-                LoadIdentity();
-                Scale(0.45, 0.45, 0.45);
-                RotateX(90 * alpha);
-                RotateY(90 * beta);
-                RotateZ(90 * gamma);
-                Translate(org.X, org.Y, org.Z);
-                _State = value;
+                var org = Transform.Origin;
+                Transform = TAffine.CreateScale(new TVector(0.45f, 0.45f, 0.45f, 0.45f));
+                for (int i = TAffine.Planes.Length - 1; i >= 0; i--)
+                    Rotate(i, 90 * (value >> 2 * i & 3));
+                Transform.Origin = org;
+                ValidState = false;
+                var state = State;
+                if (state != value)
+                    ;
+                this.state = value;
                 ValidState = true;
-                if (_State != 0)
-                    Transparent = true;
+                if (this.state != 0)
+                    Transparency = 0.5f;
             }
         }
 
-        public int Orbit
+        public double Score
         {
-            get
-            {
-                var dist = Math.Abs(Origin.X) + Math.Abs(Origin.Y) + Math.Abs(Origin.Z);
-                return (int)Math.Round(2 * dist);
-            }
+            get { return (double)State / MaxScore; }
         }
+
+        //public TVector GetStartPos()
+        //{
+        //    var cubie = Copy();
+        //    for (int axis = 0; axis < TAffine.Planes.Length; axis++)
+        //        cubie.Rotate(axis, -90 * (cubie.State >> 2 * axis & 3));
+        //    return cubie.Transform.Origin;
+        //}
 
         public TCubie Copy()
         {
             var dest = new TCubie();
-            Array.Copy(Transform, dest.Transform, Transform.Length);
+            dest.Transform = Transform.Clone();
             dest.Vertices = Vertices;
             dest.Faces = Faces;
-            dest._State = _State;
+            dest.state = state;
             dest.ValidState = ValidState;
-            dest.ClusterCount = ClusterCount;
+            dest.StartIndex = StartIndex;
+            dest.RotationCount = RotationCount;
             return dest;
+        }
+
+        //int index;
+        public int Index
+        {
+            get
+            {
+                return SizeMatrix.Coords2Index(Position);
+                //var index = (int)pos[pos.Size - 1];
+                //for (int i = pos.Size - 2; i >= 0; i--)
+                //    index = index * TRubikCube.Size + (int)pos[i];
+                //return index;
+            }
+            set 
+            {
+                //var stride = (int)Math.Pow(TRubikCube.Size, TAffine.N);
+                //var subs = new TVector(TAffine.N);
+                //for (int i = TAffine.N - 1; i >= 0; i--)
+                //{
+                //    stride /= TRubikCube.Size;
+                //    var sub = value / stride;
+                //    value -= sub * stride;
+                //    subs[i] = sub;
+                //}
+                var pos = SizeMatrix.Index2Coords(value);
+                Transform.Origin = pos - TRubikCube.C;
+            }
+        }
+
+        public int[] Position
+        {
+            get 
+            {
+                var pos = Transform.Origin + TRubikCube.C;
+                var position = new int[pos.Size];
+                for (int i = 0; i < pos.Size; i++)
+                    position[i] = (int)Math.Round(pos[i]);
+                return position;
+            }
         }
     }
 }
