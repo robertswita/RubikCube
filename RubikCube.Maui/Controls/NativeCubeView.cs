@@ -38,7 +38,10 @@ public class NativeCubeView : ContentView
 
     public NativeCubeView()
     {
-        Loaded += OnLoaded;
+        // Initialize platform view immediately, not on Loaded
+        // This prevents layout issues on Windows
+        InitializePlatformView();
+
         Unloaded += OnUnloaded;
         SizeChanged += OnSizeChanged;
     }
@@ -46,11 +49,6 @@ public class NativeCubeView : ContentView
     internal void RaiseScrollWheelChanged(float deltaX, float deltaY)
     {
         ScrollWheelChanged?.Invoke(this, new ScrollWheelEventArgs(deltaX, deltaY));
-    }
-
-    private void OnLoaded(object? sender, EventArgs e)
-    {
-        InitializePlatformView();
     }
 
     private void OnUnloaded(object? sender, EventArgs e)

@@ -107,13 +107,24 @@ public class OpenGLCubeViewHandler : ViewHandler<OpenGLCubeView, SwapChainPanel>
         var panel = new OpenGLPanel
         {
             HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Stretch,
-            VerticalAlignment = Microsoft.UI.Xaml.VerticalAlignment.Stretch
+            VerticalAlignment = Microsoft.UI.Xaml.VerticalAlignment.Stretch,
+            // Ensure panel doesn't span across grid columns
+            UseLayoutRounding = true
         };
 
         // Wait for panel to be loaded and initialized
         panel.Loaded += OnPanelLoaded;
+        panel.SizeChanged += OnPlatformViewSizeChanged;
 
         return panel;
+    }
+
+    private void OnPlatformViewSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (e.NewSize.Width > 0 && e.NewSize.Height > 0)
+        {
+            Resize((float)e.NewSize.Width, (float)e.NewSize.Height);
+        }
     }
 
     private void OnPanelLoaded(object sender, RoutedEventArgs e)
@@ -282,9 +293,10 @@ public class OpenGLCubeViewHandler : ViewHandler<OpenGLCubeView, SwapChainPanel>
 
         _contextCreated = false;
 
-        if (platformView is OpenGLPanel panel)
+        if (platformView != null)
         {
-            panel.Loaded -= OnPanelLoaded;
+            platformView.Loaded -= OnPanelLoaded;
+            platformView.SizeChanged -= OnPlatformViewSizeChanged;
         }
 
         base.DisconnectHandler(platformView);
