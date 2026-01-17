@@ -11,38 +11,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="0156a00f-7409-4873-932d-98382625e72f" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.RubikCube/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.RubikCube/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/Form1.Designer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/RubikCube/Form1.Designer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/Form1.cs" beforeDir="false" afterPath="$PROJECT_DIR$/RubikCube/Form1.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/Form1.resx" beforeDir="false" afterPath="$PROJECT_DIR$/RubikCube/Form1.resx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/OpenGL.cs" beforeDir="false" afterPath="$PROJECT_DIR$/RubikCube/OpenGL.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/RubikCubeND.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/RubikCube/RubikCubeND.csproj" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/TAffine.cs" beforeDir="false" afterPath="$PROJECT_DIR$/RubikCube/TAffine.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/TCubie.cs" beforeDir="false" afterPath="$PROJECT_DIR$/RubikCube/TCubie.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/TGLContext.cs" beforeDir="false" afterPath="$PROJECT_DIR$/RubikCube/TGLContext.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/TMatrix.cs" beforeDir="false" afterPath="$PROJECT_DIR$/RubikCube/TMatrix.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/TMove.cs" beforeDir="false" afterPath="$PROJECT_DIR$/RubikCube/TMove.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/TObject3DComparer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/RubikCube/TObject3DComparer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/TRubikCube.cs" beforeDir="false" afterPath="$PROJECT_DIR$/RubikCube/TRubikCube.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/TRubikGenome.cs" beforeDir="false" afterPath="$PROJECT_DIR$/RubikCube/TRubikGenome.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/TShape.cs" beforeDir="false" afterPath="$PROJECT_DIR$/RubikCube/TShape.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/bin/Debug/Cluster0.cfg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/bin/Debug/Cluster1.cfg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/bin/Debug/Cluster2.cfg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/bin/Debug/Cluster3.cfg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/bin/Debug/Cluster4.cfg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/bin/Debug/Cluster5.cfg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/bin/Debug/RubikCube.exe" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/bin/Debug/RubikCube.exe.config" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/bin/Debug/RubikCube.pdb" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/bin/Debug/RubikCube.vshost.exe" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/bin/Debug/RubikCube.vshost.exe.config" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/bin/Debug/RubikCube.vshost.exe.manifest" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/bin/Debug/solutions.bin" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/bin/Debug/solutions.bin.org" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/bin/Release/RubikCube.exe" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/RubikCube/bin/Release/solutions.bin" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -77,7 +46,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "Merging featiure/using-MAUI",
+    "git-widget-placeholder": "featiure/using-MAUI",
     "junie.onboarding.icon.badge.shown": "true",
     "macOS.RubikCube.Maui.executor": "Run",
     "node.js.detected.package.eslint": "true",

@@ -23,7 +23,7 @@ namespace RubikCube
 
         public void Conjugate()
         {
-            Check();
+            //Check();
             var geneIdx = Rnd.Next(Genes.Length / 2);
 
             for (int i = 1; i <= geneIdx; i++)

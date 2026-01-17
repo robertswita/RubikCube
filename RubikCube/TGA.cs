@@ -65,7 +65,7 @@ namespace GA
                     var splitIdx = TChromosome.Rnd.Next(TChromosome.GenesLength);
                     var momIdx = TChromosome.Rnd.Next(winnerCount);
                     var mom = winners[momIdx];
-                    winners.RemoveAt(momIdx);
+                    //winners.RemoveAt(momIdx);
                     var dad = winners[TChromosome.Rnd.Next(winners.Count)];
                     winners.Add(mom);
                     var child = (T)mom.Crossover(dad, splitIdx);

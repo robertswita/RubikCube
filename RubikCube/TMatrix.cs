@@ -48,12 +48,12 @@ namespace TGL
             DimSizes = new int[] { RowsCount, ColsCount };
         }
 
-        public int Coords2Index(TVector coords)
+        public int Coords2Index(int[] coords)
         {
             var index = coords[0];
-            for (int i = 1; i < coords.Size; i++)
+            for (int i = 1; i < coords.Length; i++)
                 index = index * DimSizes[i] + coords[i];
-            return (int)index;
+            return index;
         }
 
         public TVector Index2Coords(int index)

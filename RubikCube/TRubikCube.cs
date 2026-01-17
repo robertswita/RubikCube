@@ -50,6 +50,7 @@ namespace RubikCube
             Cubies = new TCubie[size];
             TCubie.SizeMatrix = new TMatrix(size, 1);
             TCubie.SizeMatrix.DimSizes = dimSizes;
+            TCubie.MaxScore = 1 << 2 * TAffine.Planes.Length;
             TCubie.Cube = CreateHyperCube();
             TMove.UpdateSizeMatrix();
             C = (Size - 1) / 2f;
@@ -164,19 +165,23 @@ namespace RubikCube
         public double Evaluate()
         {
             var score = 0d;
+            double maxClusterState = (1 << 2 * TAffine.Planes.Length) * ActiveCluster.Count;
             foreach (var cubie in SolvedCubies)
                 if (cubie.State != 0)
-                    score += (1 + cubie.State / 4096f / 8) * ActiveCluster.Count * 2;
+                    score += ActiveCluster.Count + 1;
+                    //score += maxState + cubie.State;
+                    //score += (1 + cubie.Score) * ActiveCluster.Count;
             foreach (var cubie in ActiveCluster)
                 if (cubie.State != 0)
-                    score += 1 + cubie.State / 4096f / 8;
-            return score;
+                    score += 1 + cubie.State / maxClusterState;
+                    //score += maxState + cubie.State;
+            return 100 * score / (ActiveCluster.Count + 1);
         }
 
         public List<int> GetFreeMoves()
         {
             var freeGenes = new List<int>();
-            var pos = ActiveCubie.Transform.Origin + C;
+            var pos = ActiveCubie.Position;
             for (int axis = 0; axis < TAffine.N; axis++)
                 for (int coord = 0; coord < TAffine.N; coord++)
                     for (int side = 0; side < 2; side++)
@@ -245,6 +250,8 @@ namespace RubikCube
                 }
             }
             activeCluster = null;
+            if (ActiveCubie == null)
+                SolvedCubies.Clear();
         }
 
     }
