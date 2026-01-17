@@ -165,17 +165,17 @@ namespace RubikCube
         public double Evaluate()
         {
             var score = 0d;
-            double maxState = (1 << 2 * TAffine.Planes.Length);// * ActiveCluster.Count;
+            double maxClusterState = (1 << 2 * TAffine.Planes.Length) * ActiveCluster.Count;
             foreach (var cubie in SolvedCubies)
                 if (cubie.State != 0)
-                    score += (1 + cubie.State / maxState) * ActiveCluster.Count * 2;
+                    score += ActiveCluster.Count + 1;
                     //score += maxState + cubie.State;
                     //score += (1 + cubie.Score) * ActiveCluster.Count;
             foreach (var cubie in ActiveCluster)
                 if (cubie.State != 0)
-                    score += 1 + cubie.State / maxState;
+                    score += 1 + cubie.State / maxClusterState;
                     //score += maxState + cubie.State;
-            return 100 * score / (2 * ActiveCluster.Count);
+            return 100 * score / (ActiveCluster.Count + 1);
         }
 
         public List<int> GetFreeMoves()

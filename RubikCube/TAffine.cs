@@ -20,10 +20,10 @@ namespace TGL
                 n = value;
                 Planes = new int[n * (n - 1) / 2][];
                 var idx = 0;
-                for (int i = 0; i < n - 1; i++)
-                    for (int j = i + 1; j < n; j++)
+                for (int colIdx = 1; colIdx < n; colIdx++)
+                    for (int rowIdx = 0; rowIdx < colIdx; rowIdx++)
                     {
-                        Planes[idx] = new int[] { i, j };
+                        Planes[idx] = new int[] { rowIdx, colIdx };
                         idx++;
                     }
             }
@@ -187,13 +187,15 @@ namespace TGL
         {
             var angles = new List<TVector>();
             var A = M.Transpose();
-            for (int n = 0; n < N - 1; n++)
-                for (int m = n + 1; m < N; m++)
+            for (int colIdx = 1; colIdx < n; colIdx++)
+                for (int rowIdx = 0; rowIdx < colIdx; rowIdx++)
+                //for (int rowIdx = 0; rowIdx < N - 1; rowIdx++)
+                //    for (int colIdx = rowIdx + 1; colIdx < N; colIdx++)
                 //for (int n = N - 2; n >= 0; n--)
                 //    for (int m = N - 1; m >= n + 1; m--)
                 {
-                    var a = A[n, n];
-                    var b = A[n, m];
+                    var a = A[rowIdx, rowIdx];
+                    var b = A[rowIdx, colIdx];
                     var r = (float)Math.Sqrt(a * a + b * b);
                     if (r < 0.1)
                         angles.Add(new TVector(1, 0));
@@ -202,7 +204,7 @@ namespace TGL
                         var cosA = a / r;
                         var sinA = b / r;
                         angles.Add(new TVector(cosA, sinA));
-                        A.Rotate(n, m, cosA, sinA);
+                        A.Rotate(rowIdx, colIdx, cosA, sinA);
                     }
                 }
             var scale = new TVector(N);

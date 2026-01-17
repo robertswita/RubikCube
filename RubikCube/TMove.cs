@@ -50,6 +50,8 @@ namespace RubikCube
             {
                 if (Axis >= TAffine.N) return false;
                 if (Plane >= TAffine.Planes.Length) return false;
+                if (TAffine.Planes[Plane][0] == Axis || TAffine.Planes[Plane][1] == Axis)
+                    ;
                 return true;
             }
         }

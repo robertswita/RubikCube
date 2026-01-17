@@ -23,7 +23,7 @@ namespace RubikCube
         TimeSpan Time;
         int MovesCount;
         List<TMove> Moves = new List<TMove>();
-        Dictionary<string, TRubikGenome> Solutions = new Dictionary<string,TRubikGenome>();
+        Dictionary<string, List<TMove>> Solutions = new Dictionary<string, List<TMove>>();
         int MoveNo;
         double HighScore;
         public TRubikCube RubikCube;// = new TRubikCube();
@@ -347,15 +347,15 @@ namespace RubikCube
         }
 
         string SolutionPath = "solutions.bin";
-        List<TMove> DecodeSolution(TRubikGenome solution)
+        List<TMove> DecodeSolution(List<TMove> solution)
         {
             var pos = RubikCube.ActiveCubie.Position;
             var map = new List<int>();
             var result = new List<TMove>();
             var sliceCountInCluster = TAffine.N;
-            for (var i = 0; i < solution.Genes.Length; i++)
+            for (var i = 0; i < solution.Count; i++)
             {
-                var move = TMove.Decode((int)solution.Genes[i]);
+                var move = solution[i];
                 if (!move.IsValid) continue;
                 var idx = map.IndexOf(move.Slice);
                 if (idx < 0)
@@ -373,14 +373,14 @@ namespace RubikCube
                     move.Slice = pos[idx];
                 else
                     move.Slice = TRubikCube.Size - 1 - pos[idx - sliceCountInCluster];
-                result.Add(move);
+                result.Add(TMove.Decode(move.Encode()));
             }
             return result;
         }
 
         void LoadSolutions()
         {
-            Solutions = new Dictionary<string, TRubikGenome>();
+            Solutions = new Dictionary<string, List<TMove>>();
             try
             {
                 var file = new FileStream(SolutionPath, FileMode.OpenOrCreate);
@@ -390,8 +390,7 @@ namespace RubikCube
                     {
                         var key = reader.ReadString();
                         var movesCount = reader.ReadInt32();
-                        var solution = new TRubikGenome();
-                        solution.Genes = new double[movesCount];
+                        var solution = new List<TMove>();
                         for (int i = 0; i < movesCount; i++)
                         {
                             var move = new TMove();
@@ -399,7 +398,7 @@ namespace RubikCube
                             move.Slice = reader.ReadByte();
                             move.Plane = reader.ReadByte();
                             move.Angle = reader.ReadByte();
-                            solution.Genes[i] = move.Encode();
+                            solution.Add(move);
                         }
                         Solutions.Add(key, solution);
                     }
@@ -409,26 +408,28 @@ namespace RubikCube
             SolutionLbl.Text = Solutions.Count.ToString();
         }
 
-        void SaveSolution(TRubikGenome solution)
+        void SaveSolution(TRubikGenome specimen)
         {
             var code = RubikCube.Code;
             if (!Solutions.ContainsKey(code))
             {
+                var solution = new List<TMove>();
                 var file = new FileStream(SolutionPath, FileMode.Append);
                 using (var writer = new BinaryWriter(file))
                 {
                     writer.Write(code);
-                    writer.Write(solution.MovesCount);
+                    writer.Write(specimen.MovesCount);
                     //var genes = new List<int>(solution.MovesCount);
-                    for (int i = 0; i < solution.MovesCount; i++)
+                    for (int i = 0; i < specimen.MovesCount; i++)
                     {
                         //genes.Add((int)solution.Genes[i]);
                         //writer.Write((int)solution.Genes[i]);
-                        var move = TMove.Decode((int)solution.Genes[i]);
+                        var move = TMove.Decode((int)specimen.Genes[i]);
                         writer.Write((byte)move.Axis);
                         writer.Write((byte)move.Slice);
                         writer.Write((byte)move.Plane);
                         writer.Write((byte)move.Angle);
+                        solution.Add(move);
                     }
                     Solutions.Add(code, solution);
                 }
