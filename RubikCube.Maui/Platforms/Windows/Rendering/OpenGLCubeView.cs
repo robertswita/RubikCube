@@ -107,12 +107,9 @@ public class OpenGLCubeViewHandler : ViewHandler<OpenGLCubeView, SwapChainPanel>
         var panel = new OpenGLPanel
         {
             HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Stretch,
-            VerticalAlignment = Microsoft.UI.Xaml.VerticalAlignment.Stretch,
-            // Ensure panel doesn't span across grid columns
-            UseLayoutRounding = true
+            VerticalAlignment = Microsoft.UI.Xaml.VerticalAlignment.Stretch
         };
 
-        // Wait for panel to be loaded and initialized
         panel.Loaded += OnPanelLoaded;
         panel.SizeChanged += OnPlatformViewSizeChanged;
 

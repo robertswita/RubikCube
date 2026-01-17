@@ -38,12 +38,15 @@ public class NativeCubeView : ContentView
 
     public NativeCubeView()
     {
-        // Initialize platform view immediately, not on Loaded
-        // This prevents layout issues on Windows
-        InitializePlatformView();
-
+        // Use Loaded event to ensure window is ready before OpenGL initialization
+        Loaded += OnLoaded;
         Unloaded += OnUnloaded;
         SizeChanged += OnSizeChanged;
+    }
+
+    private void OnLoaded(object? sender, EventArgs e)
+    {
+        InitializePlatformView();
     }
 
     internal void RaiseScrollWheelChanged(float deltaX, float deltaY)
