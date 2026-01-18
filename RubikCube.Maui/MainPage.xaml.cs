@@ -111,6 +111,9 @@ public partial class MainPage : ContentPage
 
         // Subscribe to scroll wheel events
         CubeViewControl.ScrollWheelChanged += OnCubeViewScrollWheelChanged;
+
+        // Subscribe to mouse drag events (for Windows rotation support)
+        CubeViewControl.MouseDragChanged += OnCubeViewMouseDragChanged;
     }
 
     // State grid drawable
@@ -171,6 +174,18 @@ public partial class MainPage : ContentPage
         var rotationAmount = e.DeltaY / 5f;
         _root.Rotate(Math.Min(TAffine.Planes.Length - 1, 2), rotationAmount);
         _root.Rotate(Math.Min(TAffine.Planes.Length - 1, 3), rotationAmount);
+        CubeViewControl.Invalidate();
+    }
+
+    private void OnCubeViewMouseDragChanged(object? sender, Controls.MouseDragEventArgs e)
+    {
+        // Apply rotation based on mouse drag delta (Windows only)
+        // Same logic as OnCubeViewPanUpdated but using direct delta values
+        var rotY = 180 * e.DeltaX / (float)CubeViewControl.Width;
+        var rotX = 180 * e.DeltaY / (float)CubeViewControl.Height;
+
+        _root.Rotate(1, rotY);
+        _root.Rotate(0, rotX);
         CubeViewControl.Invalidate();
     }
 

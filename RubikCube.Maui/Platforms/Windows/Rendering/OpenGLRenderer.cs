@@ -17,6 +17,7 @@ public class OpenGLRenderer : ICubeRenderer
 
     private readonly VertexBufferBuilder _bufferBuilder = new();
     private float _width, _height;
+    private int _offsetX, _offsetY;
     private float _bgR = 0.18f, _bgG = 0.31f, _bgB = 0.31f, _bgA = 1.0f;
 
     private bool _isInitialized;
@@ -84,6 +85,9 @@ void main()
         // Enable depth testing
         _gl.Enable(EnableCap.DepthTest);
 
+        // Enable scissor test so glClear only clears our viewport area
+        _gl.Enable(EnableCap.ScissorTest);
+
         _isInitialized = true;
     }
 
@@ -139,12 +143,20 @@ void main()
 
     public void Resize(float width, float height)
     {
+        Resize(width, height, 0, 0);
+    }
+
+    public void Resize(float width, float height, int offsetX, int offsetY)
+    {
         _width = width;
         _height = height;
+        _offsetX = offsetX;
+        _offsetY = offsetY;
 
         if (_gl != null && _isInitialized)
         {
-            _gl.Viewport(0, 0, (uint)width, (uint)height);
+            _gl.Viewport(_offsetX, _offsetY, (uint)width, (uint)height);
+            _gl.Scissor(_offsetX, _offsetY, (uint)width, (uint)height);
         }
     }
 
@@ -159,6 +171,10 @@ void main()
     public void Render(TShape root, bool isTransparencyOn)
     {
         if (!_isInitialized || _gl == null) return;
+
+        // Set viewport and scissor to our offset position (required since we render to window DC)
+        _gl.Viewport(_offsetX, _offsetY, (uint)_width, (uint)_height);
+        _gl.Scissor(_offsetX, _offsetY, (uint)_width, (uint)_height);
 
         // Clear
         _gl.ClearColor(_bgR, _bgG, _bgB, _bgA);

@@ -19,6 +19,25 @@ public class ScrollWheelEventArgs : EventArgs
 }
 
 /// <summary>
+/// Event args for mouse drag events (used for rotation on Windows).
+/// </summary>
+public class MouseDragEventArgs : EventArgs
+{
+    public float DeltaX { get; }
+    public float DeltaY { get; }
+    public bool IsStarting { get; }
+    public bool IsEnding { get; }
+
+    public MouseDragEventArgs(float deltaX, float deltaY, bool isStarting = false, bool isEnding = false)
+    {
+        DeltaX = deltaX;
+        DeltaY = deltaY;
+        IsStarting = isStarting;
+        IsEnding = isEnding;
+    }
+}
+
+/// <summary>
 /// Cross-platform wrapper for native GPU-based cube rendering.
 /// Uses Metal on macOS and OpenGL on Windows.
 /// Falls back to SkiaSharp on other platforms.
@@ -37,6 +56,11 @@ public class NativeCubeView : ContentView
     /// </summary>
     public event EventHandler<ScrollWheelEventArgs>? ScrollWheelChanged;
 
+    /// <summary>
+    /// Event raised when mouse is dragged over the view (Windows only).
+    /// </summary>
+    public event EventHandler<MouseDragEventArgs>? MouseDragChanged;
+
     public NativeCubeView()
     {
         // Use Loaded event to ensure window is ready before OpenGL initialization
@@ -53,6 +77,11 @@ public class NativeCubeView : ContentView
     internal void RaiseScrollWheelChanged(float deltaX, float deltaY)
     {
         ScrollWheelChanged?.Invoke(this, new ScrollWheelEventArgs(deltaX, deltaY));
+    }
+
+    internal void RaiseMouseDragChanged(float deltaX, float deltaY, bool isStarting = false, bool isEnding = false)
+    {
+        MouseDragChanged?.Invoke(this, new MouseDragEventArgs(deltaX, deltaY, isStarting, isEnding));
     }
 
     private void OnUnloaded(object? sender, EventArgs e)
