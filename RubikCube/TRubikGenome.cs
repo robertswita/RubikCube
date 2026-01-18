@@ -1,15 +1,20 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using GA;
 using TGL;
+using TGL.GA.Interfaces;
 
 namespace RubikCube
 {
-    public class TRubikGenome: TChromosome
+    public class TRubikGenome : TChromosome, IRubikChromosome
     {
-        public int MovesCount;
-        public static List<int> FreeMoves;
+        public int MovesCount { get; set; }
+        public static List<int> FreeMoves = new();
+
+        // IRubikChromosome implementation
+        IReadOnlyList<int> IRubikChromosome.ValidMoves
+        {
+            get => FreeMoves;
+            set => FreeMoves = value.ToList();
+        }
 
         public override void MutateGene(int idx)
         {
@@ -106,6 +111,26 @@ namespace RubikCube
             Genes[Genes.Length - 1] = lastMove.Encode();
         }
 
-    }
+        public override void Validate()
+        {
+            Check();
+        }
 
+        public override void Randomize(Random rng)
+        {
+            for (var i = 0; i < GenesLength; i++)
+            {
+                Genes[i] = FreeMoves[rng.Next(FreeMoves.Count)];
+            }
+        }
+
+        public override object Clone()
+        {
+            var clone = new TRubikGenome();
+            Array.Copy(Genes, clone.Genes, Genes.Length);
+            clone.Fitness = Fitness;
+            clone.MovesCount = MovesCount;
+            return clone;
+        }
+    }
 }
