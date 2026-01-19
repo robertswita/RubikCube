@@ -69,6 +69,11 @@ public partial class MainPage : ContentPage
     private double _highScore;
     private Stopwatch? _watch;
 
+    // GA Configuration (from UI)
+    private SolverMode _selectedSolverMode = SolverMode.Iterative;
+    private GAConfig _selectedGAConfig = GAPresets.Default;
+    private int _generationsPerIteration = 100;
+
     // Chart data
     public ObservableCollection<ISeries> Series { get; set; } = new();
     public ObservableCollection<Axis> XAxes { get; set; } = new();
@@ -116,6 +121,11 @@ public partial class MainPage : ContentPage
         DimensionLabel.Text = TAffine.N.ToString();
         SizeSlider.Value = TRubikCube.Size;
         SizeLabel.Text = TRubikCube.Size.ToString();
+
+        // Initialize GA configuration UI
+        SolverModePicker.SelectedIndex = 0; // Iterative
+        PresetPicker.SelectedIndex = 0; // Default
+        UpdateGAConfigLabels();
 
         // Subscribe to scroll wheel events
         CubeViewControl.ScrollWheelChanged += OnCubeViewScrollWheelChanged;
@@ -421,6 +431,64 @@ public partial class MainPage : ContentPage
 
     #endregion
 
+    #region GA Configuration UI
+
+    private void OnSolverModeChanged(object? sender, EventArgs e)
+    {
+        if (SolverModePicker.SelectedIndex < 0) return;
+
+        _selectedSolverMode = SolverModePicker.SelectedIndex switch
+        {
+            0 => SolverMode.Iterative,
+            1 => SolverMode.Complete,
+            2 => SolverMode.Adaptive,
+            _ => SolverMode.Iterative
+        };
+    }
+
+    private void OnPresetChanged(object? sender, EventArgs e)
+    {
+        if (PresetPicker.SelectedIndex < 0) return;
+
+        _selectedGAConfig = PresetPicker.SelectedIndex switch
+        {
+            0 => GAPresets.Default,
+            1 => GAPresets.Fast,
+            2 => GAPresets.Exploratory,
+            3 => GAPresets.Exploitative,
+            4 => GAPresets.LongRun,
+            _ => GAPresets.Default
+        };
+
+        // Update sliders to match preset
+        PopulationSlider.Value = _selectedGAConfig.PopulationSize;
+        MutationSlider.Value = _selectedGAConfig.MutationRate;
+        GenerationsSlider.Value = _selectedGAConfig.Termination.MaxGenerations;
+        UpdateGAConfigLabels();
+    }
+
+    private void OnGAParamChanged(object? sender, ValueChangedEventArgs e)
+    {
+        UpdateGAConfigLabels();
+
+        // Update config with current slider values
+        _selectedGAConfig = _selectedGAConfig with
+        {
+            PopulationSize = (int)PopulationSlider.Value,
+            MutationRate = MutationSlider.Value
+        };
+        _generationsPerIteration = (int)GenerationsSlider.Value;
+    }
+
+    private void UpdateGAConfigLabels()
+    {
+        PopulationLabel.Text = ((int)PopulationSlider.Value).ToString();
+        MutationLabel.Text = $"{(int)(MutationSlider.Value * 100)}%";
+        GenerationsLabel.Text = ((int)GenerationsSlider.Value).ToString();
+    }
+
+    #endregion
+
     #region GA Solver
 
     private void StartGaBackground()
@@ -457,19 +525,21 @@ public partial class MainPage : ContentPage
 
         try
         {
-            // Configure GA using presets (matches original TGA behavior)
-            var gaConfig = GAPresets.Default with
+            // Configure GA using UI-selected settings
+            var gaConfig = _selectedGAConfig with
             {
                 GenomeLength = 30
             };
 
             var solverConfig = new SolverConfig
             {
-                Mode = SolverMode.Iterative,
-                GenerationsPerIteration = 100
+                Mode = _selectedSolverMode,
+                GenerationsPerIteration = _generationsPerIteration
             };
 
-            DebugLog.WriteLine($"Creating solver. Cube unsolved={_gaCube.Cubies.Count(c => c.State != 0)}");
+            DebugLog.WriteLine($"Creating solver. Mode={_selectedSolverMode}, Population={gaConfig.PopulationSize}, " +
+                $"Mutation={gaConfig.MutationRate:P0}, Generations={_generationsPerIteration}");
+            DebugLog.WriteLine($"Cube unsolved={_gaCube.Cubies.Count(c => c.State != 0)}");
 
             // Create solver with the GA cube
             _solver = new RubikGASolver(_gaCube, gaConfig, solverConfig);

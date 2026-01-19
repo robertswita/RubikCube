@@ -46,6 +46,64 @@
                     <CheckBox x:Name="TransparencyBox" CheckedChanged="OnTransparencyChanged" />
                 </HorizontalStackLayout>
 
+                <!-- GA Configuration -->
+                <Frame BorderColor="Gray" Padding="10">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="GA Configuration" FontAttributes="Bold" />
+
+                        <!-- Solver Mode -->
+                        <HorizontalStackLayout Spacing="10">
+                            <Label Text="Mode:" VerticalOptions="Center" WidthRequest="80" />
+                            <Picker x:Name="SolverModePicker" WidthRequest="150" SelectedIndexChanged="OnSolverModeChanged">
+                                <Picker.ItemsSource>
+                                    <x:Array Type="{x:Type x:String}">
+                                        <x:String>Iterative</x:String>
+                                        <x:String>Complete</x:String>
+                                        <x:String>Adaptive</x:String>
+                                    </x:Array>
+                                </Picker.ItemsSource>
+                            </Picker>
+                        </HorizontalStackLayout>
+
+                        <!-- Preset -->
+                        <HorizontalStackLayout Spacing="10">
+                            <Label Text="Preset:" VerticalOptions="Center" WidthRequest="80" />
+                            <Picker x:Name="PresetPicker" WidthRequest="150" SelectedIndexChanged="OnPresetChanged">
+                                <Picker.ItemsSource>
+                                    <x:Array Type="{x:Type x:String}">
+                                        <x:String>Default</x:String>
+                                        <x:String>Fast</x:String>
+                                        <x:String>Exploratory</x:String>
+                                        <x:String>Exploitative</x:String>
+                                        <x:String>LongRun</x:String>
+                                    </x:Array>
+                                </Picker.ItemsSource>
+                            </Picker>
+                        </HorizontalStackLayout>
+
+                        <!-- Population Size -->
+                        <HorizontalStackLayout Spacing="10">
+                            <Label Text="Population:" VerticalOptions="Center" WidthRequest="80" />
+                            <Slider x:Name="PopulationSlider" Minimum="20" Maximum="500" Value="100" WidthRequest="120" ValueChanged="OnGAParamChanged" />
+                            <Label x:Name="PopulationLabel" Text="100" VerticalOptions="Center" WidthRequest="40" />
+                        </HorizontalStackLayout>
+
+                        <!-- Mutation Rate -->
+                        <HorizontalStackLayout Spacing="10">
+                            <Label Text="Mutation:" VerticalOptions="Center" WidthRequest="80" />
+                            <Slider x:Name="MutationSlider" Minimum="0" Maximum="1" Value="1.0" WidthRequest="120" ValueChanged="OnGAParamChanged" />
+                            <Label x:Name="MutationLabel" Text="100%" VerticalOptions="Center" WidthRequest="40" />
+                        </HorizontalStackLayout>
+
+                        <!-- Generations per Iteration -->
+                        <HorizontalStackLayout Spacing="10">
+                            <Label Text="Generations:" VerticalOptions="Center" WidthRequest="80" />
+                            <Slider x:Name="GenerationsSlider" Minimum="10" Maximum="500" Value="100" WidthRequest="120" ValueChanged="OnGAParamChanged" />
+                            <Label x:Name="GenerationsLabel" Text="100" VerticalOptions="Center" WidthRequest="40" />
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Frame>
+
                 <!-- Statistics -->
                 <Frame BorderColor="Gray" Padding="10">
                     <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="5">
