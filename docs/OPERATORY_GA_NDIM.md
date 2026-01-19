@@ -344,44 +344,57 @@ chromosome.Genes[startIdx + 3] = moveBInverse.Encode();
 
 ---
 
-## Operatory wymagające optymalizacji dla 4D+
+## Zoptymalizowane operatory dla 4D+
 
-### SimplifyMutation - działa, ale może być ulepszona
+### SimplifyMutation - rozszerzona o wzorce ortogonalne ✅ ZOPTYMALIZOWANA
 
 **Plik:** `GA/Operators/Mutation/SimplifyMutation.cs`
 
-**Aktualna logika:**
+**Podstawowa logika (wszystkie wymiary):**
 ```csharp
 if (move1.Axis == move2.Axis && move1.Plane == move2.Plane && move1.Slice == move2.Slice)
 {
-    // Połącz kąty
-    int combinedQt = (qt1 + qt2) % 4;
-    // ...
+    // Połącz kąty: R R → R2, R R R → R', R R' → usuń
+    CombineMoves(chromosome, startIdx, move1, move2, rng);
 }
 ```
 
-**Problem w 4D+:** Obecna implementacja wykrywa tylko bezpośrednie duplikaty - dwa kolejne ruchy na tej samej osi, płaszczyźnie i warstwie. W 4D+ istnieją dodatkowe możliwości uproszczenia:
-
-1. **Komutujące ruchy na ortogonalnych płaszczyznach:** W 4D, ruchy na płaszczyznach (0,1) i (2,3) komutują (można je wykonać w dowolnej kolejności). Wykrycie takich par pozwala na ich przegrupowanie i potencjalne uproszczenie.
-
-2. **Redundantne wzorce hyperściankowe:** W 4D, pewne sekwencje ruchów wpływające na różne 3D "komórki" mogą się upraszczać w sposób niewidoczny dla obecnego algorytmu.
-
-**Proponowane ulepszenie:**
+**Rozszerzona logika dla 4D+ (N >= 4):**
 ```csharp
-// Sprawdź czy płaszczyzny są ortogonalne (nie dzielą żadnej osi)
-bool AreOrthogonal(int plane1, int plane2)
+// Cache par ortogonalnych płaszczyzn
+// 4D: (0,1)⊥(2,3), (0,2)⊥(1,3), (0,3)⊥(1,2)
+
+// 1. Wykrywanie par przez ortogonalne ruchy
+// Wzorzec: A, B, A gdzie B ⊥ A → można uprościć A i A
+for (offset = 2; offset < windowSize; offset++)
 {
-    var axes1 = TAffine.Planes[plane1];
-    var axes2 = TAffine.Planes[plane2];
-    return !axes1.Intersect(axes2).Any();
+    if (MovesMatch(move1, move_at_offset) && AllBetweenOrthogonal(move1))
+    {
+        CombineDistantMoves(chromosome, idx1, idx2, move1, move2);
+    }
 }
 
-// Ruchy na ortogonalnych płaszczyznach komutują - można je przegrupować
-if (AreOrthogonal(move1.Plane, move2.Plane))
+// 2. Reordering ortogonalnych ruchów (30% szans)
+// Zamiana kolejności może stworzyć okazje do uproszczenia
+if (AreOrthogonal(moveA.Plane, moveB.Plane))
 {
-    // Możliwość reorderingu dla przyszłych uproszczeń
+    SwapMoves(chromosome, startIdx, startIdx + 1);
 }
 ```
+
+**Dlaczego działa dla N wymiarów:**
+- Dla N >= 4: Automatycznie buduje cache par ortogonalnych z `TAffine.Planes`
+- Dla N = 3: Brak par ortogonalnych, używa tylko podstawowej logiki
+- Wykrywanie ortogonalności jest w pełni parametryczne względem N
+
+**Kompatybilność:**
+- 3D: ✅ Podstawowa logika (bez zmian funkcjonalności)
+- 4D: ✅ Pełne wykorzystanie 3 par ortogonalnych
+- 5D+: ✅ Automatyczne wykrywanie większej liczby par ortogonalnych
+
+---
+
+## Operatory wymagające optymalizacji dla 4D+
 
 ### ConjugationMutation i CommutatorMutation - algebraicznie poprawne, ale nie zoptymalizowane
 
@@ -632,7 +645,7 @@ Po rozszerzeniu `TMove`, następujące operatory wymagałyby aktualizacji:
 | ConjugationMutation | ✅ | ✅ | ✅ | Do optymalizacji | Działa, ale nie optymalnie dla 4D+ |
 | CommutatorMutation | ✅ | ✅ | ✅ | Do optymalizacji | Działa, ale nie optymalnie dla 4D+ |
 | NeighborMutation | ✅ | ✅ | ✅ | Gotowy | Tylko modyfikuje Angle |
-| SimplifyMutation | ✅ | ⚠️ | ⚠️ | Do rozszerzenia | Pomija ortogonalne wzorce |
+| SimplifyMutation | ✅ | ✅ | ✅ | Gotowy | Wykrywa ortogonalne wzorce |
 | InverseSequenceMutation | ✅ | ✅ | ✅ | Gotowy | Generyczna inwersja |
 | InsertMutation | ✅ | ✅ | ✅ | Gotowy | Pary neutralne |
 | Wszystkie Crossover | ✅ | ✅ | ✅ | Gotowy | Pozycyjne |
