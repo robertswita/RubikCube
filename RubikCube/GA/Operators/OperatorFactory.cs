@@ -1,14 +1,11 @@
-using System;
 using TGL.GA.Configuration;
 using TGL.GA.Interfaces;
-using TGL.GA.Operators.Crossover;
-using TGL.GA.Operators.Mutation;
-using TGL.GA.Operators.Selection;
 
 namespace TGL.GA.Operators;
 
 /// <summary>
 /// Factory for creating GA operators based on configuration.
+/// Delegates to StrategyInfo for actual instantiation.
 /// </summary>
 public static class OperatorFactory
 {
@@ -17,62 +14,21 @@ public static class OperatorFactory
     /// </summary>
     public static ISelectionOperator<T> CreateSelection<T>(SelectionStrategy strategy, GAConfig? config = null)
         where T : IChromosome
-    {
-        return strategy switch
-        {
-            SelectionStrategy.Rank => new RankSelection<T>(),
-            SelectionStrategy.Tournament => new TournamentSelection<T>(config?.TournamentSize ?? 5),
-            SelectionStrategy.Roulette => new RouletteSelection<T>(),
-            SelectionStrategy.RouletteRank => new RouletteRankSelection<T>(),
-            SelectionStrategy.Unique => new UniqueSelection<T>(),
-            SelectionStrategy.StochasticUniversalSampling => new RouletteSelection<T>(), // TODO: Implement SUS
-            SelectionStrategy.Boltzmann => new TournamentSelection<T>(), // TODO: Implement Boltzmann
-            _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown selection strategy")
-        };
-    }
+        => StrategyInfo.CreateSelection<T>(strategy, config);
 
     /// <summary>
     /// Creates a crossover operator based on the specified strategy.
     /// </summary>
     public static ICrossoverOperator<T> CreateCrossover<T>(CrossoverStrategy strategy)
         where T : IChromosome, new()
-    {
-        return strategy switch
-        {
-            CrossoverStrategy.SinglePoint => new SinglePointCrossover<T>(),
-            CrossoverStrategy.TwoPoint => new TwoPointCrossover<T>(),
-            CrossoverStrategy.Uniform => new UniformCrossover<T>(),
-            CrossoverStrategy.OrderBased => new SinglePointCrossover<T>(), // TODO: Implement OX
-            CrossoverStrategy.PartiallyMapped => new SinglePointCrossover<T>(), // TODO: Implement PMX
-            CrossoverStrategy.SegmentPreserving => new SegmentPreservingCrossover<T>(),
-            _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown crossover strategy")
-        };
-    }
+        => StrategyInfo.CreateCrossover<T>(strategy);
 
     /// <summary>
     /// Creates a mutation operator based on the specified strategy.
     /// </summary>
     public static IMutationOperator<T> CreateMutation<T>(MutationStrategy strategy)
         where T : IChromosome
-    {
-        return strategy switch
-        {
-            MutationStrategy.SingleGene => new SingleGeneMutation<T>(),
-            MutationStrategy.Random => new RandomMutation<T>(),
-            MutationStrategy.Conjugation => new ConjugationMutation<T>(),
-            MutationStrategy.Swap => new SwapMutation<T>(),
-            MutationStrategy.Inversion => new InversionMutation<T>(),
-            MutationStrategy.Scramble => new ScrambleMutation<T>(),
-            MutationStrategy.Adaptive => new ScrambleMutation<T>(), // TODO: Implement Adaptive
-            MutationStrategy.Commutator => new CommutatorMutation<T>(),
-            MutationStrategy.Neighbor => new NeighborMutation<T>(),
-            MutationStrategy.Simplify => new SimplifyMutation<T>(),
-            MutationStrategy.InverseSequence => new InverseSequenceMutation<T>(),
-            MutationStrategy.Insert => new InsertMutation<T>(),
-            MutationStrategy.Shift => new ShiftMutation<T>(),
-            _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown mutation strategy")
-        };
-    }
+        => StrategyInfo.CreateMutation<T>(strategy);
 
     /// <summary>
     /// Creates all operators from a configuration.

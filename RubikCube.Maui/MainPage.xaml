@@ -106,58 +106,22 @@
                             <Label x:Name="GenerationsLabel" Text="100" VerticalOptions="Center" WidthRequest="40" />
                         </HorizontalStackLayout>
 
-                        <!-- Selection Strategy -->
+                        <!-- Selection Strategy - ItemsSource set from StrategyInfo in code-behind -->
                         <HorizontalStackLayout Spacing="10">
                             <Label Text="Selection:" VerticalOptions="Center" WidthRequest="80" />
-                            <Picker x:Name="SelectionPicker" WidthRequest="150" SelectedIndexChanged="OnSelectionChanged">
-                                <Picker.ItemsSource>
-                                    <x:Array Type="{x:Type x:String}">
-                                        <x:String>Unique</x:String>
-                                        <x:String>Tournament</x:String>
-                                        <x:String>Rank</x:String>
-                                        <x:String>Roulette</x:String>
-                                        <x:String>RouletteRank</x:String>
-                                    </x:Array>
-                                </Picker.ItemsSource>
-                            </Picker>
+                            <Picker x:Name="SelectionPicker" WidthRequest="150" SelectedIndexChanged="OnSelectionChanged" />
                         </HorizontalStackLayout>
 
-                        <!-- Crossover Strategy -->
+                        <!-- Crossover Strategy - ItemsSource set from StrategyInfo in code-behind -->
                         <HorizontalStackLayout Spacing="10">
                             <Label Text="Crossover:" VerticalOptions="Center" WidthRequest="80" />
-                            <Picker x:Name="CrossoverPicker" WidthRequest="150" SelectedIndexChanged="OnCrossoverChanged">
-                                <Picker.ItemsSource>
-                                    <x:Array Type="{x:Type x:String}">
-                                        <x:String>SinglePoint</x:String>
-                                        <x:String>TwoPoint</x:String>
-                                        <x:String>Uniform</x:String>
-                                        <x:String>SegmentPreserving</x:String>
-                                    </x:Array>
-                                </Picker.ItemsSource>
-                            </Picker>
+                            <Picker x:Name="CrossoverPicker" WidthRequest="150" SelectedIndexChanged="OnCrossoverChanged" />
                         </HorizontalStackLayout>
 
-                        <!-- Mutation Strategy -->
+                        <!-- Mutation Strategy - ItemsSource set from StrategyInfo in code-behind -->
                         <HorizontalStackLayout Spacing="10">
                             <Label Text="Mut. Type:" VerticalOptions="Center" WidthRequest="80" />
-                            <Picker x:Name="MutationPicker" WidthRequest="150" SelectedIndexChanged="OnMutationStrategyChanged">
-                                <Picker.ItemsSource>
-                                    <x:Array Type="{x:Type x:String}">
-                                        <x:String>SingleGene</x:String>
-                                        <x:String>Random</x:String>
-                                        <x:String>Swap</x:String>
-                                        <x:String>Inversion</x:String>
-                                        <x:String>Scramble</x:String>
-                                        <x:String>Conjugation</x:String>
-                                        <x:String>Commutator</x:String>
-                                        <x:String>Neighbor</x:String>
-                                        <x:String>Simplify</x:String>
-                                        <x:String>InverseSequence</x:String>
-                                        <x:String>Insert</x:String>
-                                        <x:String>Shift</x:String>
-                                    </x:Array>
-                                </Picker.ItemsSource>
-                            </Picker>
+                            <Picker x:Name="MutationPicker" WidthRequest="150" SelectedIndexChanged="OnMutationStrategyChanged" />
                         </HorizontalStackLayout>
 
                         <!-- Elite Count -->

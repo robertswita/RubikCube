@@ -88,12 +88,6 @@ namespace RubikCube
             _solutionDb.SolutionSaved += count => BeginInvoke(new Action(() => SolutionLbl.Text = count.ToString()));
             SolutionLbl.Text = _solutionDb.Count.ToString();
 
-            // Initialize preset manager
-            _presetManager = new PresetManager("presets.json");
-            _presetManager.Load();
-            _presetManager.PresetsChanged += RefreshPresetComboBox;
-            RefreshPresetComboBox();
-
             // Initialize LiveCharts
             fitnessChart.Series = new ISeries[]
             {
@@ -107,16 +101,29 @@ namespace RubikCube
             fitnessChart.XAxes = new Axis[] { new Axis { Name = "Generation" } };
             fitnessChart.YAxes = new Axis[] { new Axis { Name = "Fitness" } };
 
+            // Populate strategy combo boxes from StrategyInfo (single source of truth)
+            // Must be done BEFORE preset manager initialization, as loading presets triggers UpdateGAConfigUI()
+            cmbSelection.Items.AddRange(StrategyInfo.SelectionDisplayNames.ToArray<object>());
+            cmbCrossover.Items.AddRange(StrategyInfo.CrossoverDisplayNames.ToArray<object>());
+            cmbMutationType.Items.AddRange(StrategyInfo.MutationDisplayNames.ToArray<object>());
+
+            cmbSelection.SelectedIndex = 0;
+            cmbCrossover.SelectedIndex = 0;
+            cmbMutationType.SelectedIndex = 0;
+
             // Initialize GA configuration controls
             cmbSolverMode.SelectedIndex = 0; // Iterative
+
+            // Initialize preset manager (after combo boxes are populated)
+            _presetManager = new PresetManager("presets.json");
+            _presetManager.Load();
+            _presetManager.PresetsChanged += RefreshPresetComboBox;
+            RefreshPresetComboBox();
 
             // Select the last used preset
             var lastUsedIndex = _presetManager.GetIndex(_presetManager.LastUsedPreset);
             cmbPreset.SelectedIndex = lastUsedIndex >= 0 ? lastUsedIndex : 0;
 
-            cmbSelection.SelectedIndex = 0; // Unique
-            cmbCrossover.SelectedIndex = 0; // SinglePoint
-            cmbMutationType.SelectedIndex = 0; // SingleGene
             UpdateGAConfigFromUI();
         }
 
@@ -732,49 +739,19 @@ namespace RubikCube
 
         private void cmbSelection_SelectedIndexChanged(object sender, EventArgs e)
         {
-            var selection = cmbSelection.SelectedIndex switch
-            {
-                0 => SelectionStrategy.Unique,
-                1 => SelectionStrategy.Tournament,
-                2 => SelectionStrategy.Rank,
-                3 => SelectionStrategy.Roulette,
-                4 => SelectionStrategy.RouletteRank,
-                _ => SelectionStrategy.Unique
-            };
+            var selection = StrategyInfo.GetSelectionStrategy(cmbSelection.SelectedIndex);
             _selectedGAConfig = _selectedGAConfig with { Selection = selection };
         }
 
         private void cmbCrossover_SelectedIndexChanged(object sender, EventArgs e)
         {
-            var crossover = cmbCrossover.SelectedIndex switch
-            {
-                0 => CrossoverStrategy.SinglePoint,
-                1 => CrossoverStrategy.TwoPoint,
-                2 => CrossoverStrategy.Uniform,
-                3 => CrossoverStrategy.SegmentPreserving,
-                _ => CrossoverStrategy.SinglePoint
-            };
+            var crossover = StrategyInfo.GetCrossoverStrategy(cmbCrossover.SelectedIndex);
             _selectedGAConfig = _selectedGAConfig with { Crossover = crossover };
         }
 
         private void cmbMutationType_SelectedIndexChanged(object sender, EventArgs e)
         {
-            var mutation = cmbMutationType.SelectedIndex switch
-            {
-                0 => MutationStrategy.SingleGene,
-                1 => MutationStrategy.Random,
-                2 => MutationStrategy.Swap,
-                3 => MutationStrategy.Inversion,
-                4 => MutationStrategy.Scramble,
-                5 => MutationStrategy.Conjugation,
-                6 => MutationStrategy.Commutator,
-                7 => MutationStrategy.Neighbor,
-                8 => MutationStrategy.Simplify,
-                9 => MutationStrategy.InverseSequence,
-                10 => MutationStrategy.Insert,
-                11 => MutationStrategy.Shift,
-                _ => MutationStrategy.SingleGene
-            };
+            var mutation = StrategyInfo.GetMutationStrategy(cmbMutationType.SelectedIndex);
             _selectedGAConfig = _selectedGAConfig with { Mutation = mutation };
         }
 
@@ -857,44 +834,10 @@ namespace RubikCube
             numElite.Value = _selectedGAConfig.EliteCount;
             numChromosomeLength.Value = Math.Min(numChromosomeLength.Maximum, _selectedGAConfig.GenomeLength);
 
-            // Update selection combo
-            cmbSelection.SelectedIndex = _selectedGAConfig.Selection switch
-            {
-                SelectionStrategy.Unique => 0,
-                SelectionStrategy.Tournament => 1,
-                SelectionStrategy.Rank => 2,
-                SelectionStrategy.Roulette => 3,
-                SelectionStrategy.RouletteRank => 4,
-                _ => 0
-            };
-
-            // Update crossover combo
-            cmbCrossover.SelectedIndex = _selectedGAConfig.Crossover switch
-            {
-                CrossoverStrategy.SinglePoint => 0,
-                CrossoverStrategy.TwoPoint => 1,
-                CrossoverStrategy.Uniform => 2,
-                CrossoverStrategy.SegmentPreserving => 3,
-                _ => 0
-            };
-
-            // Update mutation type combo
-            cmbMutationType.SelectedIndex = _selectedGAConfig.Mutation switch
-            {
-                MutationStrategy.SingleGene => 0,
-                MutationStrategy.Random => 1,
-                MutationStrategy.Swap => 2,
-                MutationStrategy.Inversion => 3,
-                MutationStrategy.Scramble => 4,
-                MutationStrategy.Conjugation => 5,
-                MutationStrategy.Commutator => 6,
-                MutationStrategy.Neighbor => 7,
-                MutationStrategy.Simplify => 8,
-                MutationStrategy.InverseSequence => 9,
-                MutationStrategy.Insert => 10,
-                MutationStrategy.Shift => 11,
-                _ => 0
-            };
+            // Update strategy combo boxes from config
+            cmbSelection.SelectedIndex = StrategyInfo.GetSelectionIndex(_selectedGAConfig.Selection);
+            cmbCrossover.SelectedIndex = StrategyInfo.GetCrossoverIndex(_selectedGAConfig.Crossover);
+            cmbMutationType.SelectedIndex = StrategyInfo.GetMutationIndex(_selectedGAConfig.Mutation);
         }
 
         private void UpdateGAConfigFromUI()

@@ -693,12 +693,7 @@
             //
             this.cmbSelection.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cmbSelection.FormattingEnabled = true;
-            this.cmbSelection.Items.AddRange(new object[] {
-            "Unique",
-            "Tournament",
-            "Rank",
-            "Roulette",
-            "RouletteRank"});
+            // Items populated dynamically from StrategyInfo in Form1 constructor
             this.cmbSelection.Location = new System.Drawing.Point(100, 137);
             this.cmbSelection.Name = "cmbSelection";
             this.cmbSelection.Size = new System.Drawing.Size(120, 24);
@@ -718,11 +713,7 @@
             //
             this.cmbCrossover.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cmbCrossover.FormattingEnabled = true;
-            this.cmbCrossover.Items.AddRange(new object[] {
-            "SinglePoint",
-            "TwoPoint",
-            "Uniform",
-            "SegmentPreserving"});
+            // Items populated dynamically from StrategyInfo in Form1 constructor
             this.cmbCrossover.Location = new System.Drawing.Point(100, 167);
             this.cmbCrossover.Name = "cmbCrossover";
             this.cmbCrossover.Size = new System.Drawing.Size(120, 24);
@@ -742,19 +733,7 @@
             //
             this.cmbMutationType.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cmbMutationType.FormattingEnabled = true;
-            this.cmbMutationType.Items.AddRange(new object[] {
-            "SingleGene",
-            "Random",
-            "Swap",
-            "Inversion",
-            "Scramble",
-            "Conjugation",
-            "Commutator",
-            "Neighbor",
-            "Simplify",
-            "InverseSequence",
-            "Insert",
-            "Shift"});
+            // Items populated dynamically from StrategyInfo in Form1 constructor
             this.cmbMutationType.Location = new System.Drawing.Point(300, 167);
             this.cmbMutationType.Name = "cmbMutationType";
             this.cmbMutationType.Size = new System.Drawing.Size(110, 24);

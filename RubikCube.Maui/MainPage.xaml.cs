@@ -91,13 +91,6 @@ public partial class MainPage : ContentPage
             MainThread.BeginInvokeOnMainThread(() => SolutionLabel.Text = count.ToString());
         };
 
-        // Initialize preset manager
-        var presetPath = Path.Combine(FileSystem.AppDataDirectory, "presets.json");
-        _presetManager = new PresetManager(presetPath);
-        _presetManager.Load();
-        _presetManager.PresetsChanged += RefreshPresetPicker;
-        RefreshPresetPicker();
-
         // Initialize cube
         InitializeCube();
 
@@ -116,16 +109,30 @@ public partial class MainPage : ContentPage
         SizeSlider.Value = TRubikCube.Size;
         SizeLabel.Text = TRubikCube.Size.ToString();
 
+        // Populate strategy pickers from StrategyInfo (single source of truth)
+        // Must be done BEFORE preset manager initialization, as loading presets triggers UpdateGAConfigUI()
+        SelectionPicker.ItemsSource = StrategyInfo.SelectionDisplayNames.ToList();
+        CrossoverPicker.ItemsSource = StrategyInfo.CrossoverDisplayNames.ToList();
+        MutationPicker.ItemsSource = StrategyInfo.MutationDisplayNames.ToList();
+
+        SelectionPicker.SelectedIndex = 0;
+        CrossoverPicker.SelectedIndex = 0;
+        MutationPicker.SelectedIndex = 0;
+
         // Initialize GA configuration UI
         SolverModePicker.SelectedIndex = 0; // Iterative
+
+        // Initialize preset manager (after pickers are populated)
+        var presetPath = Path.Combine(FileSystem.AppDataDirectory, "presets.json");
+        _presetManager = new PresetManager(presetPath);
+        _presetManager.Load();
+        _presetManager.PresetsChanged += RefreshPresetPicker;
+        RefreshPresetPicker();
 
         // Select the last used preset
         var lastUsedIndex = _presetManager.GetIndex(_presetManager.LastUsedPreset);
         PresetPicker.SelectedIndex = lastUsedIndex >= 0 ? lastUsedIndex : 0;
 
-        SelectionPicker.SelectedIndex = 0; // Unique
-        CrossoverPicker.SelectedIndex = 0; // SinglePoint
-        MutationPicker.SelectedIndex = 0; // SingleGene
         UpdateGAConfigLabels();
 
         // Subscribe to scroll wheel events
@@ -486,40 +493,10 @@ public partial class MainPage : ContentPage
         EliteSlider.Value = _selectedGAConfig.EliteCount;
         ChromosomeLengthSlider.Value = _selectedGAConfig.GenomeLength;
 
-        // Update pickers to match preset
-        SelectionPicker.SelectedIndex = _selectedGAConfig.Selection switch
-        {
-            SelectionStrategy.Unique => 0,
-            SelectionStrategy.Tournament => 1,
-            SelectionStrategy.Rank => 2,
-            SelectionStrategy.Roulette => 3,
-            SelectionStrategy.RouletteRank => 4,
-            _ => 0
-        };
-        CrossoverPicker.SelectedIndex = _selectedGAConfig.Crossover switch
-        {
-            CrossoverStrategy.SinglePoint => 0,
-            CrossoverStrategy.TwoPoint => 1,
-            CrossoverStrategy.Uniform => 2,
-            CrossoverStrategy.SegmentPreserving => 3,
-            _ => 0
-        };
-        MutationPicker.SelectedIndex = _selectedGAConfig.Mutation switch
-        {
-            MutationStrategy.SingleGene => 0,
-            MutationStrategy.Random => 1,
-            MutationStrategy.Swap => 2,
-            MutationStrategy.Inversion => 3,
-            MutationStrategy.Scramble => 4,
-            MutationStrategy.Conjugation => 5,
-            MutationStrategy.Commutator => 6,
-            MutationStrategy.Neighbor => 7,
-            MutationStrategy.Simplify => 8,
-            MutationStrategy.InverseSequence => 9,
-            MutationStrategy.Insert => 10,
-            MutationStrategy.Shift => 11,
-            _ => 0
-        };
+        // Update pickers to match preset using StrategyInfo
+        SelectionPicker.SelectedIndex = StrategyInfo.GetSelectionIndex(_selectedGAConfig.Selection);
+        CrossoverPicker.SelectedIndex = StrategyInfo.GetCrossoverIndex(_selectedGAConfig.Crossover);
+        MutationPicker.SelectedIndex = StrategyInfo.GetMutationIndex(_selectedGAConfig.Mutation);
 
         UpdateGAConfigLabels();
     }
@@ -536,44 +513,10 @@ public partial class MainPage : ContentPage
 
     private void UpdateGAConfigFromUI()
     {
-        // Get selection strategy
-        var selection = SelectionPicker.SelectedIndex switch
-        {
-            0 => SelectionStrategy.Unique,
-            1 => SelectionStrategy.Tournament,
-            2 => SelectionStrategy.Rank,
-            3 => SelectionStrategy.Roulette,
-            4 => SelectionStrategy.RouletteRank,
-            _ => SelectionStrategy.Unique
-        };
-
-        // Get crossover strategy
-        var crossover = CrossoverPicker.SelectedIndex switch
-        {
-            0 => CrossoverStrategy.SinglePoint,
-            1 => CrossoverStrategy.TwoPoint,
-            2 => CrossoverStrategy.Uniform,
-            3 => CrossoverStrategy.SegmentPreserving,
-            _ => CrossoverStrategy.SinglePoint
-        };
-
-        // Get mutation strategy
-        var mutation = MutationPicker.SelectedIndex switch
-        {
-            0 => MutationStrategy.SingleGene,
-            1 => MutationStrategy.Random,
-            2 => MutationStrategy.Swap,
-            3 => MutationStrategy.Inversion,
-            4 => MutationStrategy.Scramble,
-            5 => MutationStrategy.Conjugation,
-            6 => MutationStrategy.Commutator,
-            7 => MutationStrategy.Neighbor,
-            8 => MutationStrategy.Simplify,
-            9 => MutationStrategy.InverseSequence,
-            10 => MutationStrategy.Insert,
-            11 => MutationStrategy.Shift,
-            _ => MutationStrategy.SingleGene
-        };
+        // Get strategies from pickers using StrategyInfo
+        var selection = StrategyInfo.GetSelectionStrategy(SelectionPicker.SelectedIndex);
+        var crossover = StrategyInfo.GetCrossoverStrategy(CrossoverPicker.SelectedIndex);
+        var mutation = StrategyInfo.GetMutationStrategy(MutationPicker.SelectedIndex);
 
         _selectedGAConfig = _selectedGAConfig with
         {
@@ -616,57 +559,21 @@ public partial class MainPage : ContentPage
     private void OnSelectionChanged(object? sender, EventArgs e)
     {
         if (SelectionPicker.SelectedIndex < 0) return;
-
-        var selection = SelectionPicker.SelectedIndex switch
-        {
-            0 => SelectionStrategy.Unique,
-            1 => SelectionStrategy.Tournament,
-            2 => SelectionStrategy.Rank,
-            3 => SelectionStrategy.Roulette,
-            4 => SelectionStrategy.RouletteRank,
-            _ => SelectionStrategy.Unique
-        };
-
+        var selection = StrategyInfo.GetSelectionStrategy(SelectionPicker.SelectedIndex);
         _selectedGAConfig = _selectedGAConfig with { Selection = selection };
     }
 
     private void OnCrossoverChanged(object? sender, EventArgs e)
     {
         if (CrossoverPicker.SelectedIndex < 0) return;
-
-        var crossover = CrossoverPicker.SelectedIndex switch
-        {
-            0 => CrossoverStrategy.SinglePoint,
-            1 => CrossoverStrategy.TwoPoint,
-            2 => CrossoverStrategy.Uniform,
-            3 => CrossoverStrategy.SegmentPreserving,
-            _ => CrossoverStrategy.SinglePoint
-        };
-
+        var crossover = StrategyInfo.GetCrossoverStrategy(CrossoverPicker.SelectedIndex);
         _selectedGAConfig = _selectedGAConfig with { Crossover = crossover };
     }
 
     private void OnMutationStrategyChanged(object? sender, EventArgs e)
     {
         if (MutationPicker.SelectedIndex < 0) return;
-
-        var mutation = MutationPicker.SelectedIndex switch
-        {
-            0 => MutationStrategy.SingleGene,
-            1 => MutationStrategy.Random,
-            2 => MutationStrategy.Swap,
-            3 => MutationStrategy.Inversion,
-            4 => MutationStrategy.Scramble,
-            5 => MutationStrategy.Conjugation,
-            6 => MutationStrategy.Commutator,
-            7 => MutationStrategy.Neighbor,
-            8 => MutationStrategy.Simplify,
-            9 => MutationStrategy.InverseSequence,
-            10 => MutationStrategy.Insert,
-            11 => MutationStrategy.Shift,
-            _ => MutationStrategy.SingleGene
-        };
-
+        var mutation = StrategyInfo.GetMutationStrategy(MutationPicker.SelectedIndex);
         _selectedGAConfig = _selectedGAConfig with { Mutation = mutation };
     }
 
@@ -709,9 +616,9 @@ public partial class MainPage : ContentPage
         GenerationsSlider.Value = _selectedGAConfig.Termination.MaxGenerations;
         EliteSlider.Value = _selectedGAConfig.EliteCount;
         ChromosomeLengthSlider.Value = _selectedGAConfig.GenomeLength;
-        SelectionPicker.SelectedIndex = 0; // Unique
-        CrossoverPicker.SelectedIndex = 0; // SinglePoint
-        MutationPicker.SelectedIndex = 0; // SingleGene
+        SelectionPicker.SelectedIndex = StrategyInfo.GetSelectionIndex(_selectedGAConfig.Selection);
+        CrossoverPicker.SelectedIndex = StrategyInfo.GetCrossoverIndex(_selectedGAConfig.Crossover);
+        MutationPicker.SelectedIndex = StrategyInfo.GetMutationIndex(_selectedGAConfig.Mutation);
         UpdateGAConfigLabels();
     }
 
