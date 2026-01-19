@@ -954,6 +954,148 @@ Orientacja i permutacja ostatnich sześciu krawędzi (UL, UR, UF, UB, DF, DB).
 | 9 | M U M' U' M' U M U' M U M' | 11 | Przypadek kropki |
 | 10 | M' U M U M' U' M | 7 | Szybka orientacja |
 
+##### ZZ Method - Kompletna implementacja
+
+Metoda ZZ (autorstwa Zbigniewa Zborowskiego) rozwiązuje kostkę w następujących etapach:
+1. EOLine - orientacja wszystkich 12 krawędzi + umieszczenie krawędzi DF/DB
+2. ZZF2L - budowanie pierwszych dwóch warstw używając tylko R, U, L (bez F/B)
+3. LL - ostatnia warstwa (ZBLL działa bezpośrednio, bo krawędzie są już zorientowane)
+
+###### EOLine - Edge Orientation + Line (24 algorytmy)
+
+**Basic EO Triggers (8)**
+
+| EO# | Algorytm | Ruchy | Opis |
+|-----|----------|-------|------|
+| 1 | F R U R' U' F' | 6 | Podstawowy EO z F |
+| 2 | B' R' U' R U B | 6 | Podstawowy EO z B |
+| 3 | F R U R' U' F' B' R' U' R U B | 12 | Kombinacja F-B EO |
+| 4 | R' F R F' | 4 | Sledgehammer EO |
+| 5 | F R' F' R | 4 | Hedgeslammer EO |
+| 6 | R' F R F' R' F R F' | 8 | Podwójny sledge EO |
+| 7 | F2 R U R' U' F2 | 6 | F2 EO trigger |
+| 8 | B2 R' U' R U B2 | 6 | B2 EO trigger |
+
+**Line Building (8)**
+
+| Line# | Algorytm | Ruchy | Opis |
+|-------|----------|-------|------|
+| 1 | D F D' F' | 4 | Proste wstawienie DF |
+| 2 | D' B' D B | 4 | Proste wstawienie DB |
+| 3 | F2 D F2 | 3 | DF z góry |
+| 4 | B2 D' B2 | 3 | DB z góry |
+| 5 | M2 U2 M2 | 3 | Obie krawędzie z M-slice |
+| 6 | F' D' F D F | 5 | DF flip i umieść |
+| 7 | B D B' D' B' | 5 | DB flip i umieść |
+| 8 | R2 D2 R2 | 3 | Linia z prawej |
+
+**Combined EOLine (8)**
+
+| EOLine# | Algorytm | Ruchy | Opis |
+|---------|----------|-------|------|
+| 1 | F R U R' U' F' D2 | 7 | EO + Linia podstawowa |
+| 2 | B' R' U' R U B D | 7 | EO z setupem linii |
+| 3 | F R' F' R U R U' R' D' | 9 | Zaawansowany EOLine |
+| 4 | R' F R F' D R2 D' R2 | 8 | EOLine z korektą D |
+| 5 | F R U R' U' F' B' U' R' U R B | 12 | Pełna sekwencja EOLine |
+| 6 | B L' B' L F' L F L' | 8 | Alternatywny EOLine |
+| 7 | F' U' F U F R' F' R | 8 | Szybki EO + Linia |
+| 8 | D F' D' F D' B D B' | 8 | D-layer setup EOLine |
+
+###### ZZ Left Block - 18 algorytmów
+
+| ZZ-LB# | Algorytm | Ruchy | Opis |
+|--------|----------|-------|------|
+| 1 | L' U' L | 3 | Proste wstawienie krawędzi DL |
+| 2 | U L' U' L | 4 | DL z UF |
+| 3 | U' L' U L | 4 | DL z UB |
+| 4 | U2 L' U2 L | 4 | DL z U2 |
+| 5 | L U L' | 3 | DL flip |
+| 6 | U' L' U L U' L' U L | 8 | Narożnik z UFR |
+| 7 | L' U L | 3 | Narożnik bezpośredni |
+| 8 | U L' U' L | 4 | Narożnik z UBL |
+| 9 | L' U' L U L' U' L | 7 | Skręcenie narożnika |
+| 10 | U2 L' U L | 4 | Narożnik od tyłu |
+| 11 | U' L' U' L U L' U' L | 8 | Podstawowe wstawienie pary |
+| 12 | L' U L U' L' U' L | 7 | Para z setupem |
+| 13 | U L' U' L U' L' U L | 8 | Rozdzielona para |
+| 14 | L' U2 L U' L' U L | 7 | Para z błędną orientacją |
+| 15 | U' L' U2 L U L' U' L | 8 | Złożona para |
+| 16 | L' U' L U' L' U L U L' U' L | 11 | Kompletny kwadrat |
+| 17 | U L' U' L U' L' U L U' L' U L | 12 | Kwadrat z korektą |
+| 18 | L' U L U L' U' L | 7 | Szybki kwadrat |
+
+###### ZZ Right Block - 18 algorytmów
+
+| ZZ-RB# | Algorytm | Ruchy | Opis |
+|--------|----------|-------|------|
+| 1 | R U R' | 3 | Proste wstawienie krawędzi DR |
+| 2 | U' R U R' | 4 | DR z UF |
+| 3 | U R U' R' | 4 | DR z UB |
+| 4 | U2 R U2 R' | 4 | DR z U2 |
+| 5 | R' U' R | 3 | DR flip |
+| 6 | U R U' R' U R U' R' | 8 | Narożnik z UFL |
+| 7 | R U' R' | 3 | Narożnik bezpośredni |
+| 8 | U' R U R' | 4 | Narożnik z UBR |
+| 9 | R U R' U' R U R' | 7 | Skręcenie narożnika |
+| 10 | U2 R U' R' | 4 | Narożnik od tyłu |
+| 11 | U R U R' U' R U R' | 8 | Podstawowe wstawienie pary |
+| 12 | R U' R' U R U R' | 7 | Para z setupem |
+| 13 | U' R U R' U R U' R' | 8 | Rozdzielona para |
+| 14 | R U2 R' U R U' R' | 7 | Para z błędną orientacją |
+| 15 | U R U2 R' U' R U R' | 8 | Złożona para |
+| 16 | R U R' U R U' R' U' R U R' | 11 | Kompletny kwadrat |
+| 17 | U' R U R' U R U' R' U R U' R' | 12 | Kwadrat z korektą |
+| 18 | R U' R' U' R U R' | 7 | Szybki kwadrat |
+
+###### ZZF2L - F2L używając tylko R, U, L (30 algorytmów)
+
+| ZZF2L# | Algorytm | Ruchy | Opis |
+|--------|----------|-------|------|
+| 1 | R U R' U' R U R' | 7 | Prawy slot podstawowy |
+| 2 | L' U' L U L' U' L | 7 | Lewy slot podstawowy |
+| 3 | R U2 R' U' R U R' | 7 | Prawy z podwójnym U |
+| 4 | L' U2 L U L' U' L | 7 | Lewy z podwójnym U |
+| 5 | R U' R' U R U' R' | 7 | Prawy wzorzec U' |
+| 6 | L' U L U' L' U L | 7 | Lewy wzorzec U |
+| 7 | U R U' R' U' R U R' | 8 | Narożnik do góry, prawy |
+| 8 | U' L' U L U L' U' L | 8 | Narożnik do góry, lewy |
+| 9 | U' R U R' U R U R' | 8 | Narożnik wskazuje w prawo |
+| 10 | U L' U' L U' L' U' L | 8 | Narożnik wskazuje w lewo |
+| 11 | U2 R U' R' U R U R' | 8 | Narożnik U2 prawy |
+| 12 | U2 L' U L U' L' U' L | 8 | Narożnik U2 lewy |
+| 13 | R U R' U R U R' U R U' R' | 11 | Krawędź w slocie, prawy |
+| 14 | L' U' L U' L' U' L U' L' U L | 11 | Krawędź w slocie, lewy |
+| 15 | R U' R' U R U2 R' U R U' R' | 11 | Krawędź zła, prawy |
+| 16 | L' U L U' L' U2 L U' L' U L | 11 | Krawędź zła, lewy |
+| 17 | U R U' R' | 4 | Para połączona, łatwy prawy |
+| 18 | U' L' U L | 4 | Para połączona, łatwy lewy |
+| 19 | U' R U R' U R U' R' | 8 | Para zły kierunek prawy |
+| 20 | U L' U' L U' L' U L | 8 | Para zły kierunek lewy |
+| 21 | R U2 R' U' R U' R' U R U R' | 11 | Oba w U, prawy |
+| 22 | L' U2 L U L' U L U' L' U' L | 11 | Oba w U, lewy |
+| 23 | R U R' U' R U R' U' R U R' | 11 | Potrójny sexy prawy |
+| 24 | L' U' L U L' U' L U L' U' L | 11 | Potrójny sexy lewy |
+| 25 | U R U' R' U' R U' R' U R U' R' | 12 | Długi prawy insert |
+| 26 | U' L' U L U L' U L U' L' U L | 12 | Długi lewy insert |
+| 27 | R U R' L' U' L | 6 | Przejście prawy do lewy |
+| 28 | L' U' L R U R' | 6 | Przejście lewy do prawy |
+| 29 | R U' R' U2 R U R' | 7 | Pseudo-slotting prawy |
+| 30 | L' U L U2 L' U' L | 7 | Pseudo-slotting lewy |
+
+###### ZZLL Shortcuts - 8 algorytmów
+
+| ZZLL# | Algorytm | Ruchy | Opis |
+|-------|----------|-------|------|
+| 1 | R U R' U R U2 R' L' U' L U' L' U2 L | 14 | Czysty cykl narożników |
+| 2 | R U R' U' L' U R U' L U' R' | 11 | Zamiana sąsiednich |
+| 3 | R U' L' U R' U' L U R U' L' U R' U' L | 15 | Zamiana przekątnych |
+| 4 | R U R' U R U2 R' | 7 | Sune orientacja narożników |
+| 5 | R U2 R' U' R U' R' | 7 | Antisune orientacja narożników |
+| 6 | R2 U2 R U2 R2 U2 R2 U2 R U2 R2 | 11 | H perm (tylko krawędzie) |
+| 7 | R U' R U R U R U' R' U' R2 | 11 | U perm a wariant |
+| 8 | R2 U R U R' U' R' U' R' U R' | 11 | U perm b wariant |
+
 ##### Cross - budowanie krzyża (8)
 
 | Algorytm | Ruchy | Użycie |
@@ -982,17 +1124,22 @@ Orientacja i permutacja ostatnich sześciu krawędzi (UL, UR, UF, UB, DF, DB).
 - Wzorce A2 B2 do korekty warstw
 - Koordynacja wewnętrznych/zewnętrznych warstw dla większych kostek
 
-**Całkowita liczba wzorców 3D: ~150**
+**Całkowita liczba wzorców 3D: ~248**
 - F2L: 41 algorytmów
 - First Block (FB): 18 algorytmów
 - Second Block (SB): 20 algorytmów
 - CMLL: 42 algorytmy
 - LSE: 10 algorytmów
+- EOLine: 24 algorytmy
+- ZZ Left Block: 18 algorytmów
+- ZZ Right Block: 18 algorytmów
+- ZZF2L: 30 algorytmów
+- ZZLL: 8 algorytmów
 - Cross: 8 algorytmów
 - Layer-by-layer: 4 algorytmy
 - Triggery i warianty: ~10 algorytmów
 
-**Wpływ na rozwiązywanie:** Wykorzystuje wiedzę domenową z metod CFOP i Roux. Pełny zestaw F2L pokrywa wszystkie możliwe konfiguracje pary narożnik-krawędź. Kompletna implementacja metody Roux (FB + SB + CMLL + LSE) dostarcza 90 algorytmów dla alternatywnego podejścia do rozwiązywania. GA może budować na tych fundamentach zamiast odkrywać je od nowa.
+**Wpływ na rozwiązywanie:** Wykorzystuje wiedzę domenową z metod CFOP, Roux i ZZ. Pełny zestaw F2L pokrywa wszystkie możliwe konfiguracje pary narożnik-krawędź. Kompletna implementacja metody Roux (FB + SB + CMLL + LSE) dostarcza 90 algorytmów. Metoda ZZ (EOLine + bloki + ZZF2L + ZZLL) dostarcza 98 algorytmów z unikalną cechą - brak ruchów F/B po EOLine. GA może budować na tych fundamentach zamiast odkrywać je od nowa.
 
 #### LocalSearchMutation (Mutacja z lokalnym przeszukiwaniem)
 Wykonuje hill-climbing w małym sąsiedztwie, próbując wielu małych modyfikacji i zachowując najlepszą.

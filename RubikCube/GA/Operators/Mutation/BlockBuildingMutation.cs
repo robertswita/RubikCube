@@ -47,12 +47,37 @@ namespace TGL.GA.Operators.Mutation;
 ///   - L: 6 cases
 /// - LSE (Last Six Edges) - 10 algorithms
 ///
+/// ZZ Method - Complete Implementation:
+/// - EOLine (Edge Orientation + Line) - 24 algorithms
+///   - Basic EO triggers (8)
+///   - Line building (8)
+///   - Combined EOLine patterns (8)
+/// - ZZ Left Block - 18 algorithms
+///   - Edge placement (5)
+///   - Corner placement (5)
+///   - Pair building (5)
+///   - Square completion (3)
+/// - ZZ Right Block - 18 algorithms
+///   - Edge placement (5)
+///   - Corner placement (5)
+///   - Pair building (5)
+///   - Square completion (3)
+/// - ZZF2L (R, U, L only) - 30 algorithms
+///   - Basic insertions (6)
+///   - Corner on top cases (6)
+///   - Edge in slot cases (4)
+///   - Connected pair cases (4)
+///   - Special cases (6)
+///   - Multislot patterns (4)
+/// - ZZLL shortcuts - 8 algorithms
+///
 /// For 4D+ cubes, uses generalized block-building patterns:
 /// - Layer-by-layer building blocks
 /// - Multi-plane coordination sequences
 ///
-/// Total patterns for 3D: ~150
-/// (41 F2L + 8 Cross + 18 FB + 20 SB + 42 CMLL + 10 LSE + triggers)
+/// Total patterns for 3D: ~248
+/// (41 F2L + 8 Cross + 18 FB + 20 SB + 42 CMLL + 10 LSE +
+///  24 EOLine + 18 ZZ-LB + 18 ZZ-RB + 30 ZZF2L + 8 ZZLL + triggers)
 ///
 /// These building blocks represent efficient ways to solve small
 /// portions of the cube and can accelerate GA convergence.
@@ -812,6 +837,467 @@ public class BlockBuildingMutation<T> : IMutationOperator<T> where T : IChromoso
         // LSE 10: Quick orient
         // M' U M U M' U' M
         _buildingBlocks.Add(new[] { Mi, U, M, U, Mi, Ui, M });
+
+        // ============================================================
+        // ZZ METHOD - COMPREHENSIVE IMPLEMENTATION
+        // ============================================================
+        // ZZ method solves:
+        // 1. EOLine - Edge Orientation + Line (orient all edges + place DF/DB)
+        // 2. ZZF2L - First Two Layers using only R, U, L moves
+        // 3. LL - Last Layer (ZBLL works directly since edges oriented)
+        // ============================================================
+
+        // ============================================================
+        // EOLINE - Edge Orientation + Line Building
+        // Orient all 12 edges and place DF/DB edges simultaneously
+        // ============================================================
+
+        // --- Basic Edge Orientation Triggers ---
+        // These flip edges on F/B faces
+
+        // EO 1: Basic F move EO
+        // F R U R' U' F'
+        _buildingBlocks.Add(new[] { F, R, U, Ri, Ui, Fi });
+
+        // EO 2: Basic B move EO
+        // B' R' U' R U B
+        _buildingBlocks.Add(new[] { Bi, Ri, Ui, R, U, B });
+
+        // EO 3: Front-back EO combo
+        // F R U R' U' F' B' R' U' R U B
+        _buildingBlocks.Add(new[] { F, R, U, Ri, Ui, Fi, Bi, Ri, Ui, R, U, B });
+
+        // EO 4: Sledgehammer EO
+        // R' F R F'
+        _buildingBlocks.Add(new[] { Ri, F, R, Fi });
+
+        // EO 5: Hedgeslammer EO
+        // F R' F' R
+        _buildingBlocks.Add(new[] { F, Ri, Fi, R });
+
+        // EO 6: Double sledge EO
+        // R' F R F' R' F R F'
+        _buildingBlocks.Add(new[] { Ri, F, R, Fi, Ri, F, R, Fi });
+
+        // EO 7: F2 EO trigger
+        // F2 R U R' U' F2
+        _buildingBlocks.Add(new[] { F2, R, U, Ri, Ui, F2 });
+
+        // EO 8: B2 EO trigger
+        // B2 R' U' R U B2
+        _buildingBlocks.Add(new[] { B2, Ri, Ui, R, U, B2 });
+
+        // --- Line Building (DF/DB edges) ---
+
+        // Line 1: Simple DF insert
+        // D F D' F'
+        _buildingBlocks.Add(new[] { D, F, Di, Fi });
+
+        // Line 2: Simple DB insert
+        // D' B' D B
+        _buildingBlocks.Add(new[] { Di, Bi, D, B });
+
+        // Line 3: DF from top
+        // F2 D F2
+        _buildingBlocks.Add(new[] { F2, D, F2 });
+
+        // Line 4: DB from top
+        // B2 D' B2
+        _buildingBlocks.Add(new[] { B2, Di, B2 });
+
+        // Line 5: Both edges from M-slice
+        // M2 U2 M2
+        _buildingBlocks.Add(new[] { M2m, U2, M2m });
+
+        // Line 6: DF flip and place
+        // F' D' F D F
+        _buildingBlocks.Add(new[] { Fi, Di, F, D, F });
+
+        // Line 7: DB flip and place
+        // B D B' D' B'
+        _buildingBlocks.Add(new[] { B, D, Bi, Di, Bi });
+
+        // Line 8: Line from right
+        // R2 D2 R2
+        _buildingBlocks.Add(new[] { R2, D2, R2 });
+
+        // --- Combined EOLine Patterns ---
+
+        // EOLine 1: EO + Line basic
+        // F R U R' U' F' D2
+        _buildingBlocks.Add(new[] { F, R, U, Ri, Ui, Fi, D2 });
+
+        // EOLine 2: EO with line setup
+        // B' R' U' R U B D
+        _buildingBlocks.Add(new[] { Bi, Ri, Ui, R, U, B, D });
+
+        // EOLine 3: Advanced EOLine
+        // F R' F' R U R U' R' D'
+        _buildingBlocks.Add(new[] { F, Ri, Fi, R, U, R, Ui, Ri, Di });
+
+        // EOLine 4: EOLine with D adjustment
+        // R' F R F' D R2 D' R2
+        _buildingBlocks.Add(new[] { Ri, F, R, Fi, D, R2, Di, R2 });
+
+        // EOLine 5: Full EOLine sequence
+        // F R U R' U' F' B' U' R' U R B
+        _buildingBlocks.Add(new[] { F, R, U, Ri, Ui, Fi, Bi, Ui, Ri, U, R, B });
+
+        // EOLine 6: EOLine alternative
+        // B L' B' L F' L F L'
+        _buildingBlocks.Add(new[] { B, Li, Bi, L, Fi, L, F, Li });
+
+        // EOLine 7: Quick EO + Line
+        // F' U' F U F R' F' R
+        _buildingBlocks.Add(new[] { Fi, Ui, F, U, F, Ri, Fi, R });
+
+        // EOLine 8: D-layer setup EOLine
+        // D F' D' F D' B D B'
+        _buildingBlocks.Add(new[] { D, Fi, Di, F, Di, B, D, Bi });
+
+        // ============================================================
+        // ZZ LEFT BLOCK - Building 1x2x3 on left side
+        // After EOLine, F2L uses only R, U, L (no rotations needed)
+        // ============================================================
+
+        // --- ZZ Left Edge Placement (DL edge) ---
+
+        // ZZ-LB 1: Simple DL insert
+        // L' U' L
+        _buildingBlocks.Add(new[] { Li, Ui, L });
+
+        // ZZ-LB 2: DL from UF
+        // U L' U' L
+        _buildingBlocks.Add(new[] { U, Li, Ui, L });
+
+        // ZZ-LB 3: DL from UB
+        // U' L' U L
+        _buildingBlocks.Add(new[] { Ui, Li, U, L });
+
+        // ZZ-LB 4: DL with U2
+        // U2 L' U2 L
+        _buildingBlocks.Add(new[] { U2, Li, U2, L });
+
+        // ZZ-LB 5: DL flip
+        // L U L'
+        _buildingBlocks.Add(new[] { L, U, Li });
+
+        // --- ZZ Left Corner Placement (DFL corner) ---
+
+        // ZZ-LB 6: Corner from UFR
+        // U' L' U L U' L' U L
+        _buildingBlocks.Add(new[] { Ui, Li, U, L, Ui, Li, U, L });
+
+        // ZZ-LB 7: Corner direct
+        // L' U L
+        _buildingBlocks.Add(new[] { Li, U, L });
+
+        // ZZ-LB 8: Corner from UBL
+        // U L' U' L
+        _buildingBlocks.Add(new[] { U, Li, Ui, L });
+
+        // ZZ-LB 9: Corner twist
+        // L' U' L U L' U' L
+        _buildingBlocks.Add(new[] { Li, Ui, L, U, Li, Ui, L });
+
+        // ZZ-LB 10: Corner from back
+        // U2 L' U L
+        _buildingBlocks.Add(new[] { U2, Li, U, L });
+
+        // --- ZZ Left Pair Building ---
+
+        // ZZ-LB 11: Basic pair insert
+        // U' L' U' L U L' U' L
+        _buildingBlocks.Add(new[] { Ui, Li, Ui, L, U, Li, Ui, L });
+
+        // ZZ-LB 12: Pair with setup
+        // L' U L U' L' U' L
+        _buildingBlocks.Add(new[] { Li, U, L, Ui, Li, Ui, L });
+
+        // ZZ-LB 13: Split pair
+        // U L' U' L U' L' U L
+        _buildingBlocks.Add(new[] { U, Li, Ui, L, Ui, Li, U, L });
+
+        // ZZ-LB 14: Pair from misoriented
+        // L' U2 L U' L' U L
+        _buildingBlocks.Add(new[] { Li, U2, L, Ui, Li, U, L });
+
+        // ZZ-LB 15: Complex pair
+        // U' L' U2 L U L' U' L
+        _buildingBlocks.Add(new[] { Ui, Li, U2, L, U, Li, Ui, L });
+
+        // --- ZZ Left Square Completion ---
+
+        // ZZ-LB 16: Complete square
+        // L' U' L U' L' U L U L' U' L
+        _buildingBlocks.Add(new[] { Li, Ui, L, Ui, Li, U, L, U, Li, Ui, L });
+
+        // ZZ-LB 17: Square with adjustment
+        // U L' U' L U' L' U L U' L' U L
+        _buildingBlocks.Add(new[] { U, Li, Ui, L, Ui, Li, U, L, Ui, Li, U, L });
+
+        // ZZ-LB 18: Fast square
+        // L' U L U L' U' L
+        _buildingBlocks.Add(new[] { Li, U, L, U, Li, Ui, L });
+
+        // ============================================================
+        // ZZ RIGHT BLOCK - Building 1x2x3 on right side
+        // Uses only R, U, L moves (characteristic of ZZ)
+        // ============================================================
+
+        // --- ZZ Right Edge Placement (DR edge) ---
+
+        // ZZ-RB 1: Simple DR insert
+        // R U R'
+        _buildingBlocks.Add(new[] { R, U, Ri });
+
+        // ZZ-RB 2: DR from UF
+        // U' R U R'
+        _buildingBlocks.Add(new[] { Ui, R, U, Ri });
+
+        // ZZ-RB 3: DR from UB
+        // U R U' R'
+        _buildingBlocks.Add(new[] { U, R, Ui, Ri });
+
+        // ZZ-RB 4: DR with U2
+        // U2 R U2 R'
+        _buildingBlocks.Add(new[] { U2, R, U2, Ri });
+
+        // ZZ-RB 5: DR flip
+        // R' U' R
+        _buildingBlocks.Add(new[] { Ri, Ui, R });
+
+        // --- ZZ Right Corner Placement (DFR corner) ---
+
+        // ZZ-RB 6: Corner from UFL
+        // U R U' R' U R U' R'
+        _buildingBlocks.Add(new[] { U, R, Ui, Ri, U, R, Ui, Ri });
+
+        // ZZ-RB 7: Corner direct
+        // R U' R'
+        _buildingBlocks.Add(new[] { R, Ui, Ri });
+
+        // ZZ-RB 8: Corner from UBR
+        // U' R U R'
+        _buildingBlocks.Add(new[] { Ui, R, U, Ri });
+
+        // ZZ-RB 9: Corner twist
+        // R U R' U' R U R'
+        _buildingBlocks.Add(new[] { R, U, Ri, Ui, R, U, Ri });
+
+        // ZZ-RB 10: Corner from back
+        // U2 R U' R'
+        _buildingBlocks.Add(new[] { U2, R, Ui, Ri });
+
+        // --- ZZ Right Pair Building ---
+
+        // ZZ-RB 11: Basic pair insert
+        // U R U R' U' R U R'
+        _buildingBlocks.Add(new[] { U, R, U, Ri, Ui, R, U, Ri });
+
+        // ZZ-RB 12: Pair with setup
+        // R U' R' U R U R'
+        _buildingBlocks.Add(new[] { R, Ui, Ri, U, R, U, Ri });
+
+        // ZZ-RB 13: Split pair
+        // U' R U R' U R U' R'
+        _buildingBlocks.Add(new[] { Ui, R, U, Ri, U, R, Ui, Ri });
+
+        // ZZ-RB 14: Pair from misoriented
+        // R U2 R' U R U' R'
+        _buildingBlocks.Add(new[] { R, U2, Ri, U, R, Ui, Ri });
+
+        // ZZ-RB 15: Complex pair
+        // U R U2 R' U' R U R'
+        _buildingBlocks.Add(new[] { U, R, U2, Ri, Ui, R, U, Ri });
+
+        // --- ZZ Right Square Completion ---
+
+        // ZZ-RB 16: Complete square
+        // R U R' U R U' R' U' R U R'
+        _buildingBlocks.Add(new[] { R, U, Ri, U, R, Ui, Ri, Ui, R, U, Ri });
+
+        // ZZ-RB 17: Square with adjustment
+        // U' R U R' U R U' R' U R U' R'
+        _buildingBlocks.Add(new[] { Ui, R, U, Ri, U, R, Ui, Ri, U, R, Ui, Ri });
+
+        // ZZ-RB 18: Fast square
+        // R U' R' U' R U R'
+        _buildingBlocks.Add(new[] { R, Ui, Ri, Ui, R, U, Ri });
+
+        // ============================================================
+        // ZZF2L - ZZ-specific F2L insertions (R, U, L only)
+        // No F/B moves needed since edges are already oriented
+        // ============================================================
+
+        // --- ZZF2L Basic Insertions ---
+
+        // ZZF2L 1: Right slot basic
+        // R U R' U' R U R'
+        _buildingBlocks.Add(new[] { R, U, Ri, Ui, R, U, Ri });
+
+        // ZZF2L 2: Left slot basic
+        // L' U' L U L' U' L
+        _buildingBlocks.Add(new[] { Li, Ui, L, U, Li, Ui, L });
+
+        // ZZF2L 3: Right with double U
+        // R U2 R' U' R U R'
+        _buildingBlocks.Add(new[] { R, U2, Ri, Ui, R, U, Ri });
+
+        // ZZF2L 4: Left with double U
+        // L' U2 L U L' U' L
+        _buildingBlocks.Add(new[] { Li, U2, L, U, Li, Ui, L });
+
+        // ZZF2L 5: Right U' pattern
+        // R U' R' U R U' R'
+        _buildingBlocks.Add(new[] { R, Ui, Ri, U, R, Ui, Ri });
+
+        // ZZF2L 6: Left U pattern
+        // L' U L U' L' U L
+        _buildingBlocks.Add(new[] { Li, U, L, Ui, Li, U, L });
+
+        // --- ZZF2L Corner on Top Cases ---
+
+        // ZZF2L 7: Corner up, right insert
+        // U R U' R' U' R U R'
+        _buildingBlocks.Add(new[] { U, R, Ui, Ri, Ui, R, U, Ri });
+
+        // ZZF2L 8: Corner up, left insert
+        // U' L' U L U L' U' L
+        _buildingBlocks.Add(new[] { Ui, Li, U, L, U, Li, Ui, L });
+
+        // ZZF2L 9: Corner pointing right
+        // U' R U R' U R U R'
+        _buildingBlocks.Add(new[] { Ui, R, U, Ri, U, R, U, Ri });
+
+        // ZZF2L 10: Corner pointing left
+        // U L' U' L U' L' U' L
+        _buildingBlocks.Add(new[] { U, Li, Ui, L, Ui, Li, Ui, L });
+
+        // ZZF2L 11: Corner up, U2 right
+        // U2 R U' R' U R U R'
+        _buildingBlocks.Add(new[] { U2, R, Ui, Ri, U, R, U, Ri });
+
+        // ZZF2L 12: Corner up, U2 left
+        // U2 L' U L U' L' U' L
+        _buildingBlocks.Add(new[] { U2, Li, U, L, Ui, Li, Ui, L });
+
+        // --- ZZF2L Edge in Slot Cases ---
+
+        // ZZF2L 13: Edge in slot, right
+        // R U R' U R U R' U R U' R'
+        _buildingBlocks.Add(new[] { R, U, Ri, U, R, U, Ri, U, R, Ui, Ri });
+
+        // ZZF2L 14: Edge in slot, left
+        // L' U' L U' L' U' L U' L' U L
+        _buildingBlocks.Add(new[] { Li, Ui, L, Ui, Li, Ui, L, Ui, Li, U, L });
+
+        // ZZF2L 15: Edge wrong, right
+        // R U' R' U R U2 R' U R U' R'
+        _buildingBlocks.Add(new[] { R, Ui, Ri, U, R, U2, Ri, U, R, Ui, Ri });
+
+        // ZZF2L 16: Edge wrong, left
+        // L' U L U' L' U2 L U' L' U L
+        _buildingBlocks.Add(new[] { Li, U, L, Ui, Li, U2, L, Ui, Li, U, L });
+
+        // --- ZZF2L Connected Pair Cases ---
+
+        // ZZF2L 17: Pair connected, easy right
+        // U R U' R'
+        _buildingBlocks.Add(new[] { U, R, Ui, Ri });
+
+        // ZZF2L 18: Pair connected, easy left
+        // U' L' U L
+        _buildingBlocks.Add(new[] { Ui, Li, U, L });
+
+        // ZZF2L 19: Pair wrong direction right
+        // U' R U R' U R U' R'
+        _buildingBlocks.Add(new[] { Ui, R, U, Ri, U, R, Ui, Ri });
+
+        // ZZF2L 20: Pair wrong direction left
+        // U L' U' L U' L' U L
+        _buildingBlocks.Add(new[] { U, Li, Ui, L, Ui, Li, U, L });
+
+        // --- ZZF2L Special Cases ---
+
+        // ZZF2L 21: Both pieces in U, right
+        // R U2 R' U' R U' R' U R U R'
+        _buildingBlocks.Add(new[] { R, U2, Ri, Ui, R, Ui, Ri, U, R, U, Ri });
+
+        // ZZF2L 22: Both pieces in U, left
+        // L' U2 L U L' U L U' L' U' L
+        _buildingBlocks.Add(new[] { Li, U2, L, U, Li, U, L, Ui, Li, Ui, L });
+
+        // ZZF2L 23: Triple sexy right
+        // R U R' U' R U R' U' R U R'
+        _buildingBlocks.Add(new[] { R, U, Ri, Ui, R, U, Ri, Ui, R, U, Ri });
+
+        // ZZF2L 24: Triple sexy left
+        // L' U' L U L' U' L U L' U' L
+        _buildingBlocks.Add(new[] { Li, Ui, L, U, Li, Ui, L, U, Li, Ui, L });
+
+        // ZZF2L 25: Long right insert
+        // U R U' R' U' R U' R' U R U' R'
+        _buildingBlocks.Add(new[] { U, R, Ui, Ri, Ui, R, Ui, Ri, U, R, Ui, Ri });
+
+        // ZZF2L 26: Long left insert
+        // U' L' U L U L' U L U' L' U L
+        _buildingBlocks.Add(new[] { Ui, Li, U, L, U, Li, U, L, Ui, Li, U, L });
+
+        // --- ZZF2L Multislot Patterns ---
+
+        // ZZF2L 27: Right to left transition
+        // R U R' L' U' L
+        _buildingBlocks.Add(new[] { R, U, Ri, Li, Ui, L });
+
+        // ZZF2L 28: Left to right transition
+        // L' U' L R U R'
+        _buildingBlocks.Add(new[] { Li, Ui, L, R, U, Ri });
+
+        // ZZF2L 29: Pseudo-slotting right
+        // R U' R' U2 R U R'
+        _buildingBlocks.Add(new[] { R, Ui, Ri, U2, R, U, Ri });
+
+        // ZZF2L 30: Pseudo-slotting left
+        // L' U L U2 L' U' L
+        _buildingBlocks.Add(new[] { Li, U, L, U2, Li, Ui, L });
+
+        // ============================================================
+        // ZZ LAST LAYER SHORTCUTS
+        // Since edges are oriented from EOLine, use LL-focused patterns
+        // ============================================================
+
+        // ZZLL 1: Pure corner cycle (R, U, L only)
+        // R U R' U R U2 R' L' U' L U' L' U2 L
+        _buildingBlocks.Add(new[] { R, U, Ri, U, R, U2, Ri, Li, Ui, L, Ui, Li, U2, L });
+
+        // ZZLL 2: Adjacent swap (no F moves)
+        // R U R' U' L' U R U' L U' R'
+        _buildingBlocks.Add(new[] { R, U, Ri, Ui, Li, U, R, Ui, L, Ui, Ri });
+
+        // ZZLL 3: Diagonal swap (R, U, L)
+        // R U' L' U R' U' L U R U' L' U R' U' L
+        _buildingBlocks.Add(new[] { R, Ui, Li, U, Ri, Ui, L, U, R, Ui, Li, U, Ri, Ui, L });
+
+        // ZZLL 4: Corner orient sune
+        // R U R' U R U2 R'
+        _buildingBlocks.Add(new[] { R, U, Ri, U, R, U2, Ri });
+
+        // ZZLL 5: Corner orient antisune
+        // R U2 R' U' R U' R'
+        _buildingBlocks.Add(new[] { R, U2, Ri, Ui, R, Ui, Ri });
+
+        // ZZLL 6: H perm (edges only)
+        // R2 U2 R U2 R2 U2 R2 U2 R U2 R2
+        _buildingBlocks.Add(new[] { R2, U2, R, U2, R2, U2, R2, U2, R, U2, R2 });
+
+        // ZZLL 7: U perm a variant
+        // R U' R U R U R U' R' U' R2
+        _buildingBlocks.Add(new[] { R, Ui, R, U, R, U, R, Ui, Ri, Ui, R2 });
+
+        // ZZLL 8: U perm b variant
+        // R2 U R U R' U' R' U' R' U R'
+        _buildingBlocks.Add(new[] { R2, U, R, U, Ri, Ui, Ri, Ui, Ri, U, Ri });
 
         // ============================================================
         // CROSS BUILDING

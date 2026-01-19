@@ -537,9 +537,9 @@ Dwie płaszczyzny rotacji są ortogonalne, jeśli nie współdzielą żadnej wsp
 ### BlockBuildingMutation (Mutacja budowania bloków) ✅ ZAIMPLEMENTOWANY
 **Plik:** `GA/Operators/Mutation/BlockBuildingMutation.cs`
 
-**Opis:** Wstawia sekwencje budowania bloków z metod CFOP/Roux. Zawiera pełny zestaw F2L (41 przypadków) oraz kompletną implementację metody Roux.
+**Opis:** Wstawia sekwencje budowania bloków z metod CFOP/Roux/ZZ. Zawiera pełny zestaw F2L (41 przypadków), kompletną implementację metody Roux oraz kompletną implementację metody ZZ.
 
-**Dla 3D - Pełny zestaw ~150 algorytmów:**
+**Dla 3D - Pełny zestaw ~248 algorytmów:**
 
 | Kategoria | Algorytmy | Liczba | Opis |
 |-----------|-----------|--------|------|
@@ -557,11 +557,17 @@ Dwie płaszczyzny rotacji są ortogonalne, jeśli nie współdzielą żadnej wsp
 | **Roux CMLL** | O, H, Pi, U, T, S, AS, L | 42 | Corners of Last Layer |
 | **Roux LSE** | 4a, 4b, 4c, Arrow, Dot, etc. | 10 | Last Six Edges |
 | **Razem Roux** | | **90** | Kompletna metoda |
+| **ZZ EOLine** | EO triggers, Line, Combined | 24 | Edge Orientation + Line |
+| **ZZ Left Block** | Edge, Corner, Pair, Square | 18 | Lewy blok 1x2x3 (R,U,L only) |
+| **ZZ Right Block** | Edge, Corner, Pair, Square | 18 | Prawy blok 1x2x3 (R,U,L only) |
+| **ZZF2L** | Inserts, Corner, Edge, Pair, Special | 30 | F2L bez F/B |
+| **ZZLL** | Corner cycles, perms | 8 | Last Layer shortcuts |
+| **Razem ZZ** | | **98** | Kompletna metoda |
 | **Cross** | F R, R' D' R, etc. | 8 | Budowanie krzyża |
 | **LBL** | R' D' R D, etc. | 4 | Warstwa po warstwie |
 | **Triggers** | Sexy, Sledgehammer, etc. | 6 | Podstawowe sekwencje |
 | **Left/Back variants** | L' U' L, B U B', etc. | 9 | Wersje leworęczne/tylne |
-| **Razem 3D** | | **~150** | |
+| **Razem 3D** | | **~248** | |
 
 **Dla 4D+:** Uogólnione bloki A B A', wzorce A2 B2, koordynacja warstw wewnętrznych/zewnętrznych.
 
@@ -775,7 +781,7 @@ Po rozszerzeniu `TMove`, następujące operatory wymagałyby aktualizacji:
 | HyperplaneMutation | ✅ | ✅ | ✅ | Gotowy | Przesunięcie osi/hiperpłaszczyzny |
 | OrthogonalConjugation | ⚠️ | ✅ | ✅ | Gotowy | Ortogonalne komutatory (fallback dla 3D) |
 | PatternMutation | ✅ | ✅ | ✅ | Gotowy | Wzorce 3D + uogólnione dla ND |
-| BlockBuildingMutation | ✅ | ✅ | ✅ | Gotowy | Pełny F2L (41) + Roux (FB+SB+CMLL+LSE: 90) (~150 wzorców) |
+| BlockBuildingMutation | ✅ | ✅ | ✅ | Gotowy | F2L (41) + Roux (90) + ZZ (98) (~248 wzorców) |
 | LocalSearchMutation | ✅ | ✅ | ✅ | Gotowy | Hill-climbing, dimension-agnostic |
 | DoubleRotationMutation | - | ❌ | ❌ | Brak | Wymaga rozszerzenia TMove |
 
