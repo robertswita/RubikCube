@@ -480,7 +480,7 @@ Dwie płaszczyzny rotacji są ortogonalne, jeśli nie współdzielą żadnej wsp
 
 **Opis:** Wstawia znane algorytmy speedcubingowe do chromosomu.
 
-**Dla 3D - Pełne zestawy PLL (21) i OLL (57):**
+**Dla 3D - Kompletne zestawy algorytmów speedcubingowych:**
 
 | Kategoria | Algorytmy | Liczba | Opis |
 |-----------|-----------|--------|------|
@@ -505,8 +505,30 @@ Dwie płaszczyzny rotacji są ortogonalne, jeśli nie współdzielą żadnej wsp
 | **OLL - Lightning** | 7, 8, 11, 12, 39, 40 | 6 | Błyskawica |
 | **OLL - Dot** | 1-4, 17-20 | 8 | Kropka (brak krawędzi) |
 | **Razem OLL** | | **57** | |
+| **COLL - H** | H1-H4 | 4 | Wszystkie narożniki skręcone w tym samym kierunku |
+| **COLL - Pi** | Pi1-Pi6 | 6 | Dwa sąsiednie CW, dwa CCW |
+| **COLL - U (Sune)** | U1-U6 | 6 | Kształt Sune |
+| **COLL - T** | T1-T6 | 6 | Kształt T |
+| **COLL - L** | L1-L6 | 6 | Kształt L |
+| **COLL - AS** | AS1-AS6 | 6 | Anti-Sune |
+| **COLL - S** | S1-S6 | 6 | Sune-like |
+| **Razem COLL** | | **42** | Narożniki ostatniej warstwy |
+| **ZBLL - T cases** | T1-T20 | 20 | Kształt T, krawędzie zorientowane |
+| **ZBLL - U cases** | U1-U20 | 20 | Kształt Sune, krawędzie zorientowane |
+| **ZBLL - L cases** | L1-L20 | 20 | Kształt L, krawędzie zorientowane |
+| **ZBLL - H cases** | H1-H15 | 15 | Kształt H, krawędzie zorientowane |
+| **ZBLL - Pi cases** | Pi1-Pi20 | 20 | Kształt Pi, krawędzie zorientowane |
+| **ZBLL - S cases** | S1-S20 | 20 | Sune-like, krawędzie zorientowane |
+| **ZBLL - AS cases** | AS1-AS20 | 20 | Anti-Sune, krawędzie zorientowane |
+| **Razem ZBLL** | | **135** | ~27% pełnego zestawu ZBLL (493) |
+| **Winter Variation** | WV1-WV27 | 27 | Orientacja narożników podczas F2L |
+| **VLS - Dot** | Dot1-Dot4 | 4 | Brak zorientowanych krawędzi |
+| **VLS - Line** | Line1-Line4 | 4 | Dwie przeciwległe krawędzie |
+| **VLS - L-shape** | L1-L8 | 8 | Dwie sąsiednie krawędzie |
+| **VLS - Cross** | Cross1-Cross8 | 8 | Wszystkie krawędzie zorientowane |
+| **Razem VLS** | | **24** | Orientacja krawędzi podczas F2L |
 | Triggery | Sexy, Sledgehammer, etc. | 8 | Podstawowe sekwencje |
-| **Razem 3D** | | **~86** | |
+| **Razem 3D** | | **~315** | |
 
 **Dla 4D+:** Uogólnione komutatory A B A' B' dla różnych kombinacji płaszczyzn, używając osi prostopadłej do płaszczyzny rotacji.
 

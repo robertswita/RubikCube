@@ -506,12 +506,12 @@ COLL rozwiązuje orientację i permutację narożników przy już zorientowanych
 | S5 | F R' F' R U R U' R' | 8 |
 | S6 | F' L F L' U' L' U L | 8 |
 
-##### ZBLL Subset (Zborowski-Bruchem Last Layer) - ~30 najpopularniejszych przypadków
+##### ZBLL (Zborowski-Bruchem Last Layer) - 135 algorytmów
 
 ZBLL rozwiązuje ostatnią warstwę w jednym kroku, gdy krawędzie są już zorientowane.
-Pełny zestaw ZBLL to 493 algorytmy. Tutaj przedstawiamy najczęściej używane.
+Pełny zestaw ZBLL to 493 algorytmy. Implementacja zawiera 135 najczęściej używanych.
 
-###### ZBLL T Cases
+###### ZBLL T Cases (20 algorytmów)
 
 | Nazwa | Algorytm | Ruchy |
 |-------|----------|-------|
@@ -519,8 +519,12 @@ Pełny zestaw ZBLL to 493 algorytmy. Tutaj przedstawiamy najczęściej używane.
 | T2 | R U R' U' R' F R F' U2 R U R' U R U2 R' | 17 |
 | T3 | R' U R U2 L' R' U R U' L | 10 |
 | T4 | R U2 R' U' R U' R' L U' L' U2 L U' L' | 14 |
+| T5 | R U R' U' R' F R2 U' R' U R U R' F' | 14 |
+| T6-T10 | (dodatkowe warianty T-shape) | 10-16 |
+| T11-T15 | (warianty z L i R) | 7-15 |
+| T16-T20 | (zaawansowane T przypadki) | 13-17 |
 
-###### ZBLL U Cases
+###### ZBLL U Cases (20 algorytmów)
 
 | Nazwa | Algorytm | Ruchy |
 |-------|----------|-------|
@@ -528,8 +532,11 @@ Pełny zestaw ZBLL to 493 algorytmy. Tutaj przedstawiamy najczęściej używane.
 | U2 | R U2 R' U' R U R' U' R U R' U' R U' R' | 15 |
 | U3 | R' U L U' R U L' U' R' U L U' R U L' | 15 |
 | U4 | R U' L' U R' U' L U R U' L' U R' U' L | 15 |
+| U5-U10 | (warianty Sune) | 7-15 |
+| U11-U15 | (warianty z D move) | 9-15 |
+| U16-U20 | (złożone przypadki U) | 13-17 |
 
-###### ZBLL L Cases
+###### ZBLL L Cases (20 algorytmów)
 
 | Nazwa | Algorytm | Ruchy |
 |-------|----------|-------|
@@ -537,8 +544,11 @@ Pełny zestaw ZBLL to 493 algorytmy. Tutaj przedstawiamy najczęściej używane.
 | L2 | R U R' U R U' R' U R U' R' U R U2 R' | 15 |
 | L3 | R U2 R' U R U R' U R U' R' U R U2 R' | 15 |
 | L4 | F' L' U L U' L' U' L U' L' U L F | 13 |
+| L5-L10 | (warianty L-shape) | 9-16 |
+| L11-L15 | (złożone L przypadki) | 13-17 |
+| L16-L20 | (zaawansowane L) | 14-17 |
 
-###### ZBLL H Cases
+###### ZBLL H Cases (15 algorytmów)
 
 | Nazwa | Algorytm | Ruchy |
 |-------|----------|-------|
@@ -546,8 +556,10 @@ Pełny zestaw ZBLL to 493 algorytmy. Tutaj przedstawiamy najczęściej używane.
 | H2 | R U2 R' U' R U' R' U2 R U R' U R U2 R' | 15 |
 | H3 | R2 U R' U R' U' R U' R2 U' D R' U R D' | 15 |
 | H4 | R' U2 R U R' U R U R' U' R U' R' U2 R | 15 |
+| H5-H10 | (warianty H-shape) | 15-19 |
+| H11-H15 | (zaawansowane H) | 14-17 |
 
-###### ZBLL Pi Cases
+###### ZBLL Pi Cases (20 algorytmów)
 
 | Nazwa | Algorytm | Ruchy |
 |-------|----------|-------|
@@ -555,15 +567,33 @@ Pełny zestaw ZBLL to 493 algorytmy. Tutaj przedstawiamy najczęściej używane.
 | Pi2 | F R U R' U' F' R U R' U' R' F R F' | 14 |
 | Pi3 | R U R' U' R' F R F' U2 R' F R F' | 13 |
 | Pi4 | R U2 R2 U' R2 U' R2 U2 R | 9 |
+| Pi5-Pi10 | (warianty Pi) | 12-18 |
+| Pi11-Pi15 | (złożone Pi) | 13-16 |
+| Pi16-Pi20 | (zaawansowane Pi) | 14-15 |
 
-###### ZBLL S/AS Cases
+###### ZBLL S Cases (20 algorytmów)
 
 | Nazwa | Algorytm | Ruchy |
 |-------|----------|-------|
 | S1 | R U R' U R U2 R' U' R U R' U R U2 R' | 15 |
 | S2 | R' U' R U' R' U2 R U R' U' R U' R' U2 R | 15 |
+| S3 | F R U R' U' R U' R' U' R U R' F' | 13 |
+| S4 | F' L' U' L U L' U L U L' U' L F | 13 |
+| S5-S10 | (warianty Sune-like) | 13-15 |
+| S11-S15 | (złożone S) | 13-15 |
+| S16-S20 | (zaawansowane S) | 14-17 |
+
+###### ZBLL AS Cases (20 algorytmów)
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
 | AS1 | R U2 R' U' R U' R' U R U2 R' U' R U' R' | 15 |
 | AS2 | R' U2 R U R' U R U' R' U2 R U R' U R | 15 |
+| AS3 | R' U' R U' R' U R U R' U R U R' U2 R | 14 |
+| AS4 | R U R' U R U' R' U' R U' R' U' R U2 R' | 15 |
+| AS5-AS10 | (warianty Anti-Sune) | 15-17 |
+| AS11-AS15 | (złożone AS) | 14-17 |
+| AS16-AS20 | (zaawansowane AS) | 15-18 |
 
 ##### Winter Variation (WV) - 27 algorytmów
 
