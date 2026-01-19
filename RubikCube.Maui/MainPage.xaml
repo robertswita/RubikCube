@@ -49,7 +49,10 @@
                 <!-- GA Configuration -->
                 <Frame BorderColor="Gray" Padding="10">
                     <VerticalStackLayout Spacing="8">
-                        <Label Text="GA Configuration" FontAttributes="Bold" />
+                        <HorizontalStackLayout Spacing="10">
+                            <Label Text="GA Configuration" FontAttributes="Bold" VerticalOptions="Center" />
+                            <Button Text="Reset to Default" Clicked="OnResetGAConfigClicked" Padding="5,2" FontSize="12" />
+                        </HorizontalStackLayout>
 
                         <!-- Solver Mode -->
                         <HorizontalStackLayout Spacing="10">
@@ -100,6 +103,43 @@
                             <Label Text="Generations:" VerticalOptions="Center" WidthRequest="80" />
                             <Slider x:Name="GenerationsSlider" Minimum="10" Maximum="500" Value="100" WidthRequest="120" ValueChanged="OnGAParamChanged" />
                             <Label x:Name="GenerationsLabel" Text="100" VerticalOptions="Center" WidthRequest="40" />
+                        </HorizontalStackLayout>
+
+                        <!-- Selection Strategy -->
+                        <HorizontalStackLayout Spacing="10">
+                            <Label Text="Selection:" VerticalOptions="Center" WidthRequest="80" />
+                            <Picker x:Name="SelectionPicker" WidthRequest="150" SelectedIndexChanged="OnSelectionChanged">
+                                <Picker.ItemsSource>
+                                    <x:Array Type="{x:Type x:String}">
+                                        <x:String>Unique</x:String>
+                                        <x:String>Tournament</x:String>
+                                        <x:String>Rank</x:String>
+                                        <x:String>Roulette</x:String>
+                                        <x:String>RouletteRank</x:String>
+                                    </x:Array>
+                                </Picker.ItemsSource>
+                            </Picker>
+                        </HorizontalStackLayout>
+
+                        <!-- Crossover Strategy -->
+                        <HorizontalStackLayout Spacing="10">
+                            <Label Text="Crossover:" VerticalOptions="Center" WidthRequest="80" />
+                            <Picker x:Name="CrossoverPicker" WidthRequest="150" SelectedIndexChanged="OnCrossoverChanged">
+                                <Picker.ItemsSource>
+                                    <x:Array Type="{x:Type x:String}">
+                                        <x:String>SinglePoint</x:String>
+                                        <x:String>TwoPoint</x:String>
+                                        <x:String>Uniform</x:String>
+                                    </x:Array>
+                                </Picker.ItemsSource>
+                            </Picker>
+                        </HorizontalStackLayout>
+
+                        <!-- Elite Count -->
+                        <HorizontalStackLayout Spacing="10">
+                            <Label Text="Elite:" VerticalOptions="Center" WidthRequest="80" />
+                            <Slider x:Name="EliteSlider" Minimum="0" Maximum="20" Value="2" WidthRequest="120" ValueChanged="OnGAParamChanged" />
+                            <Label x:Name="EliteLabel" Text="2" VerticalOptions="Center" WidthRequest="40" />
                         </HorizontalStackLayout>
                     </VerticalStackLayout>
                 </Frame>

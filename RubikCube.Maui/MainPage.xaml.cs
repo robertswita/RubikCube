@@ -125,6 +125,8 @@ public partial class MainPage : ContentPage
         // Initialize GA configuration UI
         SolverModePicker.SelectedIndex = 0; // Iterative
         PresetPicker.SelectedIndex = 0; // Default
+        SelectionPicker.SelectedIndex = 0; // Unique
+        CrossoverPicker.SelectedIndex = 0; // SinglePoint
         UpdateGAConfigLabels();
 
         // Subscribe to scroll wheel events
@@ -464,7 +466,59 @@ public partial class MainPage : ContentPage
         PopulationSlider.Value = _selectedGAConfig.PopulationSize;
         MutationSlider.Value = _selectedGAConfig.MutationRate;
         GenerationsSlider.Value = _selectedGAConfig.Termination.MaxGenerations;
+        EliteSlider.Value = _selectedGAConfig.EliteCount;
+
+        // Update pickers to match preset
+        SelectionPicker.SelectedIndex = _selectedGAConfig.Selection switch
+        {
+            SelectionStrategy.Unique => 0,
+            SelectionStrategy.Tournament => 1,
+            SelectionStrategy.Rank => 2,
+            SelectionStrategy.Roulette => 3,
+            SelectionStrategy.RouletteRank => 4,
+            _ => 0
+        };
+        CrossoverPicker.SelectedIndex = _selectedGAConfig.Crossover switch
+        {
+            CrossoverStrategy.SinglePoint => 0,
+            CrossoverStrategy.TwoPoint => 1,
+            CrossoverStrategy.Uniform => 2,
+            _ => 0
+        };
+
         UpdateGAConfigLabels();
+    }
+
+    private void OnSelectionChanged(object? sender, EventArgs e)
+    {
+        if (SelectionPicker.SelectedIndex < 0) return;
+
+        var selection = SelectionPicker.SelectedIndex switch
+        {
+            0 => SelectionStrategy.Unique,
+            1 => SelectionStrategy.Tournament,
+            2 => SelectionStrategy.Rank,
+            3 => SelectionStrategy.Roulette,
+            4 => SelectionStrategy.RouletteRank,
+            _ => SelectionStrategy.Unique
+        };
+
+        _selectedGAConfig = _selectedGAConfig with { Selection = selection };
+    }
+
+    private void OnCrossoverChanged(object? sender, EventArgs e)
+    {
+        if (CrossoverPicker.SelectedIndex < 0) return;
+
+        var crossover = CrossoverPicker.SelectedIndex switch
+        {
+            0 => CrossoverStrategy.SinglePoint,
+            1 => CrossoverStrategy.TwoPoint,
+            2 => CrossoverStrategy.Uniform,
+            _ => CrossoverStrategy.SinglePoint
+        };
+
+        _selectedGAConfig = _selectedGAConfig with { Crossover = crossover };
     }
 
     private void OnGAParamChanged(object? sender, ValueChangedEventArgs e)
@@ -475,7 +529,8 @@ public partial class MainPage : ContentPage
         _selectedGAConfig = _selectedGAConfig with
         {
             PopulationSize = (int)PopulationSlider.Value,
-            MutationRate = MutationSlider.Value
+            MutationRate = MutationSlider.Value,
+            EliteCount = (int)EliteSlider.Value
         };
         _generationsPerIteration = (int)GenerationsSlider.Value;
     }
@@ -485,6 +540,26 @@ public partial class MainPage : ContentPage
         PopulationLabel.Text = ((int)PopulationSlider.Value).ToString();
         MutationLabel.Text = $"{(int)(MutationSlider.Value * 100)}%";
         GenerationsLabel.Text = ((int)GenerationsSlider.Value).ToString();
+        EliteLabel.Text = ((int)EliteSlider.Value).ToString();
+    }
+
+    private void OnResetGAConfigClicked(object? sender, EventArgs e)
+    {
+        // Reset to original settings (Default preset, Iterative mode)
+        _selectedSolverMode = SolverMode.Iterative;
+        _selectedGAConfig = GAPresets.Default;
+        _generationsPerIteration = 100;
+
+        // Update UI
+        SolverModePicker.SelectedIndex = 0;
+        PresetPicker.SelectedIndex = 0;
+        PopulationSlider.Value = _selectedGAConfig.PopulationSize;
+        MutationSlider.Value = _selectedGAConfig.MutationRate;
+        GenerationsSlider.Value = _selectedGAConfig.Termination.MaxGenerations;
+        EliteSlider.Value = _selectedGAConfig.EliteCount;
+        SelectionPicker.SelectedIndex = 0; // Unique
+        CrossoverPicker.SelectedIndex = 0; // SinglePoint
+        UpdateGAConfigLabels();
     }
 
     #endregion
