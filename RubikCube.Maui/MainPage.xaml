@@ -6,7 +6,7 @@
              x:Class="RubikCube.Maui.MainPage"
              Title="Rubik's Cube 4D Solver">
 
-    <Grid ColumnDefinitions="400,*" RowDefinitions="*">
+    <Grid ColumnDefinitions="400,*,320" RowDefinitions="*">
 
         <!-- Left Panel - Controls -->
         <ScrollView Grid.Column="0" Padding="10">
@@ -194,35 +194,10 @@
                     </Grid>
                 </Frame>
 
-                <!-- Fitness Chart -->
-                <Frame BorderColor="Gray" Padding="5">
-                    <lvc:CartesianChart x:Name="FitnessChart"
-                                        HeightRequest="200"
-                                        Series="{Binding Series}"
-                                        XAxes="{Binding XAxes}"
-                                        YAxes="{Binding YAxes}" />
-                </Frame>
-
-                <!-- Iteration Time -->
-                <Label x:Name="IterTimeLabel" Text="Iter time: 0ms" />
-
-                <!-- State Grid Visualization (always square) -->
-                <VerticalStackLayout>
-                    <Label Text="State Grid:" />
-                    <Border Stroke="Gray"
-                            StrokeThickness="1"
-                            HeightRequest="250"
-                            WidthRequest="250"
-                            HorizontalOptions="Start"
-                            VerticalOptions="Start">
-                        <GraphicsView x:Name="StateGridView" />
-                    </Border>
-                </VerticalStackLayout>
-
             </VerticalStackLayout>
         </ScrollView>
 
-        <!-- Right Panel - Cube View (Native GPU rendering: Metal on macOS, OpenGL on Windows) -->
+        <!-- Center Panel - Cube View (Native GPU rendering: Metal on macOS, OpenGL on Windows) -->
         <controls:NativeCubeView x:Name="CubeViewControl"
                                  Grid.Column="1"
                                  BackgroundColor="DarkSlateGray">
@@ -231,6 +206,43 @@
                 <PinchGestureRecognizer PinchUpdated="OnCubeViewPinchUpdated" />
             </controls:NativeCubeView.GestureRecognizers>
         </controls:NativeCubeView>
+
+        <!-- Right Panel - Charts -->
+        <ScrollView Grid.Column="2" Padding="10">
+            <VerticalStackLayout Spacing="10">
+
+                <!-- Fitness Chart -->
+                <Frame BorderColor="Gray" Padding="5">
+                    <VerticalStackLayout>
+                        <Label Text="Fitness Chart" FontAttributes="Bold" />
+                        <lvc:CartesianChart x:Name="FitnessChart"
+                                            HeightRequest="250"
+                                            Series="{Binding Series}"
+                                            XAxes="{Binding XAxes}"
+                                            YAxes="{Binding YAxes}" />
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Iteration Time -->
+                <Label x:Name="IterTimeLabel" Text="Iter time: 0ms" />
+
+                <!-- State Grid Visualization -->
+                <Frame BorderColor="Gray" Padding="5">
+                    <VerticalStackLayout>
+                        <Label Text="State Grid" FontAttributes="Bold" />
+                        <Border Stroke="Gray"
+                                StrokeThickness="1"
+                                HeightRequest="280"
+                                WidthRequest="280"
+                                HorizontalOptions="Center"
+                                VerticalOptions="Start">
+                            <GraphicsView x:Name="StateGridView" />
+                        </Border>
+                    </VerticalStackLayout>
+                </Frame>
+
+            </VerticalStackLayout>
+        </ScrollView>
 
     </Grid>
 </ContentPage>
