@@ -580,9 +580,29 @@ Dwie płaszczyzny rotacji są ortogonalne, jeśli nie współdzielą żadnej wsp
 
 **Algorytm:** Generuj kandydatów → Oceń (fitness lub heurystyki) → Zastosuj najlepszego → Powtórz.
 
-**Typy modyfikacji:** Zmiana kąta, uproszczenie sąsiednich, zamiana na ruch sąsiedni, usunięcie par anulujących, zamiana z ValidMoves.
+**Typy modyfikacji (11 typów):**
 
-**Dlaczego działa dla N wymiarów:** Wszystkie operacje używają `TMove.Decode/Encode` które są N-agnostyczne. Heurystyki oparte na właściwościach ruchów (plane, axis) działają dla dowolnego N. `ValidMoves` automatycznie zawiera wszystkie ruchy dla aktualnego wymiaru.
+| Typ | Nazwa | Opis |
+|-----|-------|------|
+| 0 | Zmiana kąta | Losowa zmiana kąta ruchu |
+| 1 | Uproszczenie sąsiednich | R R → R2, R R' → usuń |
+| 2 | Zamiana na sąsiada | Zmiana slice o ±1 lub kąta o 1 |
+| 3 | Usunięcie par anulujących | Wykrycie i zamiana R R' |
+| 4 | Zamiana z ValidMoves | Zastąpienie losowym prawidłowym ruchem |
+| 5 | **Wstawianie ruchu** | Wstawienie nowego ruchu, przesunięcie reszty |
+| 6 | **Usuwanie ruchu** | Usunięcie ruchu, przesunięcie i uzupełnienie |
+| 7 | **Zamiana nie-sąsiednich** | Swap dwóch ruchów oddalonych o ≥2 pozycje |
+| 8 | **Modyfikacja wzorcowa** | Wykrywanie i upraszczanie znanych wzorców |
+| 9 | **Optymalizacja gradientowa** | Próba wszystkich 3 kątów dla pozycji |
+| 10 | **Multi-pozycyjna gradient** | Optymalizacja kątów dla 2-3 pozycji |
+
+**Wzorce do wykrywania:**
+- X X → X2 (np. R R → R2)
+- X X' → usunięcie (np. R R' → nic)
+- X Y X' → uproszczenie koniugatu
+- (A B A' B')² → A B A' B' (podwójny komutator)
+
+**Dlaczego działa dla N wymiarów:** Wszystkie operacje używają `TMove.Decode/Encode` które są N-agnostyczne. Heurystyki oparte na właściwościach ruchów (plane, axis) działają dla dowolnego N. `ValidMoves` automatycznie zawiera wszystkie ruchy dla aktualnego wymiaru. Wzorce 3D są cache'owane osobno, ale generyczne uproszczenia (X X → X2) działają dla dowolnego N.
 
 ---
 
@@ -782,7 +802,7 @@ Po rozszerzeniu `TMove`, następujące operatory wymagałyby aktualizacji:
 | OrthogonalConjugation | ⚠️ | ✅ | ✅ | Gotowy | Ortogonalne komutatory (fallback dla 3D) |
 | PatternMutation | ✅ | ✅ | ✅ | Gotowy | Wzorce 3D + uogólnione dla ND |
 | BlockBuildingMutation | ✅ | ✅ | ✅ | Gotowy | F2L (41) + Roux (90) + ZZ (98) (~248 wzorców) |
-| LocalSearchMutation | ✅ | ✅ | ✅ | Gotowy | Hill-climbing, dimension-agnostic |
+| LocalSearchMutation | ✅ | ✅ | ✅ | Gotowy | Hill-climbing z 11 typami modyfikacji, gradient angle opt. |
 | DoubleRotationMutation | - | ❌ | ❌ | Brak | Wymaga rozszerzenia TMove |
 
 **Legenda:**

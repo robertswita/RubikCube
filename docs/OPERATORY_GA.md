@@ -1145,24 +1145,53 @@ Metoda ZZ (autorstwa Zbigniewa Zborowskiego) rozwiązuje kostkę w następujący
 Wykonuje hill-climbing w małym sąsiedztwie, próbując wielu małych modyfikacji i zachowując najlepszą.
 
 **Parametry:**
-- neighborhoodSize: liczba kandydackich modyfikacji na iterację (domyślnie 5)
-- maxIterations: maksymalna liczba iteracji hill-climbingu (domyślnie 3)
+- neighborhoodSize: liczba kandydackich modyfikacji na iterację (domyślnie 8)
+- maxIterations: maksymalna liczba iteracji hill-climbingu (domyślnie 4)
 
-**Typy modyfikacji (losowo wybierane):**
+**Typy modyfikacji podstawowe (5):**
 1. **Zmiana kąta:** Zmienia kąt losowego ruchu na inny (90°→180°, 180°→-90°, itd.)
 2. **Uproszczenie sąsiednich:** Jeśli dwa sąsiednie ruchy są na tym samym axis/plane/slice, łączy je
 3. **Zamiana na sąsiada:** Zmienia warstwę o ±1 lub kąt o 1
 4. **Usunięcie par anulujących:** Szuka par typu R R' i zastępuje losowymi ruchami
 5. **Zamiana z ValidMoves:** Zastępuje gen losowym prawidłowym ruchem
 
+**Typy modyfikacji zaawansowane (6):**
+6. **Wstawianie ruchu:** Wstawia nowy ruch w losowej pozycji, przesuwając resztę (tracąc ostatni element)
+7. **Usuwanie ruchu:** Usuwa ruch z losowej pozycji, przesuwając resztę i dodając nowy na końcu
+8. **Zamiana nie-sąsiednich:** Zamienia miejscami dwa ruchy oddalone od siebie o co najmniej 2 pozycje
+9. **Modyfikacja wzorcowa:** Szuka znanych wzorców (np. double sexy, sune) i próbuje je uprościć:
+   - Wykrywanie podwójnych triggerów (R U R' U')² → R U R' U'
+   - Wykrywanie wariantów sune i zamiana na alternatywy
+   - Generyczne uproszczenia: X X → X2, X X' → usunięcie, X Y X' → Y
+10. **Optymalizacja gradientowa kąta:** Dla losowej pozycji próbuje wszystkie 3 kąty i wybiera najlepszy
+11. **Optymalizacja multi-pozycyjna:** Optymalizuje kąty dla 2-3 pozycji jednocześnie
+
+**Wzorce do wykrywania i uproszczenia:**
+| Wzorzec | Zamiana | Opis |
+|---------|---------|------|
+| R R | R2 | Dwa takie same 90° → jeden 180° |
+| R' R' | R2 | Dwa takie same -90° → jeden 180° |
+| R R' | (usuń) | Para anulująca |
+| X Y X' | Y (zmodyfikowany) | Nadmiarowy koniugat |
+| (R U R' U')² | R U R' U' | Podwójny sexy → pojedynczy |
+
+**Heurystyki oceny (bez baseCube):**
+- Kara +10 za pary anulujące (R R')
+- Kara +5 za pary do uproszczenia (R R → R2)
+- Kara +3 za nadmiarowe koniugaty (X Y X')
+- Kara +2 za długie sekwencje tej samej płaszczyzny (>3)
+- Bonus -0.5 za każdą użytą płaszczyznę/oś (różnorodność)
+- Bonus -2 za wykryte komutatory (A B A' B')
+- Bonus -0.2 za ruchy 180° (często efektywne)
+
 **Ocena kandydatów:**
 - Z ustawionym baseCube: rzeczywista ocena fitness na kopii kostki
-- Bez baseCube: heurystyki (kary za pary anulujące, nagrody za różnorodność)
+- Bez baseCube: heurystyki opisane powyżej
 
 **Algorytm:**
 ```
 dla i = 1 do maxIterations:
-    kandydaci = generuj neighborhoodSize modyfikacji
+    kandydaci = generuj neighborhoodSize modyfikacji (11 typów)
     najlepszy = oceń kandydatów
     jeśli najlepszy.score < obecny.score:
         zastosuj najlepszy
@@ -1170,7 +1199,13 @@ dla i = 1 do maxIterations:
         przerwij (brak poprawy)
 ```
 
-**Wpływ na rozwiązywanie:** Łączy zalety GA (globalna eksploracja) z lokalnym przeszukiwaniem (precyzyjna optymalizacja). Każda mutacja nie tylko wprowadza zmianę, ale aktywnie szuka najlepszej zmiany w okolicy. Szczególnie skuteczna w końcowych fazach ewolucji, gdy rozwiązanie jest blisko optimum.
+**Wpływ na rozwiązywanie:** Łączy zalety GA (globalna eksploracja) z lokalnym przeszukiwaniem (precyzyjna optymalizacja). Rozszerzone modyfikacje obejmują:
+- **Strukturalne:** Wstawianie/usuwanie ruchów pozwala na efektywne skracanie rozwiązań
+- **Globalne:** Zamiana nie-sąsiednich odkrywa dalekie zależności
+- **Domenowe:** Wykrywanie wzorców wykorzystuje wiedzę o speedcubingu
+- **Optymalizacyjne:** Gradientowa optymalizacja kątów systematycznie poprawia rozwiązanie
+
+Szczególnie skuteczna w końcowych fazach ewolucji, gdy rozwiązanie jest blisko optimum.
 
 ---
 
