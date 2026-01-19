@@ -171,7 +171,7 @@ void main()
 
             // Set MVP matrix (simple orthographic projection for now)
             float aspect = (float)Viewport.Width / Viewport.Height;
-            var projection = Matrix4.CreateOrthographic(4f * aspect, 4f, -100f, 100f);
+            var projection = Matrix4.CreateOrthographic(2f * aspect, 2f, -100f, 100f);
             GL.UniformMatrix4(_mvpLocation, false, ref projection);
 
             // Draw
