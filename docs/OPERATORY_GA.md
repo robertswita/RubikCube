@@ -49,12 +49,25 @@ Zmienia ruch na "podobny" - ten sam axis/face ale inny kąt (np. R→R' lub R→
 **Wpływ na rozwiązywanie:** Subtelna mutacja, która zachowuje ogólną strukturę rozwiązania. Zamiast całkowicie losowego ruchu, próbuje wariantów tego samego ruchu. Może szybciej znaleźć optymalne rozwiązanie, gdy struktura jest poprawna, ale kąty są złe.
 
 #### SimplifyMutation (Mutacja upraszczająca)
-Wykrywa i upraszcza redundantne wzorce:
+Wykrywa i upraszcza redundantne wzorce.
+
+**Podstawowe uproszczenia (wszystkie wymiary):**
 - R R → R2 (dwa obroty 90° = jeden 180°)
 - R R R → R' (trzy obroty 90° = jeden -90°)
 - R R' → usuń oba (wzajemne anulowanie)
 
-**Wpływ na rozwiązywanie:** Optymalizuje długość rozwiązania bez zmiany efektu końcowego. Krótsze rozwiązania są preferowane, a ta mutacja aktywnie je skraca. Może być stosowana jako krok post-processingu.
+**Rozszerzone uproszczenia dla 4D+ (wzorce ortogonalne):**
+W 4D+ ruchy na ortogonalnych płaszczyznach komutują (można je wykonać w dowolnej kolejności):
+- (0,1) ⊥ (2,3) — XY ⊥ ZW
+- (0,2) ⊥ (1,3) — XZ ⊥ YW
+- (0,3) ⊥ (1,2) — XW ⊥ YZ
+
+Nowe możliwości upraszczania:
+1. **Wykrywanie par przez ortogonalne:** Wzorzec A, B, A gdzie B ⊥ A może być uproszczony do B, A²
+2. **Reordering ortogonalnych ruchów:** Zamiana kolejności ruchów na ortogonalnych płaszczyznach może stworzyć okazje do uproszczenia
+3. **Okno wyszukiwania:** Zamiast sprawdzać tylko 2 kolejne ruchy, sprawdza okno do 4 ruchów
+
+**Wpływ na rozwiązywanie:** Optymalizuje długość rozwiązania bez zmiany efektu końcowego. Dla 3D wykrywa bezpośrednie duplikaty. Dla 4D+ dodatkowo wykorzystuje właściwości komutujących ruchów na ortogonalnych płaszczyznach do znajdowania ukrytych możliwości uproszczenia.
 
 #### InverseSequenceMutation (Mutacja odwrotnej sekwencji)
 Zastępuje segment jego odwrotnością - odwraca kolejność i invertuje kąt każdego ruchu.
