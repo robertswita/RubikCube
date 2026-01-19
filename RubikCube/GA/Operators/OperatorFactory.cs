@@ -63,7 +63,7 @@ public static class OperatorFactory
             MutationStrategy.Scramble => new ScrambleMutation<T>(),
             MutationStrategy.Adaptive => new ScrambleMutation<T>(), // TODO: Implement Adaptive
             MutationStrategy.Commutator => new CommutatorMutation<T>(),
-            MutationStrategy.Neighbor => throw new NotImplementedException("NeighborMutation not yet implemented"),
+            MutationStrategy.Neighbor => new NeighborMutation<T>(),
             MutationStrategy.Simplify => throw new NotImplementedException("SimplifyMutation not yet implemented"),
             MutationStrategy.InverseSequence => throw new NotImplementedException("InverseSequenceMutation not yet implemented"),
             MutationStrategy.Insert => throw new NotImplementedException("InsertMutation not yet implemented"),
