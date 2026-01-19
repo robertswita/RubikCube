@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using TGL.GA.Interfaces;
 
 namespace TGL.GA.Operators.Selection;
@@ -22,7 +24,7 @@ public class UniqueSelection<T> : ISelectionOperator<T> where T : IChromosome
         for (int i = 1; i < population.Count && selection.Count < count; i++)
         {
             var specimen = population[i];
-            var lastSelected = selection[^1];
+            var lastSelected = selection[selection.Count - 1];
 
             // Add if fitness is different OR we need to fill remaining slots
             int remaining = count - selection.Count;

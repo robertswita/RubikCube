@@ -1,3 +1,5 @@
+using System;
+
 namespace TGL.GA.Interfaces;
 
 /// <summary>

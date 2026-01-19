@@ -1,3 +1,4 @@
+using System;
 using TGL.GA.Configuration;
 using TGL.GA.Interfaces;
 using TGL.GA.Operators.Crossover;

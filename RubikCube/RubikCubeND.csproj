@@ -12,7 +12,7 @@
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
-    <LangVersion>8.0</LangVersion>
+    <LangVersion>10.0</LangVersion>
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -87,6 +87,7 @@
     <Compile Include="TVector.cs" />
     <Compile Include="Win32.cs" />
     <!-- GA Infrastructure -->
+    <Compile Include="GA\IsExternalInit.cs" />
     <Compile Include="GA\Interfaces\IChromosome.cs" />
     <Compile Include="GA\Interfaces\ISelectionOperator.cs" />
     <Compile Include="GA\Interfaces\ICrossoverOperator.cs" />
