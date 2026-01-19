@@ -706,28 +706,123 @@ VLS orientuje krawędzie ostatniej warstwy podczas wstawiania ostatniej pary F2L
 #### BlockBuildingMutation (Mutacja budowania bloków)
 Wstawia sekwencje budowania bloków z popularnych metod rozwiązywania.
 
-**Dla kostek 3D - CFOP/Roux:**
+**Dla kostek 3D - Pełny zestaw F2L (41 przypadków) + CFOP/Roux:**
 
-*F2L (First Two Layers) - wstawianie par:*
-- R U R' (wstawienie pary z góry)
-- R U' R' (alternatywny kąt)
-- R U2 R' (obrót 180°)
-- F' U F (wstawienie frontowe)
-- U R U' R' (setup + wstawienie)
+##### F2L (First Two Layers) - 41 algorytmów
 
-*Roux - budowanie bloków:*
-- M U M' (ruchy środkowej warstwy)
-- M' U M (odwrotność)
+###### Podstawowe przypadki - para już połączona (4)
 
-*Cross - budowanie krzyża:*
-- F R (proste wstawienie krawędzi)
-- R' D' R (sprowadzenie krawędzi)
-- D R' D' R (setup krzyża)
+| F2L# | Algorytm | Ruchy | Opis |
+|------|----------|-------|------|
+| 1 | R U R' | 3 | Para gotowa, biały na prawej |
+| 2 | U' F' U F | 4 | Para gotowa, biały na górze |
+| 3 | F' U' F | 3 | Para gotowa, biały z przodu |
+| 4 | R U' R' | 3 | Para gotowa, wstawienie od tyłu |
 
-*Elementy warstwa-po-warstwie:*
-- R' D' R D (skręcenie narożnika)
-- L D L' D' (wariant lewy)
-- R2 U2, F2 R2 (szybkie korekty)
+###### Narożnik w slocie, krawędź na górze (6)
+
+| F2L# | Algorytm | Ruchy | Opis |
+|------|----------|-------|------|
+| 5 | U' R U' R' U R U R' | 8 | Narożnik na miejscu, krawędź na górze |
+| 6 | U' R U R' U R U R' | 8 | Wariant z innym U |
+| 7 | U' R U2 R' U R U R' | 8 | Wariant z U2 |
+| 8 | U F' U F U' F' U' F | 8 | Wersja frontowa |
+| 9 | U F' U' F U' F' U' F | 8 | Frontowa z U' |
+| 10 | U F' U2 F U' F' U' F | 8 | Frontowa z U2 |
+
+###### Krawędź w slocie, narożnik na górze (6)
+
+| F2L# | Algorytm | Ruchy | Opis |
+|------|----------|-------|------|
+| 11 | R U R' U' R U R' U' R U R' | 11 | Biały do góry (przypadek 1) |
+| 12 | R U' R' U R U' R' U R U' R' | 11 | Biały do góry (przypadek 2) |
+| 13 | R U R' U' R U R' | 7 | Biały z przodu |
+| 14 | R U' R' U R U2 R' U R U' R' | 11 | Biały na prawej |
+| 15 | U' R U R' U R U R' | 8 | Biały z przodu (alt) |
+| 16 | U' R U' R' U R U R' | 8 | Biały na prawej (alt) |
+
+###### Narożnik białym do góry, krawędź na górze (6)
+
+| F2L# | Algorytm | Ruchy | Opis |
+|------|----------|-------|------|
+| 17 | R U2 R' U' R U R' | 7 | Ta sama strona |
+| 18 | F' U2 F U F' U' F | 7 | Przeciwna strona |
+| 19 | U R U2 R' U R U' R' | 8 | Przekątna (przypadek 1) |
+| 20 | U' F' U2 F U' F' U F | 8 | Przekątna (przypadek 2) |
+| 21 | F' U F U' F' U F | 7 | Przypadek 5 |
+| 22 | R U' R' U R U' R' | 7 | Przypadek 6 |
+
+###### Narożnik białym na bok, krawędź na górze (6)
+
+| F2L# | Algorytm | Ruchy | Opis |
+|------|----------|-------|------|
+| 23 | U' R U' R' U2 R U' R' | 8 | Biały na prawej, pasujące kolory |
+| 24 | U F' U F U2 F' U F | 8 | Biały z przodu, pasujące kolory |
+| 25 | F' U' F U F' U' F | 7 | Przeciwne kolory (przypadek 1) |
+| 26 | R U R' U' R U R' | 7 | Przeciwne kolory (przypadek 2) |
+| 27 | R U' R' U R U' R' | 7 | Przekątna (przypadek 1) |
+| 28 | F' U F U' F' U F | 7 | Przekątna (przypadek 2) |
+
+###### Narożnik na górze, kolory pasują (6)
+
+| F2L# | Algorytm | Ruchy | Opis |
+|------|----------|-------|------|
+| 29 | R U' R' U2 R U R' | 7 | Łatwe wstawienie |
+| 30 | F' U F U2 F' U' F | 7 | Wstawienie frontowe |
+| 31 | U2 R U R' U R U' R' | 8 | Setup U2 |
+| 32 | U2 F' U' F U' F' U F | 8 | U2 frontowe |
+| 33 | U R U' R' U' R U R' | 8 | Setup U |
+| 34 | U' F' U F U F' U' F | 8 | U' frontowe |
+
+###### Narożnik na górze, kolory przeciwne (6)
+
+| F2L# | Algorytm | Ruchy | Opis |
+|------|----------|-------|------|
+| 35 | U' R U R' U2 R U' R' | 8 | Wstawienie R |
+| 36 | U F' U' F U2 F' U F | 8 | Wstawienie F |
+| 37 | R U R' U2 R U' R' | 7 | Przypadek 3 |
+| 38 | F' U' F U2 F' U F | 7 | Przypadek 4 |
+| 39 | U' R U' R' U R U R' | 8 | U' R |
+| 40 | U F' U F U' F' U' F | 8 | U F |
+
+###### Przypadek specjalny (1)
+
+| F2L# | Algorytm | Ruchy | Opis |
+|------|----------|-------|------|
+| 41 | R U' R' U R U2 R' U R U' R' | 11 | Oba w slocie, błędna orientacja |
+
+##### Roux - budowanie bloków (6)
+
+| Nazwa | Algorytm | Ruchy | Użycie |
+|-------|----------|-------|--------|
+| M U M' | M U M' | 3 | Ruch środkowej warstwy |
+| M' U M | M' U M | 3 | Odwrotność |
+| M U2 M' | M U2 M' | 3 | Obrót 180° |
+| M' U' M | M' U' M | 3 | Alternatywa |
+| M2 U M2 | M2 U M2 | 3 | Podwójna środkowa |
+| CMLL setup | M U M' U M U2 M' | 7 | Przygotowanie CMLL |
+
+##### Cross - budowanie krzyża (8)
+
+| Algorytm | Ruchy | Użycie |
+|----------|-------|--------|
+| F R | 2 | Proste wstawienie |
+| R' D' R | 3 | Sprowadzenie krawędzi |
+| D R' D' R | 4 | Setup krzyża |
+| F' D F | 3 | Frontowa krawędź |
+| R D' R' | 3 | Prawa krawędź |
+| L' D L | 3 | Lewa krawędź |
+| B D2 B' | 3 | Tylna krawędź |
+| F D F' | 3 | Alternatywa frontowa |
+
+##### Elementy warstwa-po-warstwie (4)
+
+| Algorytm | Ruchy | Użycie |
+|----------|-------|--------|
+| R' D' R D | 4 | Skręcenie narożnika |
+| L D L' D' | 4 | Wariant lewy |
+| (R' D' R D)2 | 8 | Podwójne skręcenie |
+| (R' D' R D)3 | 12 | Potrójne skręcenie |
 
 **Dla kostek 4D+:**
 - Uogólnione bloki A B A' dla różnych płaszczyzn
@@ -735,7 +830,9 @@ Wstawia sekwencje budowania bloków z popularnych metod rozwiązywania.
 - Wzorce A2 B2 do korekty warstw
 - Koordynacja wewnętrznych/zewnętrznych warstw dla większych kostek
 
-**Wpływ na rozwiązywanie:** Wykorzystuje wiedzę domenową z metod CFOP i Roux. Te "building blocks" to sprawdzone sposoby efektywnego rozwiązywania fragmentów kostki. Dla GA, wprowadzenie tych wzorców może znacząco przyspieszyć znalezienie częściowych rozwiązań, które potem mogą być łączone i optymalizowane.
+**Całkowita liczba wzorców 3D: ~60** (41 F2L + 6 Roux + 8 Cross + 4 LBL + triggery)
+
+**Wpływ na rozwiązywanie:** Wykorzystuje wiedzę domenową z metod CFOP i Roux. Pełny zestaw F2L pokrywa wszystkie możliwe konfiguracje pary narożnik-krawędź, co znacząco przyspiesza znajdowanie częściowych rozwiązań. GA może budować na tych fundamentach zamiast odkrywać je od nowa.
 
 #### LocalSearchMutation (Mutacja z lokalnym przeszukiwaniem)
 Wykonuje hill-climbing w małym sąsiedztwie, próbując wielu małych modyfikacji i zachowując najlepszą.

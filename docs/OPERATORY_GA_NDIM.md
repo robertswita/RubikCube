@@ -537,9 +537,27 @@ Dwie płaszczyzny rotacji są ortogonalne, jeśli nie współdzielą żadnej wsp
 ### BlockBuildingMutation (Mutacja budowania bloków) ✅ ZAIMPLEMENTOWANY
 **Plik:** `GA/Operators/Mutation/BlockBuildingMutation.cs`
 
-**Opis:** Wstawia sekwencje budowania bloków z metod CFOP/Roux.
+**Opis:** Wstawia sekwencje budowania bloków z metod CFOP/Roux. Zawiera pełny zestaw F2L (41 przypadków).
 
-**Dla 3D:** F2L pair insertions, Cross building, Corner twists, Middle layer moves.
+**Dla 3D - Pełny zestaw ~60 algorytmów:**
+
+| Kategoria | Algorytmy | Liczba | Opis |
+|-----------|-----------|--------|------|
+| **F2L - Basic** | 1-4 | 4 | Para już połączona |
+| **F2L - Corner in slot** | 5-10 | 6 | Narożnik w slocie, krawędź na górze |
+| **F2L - Edge in slot** | 11-16 | 6 | Krawędź w slocie, narożnik na górze |
+| **F2L - Corner up** | 17-22 | 6 | Narożnik białym do góry |
+| **F2L - Corner out** | 23-28 | 6 | Narożnik białym na bok |
+| **F2L - Colors match** | 29-34 | 6 | Kolory pasują |
+| **F2L - Colors opposite** | 35-40 | 6 | Kolory przeciwne |
+| **F2L - Special** | 41 | 1 | Przypadek specjalny |
+| **Razem F2L** | | **41** | Pełny zestaw |
+| **Roux** | M U M', etc. | 6 | Bloki środkowej warstwy |
+| **Cross** | F R, R' D' R, etc. | 8 | Budowanie krzyża |
+| **LBL** | R' D' R D, etc. | 4 | Warstwa po warstwie |
+| **Triggers** | Sexy, Sledgehammer | 6 | Podstawowe sekwencje |
+| **Left variants** | L' U' L, etc. | 7 | Wersje leworęczne |
+| **Razem 3D** | | **~70** | |
 
 **Dla 4D+:** Uogólnione bloki A B A', wzorce A2 B2, koordynacja warstw wewnętrznych/zewnętrznych.
 
@@ -753,7 +771,7 @@ Po rozszerzeniu `TMove`, następujące operatory wymagałyby aktualizacji:
 | HyperplaneMutation | ✅ | ✅ | ✅ | Gotowy | Przesunięcie osi/hiperpłaszczyzny |
 | OrthogonalConjugation | ⚠️ | ✅ | ✅ | Gotowy | Ortogonalne komutatory (fallback dla 3D) |
 | PatternMutation | ✅ | ✅ | ✅ | Gotowy | Wzorce 3D + uogólnione dla ND |
-| BlockBuildingMutation | ✅ | ✅ | ✅ | Gotowy | CFOP/Roux dla 3D, uogólnione dla ND |
+| BlockBuildingMutation | ✅ | ✅ | ✅ | Gotowy | Pełny F2L (41) + CFOP/Roux (~70 wzorców) |
 | LocalSearchMutation | ✅ | ✅ | ✅ | Gotowy | Hill-climbing, dimension-agnostic |
 | DoubleRotationMutation | - | ❌ | ❌ | Brak | Wymaga rozszerzenia TMove |
 
