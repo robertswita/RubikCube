@@ -25,7 +25,7 @@ namespace RubikCube.Maui.Controls
 
             var centerX = dirtyRect.Width / 2;
             var centerY = dirtyRect.Height / 2;
-            var scale = Math.Min(dirtyRect.Width, dirtyRect.Height) * 0.4f;
+            var scale = Math.Min(dirtyRect.Width, dirtyRect.Height) * 0.8f;
 
             var transform = new TAffine();
             DrawObject(canvas, Root, transform, centerX, centerY, scale);
