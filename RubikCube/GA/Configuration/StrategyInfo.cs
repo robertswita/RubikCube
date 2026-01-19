@@ -34,6 +34,9 @@ public static class StrategyInfo
     public static string GetDisplayName(MutationStrategy strategy) => strategy switch
     {
         MutationStrategy.InverseSequence => "Inverse Seq.",
+        MutationStrategy.OrthogonalConjugation => "Orth. Conj.",
+        MutationStrategy.BlockBuilding => "Block Build",
+        MutationStrategy.LocalSearch => "Local Search",
         _ => strategy.ToString()
     };
 
@@ -84,6 +87,9 @@ public static class StrategyInfo
             MutationStrategy.Gaussian => new GaussianMutation<T>(),
             MutationStrategy.Hyperplane => new HyperplaneMutation<T>(),
             MutationStrategy.OrthogonalConjugation => new OrthogonalConjugationMutation<T>(),
+            MutationStrategy.Pattern => new PatternMutation<T>(),
+            MutationStrategy.BlockBuilding => new BlockBuildingMutation<T>(),
+            MutationStrategy.LocalSearch => new LocalSearchMutation<T>(),
             _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown mutation strategy")
         };
     }

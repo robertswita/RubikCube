@@ -111,5 +111,26 @@ public enum MutationStrategy
     /// For 4D+: uses planes that share no common axes (e.g., XY ⊥ ZW).
     /// Creates geometrically pure transformations affecting fewer pieces.
     /// </summary>
-    OrthogonalConjugation
+    OrthogonalConjugation,
+
+    /// <summary>
+    /// Pattern mutation - inserts known algorithm patterns (T-perm, Y-perm, Sune, etc.).
+    /// Uses speedcubing algorithms for 3D and generalized commutator patterns for 4D+.
+    /// Helps GA discover effective move sequences faster.
+    /// </summary>
+    Pattern,
+
+    /// <summary>
+    /// Block building mutation - inserts CFOP/Roux building block sequences.
+    /// Uses F2L pairs, cross building, and layer-by-layer blocks for 3D.
+    /// Generalized to multi-plane coordination for higher dimensions.
+    /// </summary>
+    BlockBuilding,
+
+    /// <summary>
+    /// Local search mutation - performs hill-climbing on a small neighborhood.
+    /// Tries multiple small modifications and keeps the best one.
+    /// Can use heuristics or actual fitness evaluation.
+    /// </summary>
+    LocalSearch
 }

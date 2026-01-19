@@ -138,6 +138,9 @@
     <Compile Include="..\RubikCube\GA\Operators\Mutation\GaussianMutation.cs" Link="Core\GA\Operators\Mutation\GaussianMutation.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Mutation\HyperplaneMutation.cs" Link="Core\GA\Operators\Mutation\HyperplaneMutation.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Mutation\OrthogonalConjugationMutation.cs" Link="Core\GA\Operators\Mutation\OrthogonalConjugationMutation.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\PatternMutation.cs" Link="Core\GA\Operators\Mutation\PatternMutation.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\BlockBuildingMutation.cs" Link="Core\GA\Operators\Mutation\BlockBuildingMutation.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\LocalSearchMutation.cs" Link="Core\GA\Operators\Mutation\LocalSearchMutation.cs" />
 
     <Compile Include="..\RubikCube\GA\Operators\OperatorFactory.cs" Link="Core\GA\Operators\OperatorFactory.cs" />
 

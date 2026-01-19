@@ -294,7 +294,7 @@ Ta formuła odwraca kierunek obrotu:
 
 **Matematyczne uzasadnienie:** W dowolnym wymiarze, odwrotność rotacji o kąt θ to rotacja o kąt -θ. Ponieważ używamy trzech dyskretnych wartości (ćwierćobroty), formuła `2 - angle` poprawnie oblicza odwrotność.
 
-#### ConjugationMutation (Mutacja koniugacji)
+#### ConjugationMutation (Mutacja koniugacji) ✅ ZOPTYMALIZOWANY
 **Plik:** `GA/Operators/Mutation/ConjugationMutation.cs`
 
 **Działanie:** Implementuje wzorzec koniugacji ABA' z teorii grup.
@@ -302,6 +302,18 @@ Ta formuła odwraca kierunek obrotu:
 **Dlaczego działa dla N wymiarów:** Koniugacja jest fundamentalnym pojęciem teorii grup, które działa niezależnie od reprezentacji grupy. Grupa Rubika w dowolnym wymiarze pozostaje grupą, a koniugacje zachowują swoje właściwości algebraiczne.
 
 **Geometryczna interpretacja:** Koniugacja "przenosi" efekt sekwencji B w miejsce określone przez A. To działa tak samo w 3D, 4D czy 7D - zmienia się tylko przestrzeń, w której operujemy.
+
+**Optymalizacja dla 4D+:**
+W wymiarach >= 4 operator zapewnia, że centralny ruch "B" jest na ortogonalnej płaszczyźnie względem otaczających ruchów "A":
+- Buduje cache ortogonalnych płaszczyzn z `TAffine.Planes`
+- Sprawdza, czy centralny ruch jest już optymalny
+- Jeśli nie, generuje nowy ruch B na ortogonalnej płaszczyźnie używając `ValidMoves`
+- Dla 3D zachowuje poprzednie zachowanie (brak płaszczyzn ortogonalnych)
+
+**Kompatybilność:**
+- 3D: ✅ Zachowanie bez zmian
+- 4D: ✅ Preferuje ortogonalne płaszczyzny dla ruchu B
+- 5D+: ✅ Więcej opcji ortogonalnych
 
 #### CommutatorMutation (Mutacja komutatora) ✅ ZOPTYMALIZOWANY
 **Plik:** `GA/Operators/Mutation/CommutatorMutation.cs`
@@ -411,20 +423,9 @@ if (AreOrthogonal(moveA.Plane, moveB.Plane))
 
 ## Operatory wymagające optymalizacji dla 4D+
 
-### ConjugationMutation - algebraicznie poprawny, ale nie zoptymalizowany
+Wszystkie operatory domenowe (ConjugationMutation, CommutatorMutation, SimplifyMutation) zostały już zoptymalizowane dla 4D+.
 
-**Problem:** Obecna implementacja wybiera losowe kolejne ruchy do utworzenia koniugacji. W 3D to działa dobrze, ale w 4D+ nie wszystkie kombinacje są równie efektywne.
-
-**W 4D najbardziej użyteczne są:**
-- Koniugacje używające ruchów na **ortogonalnych płaszczyznach** (wpływają na mniejszą liczbę elementów)
-
-**Proponowane ulepszenie dla 4D+:**
-```csharp
-// Preferuj ruchy na ortogonalnych płaszczyznach dla efektywniejszych koniugacji
-// Wzorzec ABA' gdzie B jest na płaszczyźnie ortogonalnej do płaszczyzny A
-```
-
-**Uwaga:** CommutatorMutation został już zoptymalizowany dla 4D+ (patrz sekcja operatorów domenowych).
+Pozostałe operatory specyficzne dla 4D+ (jak DoubleRotationMutation) wymagają rozszerzenia struktury TMove o wsparcie dla podwójnych rotacji.
 
 ---
 
@@ -473,6 +474,39 @@ Dwie płaszczyzny rotacji są ortogonalne, jeśli nie współdzielą żadnej wsp
 - 3D: Działa z fallback (najbardziej odległe płaszczyzny) - mniej efektywne, ale poprawne
 - 4D: Pełne wykorzystanie ortogonalnych par
 - 5D+: Więcej opcji ortogonalnych, większa elastyczność
+
+### PatternMutation (Mutacja wzorcowa) ✅ ZAIMPLEMENTOWANY
+**Plik:** `GA/Operators/Mutation/PatternMutation.cs`
+
+**Opis:** Wstawia znane algorytmy speedcubingowe do chromosomu.
+
+**Dla 3D:** Sexy move (R U R' U'), Sledgehammer, Sune, Anti-Sune, T-perm trigger, Double sexy, warianty leworęczne.
+
+**Dla 4D+:** Uogólnione komutatory A B A' B' dla różnych kombinacji płaszczyzn, używając osi prostopadłej do płaszczyzny rotacji.
+
+**Dlaczego działa dla N wymiarów:** Cache wzorców budowany dynamicznie dla `TAffine.N`. Dla N > 3 generuje parametryczne wzorce oparte na komutatorach z `TAffine.Planes`.
+
+### BlockBuildingMutation (Mutacja budowania bloków) ✅ ZAIMPLEMENTOWANY
+**Plik:** `GA/Operators/Mutation/BlockBuildingMutation.cs`
+
+**Opis:** Wstawia sekwencje budowania bloków z metod CFOP/Roux.
+
+**Dla 3D:** F2L pair insertions, Cross building, Corner twists, Middle layer moves.
+
+**Dla 4D+:** Uogólnione bloki A B A', wzorce A2 B2, koordynacja warstw wewnętrznych/zewnętrznych.
+
+**Dlaczego działa dla N wymiarów:** Płaszczyzny i osie wybierane parametrycznie z `TAffine.Planes`, rozmiar kostki uwzględniany dla warstw wewnętrznych.
+
+### LocalSearchMutation (Mutacja z lokalnym przeszukiwaniem) ✅ ZAIMPLEMENTOWANY
+**Plik:** `GA/Operators/Mutation/LocalSearchMutation.cs`
+
+**Opis:** Hill-climbing w małym sąsiedztwie - próbuje wielu modyfikacji, zachowuje najlepszą.
+
+**Algorytm:** Generuj kandydatów → Oceń (fitness lub heurystyki) → Zastosuj najlepszego → Powtórz.
+
+**Typy modyfikacji:** Zmiana kąta, uproszczenie sąsiednich, zamiana na ruch sąsiedni, usunięcie par anulujących, zamiana z ValidMoves.
+
+**Dlaczego działa dla N wymiarów:** Wszystkie operacje używają `TMove.Decode/Encode` które są N-agnostyczne. Heurystyki oparte na właściwościach ruchów (plane, axis) działają dla dowolnego N. `ValidMoves` automatycznie zawiera wszystkie ruchy dla aktualnego wymiaru.
 
 ---
 
@@ -651,7 +685,7 @@ Po rozszerzeniu `TMove`, następujące operatory wymagałyby aktualizacji:
 | GaussianMutation | ✅ | ✅ | ✅ | Gotowy | Szum gaussowski |
 | SingleGeneMutation | ✅ | ✅ | ✅ | Gotowy | Używa ValidMoves |
 | RandomMutation | ✅ | ✅ | ✅ | Gotowy | Używa ValidMoves |
-| ConjugationMutation | ✅ | ✅ | ✅ | Do optymalizacji | Działa, ale nie optymalnie dla 4D+ |
+| ConjugationMutation | ✅ | ✅ | ✅ | Gotowy | Ortogonalne płaszczyzny dla 4D+ |
 | CommutatorMutation | ✅ | ✅ | ✅ | Gotowy | Ortogonalne pary dla 4D+ |
 | NeighborMutation | ✅ | ✅ | ✅ | Gotowy | Tylko modyfikuje Angle |
 | SimplifyMutation | ✅ | ✅ | ✅ | Gotowy | Wykrywa ortogonalne wzorce |
@@ -670,6 +704,9 @@ Po rozszerzeniu `TMove`, następujące operatory wymagałyby aktualizacji:
 | ExponentialRankingSelection | ✅ | ✅ | ✅ | Gotowy | Wykładnicze prawdopodobieństwo |
 | HyperplaneMutation | ✅ | ✅ | ✅ | Gotowy | Przesunięcie osi/hiperpłaszczyzny |
 | OrthogonalConjugation | ⚠️ | ✅ | ✅ | Gotowy | Ortogonalne komutatory (fallback dla 3D) |
+| PatternMutation | ✅ | ✅ | ✅ | Gotowy | Wzorce 3D + uogólnione dla ND |
+| BlockBuildingMutation | ✅ | ✅ | ✅ | Gotowy | CFOP/Roux dla 3D, uogólnione dla ND |
+| LocalSearchMutation | ✅ | ✅ | ✅ | Gotowy | Hill-climbing, dimension-agnostic |
 | DoubleRotationMutation | - | ❌ | ❌ | Brak | Wymaga rozszerzenia TMove |
 
 **Legenda:**

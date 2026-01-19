@@ -247,6 +247,97 @@ Wynik: [A_XY, B_ZW, A'_XY, B'_ZW]
 
 **Wpływ na rozwiązywanie:** Dla 4D+ kostek, ortogonalne komutatory są szczególnie efektywne do precyzyjnego przestawiania małej liczby elementów bez zakłócania reszty kostki. Dla 3D używa płaszczyzn o minimalnym nakładaniu się jako przybliżenia.
 
+#### PatternMutation (Mutacja wzorcowa)
+Wstawia znane algorytmy speedcubingowe do chromosomu.
+
+**Dla kostek 3D:**
+- Sexy move: R U R' U' (bardzo powszechny trigger)
+- Inverse sexy: U R U' R'
+- Sledgehammer: R' F R F'
+- Hedgeslammer: F R' F' R
+- Sune: R U R' U R U2 R'
+- Anti-Sune: R U2 R' U' R U' R'
+- Double sexy: (R U R' U')2
+- T-perm trigger: R U R' F'
+- Warianty leworęczne
+
+**Dla kostek 4D+:**
+- Uogólnione komutatory: A B A' B' dla różnych kombinacji płaszczyzn
+- Podwójne komutatory: (A B A' B')2
+- Wzorce koniugacji: A B A', A2 B A2
+
+**Implementacja:**
+- Cache wzorców budowany przy pierwszym użyciu dla aktualnego wymiaru
+- Losowy wzorzec wstawiany na losowej pozycji w chromosomie
+- Wzorce dostosowane do rozmiaru kostki (slice = lastSlice dla ruchów zewnętrznych)
+
+**Wpływ na rozwiązywanie:** Przyspiesza konwergencję GA poprzez wprowadzanie sprawdzonych sekwencji. Te algorytmy są wynikiem dziesięcioleci optymalizacji przez speedcuberów i reprezentują efektywne manipulacje kostki. GA może budować na tych fundamentach zamiast odkrywać je od nowa.
+
+#### BlockBuildingMutation (Mutacja budowania bloków)
+Wstawia sekwencje budowania bloków z popularnych metod rozwiązywania.
+
+**Dla kostek 3D - CFOP/Roux:**
+
+*F2L (First Two Layers) - wstawianie par:*
+- R U R' (wstawienie pary z góry)
+- R U' R' (alternatywny kąt)
+- R U2 R' (obrót 180°)
+- F' U F (wstawienie frontowe)
+- U R U' R' (setup + wstawienie)
+
+*Roux - budowanie bloków:*
+- M U M' (ruchy środkowej warstwy)
+- M' U M (odwrotność)
+
+*Cross - budowanie krzyża:*
+- F R (proste wstawienie krawędzi)
+- R' D' R (sprowadzenie krawędzi)
+- D R' D' R (setup krzyża)
+
+*Elementy warstwa-po-warstwie:*
+- R' D' R D (skręcenie narożnika)
+- L D L' D' (wariant lewy)
+- R2 U2, F2 R2 (szybkie korekty)
+
+**Dla kostek 4D+:**
+- Uogólnione bloki A B A' dla różnych płaszczyzn
+- Komutatory A B A' B' między płaszczyznami
+- Wzorce A2 B2 do korekty warstw
+- Koordynacja wewnętrznych/zewnętrznych warstw dla większych kostek
+
+**Wpływ na rozwiązywanie:** Wykorzystuje wiedzę domenową z metod CFOP i Roux. Te "building blocks" to sprawdzone sposoby efektywnego rozwiązywania fragmentów kostki. Dla GA, wprowadzenie tych wzorców może znacząco przyspieszyć znalezienie częściowych rozwiązań, które potem mogą być łączone i optymalizowane.
+
+#### LocalSearchMutation (Mutacja z lokalnym przeszukiwaniem)
+Wykonuje hill-climbing w małym sąsiedztwie, próbując wielu małych modyfikacji i zachowując najlepszą.
+
+**Parametry:**
+- neighborhoodSize: liczba kandydackich modyfikacji na iterację (domyślnie 5)
+- maxIterations: maksymalna liczba iteracji hill-climbingu (domyślnie 3)
+
+**Typy modyfikacji (losowo wybierane):**
+1. **Zmiana kąta:** Zmienia kąt losowego ruchu na inny (90°→180°, 180°→-90°, itd.)
+2. **Uproszczenie sąsiednich:** Jeśli dwa sąsiednie ruchy są na tym samym axis/plane/slice, łączy je
+3. **Zamiana na sąsiada:** Zmienia warstwę o ±1 lub kąt o 1
+4. **Usunięcie par anulujących:** Szuka par typu R R' i zastępuje losowymi ruchami
+5. **Zamiana z ValidMoves:** Zastępuje gen losowym prawidłowym ruchem
+
+**Ocena kandydatów:**
+- Z ustawionym baseCube: rzeczywista ocena fitness na kopii kostki
+- Bez baseCube: heurystyki (kary za pary anulujące, nagrody za różnorodność)
+
+**Algorytm:**
+```
+dla i = 1 do maxIterations:
+    kandydaci = generuj neighborhoodSize modyfikacji
+    najlepszy = oceń kandydatów
+    jeśli najlepszy.score < obecny.score:
+        zastosuj najlepszy
+    w przeciwnym razie:
+        przerwij (brak poprawy)
+```
+
+**Wpływ na rozwiązywanie:** Łączy zalety GA (globalna eksploracja) z lokalnym przeszukiwaniem (precyzyjna optymalizacja). Każda mutacja nie tylko wprowadza zmianę, ale aktywnie szuka najlepszej zmiany w okolicy. Szczególnie skuteczna w końcowych fazach ewolucji, gdy rozwiązanie jest blisko optimum.
+
 ---
 
 ## Operatory Krzyżowania
