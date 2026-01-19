@@ -284,6 +284,22 @@ public partial class MainPage : ContentPage
         StopGa();
     }
 
+    private async void OnClearSolutionsClicked(object? sender, EventArgs e)
+    {
+        if (_isGaRunning) return;
+
+        bool confirm = await DisplayAlert(
+            "Clear Solutions",
+            "Are you sure you want to delete the solution database?",
+            "Yes", "No");
+
+        if (confirm)
+        {
+            _solutionDb.Clear();
+            SolutionLabel.Text = "0";
+        }
+    }
+
     private void OnResetClicked(object? sender, EventArgs e)
     {
         // Stop everything

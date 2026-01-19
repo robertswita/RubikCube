@@ -197,7 +197,10 @@
                         <Label x:Name="MovesLabel" Text="0" Grid.Row="2" Grid.Column="1" />
 
                         <Label Text="Solutions:" Grid.Row="3" Grid.Column="0" />
-                        <Label x:Name="SolutionLabel" Text="0" Grid.Row="3" Grid.Column="1" />
+                        <HorizontalStackLayout Grid.Row="3" Grid.Column="1" Spacing="5">
+                            <Label x:Name="SolutionLabel" Text="0" VerticalOptions="Center" />
+                            <Button x:Name="ClearSolutionsBtn" Text="🗑" WidthRequest="30" HeightRequest="25" Padding="0" Clicked="OnClearSolutionsClicked" />
+                        </HorizontalStackLayout>
 
                         <Label Text="GA Iterations:" Grid.Row="4" Grid.Column="0" />
                         <Label x:Name="GACountLabel" Text="0" Grid.Row="4" Grid.Column="1" />

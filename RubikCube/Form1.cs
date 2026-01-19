@@ -531,6 +531,23 @@ namespace RubikCube
             }
         }
 
+        private void OnClearSolutionsClicked(object sender, EventArgs e)
+        {
+            if (_isGaRunning) return;
+
+            var result = MessageBox.Show(
+                "Are you sure you want to delete the solution database?",
+                "Clear Solutions",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                _solutionDb.Clear();
+                SolutionLbl.Text = "0";
+            }
+        }
+
         private void saveClustersToolStripMenuItem_Click(object sender, EventArgs e)
         {
             TRubikCube.Size = 7;

@@ -82,6 +82,28 @@ public class SolutionDatabase
     }
 
     /// <summary>
+    /// Clears all solutions from memory and deletes the database file.
+    /// </summary>
+    public void Clear()
+    {
+        lock (_lock)
+        {
+            _solutions.Clear();
+            try
+            {
+                if (File.Exists(_filePath))
+                {
+                    File.Delete(_filePath);
+                }
+            }
+            catch (Exception)
+            {
+                // Ignore delete errors
+            }
+        }
+    }
+
+    /// <summary>
     /// Saves a solution to the database.
     /// </summary>
     /// <param name="cubeCode">The cube state code (key).</param>

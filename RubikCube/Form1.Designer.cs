@@ -37,6 +37,7 @@
             this.TransparencyBox = new System.Windows.Forms.CheckBox();
             this.SolutionLbl = new System.Windows.Forms.Label();
             this.solutionCountLbl = new System.Windows.Forms.Label();
+            this.clearSolutionsBtn = new System.Windows.Forms.Button();
             this.IterTimeBox = new System.Windows.Forms.Label();
             this.PauseBtn = new System.Windows.Forms.Button();
             this.slicesLbl = new System.Windows.Forms.Label();
@@ -129,6 +130,7 @@
             this.controlPanel.Controls.Add(this.StateBox);
             this.controlPanel.Controls.Add(this.TransparencyBox);
             this.controlPanel.Controls.Add(this.SolutionLbl);
+            this.controlPanel.Controls.Add(this.clearSolutionsBtn);
             this.controlPanel.Controls.Add(this.solutionCountLbl);
             this.controlPanel.Controls.Add(this.IterTimeBox);
             this.controlPanel.Controls.Add(this.PauseBtn);
@@ -185,7 +187,7 @@
             // TransparencyBox
             // 
             this.TransparencyBox.AutoSize = true;
-            this.TransparencyBox.Location = new System.Drawing.Point(399, 10);
+            this.TransparencyBox.Location = new System.Drawing.Point(510, 10);
             this.TransparencyBox.Name = "TransparencyBox";
             this.TransparencyBox.Size = new System.Drawing.Size(18, 17);
             this.TransparencyBox.TabIndex = 29;
@@ -200,7 +202,17 @@
             this.SolutionLbl.Size = new System.Drawing.Size(14, 16);
             this.SolutionLbl.TabIndex = 28;
             this.SolutionLbl.Text = "0";
-            // 
+            //
+            // clearSolutionsBtn
+            //
+            this.clearSolutionsBtn.Location = new System.Drawing.Point(382, 109);
+            this.clearSolutionsBtn.Name = "clearSolutionsBtn";
+            this.clearSolutionsBtn.Size = new System.Drawing.Size(23, 23);
+            this.clearSolutionsBtn.TabIndex = 65;
+            this.clearSolutionsBtn.Text = "🗑";
+            this.clearSolutionsBtn.UseVisualStyleBackColor = true;
+            this.clearSolutionsBtn.Click += new System.EventHandler(this.OnClearSolutionsClicked);
+            //
             // label10
             // 
             this.solutionCountLbl.AutoSize = true;
@@ -348,7 +360,7 @@
             this.errorValueLbl.Name = "label2";
             this.errorValueLbl.Size = new System.Drawing.Size(44, 16);
             this.errorValueLbl.TabIndex = 11;
-            this.errorValueLbl.Text = "label2";
+            this.errorValueLbl.Text = "0.000";
             // 
             // button2
             // 
@@ -367,7 +379,7 @@
             this.timeValueLbl.Name = "label1";
             this.timeValueLbl.Size = new System.Drawing.Size(44, 16);
             this.timeValueLbl.TabIndex = 9;
-            this.timeValueLbl.Text = "label1";
+            this.timeValueLbl.Text = "00:00:00";
             // 
             // button1
             // 
@@ -501,7 +513,7 @@
             // label13
             // 
             this.transparencyLbl.AutoSize = true;
-            this.transparencyLbl.Location = new System.Drawing.Point(299, 9);
+            this.transparencyLbl.Location = new System.Drawing.Point(425, 9);
             this.transparencyLbl.Name = "label13";
             this.transparencyLbl.Size = new System.Drawing.Size(94, 16);
             this.transparencyLbl.TabIndex = 35;
@@ -787,9 +799,9 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1980, 1024);
-            this.Controls.Add(this.mainMenu);
-            this.Controls.Add(this.controlPanel);
             this.Controls.Add(this.cubeView);
+            this.Controls.Add(this.controlPanel);
+            this.Controls.Add(this.mainMenu);
             this.Controls.Add(this.pictureBox1);
             this.MainMenuStrip = this.mainMenu;
             this.Name = "TRubikForm";
@@ -848,6 +860,7 @@
         private System.Windows.Forms.Label IterTimeBox;
         private System.Windows.Forms.Label SolutionLbl;
         private System.Windows.Forms.Label solutionCountLbl;
+        private System.Windows.Forms.Button clearSolutionsBtn;
         private System.Windows.Forms.ToolStripMenuItem saveClustersToolStripMenuItem;
         private System.Windows.Forms.OpenFileDialog openFileDialog1;
         private System.Windows.Forms.CheckBox TransparencyBox;
