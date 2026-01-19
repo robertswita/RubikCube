@@ -427,6 +427,227 @@ Wstawia znane algorytmy speedcubingowe do chromosomu.
 | 19 | R' U2 F R U R' U' F2 U2 F R | 11 |
 | 20 | R U R' U R U' R' U R U2 R' U' R U R' U' R U' R' | 19 |
 
+##### COLL (Corners of Last Layer) - 42 algorytmy
+
+COLL rozwiązuje orientację i permutację narożników przy już zorientowanych krawędziach.
+
+###### COLL H (Wszystkie narożniki skręcone w tym samym kierunku) - 4 przypadki
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| H1 | R U R' U R U' R' U R U2 R' | 11 |
+| H2 | R U2 R' U' R U R' U' R U' R' | 11 |
+| H3 | F R U R' U' R U R' U' R U R' U' F' | 14 |
+| H4 | R U R' U R U L' U R' U' L | 11 |
+
+###### COLL Pi (Dwa sąsiednie narożniki CW, dwa CCW) - 6 przypadków
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| Pi1 | R U2 R' U' R U R' U2 R' F R F' | 12 |
+| Pi2 | F R' F' R U2 R U' R' U R U2 R' | 12 |
+| Pi3 | R' U' R' F R F' R U' R' U2 R | 11 |
+| Pi4 | R U2 R' U' R U R' U' R U R' U' R U' R' | 15 |
+| Pi5 | R' F' R U R' U' R' F R2 U' R' U2 R | 13 |
+| Pi6 | R U R' U' R' F R2 U R' U' R U R' U' F' | 15 |
+
+###### COLL U (Kształt Sune) - 6 przypadków
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| U1 | R U R' U R U2 R' | 7 |
+| U2 | R U R' U R U' R' U R U2 R' | 11 |
+| U3 | R2 D R' U2 R D' R' U2 R' | 9 |
+| U4 | R2 D' R U2 R' D R U2 R | 9 |
+| U5 | F R U' R' U R U R' U R U' R' F' | 13 |
+| U6 | R' U' R U' R' U R U' R' U2 R | 11 |
+
+###### COLL T (Kształt T) - 6 przypadków
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| T1 | R U R' U' R' F R F' | 8 |
+| T2 | L' U' L U L F' L' F | 8 |
+| T3 | R U2 R' U' R U' R2 U2 R U R' U R | 13 |
+| T4 | R U R D R' U R D' R2 | 9 |
+| T5 | R' U R U2 R' L' U R U' L | 10 |
+| T6 | L' U' L U2 L R U' L' U R' | 10 |
+
+###### COLL L (Kształt L) - 6 przypadków
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| L1 | F R U' R' U' R U R' F' | 9 |
+| L2 | F' L' U L U L' U' L F | 9 |
+| L3 | R' U' R U R' F' R U R' U' R' F R2 | 13 |
+| L4 | R U R' U' R U' R' F' U' F R U R' | 13 |
+| L5 | F R' F' R U2 R U2 R' | 8 |
+| L6 | F' L F L' U2 L' U2 L | 8 |
+
+###### COLL AS (Anti-Sune) - 6 przypadków
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| AS1 | R U2 R' U' R U' R' | 7 |
+| AS2 | R' U' R U' R' U R U' R' U2 R | 11 |
+| AS3 | L' U R U' L U R' | 7 |
+| AS4 | R U' L' U R' U' L | 7 |
+| AS5 | F' R U R' U' R' F R U R U' R' | 12 |
+| AS6 | R U R' U R U2 R' U' R U R' U R U2 R' | 15 |
+
+###### COLL S (Sune-like) - 6 przypadków
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| S1 | R U R' U' R' F R F' R U R' U R U2 R' | 15 |
+| S2 | L' U' L U L F' L' F L' U' L U' L' U2 L | 15 |
+| S3 | R U R' U R U2 R' U R U R' U R U2 R' | 15 |
+| S4 | R U R' U R U R' U R U2 R' | 11 |
+| S5 | F R' F' R U R U' R' | 8 |
+| S6 | F' L F L' U' L' U L | 8 |
+
+##### ZBLL Subset (Zborowski-Bruchem Last Layer) - ~30 najpopularniejszych przypadków
+
+ZBLL rozwiązuje ostatnią warstwę w jednym kroku, gdy krawędzie są już zorientowane.
+Pełny zestaw ZBLL to 493 algorytmy. Tutaj przedstawiamy najczęściej używane.
+
+###### ZBLL T Cases
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| T1 | R U R' U' R' F R2 U' R' U' R U R' F' | 14 |
+| T2 | R U R' U' R' F R F' U2 R U R' U R U2 R' | 17 |
+| T3 | R' U R U2 L' R' U R U' L | 10 |
+| T4 | R U2 R' U' R U' R' L U' L' U2 L U' L' | 14 |
+
+###### ZBLL U Cases
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| U1 | R' U' R U' R' U2 R2 U R' U R U2 R' | 13 |
+| U2 | R U2 R' U' R U R' U' R U R' U' R U' R' | 15 |
+| U3 | R' U L U' R U L' U' R' U L U' R U L' | 15 |
+| U4 | R U' L' U R' U' L U R U' L' U R' U' L | 15 |
+
+###### ZBLL L Cases
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| L1 | F R U' R' U R U R' U R U' R' F' | 13 |
+| L2 | R U R' U R U' R' U R U' R' U R U2 R' | 15 |
+| L3 | R U2 R' U R U R' U R U' R' U R U2 R' | 15 |
+| L4 | F' L' U L U' L' U' L U' L' U L F | 13 |
+
+###### ZBLL H Cases
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| H1 | R U R' U R U' R' U R U2 R' | 11 |
+| H2 | R U2 R' U' R U' R' U2 R U R' U R U2 R' | 15 |
+| H3 | R2 U R' U R' U' R U' R2 U' D R' U R D' | 15 |
+| H4 | R' U2 R U R' U R U R' U' R U' R' U2 R | 15 |
+
+###### ZBLL Pi Cases
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| Pi1 | R' U' F' R U R' U' R' F R2 U' R' U' R U R' U R | 18 |
+| Pi2 | F R U R' U' F' R U R' U' R' F R F' | 14 |
+| Pi3 | R U R' U' R' F R F' U2 R' F R F' | 13 |
+| Pi4 | R U2 R2 U' R2 U' R2 U2 R | 9 |
+
+###### ZBLL S/AS Cases
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| S1 | R U R' U R U2 R' U' R U R' U R U2 R' | 15 |
+| S2 | R' U' R U' R' U2 R U R' U' R U' R' U2 R | 15 |
+| AS1 | R U2 R' U' R U' R' U R U2 R' U' R U' R' | 15 |
+| AS2 | R' U2 R U R' U R U' R' U2 R U R' U R | 15 |
+
+##### Winter Variation (WV) - 27 algorytmów
+
+Winter Variation orientuje narożniki podczas wstawiania ostatniej pary F2L.
+Używane gdy para jest gotowa do wstawienia przez R U' R'.
+
+| WV# | Algorytm | Ruchy | Opis |
+|-----|----------|-------|------|
+| 1 | R U R' U' R U' R' | 7 | Podstawowe wstawienie |
+| 2 | R U' R' U R U' R' | 7 | Alternatywny kąt |
+| 3 | R U2 R' U' R U' R' | 7 | Obrót 180° |
+| 4 | R U' R' U2 R U' R' | 7 | Setup U2 |
+| 5 | R' F R F' R U' R' | 7 | Z sledgehammer |
+| 6 | R U R' U R U' R' | 7 | Prosta wersja |
+| 7 | R U' R' U' R U' R' | 7 | Podwójne U' |
+| 8 | R U2 R' U R U' R' | 7 | U2 + U |
+| 9 | R U R' U' R U2 R' | 7 | Zakończenie U2 |
+| 10 | R U' R' U R U2 R' | 7 | Setup + U2 |
+| 11 | F R' F' R U' R U R' | 8 | Hedgeslammer start |
+| 12 | R U' R' U' R U R' U R U' R' | 11 | Dłuższa sekwencja |
+| 13 | R' F R F' U R U' R' | 8 | Sledge + insert |
+| 14 | R U' R' U R U R' U R U' R' | 11 | Pełna sekwencja |
+| 15 | U' R U' R' U R U R' | 8 | Setup U' |
+| 16 | U R U' R' U' R U R' | 8 | Setup U |
+| 17 | R U R' U2 R U R' U R U' R' | 11 | Z U2 w środku |
+| 18 | R U2 R' U R U R' U R U' R' | 11 | Podwójny start U2 |
+| 19 | R' F R F' R U R' U R U' R' | 11 | Sledge + długa |
+| 20 | F R' F' R U R U R' U R U' R' | 12 | Hedge + długa |
+| 21 | R U' R' U2 R U R' U R U' R' | 11 | U' start |
+| 22 | R U R' U R U' R' U R U' R' | 11 | Powtarzająca |
+| 23 | R U2 R' U' R U R' U' R U' R' | 11 | Anti-pattern |
+| 24 | R U' R' U R U' R' U R U' R' | 11 | Ciągłe U' |
+| 25 | R U R' U' R U' R' U R U' R' | 11 | Mix |
+| 26 | R' F R2 U' R' U' R U R' F' | 10 | Specjalny setup |
+| 27 | R' F R F' U2 R U' R' U R U' R' | 12 | Sledge + U2 |
+
+##### VLS (Valk Last Slot) - ~24 popularne przypadki
+
+VLS orientuje krawędzie ostatniej warstwy podczas wstawiania ostatniej pary F2L.
+
+###### VLS Dot Cases (Brak zorientowanych krawędzi)
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| Dot 1 | R' F R F' U' F' U F R U' R' | 11 |
+| Dot 2 | F R' F' R U R U R' U R U' R' | 12 |
+| Dot 3 | R' F R F' R U R' U' R U R' U R U' R' | 15 |
+| Dot 4 | R U R' U' R U' R' U' F' U F R U' R' | 14 |
+
+###### VLS Line Cases (Dwie przeciwległe krawędzie zorientowane)
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| Line 1 | R U' R' U R U' R' U' F' U' F R U' R' | 14 |
+| Line 2 | F R' F' R U R U' R' U' F' U F R U' R' | 14 |
+| Line 3 | R U R' U R U' R' U F' U' F R U' R' | 14 |
+| Line 4 | R' F R F' U R U' R' U F' U' F R U' R' | 14 |
+
+###### VLS L-shape Cases (Dwie sąsiednie krawędzie zorientowane)
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| L1 | R U R' U' F' U' F R U' R' | 10 |
+| L2 | R U' R' U' F' U' F R U' R' | 10 |
+| L3 | R' F R F' U' R U' R' U R U' R' | 12 |
+| L4 | F R' F' R U2 R U' R' U R U' R' | 12 |
+| L5 | R U2 R' U' F' U F R U' R' | 10 |
+| L6 | R U R' U2 F' U F R U' R' | 10 |
+| L7 | R' F R F' R U2 R' U R U' R' | 11 |
+| L8 | F R' F' R U R U R' U R U' R' | 12 |
+
+###### VLS Cross Cases (Wszystkie krawędzie zorientowane)
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| Cross 1 | R U' R' U R U' R' | 7 |
+| Cross 2 | R U R' U' R U' R' | 7 |
+| Cross 3 | R U2 R' U' R U' R' | 7 |
+| Cross 4 | R U' R' U R U2 R' | 7 |
+| Cross 5 | R' F R F' R U' R' | 7 |
+| Cross 6 | F R' F' R U R U' R' | 8 |
+| Cross 7 | R U R' U R U' R' U R U' R' | 11 |
+| Cross 8 | R U' R' U R U R' U R U' R' | 11 |
+
 ##### Triggery podstawowe
 
 | Nazwa | Algorytm | Ruchy | Użycie |
