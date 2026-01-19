@@ -136,8 +136,8 @@ public static class StrategyInfo
             CrossoverStrategy.SinglePoint => new SinglePointCrossover<T>(),
             CrossoverStrategy.TwoPoint => new TwoPointCrossover<T>(),
             CrossoverStrategy.Uniform => new UniformCrossover<T>(),
-            CrossoverStrategy.OrderBased => new SinglePointCrossover<T>(), // TODO: Implement OX
-            CrossoverStrategy.PartiallyMapped => new SinglePointCrossover<T>(), // TODO: Implement PMX
+            CrossoverStrategy.OrderBased => new OrderCrossover<T>(),
+            CrossoverStrategy.PartiallyMapped => new PMXCrossover<T>(),
             CrossoverStrategy.SegmentPreserving => new SegmentPreservingCrossover<T>(),
             _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown crossover strategy")
         };
