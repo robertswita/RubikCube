@@ -106,8 +106,8 @@ namespace RubikCube
             if (e.Button == MouseButtons.Left)
             {
                 var rot = new TVector();
-                rot.Y = 180 * (e.X - StartPos.X) / tglView1.Width;
-                rot.X = 180 * (e.Y - StartPos.Y) / tglView1.Height;
+                rot.Y = -180 * (e.X - StartPos.X) / tglView1.Width;
+                rot.X = -180 * (e.Y - StartPos.Y) / tglView1.Height;
                 Root.Rotate(1, rot.Y);
                 Root.Rotate(0, rot.X);
                 tglView1.Invalidate();
