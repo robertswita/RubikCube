@@ -118,6 +118,7 @@
     <Compile Include="..\RubikCube\GA\Operators\Mutation\SwapMutation.cs" Link="Core\GA\Operators\Mutation\SwapMutation.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Mutation\InversionMutation.cs" Link="Core\GA\Operators\Mutation\InversionMutation.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Mutation\ScrambleMutation.cs" Link="Core\GA\Operators\Mutation\ScrambleMutation.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\AdaptiveMutation.cs" Link="Core\GA\Operators\Mutation\AdaptiveMutation.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Mutation\ConjugationMutation.cs" Link="Core\GA\Operators\Mutation\ConjugationMutation.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Mutation\SingleGeneMutation.cs" Link="Core\GA\Operators\Mutation\SingleGeneMutation.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Mutation\CommutatorMutation.cs" Link="Core\GA\Operators\Mutation\CommutatorMutation.cs" />

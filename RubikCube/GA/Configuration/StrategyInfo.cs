@@ -71,7 +71,7 @@ public static class StrategyInfo
             MutationStrategy.Swap => new SwapMutation<T>(),
             MutationStrategy.Inversion => new InversionMutation<T>(),
             MutationStrategy.Scramble => new ScrambleMutation<T>(),
-            MutationStrategy.Adaptive => new ScrambleMutation<T>(), // TODO: Implement
+            MutationStrategy.Adaptive => new AdaptiveMutation<T>(),
             MutationStrategy.Commutator => new CommutatorMutation<T>(),
             MutationStrategy.Neighbor => new NeighborMutation<T>(),
             MutationStrategy.Simplify => new SimplifyMutation<T>(),
