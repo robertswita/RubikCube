@@ -78,6 +78,10 @@ public static class StrategyInfo
             MutationStrategy.InverseSequence => new InverseSequenceMutation<T>(),
             MutationStrategy.Insert => new InsertMutation<T>(),
             MutationStrategy.Shift => new ShiftMutation<T>(),
+            MutationStrategy.Displacement => new DisplacementMutation<T>(),
+            MutationStrategy.Translocation => new TranslocationMutation<T>(),
+            MutationStrategy.Creep => new CreepMutation<T>(),
+            MutationStrategy.Gaussian => new GaussianMutation<T>(),
             _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown mutation strategy")
         };
     }

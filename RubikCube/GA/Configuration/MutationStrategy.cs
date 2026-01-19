@@ -71,5 +71,31 @@ public enum MutationStrategy
     /// Example: abcdef -> fabcde (right shift) or abcdef -> bcdefa (left shift).
     /// Highly disruptive mutation useful for escaping local minima.
     /// </summary>
-    Shift
+    Shift,
+
+    /// <summary>
+    /// Displacement mutation - removes a segment and inserts it at another position.
+    /// Preserves all genes but changes their arrangement.
+    /// </summary>
+    Displacement,
+
+    /// <summary>
+    /// Translocation mutation - swaps two non-overlapping segments.
+    /// Exchanges positions of two distinct gene blocks.
+    /// </summary>
+    Translocation,
+
+    /// <summary>
+    /// Creep mutation - makes small incremental changes to genes.
+    /// For Rubik's cube: changes angles by ±1, slices by ±1.
+    /// For continuous: adds small random values.
+    /// </summary>
+    Creep,
+
+    /// <summary>
+    /// Gaussian mutation - adds Gaussian (normal) distributed noise.
+    /// Noise magnitude determines mutation intensity.
+    /// Common in evolution strategies (ES).
+    /// </summary>
+    Gaussian
 }

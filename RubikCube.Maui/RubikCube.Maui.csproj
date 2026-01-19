@@ -127,6 +127,10 @@
     <Compile Include="..\RubikCube\GA\Operators\Mutation\InverseSequenceMutation.cs" Link="Core\GA\Operators\Mutation\InverseSequenceMutation.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Mutation\InsertMutation.cs" Link="Core\GA\Operators\Mutation\InsertMutation.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Mutation\ShiftMutation.cs" Link="Core\GA\Operators\Mutation\ShiftMutation.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\DisplacementMutation.cs" Link="Core\GA\Operators\Mutation\DisplacementMutation.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\TranslocationMutation.cs" Link="Core\GA\Operators\Mutation\TranslocationMutation.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\CreepMutation.cs" Link="Core\GA\Operators\Mutation\CreepMutation.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\GaussianMutation.cs" Link="Core\GA\Operators\Mutation\GaussianMutation.cs" />
 
     <Compile Include="..\RubikCube\GA\Operators\OperatorFactory.cs" Link="Core\GA\Operators\OperatorFactory.cs" />
 
