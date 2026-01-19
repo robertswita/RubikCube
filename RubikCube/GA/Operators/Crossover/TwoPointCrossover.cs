@@ -13,6 +13,17 @@ public class TwoPointCrossover<T> : ICrossoverOperator<T> where T : IChromosome,
     {
         int length = parent1.Length;
 
+        // Two-point crossover requires at least 3 genes to have a meaningful middle segment.
+        // With fewer genes, fall back to copying parents (let mutation provide variation).
+        if (length < 3)
+        {
+            var c1 = new T();
+            var c2 = new T();
+            Array.Copy(parent1.Genes, c1.Genes, length);
+            Array.Copy(parent2.Genes, c2.Genes, length);
+            return (c1, c2);
+        }
+
         int point1 = rng.Next(0, length - 1);
         int point2 = rng.Next(point1 + 1, length);
 

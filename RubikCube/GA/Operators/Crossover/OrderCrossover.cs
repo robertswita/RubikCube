@@ -33,9 +33,10 @@ public class OrderCrossover<T> : ICrossoverOperator<T> where T : IChromosome, ne
     public (T child1, T child2) Crossover(T parent1, T parent2, Random rng)
     {
         int length = parent1.Length;
+        // Order crossover requires at least 3 genes to have a meaningful segment to preserve.
+        // With fewer genes, fall back to copying parents (let mutation provide variation).
         if (length < 3)
         {
-            // Fall back to simple swap for very short chromosomes
             var c1 = new T();
             var c2 = new T();
             Array.Copy(parent1.Genes, c1.Genes, length);

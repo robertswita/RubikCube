@@ -38,8 +38,9 @@ public class SegmentPreservingCrossover<T> : ICrossoverOperator<T> where T : ICh
             preserveEnd = Math.Min(rubikBetter.MovesCount, length);
         }
 
-        // Determine preserve start - keep at least half of the effective segment
-        int preserveStart = rng.Next(preserveEnd / 2);
+        // Determine preserve start - keep at least half of the effective segment.
+        // Guard against preserveEnd <= 1 where rng.Next(0) would throw.
+        int preserveStart = preserveEnd > 1 ? rng.Next(preserveEnd / 2) : 0;
 
         // Child 1: Preserve segment from better parent, rest from worse parent
         // [worseParent: 0..preserveStart) + [betterParent: preserveStart..preserveEnd) + [worseParent: preserveEnd..length)
@@ -61,7 +62,8 @@ public class SegmentPreservingCrossover<T> : ICrossoverOperator<T> where T : ICh
         {
             worsePreserveEnd = Math.Min(rubikWorse.MovesCount, length);
         }
-        int worsePreserveStart = rng.Next(worsePreserveEnd / 2);
+        // Guard against worsePreserveEnd <= 1 where rng.Next(0) would throw.
+        int worsePreserveStart = worsePreserveEnd > 1 ? rng.Next(worsePreserveEnd / 2) : 0;
 
         for (int i = 0; i < length; i++)
         {
