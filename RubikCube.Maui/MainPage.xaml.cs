@@ -73,6 +73,7 @@ public partial class MainPage : ContentPage
     private SolverMode _selectedSolverMode = SolverMode.Iterative;
     private GAConfig _selectedGAConfig = GAPresets.Default;
     private int _generationsPerIteration = 100;
+    private PresetManager _presetManager = null!;
 
     // Chart data
     private const int MaxChartPoints = 500;
@@ -113,6 +114,13 @@ public partial class MainPage : ContentPage
         {
             MainThread.BeginInvokeOnMainThread(() => SolutionLabel.Text = count.ToString());
         };
+
+        // Initialize preset manager
+        var presetPath = Path.Combine(FileSystem.AppDataDirectory, "presets.json");
+        _presetManager = new PresetManager(presetPath);
+        _presetManager.Load();
+        _presetManager.PresetsChanged += RefreshPresetPicker;
+        RefreshPresetPicker();
 
         // Initialize cube
         InitializeCube();
@@ -485,17 +493,10 @@ public partial class MainPage : ContentPage
 
     private void OnPresetChanged(object? sender, EventArgs e)
     {
-        if (PresetPicker.SelectedIndex < 0) return;
-
-        _selectedGAConfig = PresetPicker.SelectedIndex switch
+        if (PresetPicker.SelectedItem is string presetName)
         {
-            0 => GAPresets.Default,
-            1 => GAPresets.Fast,
-            2 => GAPresets.Exploratory,
-            3 => GAPresets.Exploitative,
-            4 => GAPresets.LongRun,
-            _ => GAPresets.Default
-        };
+            _selectedGAConfig = _presetManager.GetConfig(presetName);
+        }
 
         // Update sliders to match preset
         PopulationSlider.Value = _selectedGAConfig.PopulationSize;
@@ -539,6 +540,94 @@ public partial class MainPage : ContentPage
         };
 
         UpdateGAConfigLabels();
+    }
+
+    private void RefreshPresetPicker()
+    {
+        var selectedIndex = PresetPicker.SelectedIndex;
+        PresetPicker.ItemsSource = _presetManager.PresetNames.ToList();
+        if (selectedIndex >= 0 && selectedIndex < PresetPicker.ItemsSource.Count)
+            PresetPicker.SelectedIndex = selectedIndex;
+        else if (PresetPicker.ItemsSource.Count > 0)
+            PresetPicker.SelectedIndex = 0;
+    }
+
+    private void UpdateGAConfigFromUI()
+    {
+        // Get selection strategy
+        var selection = SelectionPicker.SelectedIndex switch
+        {
+            0 => SelectionStrategy.Unique,
+            1 => SelectionStrategy.Tournament,
+            2 => SelectionStrategy.Rank,
+            3 => SelectionStrategy.Roulette,
+            4 => SelectionStrategy.RouletteRank,
+            _ => SelectionStrategy.Unique
+        };
+
+        // Get crossover strategy
+        var crossover = CrossoverPicker.SelectedIndex switch
+        {
+            0 => CrossoverStrategy.SinglePoint,
+            1 => CrossoverStrategy.TwoPoint,
+            2 => CrossoverStrategy.Uniform,
+            3 => CrossoverStrategy.SegmentPreserving,
+            _ => CrossoverStrategy.SinglePoint
+        };
+
+        // Get mutation strategy
+        var mutation = MutationPicker.SelectedIndex switch
+        {
+            0 => MutationStrategy.SingleGene,
+            1 => MutationStrategy.Random,
+            2 => MutationStrategy.Swap,
+            3 => MutationStrategy.Inversion,
+            4 => MutationStrategy.Scramble,
+            5 => MutationStrategy.Conjugation,
+            6 => MutationStrategy.Commutator,
+            7 => MutationStrategy.Neighbor,
+            8 => MutationStrategy.Simplify,
+            9 => MutationStrategy.InverseSequence,
+            10 => MutationStrategy.Insert,
+            _ => MutationStrategy.SingleGene
+        };
+
+        _selectedGAConfig = _selectedGAConfig with
+        {
+            PopulationSize = (int)PopulationSlider.Value,
+            MutationRate = MutationSlider.Value,
+            EliteCount = (int)EliteSlider.Value,
+            GenomeLength = (int)ChromosomeLengthSlider.Value,
+            Selection = selection,
+            Crossover = crossover,
+            Mutation = mutation
+        };
+        _generationsPerIteration = (int)GenerationsSlider.Value;
+    }
+
+    private async void OnSavePresetClicked(object? sender, EventArgs e)
+    {
+        // Show input dialog to get preset name
+        string presetName = await DisplayPromptAsync("Save Preset", "Enter a name for the preset:");
+        if (string.IsNullOrWhiteSpace(presetName)) return;
+
+        // Get current config from UI
+        UpdateGAConfigFromUI();
+
+        // Try to add the preset
+        if (_presetManager.AddPreset(presetName, _selectedGAConfig))
+        {
+            // Select the new preset
+            int index = _presetManager.GetIndex(presetName);
+            if (index >= 0)
+                PresetPicker.SelectedIndex = index;
+
+            await DisplayAlert("Save Preset", $"Preset '{presetName}' saved successfully.", "OK");
+        }
+        else
+        {
+            await DisplayAlert("Save Preset", $"A preset with the name '{presetName}' already exists.", "OK");
+        }
     }
 
     private void OnSelectionChanged(object? sender, EventArgs e)

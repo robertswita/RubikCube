@@ -50,6 +50,7 @@ namespace RubikCube
         private SolverMode _selectedSolverMode = SolverMode.Iterative;
         private GAConfig _selectedGAConfig = GAPresets.Default;
         private int _generationsPerIteration = 100;
+        private PresetManager _presetManager = null!;
         TShape Root = new TShape();
         public TRubikForm()
         {
@@ -83,6 +84,12 @@ namespace RubikCube
             _solutionDb.SolutionSaved += count => BeginInvoke(new Action(() => SolutionLbl.Text = count.ToString()));
             SolutionLbl.Text = _solutionDb.Count.ToString();
 
+            // Initialize preset manager
+            _presetManager = new PresetManager("presets.json");
+            _presetManager.Load();
+            _presetManager.PresetsChanged += RefreshPresetComboBox;
+            RefreshPresetComboBox();
+
             // Initialize LiveCharts
             fitnessChart.Series = new ISeries[]
             {
@@ -103,6 +110,20 @@ namespace RubikCube
             cmbCrossover.SelectedIndex = 0; // SinglePoint
             cmbMutationType.SelectedIndex = 0; // SingleGene
             UpdateGAConfigFromUI();
+        }
+
+        private void RefreshPresetComboBox()
+        {
+            var selectedIndex = cmbPreset.SelectedIndex;
+            cmbPreset.Items.Clear();
+            foreach (var name in _presetManager.PresetNames)
+            {
+                cmbPreset.Items.Add(name);
+            }
+            if (selectedIndex >= 0 && selectedIndex < cmbPreset.Items.Count)
+                cmbPreset.SelectedIndex = selectedIndex;
+            else if (cmbPreset.Items.Count > 0)
+                cmbPreset.SelectedIndex = 0;
         }
 
         Point StartPos;
@@ -652,15 +673,10 @@ namespace RubikCube
 
         private void cmbPreset_SelectedIndexChanged(object sender, EventArgs e)
         {
-            _selectedGAConfig = cmbPreset.SelectedIndex switch
+            if (cmbPreset.SelectedItem is string presetName)
             {
-                0 => GAPresets.Default,
-                1 => GAPresets.Fast,
-                2 => GAPresets.Exploratory,
-                3 => GAPresets.Exploitative,
-                4 => GAPresets.LongRun,
-                _ => GAPresets.Default
-            };
+                _selectedGAConfig = _presetManager.GetConfig(presetName);
+            }
 
             // Update UI controls to match preset
             UpdateGAConfigUI();
@@ -734,6 +750,54 @@ namespace RubikCube
 
             // Update numeric controls
             UpdateGAConfigUI();
+        }
+
+        private void OnSavePresetClicked(object sender, EventArgs e)
+        {
+            // Show input dialog to get preset name
+            string presetName = ShowInputDialog("Save Preset", "Enter a name for the preset:");
+            if (string.IsNullOrWhiteSpace(presetName)) return;
+
+            // Get current config from UI
+            UpdateGAConfigFromUI();
+
+            // Try to add the preset
+            if (_presetManager.AddPreset(presetName, _selectedGAConfig))
+            {
+                // Select the new preset
+                int index = _presetManager.GetIndex(presetName);
+                if (index >= 0)
+                    cmbPreset.SelectedIndex = index;
+
+                MessageBox.Show($"Preset '{presetName}' saved successfully.", "Save Preset", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                MessageBox.Show($"A preset with the name '{presetName}' already exists.", "Save Preset", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private string ShowInputDialog(string title, string prompt)
+        {
+            using var form = new Form();
+            form.Text = title;
+            form.ClientSize = new Size(400, 130);
+            form.StartPosition = FormStartPosition.CenterParent;
+            form.FormBorderStyle = FormBorderStyle.FixedDialog;
+            form.MaximizeBox = false;
+            form.MinimizeBox = false;
+            form.AutoScaleMode = AutoScaleMode.Dpi;
+
+            var label = new Label { Text = prompt, Left = 15, Top = 15, Width = 370, Height = 25 };
+            var textBox = new TextBox { Left = 15, Top = 45, Width = 370 };
+            var okButton = new Button { Text = "OK", Left = 220, Top = 85, Width = 80, Height = 30, DialogResult = DialogResult.OK };
+            var cancelButton = new Button { Text = "Cancel", Left = 305, Top = 85, Width = 80, Height = 30, DialogResult = DialogResult.Cancel };
+
+            form.Controls.AddRange(new Control[] { label, textBox, okButton, cancelButton });
+            form.AcceptButton = okButton;
+            form.CancelButton = cancelButton;
+
+            return form.ShowDialog() == DialogResult.OK ? textBox.Text.Trim() : "";
         }
 
         private void UpdateGAConfigUI()

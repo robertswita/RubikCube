@@ -81,17 +81,8 @@
                         <!-- Preset -->
                         <HorizontalStackLayout Spacing="10">
                             <Label Text="Preset:" VerticalOptions="Center" WidthRequest="80" />
-                            <Picker x:Name="PresetPicker" WidthRequest="150" SelectedIndexChanged="OnPresetChanged">
-                                <Picker.ItemsSource>
-                                    <x:Array Type="{x:Type x:String}">
-                                        <x:String>Default</x:String>
-                                        <x:String>Fast</x:String>
-                                        <x:String>Exploratory</x:String>
-                                        <x:String>Exploitative</x:String>
-                                        <x:String>LongRun</x:String>
-                                    </x:Array>
-                                </Picker.ItemsSource>
-                            </Picker>
+                            <Picker x:Name="PresetPicker" WidthRequest="120" SelectedIndexChanged="OnPresetChanged" />
+                            <Button x:Name="SavePresetBtn" Text="Save" WidthRequest="50" HeightRequest="30" Padding="0" Clicked="OnSavePresetClicked" />
                         </HorizontalStackLayout>
 
                         <!-- Population Size -->

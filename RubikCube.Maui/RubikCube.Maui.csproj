@@ -96,6 +96,7 @@
     <Compile Include="..\RubikCube\GA\Configuration\SolverConfig.cs" Link="Core\GA\Configuration\SolverConfig.cs" />
     <Compile Include="..\RubikCube\GA\Configuration\GAState.cs" Link="Core\GA\Configuration\GAState.cs" />
     <Compile Include="..\RubikCube\GA\Configuration\GAPresets.cs" Link="Core\GA\Configuration\GAPresets.cs" />
+    <Compile Include="..\RubikCube\GA\Configuration\PresetManager.cs" Link="Core\GA\Configuration\PresetManager.cs" />
 
     <Compile Include="..\RubikCube\GA\Operators\Selection\RankSelection.cs" Link="Core\GA\Operators\Selection\RankSelection.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Selection\TournamentSelection.cs" Link="Core\GA\Operators\Selection\TournamentSelection.cs" />

@@ -74,6 +74,7 @@
             this.transparencyLbl = new System.Windows.Forms.Label();
             this.gaConfigGroup = new System.Windows.Forms.GroupBox();
             this.resetGAConfigBtn = new System.Windows.Forms.Button();
+            this.savePresetBtn = new System.Windows.Forms.Button();
             this.lblSolverMode = new System.Windows.Forms.Label();
             this.cmbSolverMode = new System.Windows.Forms.ComboBox();
             this.lblPreset = new System.Windows.Forms.Label();
@@ -522,6 +523,7 @@
             // gaConfigGroup
             //
             this.gaConfigGroup.Controls.Add(this.resetGAConfigBtn);
+            this.gaConfigGroup.Controls.Add(this.savePresetBtn);
             this.gaConfigGroup.Controls.Add(this.lblSolverMode);
             this.gaConfigGroup.Controls.Add(this.cmbSolverMode);
             this.gaConfigGroup.Controls.Add(this.lblPreset);
@@ -559,6 +561,16 @@
             this.resetGAConfigBtn.Text = "Reset to Default";
             this.resetGAConfigBtn.UseVisualStyleBackColor = true;
             this.resetGAConfigBtn.Click += new System.EventHandler(this.resetGAConfigBtn_Click);
+            //
+            // savePresetBtn
+            //
+            this.savePresetBtn.Location = new System.Drawing.Point(180, 18);
+            this.savePresetBtn.Name = "savePresetBtn";
+            this.savePresetBtn.Size = new System.Drawing.Size(95, 25);
+            this.savePresetBtn.TabIndex = 66;
+            this.savePresetBtn.Text = "Save Preset";
+            this.savePresetBtn.UseVisualStyleBackColor = true;
+            this.savePresetBtn.Click += new System.EventHandler(this.OnSavePresetClicked);
             //
             // lblSolverMode
             //
@@ -877,6 +889,7 @@
         private System.Windows.Forms.Label dimensionLbl;
         private System.Windows.Forms.GroupBox gaConfigGroup;
         private System.Windows.Forms.Button resetGAConfigBtn;
+        private System.Windows.Forms.Button savePresetBtn;
         private System.Windows.Forms.Label lblSolverMode;
         private System.Windows.Forms.ComboBox cmbSolverMode;
         private System.Windows.Forms.Label lblPreset;
