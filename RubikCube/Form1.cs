@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
@@ -14,6 +15,9 @@ using System.IO;
 using GA;
 using TGL.GA;
 using TGL.GA.Configuration;
+using LiveChartsCore;
+using LiveChartsCore.Defaults;
+using LiveChartsCore.SkiaSharpView;
 
 namespace RubikCube
 {
@@ -33,6 +37,9 @@ namespace RubikCube
         //public TCamera Camera;
         RubikGASolver? _solver;
         CancellationTokenSource? _cts;
+
+        // Chart data for LiveCharts
+        private ObservableCollection<ObservableValue> _fitnessValues = new();
 
         // GA Configuration (from UI)
         private SolverMode _selectedSolverMode = SolverMode.Iterative;
@@ -64,6 +71,19 @@ namespace RubikCube
             RubikCube = new TRubikCube();
             RubikCube.Parent = Root;
             LoadSolutions();
+
+            // Initialize LiveCharts
+            chart1.Series = new ISeries[]
+            {
+                new LineSeries<ObservableValue>
+                {
+                    Values = _fitnessValues,
+                    Fill = null,
+                    GeometrySize = 0
+                }
+            };
+            chart1.XAxes = new Axis[] { new Axis { Name = "Generation" } };
+            chart1.YAxes = new Axis[] { new Axis { Name = "Fitness" } };
 
             // Initialize GA configuration controls
             cmbSolverMode.SelectedIndex = 0; // Iterative
@@ -196,18 +216,14 @@ namespace RubikCube
 
         void OnProgress(TRubikGenome specimen)
         {
-            //if (chart1.Series[0].Points.Count % 300 == 0)
-            //    chart1.Series[0].Points.Clear();
-            //var ga = (TGA<TRubikGenome>)sender;
-            chart1.Series[0].Points.AddY(specimen.Fitness);
-            chart1.Refresh();
+            _fitnessValues.Add(new ObservableValue(specimen.Fitness));
+            if (_fitnessValues.Count > 500)
+                _fitnessValues.RemoveAt(0);
+
             var iterTime = Watch.Elapsed - IterElapsed;
             IterTimeBox.Text = "Iter time:" + iterTime.Milliseconds;
             IterTimeBox.Refresh();
             IterElapsed += iterTime;
-
-            //label2.Refresh();
-            //label4.Refresh();
         }
 
         bool TrySolutions = true;
@@ -229,7 +245,7 @@ namespace RubikCube
             {
                 Watch = Stopwatch.StartNew();
                 IterElapsed = TimeSpan.Zero;
-                chart1.Series[0].Points.Clear();
+                _fitnessValues.Clear();
 
                 // Build GA config from UI settings
                 var gaConfig = _selectedGAConfig with
@@ -547,7 +563,7 @@ namespace RubikCube
             if (!IsPaused)
             {
                 PauseBtn.BackColor = DefaultBackColor;
-                chart1.Series[0].Points.Clear();
+                _fitnessValues.Clear();
                 MoveTimer.Start();
             }
         }
@@ -837,7 +853,7 @@ namespace RubikCube
             label6.Text = "0";
             MovesLbl.Text = "0";
             SolutionLbl.Text = Solutions.Count.ToString();
-            chart1.Series[0].Points.Clear();
+            _fitnessValues.Clear();
         }
 
         #endregion

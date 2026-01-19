@@ -29,8 +29,6 @@
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea2 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Series series2 = new System.Windows.Forms.DataVisualization.Charting.Series();
             this.MoveTimer = new System.Windows.Forms.Timer(this.components);
             this.panel1 = new System.Windows.Forms.Panel();
             this.MovesLbl = new System.Windows.Forms.Label();
@@ -47,7 +45,7 @@
             this.label7 = new System.Windows.Forms.Label();
             this.label6 = new System.Windows.Forms.Label();
             this.label5 = new System.Windows.Forms.Label();
-            this.chart1 = new System.Windows.Forms.DataVisualization.Charting.Chart();
+            this.chart1 = new LiveChartsCore.SkiaSharpView.WinForms.CartesianChart();
             this.label4 = new System.Windows.Forms.Label();
             this.label3 = new System.Windows.Forms.Label();
             this.label2 = new System.Windows.Forms.Label();
@@ -104,7 +102,6 @@
             this.panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.StateBox)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.SlicesBox)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             this.menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.stateGridBindingSource)).BeginInit();
@@ -294,22 +291,13 @@
             this.label5.Size = new System.Drawing.Size(35, 16);
             this.label5.TabIndex = 17;
             this.label5.Text = "iters:";
-            // 
+            //
             // chart1
-            // 
-            chartArea2.AxisX.Title = "iteration";
-            chartArea2.AxisY.Title = "error";
-            chartArea2.Name = "ChartArea1";
-            this.chart1.ChartAreas.Add(chartArea2);
+            //
             this.chart1.Location = new System.Drawing.Point(0, 400);
             this.chart1.Name = "chart1";
-            series2.ChartArea = "ChartArea1";
-            series2.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
-            series2.Name = "Series1";
-            this.chart1.Series.Add(series2);
             this.chart1.Size = new System.Drawing.Size(421, 269);
             this.chart1.TabIndex = 14;
-            this.chart1.Text = "chart1";
             //
             // label4
             //
@@ -787,7 +775,6 @@
             this.panel1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.StateBox)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.SlicesBox)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.chart1)).EndInit();
             this.menuStrip1.ResumeLayout(false);
             this.menuStrip1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
@@ -817,7 +804,7 @@
         private System.Windows.Forms.Button button2;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.Button button1;
-        private System.Windows.Forms.DataVisualization.Charting.Chart chart1;
+        private LiveChartsCore.SkiaSharpView.WinForms.CartesianChart chart1;
         private System.ComponentModel.BackgroundWorker solveWorker;
         private System.Windows.Forms.MenuStrip menuStrip1;
         private System.Windows.Forms.ToolStripMenuItem fileToolStripMenuItem;
