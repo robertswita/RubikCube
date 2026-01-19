@@ -12,6 +12,8 @@
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
+    <LangVersion>8.0</LangVersion>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -84,6 +86,52 @@
     </Compile>
     <Compile Include="TVector.cs" />
     <Compile Include="Win32.cs" />
+    <!-- GA Infrastructure -->
+    <Compile Include="GA\Interfaces\IChromosome.cs" />
+    <Compile Include="GA\Interfaces\ISelectionOperator.cs" />
+    <Compile Include="GA\Interfaces\ICrossoverOperator.cs" />
+    <Compile Include="GA\Interfaces\IMutationOperator.cs" />
+    <Compile Include="GA\Interfaces\IFitnessEvaluator.cs" />
+    <Compile Include="GA\Interfaces\ITerminationCondition.cs" />
+    <Compile Include="GA\Configuration\SelectionStrategy.cs" />
+    <Compile Include="GA\Configuration\CrossoverStrategy.cs" />
+    <Compile Include="GA\Configuration\MutationStrategy.cs" />
+    <Compile Include="GA\Configuration\SolverMode.cs" />
+    <Compile Include="GA\Configuration\TerminationConfig.cs" />
+    <Compile Include="GA\Configuration\GAConfig.cs" />
+    <Compile Include="GA\Configuration\SolverConfig.cs" />
+    <Compile Include="GA\Configuration\GAState.cs" />
+    <Compile Include="GA\Configuration\GAPresets.cs" />
+    <Compile Include="GA\Operators\Selection\RankSelection.cs" />
+    <Compile Include="GA\Operators\Selection\TournamentSelection.cs" />
+    <Compile Include="GA\Operators\Selection\RouletteSelection.cs" />
+    <Compile Include="GA\Operators\Selection\RouletteRankSelection.cs" />
+    <Compile Include="GA\Operators\Selection\UniqueSelection.cs" />
+    <Compile Include="GA\Operators\Crossover\SinglePointCrossover.cs" />
+    <Compile Include="GA\Operators\Crossover\TwoPointCrossover.cs" />
+    <Compile Include="GA\Operators\Crossover\UniformCrossover.cs" />
+    <Compile Include="GA\Operators\Crossover\SegmentPreservingCrossover.cs" />
+    <Compile Include="GA\Operators\Mutation\RandomMutation.cs" />
+    <Compile Include="GA\Operators\Mutation\SwapMutation.cs" />
+    <Compile Include="GA\Operators\Mutation\InversionMutation.cs" />
+    <Compile Include="GA\Operators\Mutation\ScrambleMutation.cs" />
+    <Compile Include="GA\Operators\Mutation\ConjugationMutation.cs" />
+    <Compile Include="GA\Operators\Mutation\SingleGeneMutation.cs" />
+    <Compile Include="GA\Operators\Mutation\CommutatorMutation.cs" />
+    <Compile Include="GA\Operators\Mutation\NeighborMutation.cs" />
+    <Compile Include="GA\Operators\Mutation\SimplifyMutation.cs" />
+    <Compile Include="GA\Operators\Mutation\InverseSequenceMutation.cs" />
+    <Compile Include="GA\Operators\Mutation\InsertMutation.cs" />
+    <Compile Include="GA\Operators\OperatorFactory.cs" />
+    <Compile Include="GA\Termination\CompositeTermination.cs" />
+    <Compile Include="GA\Termination\MaxGenerationsTermination.cs" />
+    <Compile Include="GA\Termination\TargetFitnessTermination.cs" />
+    <Compile Include="GA\Termination\StagnationTermination.cs" />
+    <Compile Include="GA\Termination\MaxTimeTermination.cs" />
+    <Compile Include="GA\GeneticAlgorithm.cs" />
+    <Compile Include="GA\MinimizingFitnessEvaluator.cs" />
+    <Compile Include="GA\RubikFitnessEvaluator.cs" />
+    <Compile Include="GA\RubikGASolver.cs" />
     <EmbeddedResource Include="Form1.resx">
       <DependentUpon>Form1.cs</DependentUpon>
     </EmbeddedResource>
