@@ -12,6 +12,8 @@ using System.Diagnostics;
 using System.Threading;
 using System.IO;
 using GA;
+using TGL.GA;
+using TGL.GA.Configuration;
 
 namespace RubikCube
 {
@@ -29,7 +31,13 @@ namespace RubikCube
         public TRubikCube RubikCube;// = new TRubikCube();
         //public TScene Scene = new TScene();
         //public TCamera Camera;
-        TGA<TRubikGenome> Ga;
+        RubikGASolver? _solver;
+        CancellationTokenSource? _cts;
+
+        // GA Configuration (from UI)
+        private SolverMode _selectedSolverMode = SolverMode.Iterative;
+        private GAConfig _selectedGAConfig = GAPresets.Default;
+        private int _generationsPerIteration = 100;
         TShape Root = new TShape();
         public TRubikForm()
         {
@@ -56,6 +64,13 @@ namespace RubikCube
             RubikCube = new TRubikCube();
             RubikCube.Parent = Root;
             LoadSolutions();
+
+            // Initialize GA configuration controls
+            cmbSolverMode.SelectedIndex = 0; // Iterative
+            cmbPreset.SelectedIndex = 0; // Default
+            cmbSelection.SelectedIndex = 0; // Unique
+            cmbCrossover.SelectedIndex = 0; // SinglePoint
+            UpdateGAConfigFromUI();
         }
 
         Point StartPos;
@@ -232,6 +247,8 @@ namespace RubikCube
 
         bool TrySolutions = true;
         Stopwatch Watch;
+        TRubikGenome? _lastBest;
+
         void Solve()
         {
             if (HighScore == 0)
@@ -249,27 +266,52 @@ namespace RubikCube
                 IterElapsed = TimeSpan.Zero;
                 chart1.Series[0].Points.Clear();
 
-                TChromosome.GenesLength = 50;
-                Ga = new TGA<TRubikGenome>();
-                Ga.GenerationsCount = 50;
-                Ga.PopulationCount = 200;
-                Ga.WinnerRatio = 0.1;
-                Ga.MutationRatio = 5;
-                Ga.SelectionType = TGA<TRubikGenome>.TSelectionType.Unique;
-                Ga.Evaluate = OnEvaluate;
-                Ga.Progress = OnProgress;
-                TRubikGenome.FreeMoves = RubikCube.GetFreeMoves();
-                Ga.HighScore = HighScore;
-                Ga.Execute();
-                if (Ga.HighScore == 0 && RubikCube.ActiveCluster.Count > 1)
+                // Build GA config from UI settings
+                var gaConfig = _selectedGAConfig with
                 {
-                    SaveSolution(Ga.Best);
+                    PopulationSize = (int)numPopulation.Value,
+                    MutationRate = (double)numMutation.Value / 100.0,
+                    EliteCount = (int)numElite.Value,
+                    Termination = _selectedGAConfig.Termination with
+                    {
+                        MaxGenerations = (int)numGenerations.Value
+                    }
+                };
+
+                var solverConfig = new SolverConfig
+                {
+                    Mode = _selectedSolverMode,
+                    GenerationsPerIteration = (int)numGenerations.Value
+                };
+
+                _solver = new RubikGASolver(RubikCube, gaConfig, solverConfig);
+                _lastBest = null;
+
+                _solver.GenerationCompleted += state =>
+                {
+                    if (state.Best != null)
+                    {
+                        _lastBest = state.Best;
+                        OnProgress(state.Best);
+                    }
+                };
+
+                _solver.MovesReady += moves =>
+                {
+                    Moves.AddRange(moves);
+                };
+
+                _cts = new CancellationTokenSource();
+                var result = _solver.RunIteration(_cts.Token);
+
+                if (result.Fitness == 0 && RubikCube.ActiveCluster.Count > 1 && _lastBest != null)
+                {
+                    SaveSolution(_lastBest);
                 }
-                if (Ga.HighScore < HighScore)
+                if (result.Fitness < HighScore && result.Moves.Count > 0)
                 {
-                    HighScore = Ga.HighScore;
-                    for (int i = 0; i < Ga.Best.MovesCount; i++)
-                        Moves.Add(TMove.Decode((int)Ga.Best.Genes[i]));
+                    HighScore = result.Fitness;
+                    Moves.AddRange(result.Moves);
                     TrySolutions = true;
                 }
                 if (TrySolutions)
@@ -311,7 +353,7 @@ namespace RubikCube
             }
             else
             {
-                Ga = null;
+                _solver = null;
             }
         }
 
@@ -632,5 +674,127 @@ namespace RubikCube
             TAffine.N = (int)DimsBox.Value;
             UpdateView();
         }
+
+        #region GA Configuration Event Handlers
+
+        private void cmbSolverMode_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            _selectedSolverMode = cmbSolverMode.SelectedIndex switch
+            {
+                0 => SolverMode.Iterative,
+                1 => SolverMode.Complete,
+                2 => SolverMode.Adaptive,
+                _ => SolverMode.Iterative
+            };
+        }
+
+        private void cmbPreset_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            _selectedGAConfig = cmbPreset.SelectedIndex switch
+            {
+                0 => GAPresets.Default,
+                1 => GAPresets.Fast,
+                2 => GAPresets.Exploratory,
+                3 => GAPresets.Exploitative,
+                4 => GAPresets.LongRun,
+                _ => GAPresets.Default
+            };
+
+            // Update UI controls to match preset
+            UpdateGAConfigUI();
+        }
+
+        private void cmbSelection_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            var selection = cmbSelection.SelectedIndex switch
+            {
+                0 => SelectionStrategy.Unique,
+                1 => SelectionStrategy.Tournament,
+                2 => SelectionStrategy.Rank,
+                3 => SelectionStrategy.Roulette,
+                4 => SelectionStrategy.RouletteRank,
+                _ => SelectionStrategy.Unique
+            };
+            _selectedGAConfig = _selectedGAConfig with { Selection = selection };
+        }
+
+        private void cmbCrossover_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            var crossover = cmbCrossover.SelectedIndex switch
+            {
+                0 => CrossoverStrategy.SinglePoint,
+                1 => CrossoverStrategy.TwoPoint,
+                2 => CrossoverStrategy.Uniform,
+                _ => CrossoverStrategy.SinglePoint
+            };
+            _selectedGAConfig = _selectedGAConfig with { Crossover = crossover };
+        }
+
+        private void numGAParam_ValueChanged(object sender, EventArgs e)
+        {
+            UpdateGAConfigFromUI();
+        }
+
+        private void resetGAConfigBtn_Click(object sender, EventArgs e)
+        {
+            // Reset to default values
+            _selectedSolverMode = SolverMode.Iterative;
+            _selectedGAConfig = GAPresets.Default;
+            _generationsPerIteration = 100;
+
+            // Update combo boxes
+            cmbSolverMode.SelectedIndex = 0;
+            cmbPreset.SelectedIndex = 0;
+            cmbSelection.SelectedIndex = 0;
+            cmbCrossover.SelectedIndex = 0;
+
+            // Update numeric controls
+            UpdateGAConfigUI();
+        }
+
+        private void UpdateGAConfigUI()
+        {
+            numPopulation.Value = _selectedGAConfig.PopulationSize;
+            numMutation.Value = (int)(_selectedGAConfig.MutationRate * 100);
+            numGenerations.Value = Math.Min(numGenerations.Maximum, _selectedGAConfig.Termination.MaxGenerations);
+            numElite.Value = _selectedGAConfig.EliteCount;
+
+            // Update selection combo
+            cmbSelection.SelectedIndex = _selectedGAConfig.Selection switch
+            {
+                SelectionStrategy.Unique => 0,
+                SelectionStrategy.Tournament => 1,
+                SelectionStrategy.Rank => 2,
+                SelectionStrategy.Roulette => 3,
+                SelectionStrategy.RouletteRank => 4,
+                _ => 0
+            };
+
+            // Update crossover combo
+            cmbCrossover.SelectedIndex = _selectedGAConfig.Crossover switch
+            {
+                CrossoverStrategy.SinglePoint => 0,
+                CrossoverStrategy.TwoPoint => 1,
+                CrossoverStrategy.Uniform => 2,
+                _ => 0
+            };
+        }
+
+        private void UpdateGAConfigFromUI()
+        {
+            _selectedGAConfig = _selectedGAConfig with
+            {
+                PopulationSize = (int)numPopulation.Value,
+                MutationRate = (double)numMutation.Value / 100.0,
+                EliteCount = (int)numElite.Value,
+                Termination = _selectedGAConfig.Termination with
+                {
+                    MaxGenerations = (int)numGenerations.Value
+                }
+            };
+            _generationsPerIteration = (int)numGenerations.Value;
+        }
+
+        #endregion
     }
 }

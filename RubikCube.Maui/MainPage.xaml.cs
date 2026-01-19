@@ -75,6 +75,7 @@ public partial class MainPage : ContentPage
     private int _generationsPerIteration = 100;
 
     // Chart data
+    private const int MaxChartPoints = 500;
     public ObservableCollection<ISeries> Series { get; set; } = new();
     public ObservableCollection<Axis> XAxes { get; set; } = new();
     public ObservableCollection<Axis> YAxes { get; set; } = new();
@@ -656,6 +657,11 @@ public partial class MainPage : ContentPage
         {
             if (state.Best != null)
             {
+                // Remove oldest point if we're at the limit (queue behavior)
+                if (_fitnessValues.Count >= MaxChartPoints)
+                {
+                    _fitnessValues.RemoveAt(0);
+                }
                 _fitnessValues.Add(new ObservableValue(state.Best.Fitness));
             }
 
