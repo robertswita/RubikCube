@@ -393,7 +393,8 @@ namespace RubikCube
             if (MoveTimer.Enabled || _isGaRunning) return;
             IsPaused = true;
             var rnd = TChromosome.Rnd;
-            for (int i = 0; i < 30; i++)
+            int shuffleMoves = (int)numShuffleMoves.Value;
+            for (int i = 0; i < shuffleMoves; i++)
             {
                 // Use _gaCube consistently for both selecting moves AND applying them
                 // (like MAUI does) to keep _gaCube state consistent

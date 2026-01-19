@@ -40,6 +40,16 @@
                     <Label x:Name="SizeLabel" Text="3" VerticalOptions="Center" WidthRequest="30" />
                 </HorizontalStackLayout>
 
+                <!-- Shuffle Moves Control -->
+                <HorizontalStackLayout Spacing="10" VerticalOptions="Center">
+                    <Label Text="Shuffle:" VerticalOptions="Center" WidthRequest="75" />
+                    <Slider x:Name="ShuffleMoveSlider"
+                            Minimum="5" Maximum="100" Value="30"
+                            WidthRequest="150"
+                            ValueChanged="OnShuffleMoveSliderChanged" />
+                    <Label x:Name="ShuffleMoveLabel" Text="30" VerticalOptions="Center" WidthRequest="30" />
+                </HorizontalStackLayout>
+
                 <!-- Transparency Toggle -->
                 <HorizontalStackLayout Spacing="10">
                     <Label Text="Transparency:" VerticalOptions="Center" />

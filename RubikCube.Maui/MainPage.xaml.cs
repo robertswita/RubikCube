@@ -251,13 +251,14 @@ public partial class MainPage : ContentPage
         // Stop GA if running
         StopGa();
 
-        DebugLog.WriteLine($"Shuffle START: _gaCube unsolved={_gaCube.Cubies.Count(c => c.State != 0)}");
+        int shuffleMoves = (int)Math.Round(ShuffleMoveSlider.Value);
+        DebugLog.WriteLine($"Shuffle START: {shuffleMoves} moves, _gaCube unsolved={_gaCube.Cubies.Count(c => c.State != 0)}");
 
         var rnd = TChromosome.Rnd;
 
         // Generate shuffle moves using _gaCube (which is always "ahead")
         // Apply each move to _gaCube immediately, queue for _rubikCube animation
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < shuffleMoves; i++)
         {
             _gaCube.ActiveCubie = _gaCube.Cubies[rnd.Next(_gaCube.Cubies.Length)];
             var freeMoves = _gaCube.GetFreeMoves();
@@ -348,6 +349,12 @@ public partial class MainPage : ContentPage
             TRubikCube.Size = size;
             RecreateCube();
         }
+    }
+
+    private void OnShuffleMoveSliderChanged(object? sender, ValueChangedEventArgs e)
+    {
+        int moves = (int)Math.Round(e.NewValue);
+        ShuffleMoveLabel.Text = moves.ToString();
     }
 
     private void RecreateCube()

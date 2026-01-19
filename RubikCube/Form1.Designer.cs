@@ -41,6 +41,8 @@
             this.PauseBtn = new System.Windows.Forms.Button();
             this.slicesLbl = new System.Windows.Forms.Label();
             this.SlicesBox = new System.Windows.Forms.NumericUpDown();
+            this.shuffleLbl = new System.Windows.Forms.Label();
+            this.numShuffleMoves = new System.Windows.Forms.NumericUpDown();
             this.timeLbl = new System.Windows.Forms.Label();
             this.errorLbl = new System.Windows.Forms.Label();
             this.itersValueLbl = new System.Windows.Forms.Label();
@@ -102,6 +104,7 @@
             this.controlPanel.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.StateBox)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.SlicesBox)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numShuffleMoves)).BeginInit();
             this.mainMenu.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.stateGridBindingSource)).BeginInit();
@@ -131,6 +134,8 @@
             this.controlPanel.Controls.Add(this.PauseBtn);
             this.controlPanel.Controls.Add(this.slicesLbl);
             this.controlPanel.Controls.Add(this.SlicesBox);
+            this.controlPanel.Controls.Add(this.shuffleLbl);
+            this.controlPanel.Controls.Add(this.numShuffleMoves);
             this.controlPanel.Controls.Add(this.timeLbl);
             this.controlPanel.Controls.Add(this.errorLbl);
             this.controlPanel.Controls.Add(this.itersValueLbl);
@@ -255,9 +260,28 @@
             0,
             0});
             this.SlicesBox.ValueChanged += new System.EventHandler(this.OnSlicesValueChanged);
-            // 
+            //
+            // shuffleLbl
+            //
+            this.shuffleLbl.AutoSize = true;
+            this.shuffleLbl.Location = new System.Drawing.Point(295, 9);
+            this.shuffleLbl.Name = "shuffleLbl";
+            this.shuffleLbl.Size = new System.Drawing.Size(52, 16);
+            this.shuffleLbl.TabIndex = 63;
+            this.shuffleLbl.Text = "Shuffle:";
+            //
+            // numShuffleMoves
+            //
+            this.numShuffleMoves.Location = new System.Drawing.Point(353, 7);
+            this.numShuffleMoves.Maximum = new decimal(new int[] { 100, 0, 0, 0 });
+            this.numShuffleMoves.Minimum = new decimal(new int[] { 5, 0, 0, 0 });
+            this.numShuffleMoves.Name = "numShuffleMoves";
+            this.numShuffleMoves.Size = new System.Drawing.Size(64, 22);
+            this.numShuffleMoves.TabIndex = 64;
+            this.numShuffleMoves.Value = new decimal(new int[] { 30, 0, 0, 0 });
+            //
             // label8
-            // 
+            //
             this.timeLbl.AutoSize = true;
             this.timeLbl.Location = new System.Drawing.Point(33, 113);
             this.timeLbl.Name = "label8";
@@ -775,6 +799,7 @@
             this.controlPanel.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.StateBox)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.SlicesBox)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numShuffleMoves)).EndInit();
             this.mainMenu.ResumeLayout(false);
             this.mainMenu.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
@@ -817,6 +842,8 @@
         private System.Windows.Forms.PictureBox pictureBox1;
         private System.Windows.Forms.Label slicesLbl;
         private System.Windows.Forms.NumericUpDown SlicesBox;
+        private System.Windows.Forms.Label shuffleLbl;
+        private System.Windows.Forms.NumericUpDown numShuffleMoves;
         private System.Windows.Forms.Button PauseBtn;
         private System.Windows.Forms.Label IterTimeBox;
         private System.Windows.Forms.Label SolutionLbl;
