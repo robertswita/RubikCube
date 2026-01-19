@@ -53,6 +53,15 @@ namespace TGL
             return S;
         }
 
+        public static TAffine Scale(TVector scale) => CreateScale(scale);
+
+        public static TAffine Translate(TVector t)
+        {
+            var T = new TAffine();
+            T.Origin.Assign(t);
+            return T;
+        }
+
         public static TAffine CreateShear(TVector h)
         {
             var H = new TAffine();

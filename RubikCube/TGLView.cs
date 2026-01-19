@@ -1,6 +1,6 @@
 using System;
 using System.Windows.Forms;
-using OpenTK.WinForms;
+using OpenTK.GLControl;
 using OpenTK.Graphics.OpenGL4;
 
 namespace TGL
