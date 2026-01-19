@@ -14,6 +14,9 @@ public class RouletteSelection<T> : ISelectionOperator<T> where T : IChromosome
     public IReadOnlyList<T> Select(IReadOnlyList<T> population, int count, Random rng)
     {
         int populationCount = population.Count;
+        if (populationCount == 0 || count == 0)
+            return Array.Empty<T>();
+
         var fitness = new double[populationCount];
         double fitnessSum = 0;
 
@@ -24,7 +27,18 @@ public class RouletteSelection<T> : ISelectionOperator<T> where T : IChromosome
             fitnessSum += fitness[i];
         }
 
-        // Reverse so that best individuals have highest cumulative probability
+        // Guard against all-zero fitness (fall back to uniform selection)
+        if (fitnessSum <= 0)
+        {
+            var uniformResult = new List<T>(count);
+            for (int i = 0; i < count; i++)
+                uniformResult.Add(population[rng.Next(populationCount)]);
+            return uniformResult;
+        }
+
+        // Reverse so that best individuals (lowest fitness) have highest cumulative probability.
+        // After reverse: fitness[0] = worst fitness (highest value), fitness[N-1] = best fitness (lowest value).
+        // This gives more probability mass to lower indices, which map to better individuals.
         Array.Reverse(fitness);
 
         // Build cumulative probability distribution
@@ -35,26 +49,35 @@ public class RouletteSelection<T> : ISelectionOperator<T> where T : IChromosome
             cumulativeProb[i] = cumulativeProb[i - 1] + fitness[i];
         }
 
-        // Select using binary search
+        // Select using binary search to find smallest index where cumulativeProb[index] >= p
         var selection = new List<T>(count);
         for (int i = 0; i < count; i++)
         {
             double p = rng.NextDouble() * fitnessSum;
-            int first = 0;
-            int last = populationCount - 1;
-
-            while (first < last - 1)
-            {
-                int middle = (last + first) / 2;
-                if (p < cumulativeProb[middle])
-                    last = middle;
-                else
-                    first = middle;
-            }
-
-            selection.Add(population[first]);
+            int selectedIdx = BinarySearchCumulative(cumulativeProb, p);
+            selection.Add(population[selectedIdx]);
         }
 
         return selection;
+    }
+
+    /// <summary>
+    /// Binary search to find the smallest index where cumulativeProb[index] >= value.
+    /// </summary>
+    private static int BinarySearchCumulative(double[] cumulativeProb, double value)
+    {
+        int left = 0;
+        int right = cumulativeProb.Length - 1;
+
+        while (left < right)
+        {
+            int mid = (left + right) / 2;
+            if (cumulativeProb[mid] < value)
+                left = mid + 1;
+            else
+                right = mid;
+        }
+
+        return left;
     }
 }

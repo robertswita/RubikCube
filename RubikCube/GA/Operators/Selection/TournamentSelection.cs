@@ -23,6 +23,9 @@ public class TournamentSelection<T> : ISelectionOperator<T> where T : IChromosom
 
     public IReadOnlyList<T> Select(IReadOnlyList<T> population, int count, Random rng)
     {
+        if (population.Count == 0 || count == 0)
+            return Array.Empty<T>();
+
         var selection = new List<T>(count);
 
         for (int i = 0; i < count; i++)
