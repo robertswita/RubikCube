@@ -429,3 +429,6 @@ fabric.properties
 # Project specific
 # =============================================================================
 RubikCube/bin/
+
+# Claude Code
+.claude/
