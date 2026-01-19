@@ -648,7 +648,7 @@
             this.numMutation.Name = "numMutation";
             this.numMutation.Size = new System.Drawing.Size(60, 22);
             this.numMutation.TabIndex = 8;
-            this.numMutation.Value = new decimal(new int[] { 100, 0, 0, 0 });
+            this.numMutation.Value = new decimal(new int[] { 1, 0, 0, 0 });
             this.numMutation.ValueChanged += new System.EventHandler(this.numGAParam_ValueChanged);
             //
             // lblMutationPercent
@@ -672,12 +672,12 @@
             // numGenerations
             //
             this.numGenerations.Location = new System.Drawing.Point(100, 108);
-            this.numGenerations.Maximum = new decimal(new int[] { 500, 0, 0, 0 });
+            this.numGenerations.Maximum = new decimal(new int[] { 10000, 0, 0, 0 });
             this.numGenerations.Minimum = new decimal(new int[] { 10, 0, 0, 0 });
             this.numGenerations.Name = "numGenerations";
             this.numGenerations.Size = new System.Drawing.Size(80, 22);
             this.numGenerations.TabIndex = 11;
-            this.numGenerations.Value = new decimal(new int[] { 100, 0, 0, 0 });
+            this.numGenerations.Value = new decimal(new int[] { 2000, 0, 0, 0 });
             this.numGenerations.ValueChanged += new System.EventHandler(this.numGAParam_ValueChanged);
             //
             // lblSelection
@@ -756,7 +756,7 @@
             this.numElite.Name = "numElite";
             this.numElite.Size = new System.Drawing.Size(60, 22);
             this.numElite.TabIndex = 17;
-            this.numElite.Value = new decimal(new int[] { 2, 0, 0, 0 });
+            this.numElite.Value = new decimal(new int[] { 0, 0, 0, 0 });
             this.numElite.ValueChanged += new System.EventHandler(this.numGAParam_ValueChanged);
             //
             // lblChromosomeLength

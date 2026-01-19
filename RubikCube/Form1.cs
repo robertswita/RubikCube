@@ -120,11 +120,12 @@ namespace RubikCube
             _presetManager.PresetsChanged += RefreshPresetComboBox;
             RefreshPresetComboBox();
 
-            // Select the last used preset
+            // Select the last used preset (this triggers UpdateGAConfigUI via event handler)
             var lastUsedIndex = _presetManager.GetIndex(_presetManager.LastUsedPreset);
             cmbPreset.SelectedIndex = lastUsedIndex >= 0 ? lastUsedIndex : 0;
 
-            UpdateGAConfigFromUI();
+            // Ensure UI is populated from config (single source of truth)
+            UpdateGAConfigUI();
         }
 
         private void RefreshPresetComboBox()

@@ -7,27 +7,9 @@ public static class GAPresets
 {
     /// <summary>
     /// Default configuration matching the original TGA behavior.
-    /// Good balance of exploration and exploitation.
+    /// Uses GADefaults as the single source of truth.
     /// </summary>
-    public static GAConfig Default => new()
-    {
-        PopulationSize = 200,
-        EliteCount = 2,
-        GenomeLength = 50,
-        Selection = SelectionStrategy.Unique,
-        SelectionRatio = 0.1,
-        TournamentSize = 5,
-        Crossover = CrossoverStrategy.SinglePoint,
-        CrossoverRate = 1.0, // Original always does crossover
-        Mutation = MutationStrategy.SingleGene,
-        MutationRate = 1.0, // Original mutates all non-elites
-        Termination = new TerminationConfig
-        {
-            MaxGenerations = 100,
-            TargetFitness = 0.0,
-            StagnationLimit = 0 // Disabled
-        }
-    };
+    public static GAConfig Default => new();
 
     /// <summary>
     /// High exploration configuration for finding new solution paths.

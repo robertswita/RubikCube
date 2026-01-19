@@ -21,19 +21,19 @@ public class NamedPreset
 /// </summary>
 public class GAConfigData
 {
-    public int PopulationSize { get; set; } = 200;
-    public int EliteCount { get; set; } = 2;
-    public int GenomeLength { get; set; } = 50;
-    public string Selection { get; set; } = "Tournament";
-    public double SelectionRatio { get; set; } = 0.3;
-    public int TournamentSize { get; set; } = 5;
-    public string Crossover { get; set; } = "SinglePoint";
-    public double CrossoverRate { get; set; } = 1.0;
-    public string Mutation { get; set; } = "SingleGene";
-    public double MutationRate { get; set; } = 0.1;
-    public int MaxGenerations { get; set; } = 100;
-    public double TargetFitness { get; set; } = 0.0;
-    public int StagnationLimit { get; set; } = 0;
+    public int PopulationSize { get; set; } = GADefaults.PopulationSize;
+    public int EliteCount { get; set; } = GADefaults.EliteCount;
+    public int GenomeLength { get; set; } = GADefaults.GenomeLength;
+    public string Selection { get; set; } = GADefaults.Selection.ToString();
+    public double SelectionRatio { get; set; } = GADefaults.SelectionRatio;
+    public int TournamentSize { get; set; } = GADefaults.TournamentSize;
+    public string Crossover { get; set; } = GADefaults.Crossover.ToString();
+    public double CrossoverRate { get; set; } = GADefaults.CrossoverRate;
+    public string Mutation { get; set; } = GADefaults.Mutation.ToString();
+    public double MutationRate { get; set; } = GADefaults.MutationRate;
+    public int MaxGenerations { get; set; } = GADefaults.MaxGenerations;
+    public double TargetFitness { get; set; } = GADefaults.TargetFitness;
+    public int StagnationLimit { get; set; } = GADefaults.StagnationLimit;
 
     public static GAConfigData FromGAConfig(GAConfig config)
     {

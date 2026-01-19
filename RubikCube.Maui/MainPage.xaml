@@ -95,15 +95,15 @@
                         <!-- Mutation Rate -->
                         <HorizontalStackLayout Spacing="10">
                             <Label Text="Mutation:" VerticalOptions="Center" WidthRequest="80" />
-                            <Slider x:Name="MutationSlider" Minimum="0" Maximum="1" Value="1.0" WidthRequest="120" ValueChanged="OnGAParamChanged" />
-                            <Label x:Name="MutationLabel" Text="100%" VerticalOptions="Center" WidthRequest="40" />
+                            <Slider x:Name="MutationSlider" Minimum="0" Maximum="1" Value="0.01" WidthRequest="120" ValueChanged="OnGAParamChanged" />
+                            <Label x:Name="MutationLabel" Text="1%" VerticalOptions="Center" WidthRequest="40" />
                         </HorizontalStackLayout>
 
                         <!-- Generations per Iteration -->
                         <HorizontalStackLayout Spacing="10">
                             <Label Text="Generations:" VerticalOptions="Center" WidthRequest="80" />
-                            <Slider x:Name="GenerationsSlider" Minimum="10" Maximum="500" Value="100" WidthRequest="120" ValueChanged="OnGAParamChanged" />
-                            <Label x:Name="GenerationsLabel" Text="100" VerticalOptions="Center" WidthRequest="40" />
+                            <Slider x:Name="GenerationsSlider" Minimum="10" Maximum="10000" Value="2000" WidthRequest="120" ValueChanged="OnGAParamChanged" />
+                            <Label x:Name="GenerationsLabel" Text="2000" VerticalOptions="Center" WidthRequest="40" />
                         </HorizontalStackLayout>
 
                         <!-- Selection Strategy - ItemsSource set from StrategyInfo in code-behind -->
@@ -127,8 +127,8 @@
                         <!-- Elite Count -->
                         <HorizontalStackLayout Spacing="10">
                             <Label Text="Elite:" VerticalOptions="Center" WidthRequest="80" />
-                            <Slider x:Name="EliteSlider" Minimum="0" Maximum="20" Value="2" WidthRequest="120" ValueChanged="OnGAParamChanged" />
-                            <Label x:Name="EliteLabel" Text="2" VerticalOptions="Center" WidthRequest="40" />
+                            <Slider x:Name="EliteSlider" Minimum="0" Maximum="20" Value="0" WidthRequest="120" ValueChanged="OnGAParamChanged" />
+                            <Label x:Name="EliteLabel" Text="0" VerticalOptions="Center" WidthRequest="40" />
                         </HorizontalStackLayout>
 
                         <!-- Chromosome Length -->

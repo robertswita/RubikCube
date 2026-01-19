@@ -12,17 +12,17 @@ public record GAConfig
     /// <summary>
     /// Number of individuals in the population.
     /// </summary>
-    public int PopulationSize { get; init; } = 200;
+    public int PopulationSize { get; init; } = GADefaults.PopulationSize;
 
     /// <summary>
     /// Number of best individuals to preserve unchanged (elitism).
     /// </summary>
-    public int EliteCount { get; init; } = 2;
+    public int EliteCount { get; init; } = GADefaults.EliteCount;
 
     /// <summary>
     /// Length of each chromosome (number of genes).
     /// </summary>
-    public int GenomeLength { get; init; } = 50;
+    public int GenomeLength { get; init; } = GADefaults.GenomeLength;
 
     #endregion
 
@@ -31,38 +31,38 @@ public record GAConfig
     /// <summary>
     /// The selection strategy to use.
     /// </summary>
-    public SelectionStrategy Selection { get; init; } = SelectionStrategy.Tournament;
+    public SelectionStrategy Selection { get; init; } = GADefaults.Selection;
 
     /// <summary>
     /// Proportion of population to select as parents (0.0 to 1.0).
     /// </summary>
-    public double SelectionRatio { get; init; } = 0.3;
+    public double SelectionRatio { get; init; } = GADefaults.SelectionRatio;
 
     /// <summary>
     /// Size of tournament for Tournament selection.
     /// </summary>
-    public int TournamentSize { get; init; } = 5;
+    public int TournamentSize { get; init; } = GADefaults.TournamentSize;
 
     /// <summary>
     /// Temperature for Boltzmann selection.
     /// Higher values (50-100) give more uniform selection (exploration).
     /// Lower values (1-10) strongly favor better individuals (exploitation).
     /// </summary>
-    public double BoltzmannTemperature { get; init; } = 10.0;
+    public double BoltzmannTemperature { get; init; } = GADefaults.BoltzmannTemperature;
 
     /// <summary>
     /// Truncation rate for Truncation selection (0.0 to 1.0).
     /// Only the top TruncationRate% of population are eligible for selection.
     /// Default 0.5 means top 50% can be selected.
     /// </summary>
-    public double TruncationRate { get; init; } = 0.5;
+    public double TruncationRate { get; init; } = GADefaults.TruncationRate;
 
     /// <summary>
     /// Selection pressure for Linear Ranking selection (1.0 to 2.0).
     /// 1.0 = uniform selection, 2.0 = maximum linear pressure.
     /// Default 1.5 provides moderate pressure.
     /// </summary>
-    public double LinearRankingPressure { get; init; } = 1.5;
+    public double LinearRankingPressure { get; init; } = GADefaults.LinearRankingPressure;
 
     /// <summary>
     /// Base for Exponential Ranking selection (0.0 to 1.0).
@@ -70,7 +70,7 @@ public record GAConfig
     /// Lower values = steeper decay = stronger pressure on top individuals.
     /// Default 0.99 provides good balance.
     /// </summary>
-    public double ExponentialRankingBase { get; init; } = 0.99;
+    public double ExponentialRankingBase { get; init; } = GADefaults.ExponentialRankingBase;
 
     #endregion
 
@@ -79,12 +79,12 @@ public record GAConfig
     /// <summary>
     /// The crossover strategy to use.
     /// </summary>
-    public CrossoverStrategy Crossover { get; init; } = CrossoverStrategy.SinglePoint;
+    public CrossoverStrategy Crossover { get; init; } = GADefaults.Crossover;
 
     /// <summary>
     /// Probability of crossover occurring (0.0 to 1.0).
     /// </summary>
-    public double CrossoverRate { get; init; } = 1.0;
+    public double CrossoverRate { get; init; } = GADefaults.CrossoverRate;
 
     #endregion
 
@@ -93,12 +93,12 @@ public record GAConfig
     /// <summary>
     /// The mutation strategy to use.
     /// </summary>
-    public MutationStrategy Mutation { get; init; } = MutationStrategy.SingleGene;
+    public MutationStrategy Mutation { get; init; } = GADefaults.Mutation;
 
     /// <summary>
     /// Probability of mutation occurring per individual (0.0 to 1.0).
     /// </summary>
-    public double MutationRate { get; init; } = 0.1;
+    public double MutationRate { get; init; } = GADefaults.MutationRate;
 
     #endregion
 
