@@ -1,3 +1,4 @@
+using RubikCube;
 using TGL.GA.Configuration;
 using TGL.GA.Interfaces;
 
@@ -266,7 +267,7 @@ public class RubikGASolver
 
             var best = ga.Run(ct);
             totalGenerations += ga.State.Generation;
-            totalEvaluations += ga.State.EvaluationCount;
+            totalEvaluations += (int)ga.State.EvaluationCount;
 
             if (best.Fitness < double.MaxValue && best.MovesCount > 0)
             {
@@ -442,7 +443,7 @@ public class RubikGASolver
             Moves = moves,
             Fitness = best.Fitness,
             TotalGenerations = ga.State.Generation,
-            TotalEvaluations = ga.State.EvaluationCount,
+            TotalEvaluations = (int)ga.State.EvaluationCount,
             TerminationReason = null
         };
     }

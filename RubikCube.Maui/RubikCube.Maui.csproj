@@ -74,10 +74,57 @@
     <Compile Include="..\RubikCube\TMatrix.cs" Link="Core\Math\TMatrix.cs" />
     <Compile Include="..\RubikCube\TAffine.cs" Link="Core\Math\TAffine.cs" />
 
-    <!-- GA solver - no changes needed -->
+    <!-- GA solver - legacy -->
     <Compile Include="..\RubikCube\TGA.cs" Link="Core\GA\TGA.cs" />
     <Compile Include="..\RubikCube\TChromosome.cs" Link="Core\GA\TChromosome.cs" />
     <Compile Include="..\RubikCube\TRubikGenome.cs" Link="Core\GA\TRubikGenome.cs" />
+
+    <!-- GA infrastructure - new configurable GA -->
+    <Compile Include="..\RubikCube\GA\Interfaces\IChromosome.cs" Link="Core\GA\Interfaces\IChromosome.cs" />
+    <Compile Include="..\RubikCube\GA\Interfaces\ISelectionOperator.cs" Link="Core\GA\Interfaces\ISelectionOperator.cs" />
+    <Compile Include="..\RubikCube\GA\Interfaces\ICrossoverOperator.cs" Link="Core\GA\Interfaces\ICrossoverOperator.cs" />
+    <Compile Include="..\RubikCube\GA\Interfaces\IMutationOperator.cs" Link="Core\GA\Interfaces\IMutationOperator.cs" />
+    <Compile Include="..\RubikCube\GA\Interfaces\IFitnessEvaluator.cs" Link="Core\GA\Interfaces\IFitnessEvaluator.cs" />
+    <Compile Include="..\RubikCube\GA\Interfaces\ITerminationCondition.cs" Link="Core\GA\Interfaces\ITerminationCondition.cs" />
+
+    <Compile Include="..\RubikCube\GA\Configuration\SelectionStrategy.cs" Link="Core\GA\Configuration\SelectionStrategy.cs" />
+    <Compile Include="..\RubikCube\GA\Configuration\CrossoverStrategy.cs" Link="Core\GA\Configuration\CrossoverStrategy.cs" />
+    <Compile Include="..\RubikCube\GA\Configuration\MutationStrategy.cs" Link="Core\GA\Configuration\MutationStrategy.cs" />
+    <Compile Include="..\RubikCube\GA\Configuration\SolverMode.cs" Link="Core\GA\Configuration\SolverMode.cs" />
+    <Compile Include="..\RubikCube\GA\Configuration\TerminationConfig.cs" Link="Core\GA\Configuration\TerminationConfig.cs" />
+    <Compile Include="..\RubikCube\GA\Configuration\GAConfig.cs" Link="Core\GA\Configuration\GAConfig.cs" />
+    <Compile Include="..\RubikCube\GA\Configuration\SolverConfig.cs" Link="Core\GA\Configuration\SolverConfig.cs" />
+    <Compile Include="..\RubikCube\GA\Configuration\GAState.cs" Link="Core\GA\Configuration\GAState.cs" />
+    <Compile Include="..\RubikCube\GA\Configuration\GAPresets.cs" Link="Core\GA\Configuration\GAPresets.cs" />
+
+    <Compile Include="..\RubikCube\GA\Operators\Selection\RankSelection.cs" Link="Core\GA\Operators\Selection\RankSelection.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Selection\TournamentSelection.cs" Link="Core\GA\Operators\Selection\TournamentSelection.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Selection\RouletteSelection.cs" Link="Core\GA\Operators\Selection\RouletteSelection.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Selection\RouletteRankSelection.cs" Link="Core\GA\Operators\Selection\RouletteRankSelection.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Selection\UniqueSelection.cs" Link="Core\GA\Operators\Selection\UniqueSelection.cs" />
+
+    <Compile Include="..\RubikCube\GA\Operators\Crossover\SinglePointCrossover.cs" Link="Core\GA\Operators\Crossover\SinglePointCrossover.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Crossover\TwoPointCrossover.cs" Link="Core\GA\Operators\Crossover\TwoPointCrossover.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Crossover\UniformCrossover.cs" Link="Core\GA\Operators\Crossover\UniformCrossover.cs" />
+
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\RandomMutation.cs" Link="Core\GA\Operators\Mutation\RandomMutation.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\SwapMutation.cs" Link="Core\GA\Operators\Mutation\SwapMutation.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\InversionMutation.cs" Link="Core\GA\Operators\Mutation\InversionMutation.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\ScrambleMutation.cs" Link="Core\GA\Operators\Mutation\ScrambleMutation.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\ConjugationMutation.cs" Link="Core\GA\Operators\Mutation\ConjugationMutation.cs" />
+
+    <Compile Include="..\RubikCube\GA\Operators\OperatorFactory.cs" Link="Core\GA\Operators\OperatorFactory.cs" />
+
+    <Compile Include="..\RubikCube\GA\Termination\CompositeTermination.cs" Link="Core\GA\Termination\CompositeTermination.cs" />
+    <Compile Include="..\RubikCube\GA\Termination\MaxGenerationsTermination.cs" Link="Core\GA\Termination\MaxGenerationsTermination.cs" />
+    <Compile Include="..\RubikCube\GA\Termination\TargetFitnessTermination.cs" Link="Core\GA\Termination\TargetFitnessTermination.cs" />
+    <Compile Include="..\RubikCube\GA\Termination\StagnationTermination.cs" Link="Core\GA\Termination\StagnationTermination.cs" />
+    <Compile Include="..\RubikCube\GA\Termination\MaxTimeTermination.cs" Link="Core\GA\Termination\MaxTimeTermination.cs" />
+
+    <Compile Include="..\RubikCube\GA\GeneticAlgorithm.cs" Link="Core\GA\GeneticAlgorithm.cs" />
+    <Compile Include="..\RubikCube\GA\MinimizingFitnessEvaluator.cs" Link="Core\GA\MinimizingFitnessEvaluator.cs" />
+    <Compile Include="..\RubikCube\GA\RubikFitnessEvaluator.cs" Link="Core\GA\RubikFitnessEvaluator.cs" />
+    <Compile Include="..\RubikCube\GA\RubikGASolver.cs" Link="Core\GA\RubikGASolver.cs" />
 
     <!-- Domain logic - no changes needed -->
     <Compile Include="..\RubikCube\TMove.cs" Link="Core\TMove.cs" />

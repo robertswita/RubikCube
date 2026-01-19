@@ -1,3 +1,4 @@
+using RubikCube;
 using TGL;
 using TGL.GA.Interfaces;
 
