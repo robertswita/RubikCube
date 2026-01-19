@@ -250,16 +250,50 @@ Wynik: [A_XY, B_ZW, A'_XY, B'_ZW]
 #### PatternMutation (Mutacja wzorcowa)
 Wstawia znane algorytmy speedcubingowe do chromosomu.
 
-**Dla kostek 3D:**
-- Sexy move: R U R' U' (bardzo powszechny trigger)
-- Inverse sexy: U R U' R'
-- Sledgehammer: R' F R F'
-- Hedgeslammer: F R' F' R
+**Dla kostek 3D - Pełny zestaw PLL (21 algorytmów):**
+
+*Edge-only PLLs (4):*
+- **Ua-perm**: R U' R U R U R U' R' U' R2 (cykl krawędzi zgodnie z ruchem wskazówek)
+- **Ub-perm**: R2 U R U R' U' R' U' R' U R' (cykl krawędzi przeciwnie)
+- **H-perm**: R2 U2 R U2 R2 U2 R2 U2 R U2 R2 (zamiana przeciwległych par krawędzi)
+- **Z-perm**: R' U' R U' R U R U' R' U R U R2 U' R' (zamiana sąsiednich par krawędzi)
+
+*Corner-only PLLs (3):*
+- **Aa-perm**: R' F R' B2 R F' R' B2 R2 (cykl narożników zgodnie)
+- **Ab-perm**: R2 B2 R F R' B2 R F' R (cykl narożników przeciwnie)
+- **E-perm**: R B' R' F R B R' F' R B R' F R B' R' F' (zamiana przekątnych narożników)
+
+*Adjacent corner swap PLLs (6):*
+- **T-perm**: R U R' U' R' F R2 U' R' U' R U R' F' (zamiana sąsiednich narożników + krawędzi)
+- **F-perm**: R' U' F' R U R' U' R' F R2 U' R' U' R U R' U R
+- **Ja-perm**: R' U L' U2 R U' R' U2 R L
+- **Jb-perm**: R U R' F' R U R' U' R' F R2 U' R'
+- **Ra-perm**: R U' R' U' R U R D R' U' R D' R' U2 R'
+- **Rb-perm**: R' U2 R U2 R' F R U R' U' R' F' R2
+
+*Diagonal corner swap PLLs (4):*
+- **Y-perm**: F R U' R' U' R U R' F' R U R' U' R' F R F'
+- **V-perm**: R' U R' U' R D' R' D R' U D' R2 U' R2 D R2
+- **Na-perm**: R U R' U R U R' F' R U R' U' R' F R2 U' R' U2 R U' R' (21 ruchów)
+- **Nb-perm**: R' U R U' R' F' U' F R U R' F R' F' R U' R
+
+*G-perms (cykle narożników + krawędzi) (4):*
+- **Ga-perm**: R2 U R' U R' U' R U' R2 U' D R' U R D'
+- **Gb-perm**: R' U' R U D' R2 U R' U R U' R U' R2 D
+- **Gc-perm**: R2 U' R U' R U R' U R2 U D' R U' R' D
+- **Gd-perm**: R U R' U' D R2 U' R U' R' U R' U R2 D'
+
+**OLL (2 podstawowe):**
 - Sune: R U R' U R U2 R'
 - Anti-Sune: R U2 R' U' R U' R'
+
+**Triggery podstawowe:**
+- Sexy move: R U R' U'
+- Sledgehammer: R' F R F'
+- Hedgeslammer: F R' F' R
+- Left sexy: L' U' L U
 - Double sexy: (R U R' U')2
-- T-perm trigger: R U R' F'
-- Warianty leworęczne
+- Corner twist: R' D' R D
 
 **Dla kostek 4D+:**
 - Uogólnione komutatory: A B A' B' dla różnych kombinacji płaszczyzn
