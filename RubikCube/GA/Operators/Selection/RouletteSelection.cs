@@ -17,18 +17,22 @@ public class RouletteSelection<T> : ISelectionOperator<T> where T : IChromosome
         if (populationCount == 0 || count == 0)
             return Array.Empty<T>();
 
-        var fitness = new double[populationCount];
-        double fitnessSum = 0;
+        // For minimization (lower fitness is better), use inverse fitness weighting.
+        // weight[i] = 1 / (fitness[i] + epsilon) gives higher weight to lower fitness values.
+        const double epsilon = 1e-10;
+        var weights = new double[populationCount];
+        double weightSum = 0;
 
-        // Calculate inverted fitness (since lower is better)
         for (int i = 0; i < populationCount; i++)
         {
-            fitness[i] = population[i].Fitness;
-            fitnessSum += fitness[i];
+            double fitness = population[i].Fitness;
+            // Handle negative or zero fitness by shifting to positive range
+            weights[i] = 1.0 / (Math.Max(fitness, 0) + epsilon);
+            weightSum += weights[i];
         }
 
-        // Guard against all-zero fitness (fall back to uniform selection)
-        if (fitnessSum <= 0)
+        // Guard against zero weight sum (shouldn't happen with epsilon, but be safe)
+        if (weightSum <= 0)
         {
             var uniformResult = new List<T>(count);
             for (int i = 0; i < count; i++)
@@ -36,24 +40,19 @@ public class RouletteSelection<T> : ISelectionOperator<T> where T : IChromosome
             return uniformResult;
         }
 
-        // Reverse so that best individuals (lowest fitness) have highest cumulative probability.
-        // After reverse: fitness[0] = worst fitness (highest value), fitness[N-1] = best fitness (lowest value).
-        // This gives more probability mass to lower indices, which map to better individuals.
-        Array.Reverse(fitness);
-
         // Build cumulative probability distribution
         var cumulativeProb = new double[populationCount];
-        cumulativeProb[0] = fitness[0];
+        cumulativeProb[0] = weights[0];
         for (int i = 1; i < populationCount; i++)
         {
-            cumulativeProb[i] = cumulativeProb[i - 1] + fitness[i];
+            cumulativeProb[i] = cumulativeProb[i - 1] + weights[i];
         }
 
         // Select using binary search to find smallest index where cumulativeProb[index] >= p
         var selection = new List<T>(count);
         for (int i = 0; i < count; i++)
         {
-            double p = rng.NextDouble() * fitnessSum;
+            double p = rng.NextDouble() * weightSum;
             int selectedIdx = BinarySearchCumulative(cumulativeProb, p);
             selection.Add(population[selectedIdx]);
         }

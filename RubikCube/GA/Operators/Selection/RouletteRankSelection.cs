@@ -29,18 +29,14 @@ public class RouletteRankSelection<T> : ISelectionOperator<T> where T : IChromos
         var ranks = new double[populationCount];
         double rankSum = 0;
 
-        // Use rank instead of fitness (population assumed sorted, best first).
-        // Rank 0 = best, Rank N-1 = worst.
+        // Assign ranks so that best individuals (at lower indices) get higher ranks.
+        // Best (index 0) gets rank N, worst (index N-1) gets rank 1.
+        // This ensures all individuals have non-zero selection probability.
         for (int i = 0; i < populationCount; i++)
         {
-            ranks[i] = i;
+            ranks[i] = populationCount - i;  // N, N-1, N-2, ..., 2, 1
             rankSum += ranks[i];
         }
-
-        // Reverse so that best individuals (originally rank 0) have highest cumulative probability.
-        // After reverse: ranks[0] = N-1 (highest), ranks[N-1] = 0 (lowest).
-        // This gives more probability mass to lower indices, which map to better individuals.
-        Array.Reverse(ranks);
 
         // Build cumulative probability distribution
         var cumulativeProb = new double[populationCount];

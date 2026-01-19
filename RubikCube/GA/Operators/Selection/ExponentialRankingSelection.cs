@@ -50,8 +50,14 @@ public class ExponentialRankingSelection<T> : ISelectionOperator<T> where T : IC
         if (n == 0)
             return Array.Empty<T>();
 
+        // Single element population: return it count times
         if (n == 1)
-            return new List<T> { population[0] };
+        {
+            var singleResult = new List<T>(count);
+            for (int i = 0; i < count; i++)
+                singleResult.Add(population[0]);
+            return singleResult;
+        }
 
         // Calculate cumulative probabilities using exponential distribution
         // For minimization: population is sorted best-first, so index 0 should have rank 1 (highest prob)
