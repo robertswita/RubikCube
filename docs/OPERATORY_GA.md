@@ -38,8 +38,6 @@ Implementuje wzorzec koniugacji ABA' z teorii grup. Wybiera losowy punkt w pierw
 
 **Wpływ na rozwiązywanie:** Wykorzystuje właściwości algebraiczne kostki Rubika. Koniugacje są fundamentalnym narzędziem w ręcznym rozwiązywaniu kostki - pozwalają "przenieść" efekt algorytmu w inne miejsce kostki.
 
-### Planowane
-
 #### CommutatorMutation (Mutacja komutatora)
 Implementuje wzorzec komutatora ABA'B' z teorii grup. Komutator to sekwencja, która wpływa tylko na niewielką liczbę elementów kostki.
 
@@ -68,6 +66,114 @@ Wstawia "neutralną" parę ruchów (np. R R') w losowym miejscu.
 
 **Wpływ na rozwiązywanie:** Pozwala na eksplorację dłuższych rozwiązań bez niszczenia istniejącego postępu. Neutralna para nie zmienia stanu kostki, ale może zostać zmodyfikowana przez późniejsze mutacje w użyteczną sekwencję.
 
+#### ShiftMutation (Mutacja przesunięcia / rotacji cyklicznej)
+Wykonuje cykliczne przesunięcie genów w chromosomie. Może przesuwać cały chromosom lub tylko wybrany segment.
+
+**Przykłady:**
+- Przesunięcie w prawo: `abcdef → fabcde`
+- Przesunięcie w lewo: `abcdef → bcdefa`
+- Przesunięcie segmentu: `abCDEfgh → abECDfgh`
+
+**Wpływ na rozwiązywanie:** Jest to wysoce destrukcyjna mutacja, ponieważ ruchy kostki Rubika nie są przemienne (R U ≠ U R). Przesunięta sekwencja zastosowana do tego samego stanu początkowego da zupełnie inny wynik. Jednak może być użyteczna do:
+- Ucieczki z lokalnych minimów (podobnie jak ScrambleMutation)
+- Eksploracji przestrzeni rozwiązań gdy chromosom zawiera "martwe" sekcje
+- Testowania alternatywnych kolejności ruchów
+
+**Uwaga:** Ten operator jest powszechnie stosowany w problemach permutacyjnych (np. TSP), gdzie punkt startowy nie ma znaczenia. W przypadku kostki Rubika jest mniej naturalny, ale może służyć jako narzędzie eksploracyjne.
+
+**Implementacja:** Używa efektywnego algorytmu odwracania (reversal algorithm) o złożoności O(n) do wykonania przesunięcia w miejscu.
+
+#### AdaptiveMutation (Mutacja adaptacyjna)
+Dostosowuje intensywność mutacji na podstawie fitness chromosomu, balansując eksplorację i eksploatację.
+
+**Zasada działania:**
+- Słaby fitness (wysoka wartość) → agresywna mutacja (więcej genów, większe zmiany)
+- Dobry fitness (niska wartość) → łagodna mutacja (mniej genów, mniejsze zmiany)
+
+**Intensywność obliczana jako:**
+```
+intensity = (fitness - minFitness) / (maxFitness - minFitness)
+genesToMutate = minGenes + intensity * (maxGenes - minGenes)
+```
+
+**Strategie w zależności od intensywności:**
+- Wysoka (>70%): Mutacja tasująca (ScrambleMutation) - agresywna restrukturyzacja
+- Średnia (30-70%): Losowa wymiana genów (RandomMutation)
+- Niska (<30%): Mutacja sąsiedztwa (NeighborMutation) - drobne zmiany kątów
+
+**Wpływ na rozwiązywanie:** Pozwala algorytmowi automatycznie dostosować strategię:
+- Gdy rozwiązanie jest dalekie od optimum, eksploruje szeroko
+- Gdy rozwiązanie jest bliskie optimum, dostraja precyzyjnie
+
+Jest to operator "meta" łączący zalety wielu prostszych operatorów, wybierając odpowiedni w zależności od jakości chromosomu.
+
+#### DisplacementMutation (Mutacja przemieszczenia)
+Usuwa segment z jednej pozycji i wstawia go w innym miejscu chromosomu.
+
+**Algorytm:**
+1. Wybierz losowy segment [start, end)
+2. Wybierz losowy punkt wstawienia poza segmentem
+3. Usuń segment i wstaw go w nowej pozycji
+
+**Przykład:**
+```
+Oryginał:     [A B C D E F G H]
+Segment:      [C D E] (pozycje 2-4)
+Wstaw na:     pozycję 6
+Wynik:        [A B F G C D E H]
+```
+
+**Wpływ na rozwiązywanie:** Zachowuje cały materiał genetyczny, ale zmienia jego układ. Dla kostki Rubika może odkryć, że ta sama sekwencja ruchów wykonana w innym miejscu rozwiązania daje lepsze wyniki.
+
+#### TranslocationMutation (Mutacja translokacji)
+Zamienia miejscami dwa nienachodzące się segmenty.
+
+**Algorytm:**
+1. Wybierz pierwszy segment [start1, end1)
+2. Wybierz drugi segment [start2, end2) nieprzecinający się z pierwszym
+3. Zamień oba segmenty miejscami
+
+**Przykład:**
+```
+Oryginał:  [A B C D E F G H I J]
+Segment1:  [B C] (pozycje 1-2)
+Segment2:  [F G H] (pozycje 5-7)
+Wynik:     [A F G H D E B C I J]
+```
+
+**Wpływ na rozwiązywanie:** Zamienia dwa "pod-algorytmy" w rozwiązaniu. Może odkryć, że inna kolejność bloków ruchów prowadzi do lepszego wyniku. Przydatne gdy rozwiązanie zawiera kilka niezależnych sekwencji.
+
+#### CreepMutation (Mutacja pełzająca)
+Wprowadza małe, przyrostowe zmiany w genach.
+
+**Dla kostki Rubika:**
+- Zmienia kąty o ±1 (90° ↔ 180° ↔ -90°)
+- Zmienia warstwę (slice) o ±1 (dla większych kostek)
+- Zmienia płaszczyznę na sąsiednią
+
+**Dla optymalizacji ciągłej:**
+- Dodaje małe losowe wartości w zakresie [-creepRange, +creepRange]
+
+**Wpływ na rozwiązywanie:** Idealna do precyzyjnego dostrajania rozwiązań bliskich optimum. Zamiast dużych skoków, wprowadza subtelne modyfikacje. Inspirowana strategiami ewolucyjnymi (ES), gdzie małe mutacje kumulują się przez pokolenia.
+
+#### GaussianMutation (Mutacja gaussowska)
+Dodaje szum o rozkładzie normalnym (Gaussa) do genów.
+
+**Formuła:** noise ~ N(0, σ²)
+
+Parametr σ (sigma) kontroluje siłę mutacji:
+- Małe σ: Lokalne przeszukiwanie o drobnej granularności
+- Duże σ: Bardziej eksploracyjne mutacje
+
+**Dla kostki Rubika (dyskretne ruchy):**
+- Mały szum (|noise| < 1): Tylko zmiana kąta
+- Średni szum (1 < |noise| < 2): Zmiana kąta + warstwy
+- Duży szum (|noise| > 2): Całkowita wymiana genu
+
+**Wpływ na rozwiązywanie:** Rozkład Gaussa zapewnia, że większość mutacji jest małych, ale czasem zdarzają się większe skoki. To naturalnie balansuje eksploatację (małe zmiany) z eksploracją (duże zmiany). Powszechnie stosowana w strategiach ewolucyjnych (ES) i CMA-ES.
+
+**Implementacja:** Wykorzystuje transformację Box-Mullera do generowania liczb z rozkładu normalnego.
+
 ---
 
 ## Operatory Krzyżowania
@@ -95,12 +201,123 @@ Każdy gen jest niezależnie wybierany z jednego lub drugiego rodzica z zadanym 
 
 **Wpływ na rozwiązywanie:** Maksymalne mieszanie materiału genetycznego. Nie zachowuje ciągłych bloków, ale pozwala na bardzo szczegółową rekombinację. Przydatne gdy dobre cechy są rozproszone po całym chromosomie.
 
-### Planowane
-
 #### SegmentPreservingCrossover (Krzyżowanie zachowujące segmenty)
 Identyfikuje "dobre" podsekwencje (na podstawie lokalnej poprawy fitness) i zachowuje je podczas krzyżowania.
 
 **Wpływ na rozwiązywanie:** Inteligentne krzyżowanie, które rozpoznaje wartościowe fragmenty rozwiązania i chroni je przed zniszczeniem. Wymaga dodatkowej analizy fitness, ale może znacząco przyspieszyć konwergencję, zachowując odkryte "budulce" dobrego rozwiązania.
+
+#### OrderCrossover / OX (Krzyżowanie z zachowaniem kolejności)
+Operator zaprojektowany do zachowania względnej kolejności genów z rodziców.
+
+**Algorytm:**
+1. Wybierz dwa losowe punkty krzyżowania
+2. Skopiuj segment między punktami z Rodzica1 do Dziecka1
+3. Wypełnij pozostałe pozycje genami z Rodzica2 w kolejności, zaczynając od pozycji za drugim punktem i zawijając
+
+**Przykład:**
+```
+P1: [A B | C D E | F G H]  (segment oznaczony |)
+P2: [H G F E D C B A]
+
+Dziecko1: [G F | C D E | B A]  (segment z P1, reszta z P2 w kolejności)
+```
+
+**Wpływ na rozwiązywanie:** OX zachowuje "bloki budulcowe" z jednego rodzica (segment) jednocześnie inkorporując względną kolejność ruchów z drugiego rodzica. Dla kostki Rubika, gdzie kolejność ruchów jest kluczowa, może odkryć efektywne kombinacje sekwencji.
+
+**Uwaga:** OX został pierwotnie zaprojektowany dla problemów permutacyjnych (TSP), gdzie każdy element występuje dokładnie raz. Dla kostki Rubika (gdzie geny mogą się powtarzać) operator został zaadaptowany do zachowania ducha algorytmu.
+
+#### PMXCrossover / PMX (Krzyżowanie z częściowym odwzorowaniem)
+Partially Mapped Crossover - operator utrzymujący relacje pozycyjne między genami.
+
+**Algorytm:**
+1. Wybierz dwa punkty krzyżowania
+2. Skopiuj segment z P1 do C1 na te same pozycje
+3. Utwórz mapowania dla segmentu (gen_P1 ↔ gen_P2)
+4. Dla każdej pozycji poza segmentem:
+   - Jeśli gen z P2 nie występuje w segmencie, użyj go bezpośrednio
+   - Jeśli występuje, podążaj za łańcuchem mapowań aż znajdziesz gen spoza segmentu
+
+**Przykład (przypadek permutacyjny):**
+```
+P1: [1 2 | 3 4 5 | 6 7 8]
+P2: [4 7 | 2 5 1 | 8 3 6]
+
+Segment: pozycje 2-4
+Mapowania z segmentu: 3↔2, 4↔5, 5↔1
+
+Dziecko1 segment: [_ _ | 3 4 5 | _ _ _]
+Pozycja 0: P2[0]=4, 4 jest w segmencie, mapuj 4→5→1, użyj 1
+Pozycja 1: P2[1]=7, nie w segmencie, użyj 7
+...
+```
+
+**Wpływ na rozwiązywanie:** PMX zachowuje absolutne pozycje genów lepiej niż OX. Dla kostki Rubika może być użyteczny gdy określone ruchy na określonych pozycjach chromosomu mają szczególne znaczenie. Mapowanie zapewnia bardziej "płynne" przejście między materiałem genetycznym rodziców.
+
+**Uwaga:** Implementacja obsługuje cykle w mapowaniach (które mogą wystąpić gdy geny się powtarzają) poprzez detekcję i przerwanie nieskończonych pętli.
+
+#### CycleCrossover / CX (Krzyżowanie cyklowe)
+Cycle Crossover - operator identyfikujący cykle między rodzicami i naprzemiennie dziedziczący z nich.
+
+**Algorytm:**
+1. Znajdź wszystkie cykle pozycji między P1 i P2:
+   - Zacznij od pozycji 0, weź gen z P1
+   - Znajdź ten gen w P2, przejdź do tej pozycji
+   - Powtarzaj aż wrócisz do początku
+2. Dla kolejnych cykli naprzemiennie przypisuj:
+   - Cykl nieparzysty: C1 dostaje geny z P1, C2 z P2
+   - Cykl parzysty: C1 dostaje geny z P2, C2 z P1
+
+**Przykład:**
+```
+Pozycja: [0  1  2  3  4  5  6  7]
+P1:      [1  2  3  4  5  6  7  8]
+P2:      [8  4  6  1  2  3  5  7]
+
+Cykl zaczynając od pozycji 0:
+- P1[0]=1, znajdź 1 w P2 → pozycja 3
+- P1[3]=4, znajdź 4 w P2 → pozycja 1
+- P1[1]=2, znajdź 2 w P2 → pozycja 4
+- P1[4]=5, znajdź 5 w P2 → pozycja 6
+- P1[6]=7, znajdź 7 w P2 → pozycja 7
+- P1[7]=8, znajdź 8 w P2 → pozycja 0 (powrót)
+Pozycje w cyklu: {0, 1, 3, 4, 6, 7}
+
+C1: P1 na pozycjach cyklu, P2 gdzie indziej
+[1  2  6  4  5  3  7  8]
+```
+
+**Wpływ na rozwiązywanie:** CX zachowuje ścisłe relacje pozycja-wartość w obrębie cykli. Dla kostki Rubika, dzieci dziedziczą spójne "bloki" od każdego rodzica bez rozbijania powiązań pozycyjnych.
+
+#### EdgeRecombinationCrossover / ERX (Krzyżowanie z rekombinacją krawędzi)
+Edge Recombination - operator zachowujący relacje sąsiedztwa między genami.
+
+**Algorytm:**
+1. Zbuduj tablicę krawędzi: dla każdego genu wypisz jego sąsiadów z obu rodziców
+2. Zacznij od genu z najmniejszą liczbą krawędzi
+3. Powtarzaj aż dziecko będzie kompletne:
+   a. Usuń bieżący gen ze wszystkich list sąsiadów
+   b. Jeśli bieżący gen ma sąsiadów, wybierz tego z najmniejszą liczbą pozostałych krawędzi
+   c. W przeciwnym razie wybierz losowy nieodwiedzony gen
+
+**Przykład:**
+```
+P1: [A B C D E]
+P2: [B D A C E]
+
+Tablica krawędzi:
+A: {B, D, C} (B z P1, D i C z P2)
+B: {A, C, D} (A i C z P1, D z P2)
+C: {B, D, A, E} (B i D z P1, A i E z P2)
+D: {C, E, B, A} (C i E z P1, B i A z P2)
+E: {D, C} (D z P1, C z P2)
+
+Budowanie dziecka od A:
+- Wybierz A, sąsiedzi to {B, D, C}
+- B ma 2 krawędzie, D ma 3, C ma 3 → wybierz B
+- ...
+```
+
+**Wpływ na rozwiązywanie:** ERX zachowuje lokalne sąsiedztwa ruchów z obu rodziców. Dla kostki Rubika jest szczególnie przydatny, ponieważ sąsiednie ruchy często tworzą znaczące wzorce (ruchy setupowe, triggery). Dzieci zachowują te lokalne struktury.
 
 ---
 
@@ -124,6 +341,79 @@ Prawdopodobieństwo wyboru proporcjonalne do pozycji w rankingu, nie do wartośc
 
 #### Unique (Selekcja unikalna)
 Wybiera osobniki o unikalnych wartościach fitness, promując różnorodność.
+
+#### SUS (Stochastic Universal Sampling - Stochastyczne Próbkowanie Uniwersalne)
+Ulepszenie selekcji ruletkowej. Zamiast N losowych "rzutów ruletką", używa pojedynczej losowej wartości startowej i N równomiernie rozmieszczonych wskaźników.
+
+**Zalety nad klasyczną ruletką:**
+- Zero biasu: oczekiwana liczba kopii równa się rzeczywistej liczbie wybranych
+- Minimalna wariancja: różnica między oczekiwaną a rzeczywistą liczbą jest zminimalizowana
+- Lepsza konserwacja różnorodności populacji
+
+**Wpływ na rozwiązywanie:** Daje słabszym osobnikom lepszą szansę na selekcję w porównaniu do standardowej ruletki, co pomaga w utrzymaniu różnorodności genetycznej i unikaniu przedwczesnej konwergencji.
+
+#### Boltzmann (Selekcja Boltzmanna)
+Prawdopodobieństwo wyboru oparte na rozkładzie Boltzmanna: P(i) = exp(-fitness[i] / T) / Σexp(-fitness[j] / T)
+
+Parametr T (temperatura) kontroluje presję selekcyjną:
+- Wysoka T (50-100): Prawie równomierna selekcja, promuje eksplorację
+- Niska T (1-10): Silne faworyzowanie najlepszych osobników, promuje eksploatację
+
+**Wpływ na rozwiązywanie:** Szczególnie użyteczna dla:
+- Unikania przedwczesnej konwergencji we wczesnych generacjach (wysoka T)
+- Precyzyjnego strojenia rozwiązań w późniejszych generacjach (niska T)
+- Utrzymania różnorodności populacji przy jednoczesnym faworyzowaniu lepszych osobników
+
+**Inspiracja:** Mechanizm zaczerpnięty z symulowanego wyżarzania (simulated annealing), gdzie temperatura kontroluje prawdopodobieństwo akceptacji gorszych rozwiązań.
+
+#### Truncation (Selekcja obcinająca)
+Tylko górne k% populacji jest uprawnione do selekcji. Spośród tej elitarnej puli wybór jest równomierny.
+
+**Parametr:** truncationRate (0.0 - 1.0)
+- 0.5 (50%): Umiarkowana presja, zbalansowana eksploracja/eksploatacja
+- 0.25 (25%): Silna presja, szybsza konwergencja ale ryzyko przedwczesnej zbieżności
+- 0.1 (10%): Bardzo silna presja, używana w strategiach ewolucyjnych (μ,λ)
+
+**Wpływ na rozwiązywanie:** Tworzy silną presję selekcyjną poprzez całkowite wykluczenie dolnej części populacji z reprodukcji. Proste do zrozumienia i implementacji, deterministyczne obcinanie z losowym wyborem z elity.
+
+#### LinearRanking (Liniowa selekcja rankingowa)
+Prawdopodobieństwo selekcji jest liniowo proporcjonalne do rangi osobnika.
+
+**Formuła:** P(i) = (2 - s)/N + 2*(rank - 1)*(s - 1)/(N*(N - 1))
+
+gdzie s to parametr presji selekcyjnej (1.0 - 2.0):
+- s = 1.0: Selekcja równomierna (wszystkie równe prawdopodobieństwo)
+- s = 2.0: Maksymalna presja liniowa (najlepszy ma 2x średniego prawdopodobieństwa, najgorszy 0)
+- s = 1.5: Umiarkowana presja (zalecana wartość domyślna)
+
+**Przykład (N=5, s=1.5):**
+```
+Rangi (najlepszy do najgorszego): 5, 4, 3, 2, 1
+Prawdopodobieństwa: 0.30, 0.25, 0.20, 0.15, 0.10
+```
+
+**Zalety nad ruletką fitness-proporcjonalną:**
+- Unika dominacji przez super-dopasowanych osobników
+- Działa dobrze gdy wartości fitness mają dużą wariancję
+- Utrzymuje stałą presję selekcyjną niezależnie od skalowania fitness
+
+#### ExponentialRanking (Wykładnicza selekcja rankingowa)
+Prawdopodobieństwo selekcji maleje wykładniczo z rangą.
+
+**Formuła:** P(i) = base^rank / Σ(base^rank)
+
+**Parametr:** base (0.0 - 1.0)
+- Wartość bliska 1.0 (np. 0.99): Łagodny spadek, więcej równomierna selekcja
+- Wartość bliższa 0.0 (np. 0.9): Stromy spadek, silna presja na czołowych osobników
+
+**Przykład (N=5, base=0.9):**
+```
+Rangi (najlepszy do najgorszego): 1, 2, 3, 4, 5
+Surowe wartości: 0.9^1, 0.9^2, 0.9^3, 0.9^4, 0.9^5 = 0.9, 0.81, 0.729, 0.656, 0.590
+Prawdopodobieństwa (znormalizowane): 0.244, 0.220, 0.198, 0.178, 0.160
+```
+
+**Wpływ na rozwiązywanie:** Silniejsze różnicowanie między czołowymi osobnikami niż liniowe rankowanie. Dolni osobnicy nadal mają niezerowe (ale bardzo małe) prawdopodobieństwo. Dobre do precyzyjnego strojenia gdy populacja się zbiega.
 
 ---
 
