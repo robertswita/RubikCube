@@ -249,9 +249,7 @@ namespace RubikCube
             IterElapsed = elapsed;
         }
 
-        bool TrySolutions = true;
         Stopwatch Watch;
-        TRubikGenome? _lastBest;
 
         void StartGaBackground()
         {
@@ -288,121 +286,72 @@ namespace RubikCube
 
             try
             {
-                while (!token.IsCancellationRequested)
+                // Build GA config
+                var gaConfig = baseConfig with
                 {
-                    // Initialize cluster if needed
-                    if (HighScore == 0)
+                    PopulationSize = populationSize,
+                    MutationRate = mutationRate,
+                    EliteCount = eliteCount,
+                    GenomeLength = genomeLength,
+                    Termination = baseConfig.Termination with
                     {
-                        _gaCube.NextCluster();
-                        if (_gaCube.ActiveCubie != null)
-                        {
-                            TRubikGenome.FreeMoves = _gaCube.GetFreeMoves();
-                            HighScore = _gaCube.Evaluate();
-                        }
+                        MaxGenerations = maxGenerations
                     }
+                };
 
-                    if (_gaCube.ActiveCluster == null)
+                var solverConfig = new SolverConfig
+                {
+                    Mode = solverMode,
+                    GenerationsPerIteration = maxGenerations
+                };
+
+                // Create solver once - it handles everything internally
+                _solver = new RubikGASolver(_gaCube, gaConfig, solverConfig);
+                _solver.SolutionDb = _solutionDb;
+
+                // Subscribe to events
+                _solver.GenerationCompleted += state =>
+                {
+                    if (state.Best != null)
                     {
-                        // Solving complete
-                        break;
+                        var elapsed = Watch?.Elapsed ?? TimeSpan.Zero;
+                        var fitness = state.Best.Fitness;
+                        BeginInvoke(new Action(() => OnProgressThreadSafe(fitness, elapsed)));
                     }
+                };
 
-                    // Build GA config
-                    var gaConfig = baseConfig with
-                    {
-                        PopulationSize = populationSize,
-                        MutationRate = mutationRate,
-                        EliteCount = eliteCount,
-                        GenomeLength = genomeLength,
-                        Termination = baseConfig.Termination with
-                        {
-                            MaxGenerations = maxGenerations
-                        }
-                    };
+                _solver.MovesReady += moves =>
+                {
+                    // Queue moves for display cube animation
+                    foreach (var move in moves)
+                        _moveQueue.Enqueue(move);
 
-                    var solverConfig = new SolverConfig
-                    {
-                        Mode = solverMode,
-                        GenerationsPerIteration = maxGenerations
-                    };
-
-                    _solver = new RubikGASolver(_gaCube, gaConfig, solverConfig);
-                    _lastBest = null;
-
-                    _solver.GenerationCompleted += state =>
-                    {
-                        if (state.Best != null)
-                        {
-                            _lastBest = state.Best;
-                            // Capture elapsed time before invoking (thread-safe)
-                            var elapsed = Watch?.Elapsed ?? TimeSpan.Zero;
-                            var fitness = state.Best.Fitness;
-                            // Update UI on UI thread
-                            BeginInvoke(new Action(() => OnProgressThreadSafe(fitness, elapsed)));
-                        }
-                    };
-
-                    _solver.MovesReady += moves =>
-                    {
-                        // Queue moves for display cube (thread-safe)
-                        foreach (var move in moves)
-                            _moveQueue.Enqueue(move);
-                    };
-
-                    var result = _solver.RunIteration(token);
-
-                    if (token.IsCancellationRequested) break;
-
-                    if (result.Fitness == 0 && _gaCube.ActiveCluster.Count > 1 && _lastBest != null)
-                    {
-                        BeginInvoke(new Action(() => _solutionDb.SaveSolution(_gaCube.Code, _lastBest)));
-                    }
-
-                    if (result.Fitness < HighScore && result.Moves.Count > 0)
-                    {
-                        HighScore = result.Fitness;
-                        // Apply moves to _gaCube AND queue them for display
-                        foreach (var move in result.Moves)
-                        {
-                            _gaCube.Turn(move);
-                            _moveQueue.Enqueue(move);
-                        }
-                        TrySolutions = true;
-                    }
-
-                    if (TrySolutions)
-                    {
-                        // Try saved solutions from database
-                        var solutionResult = _solutionDb.TrySolutions(_gaCube, HighScore);
-                        if (solutionResult != null)
-                        {
-                            HighScore = solutionResult.Fitness;
-                            // Apply moves to _gaCube AND queue them for display
-                            foreach (var m in solutionResult.Moves)
-                            {
-                                _gaCube.Turn(m);
-                                _moveQueue.Enqueue(m);
-                            }
-                        }
-                        TrySolutions = false;
-                    }
-
-                    // Update stats
-                    var elapsed = Watch.Elapsed;
-                    BeginInvoke(new Action(() =>
-                    {
-                        MovesCount += _moveQueue.Count;
-                        Time += elapsed;
-                    }));
-
-                    Watch.Restart();
-
-                    // Wait for animation to catch up before next iteration
+                    // Wait for animation to catch up
                     while (!_moveQueue.IsEmpty && !token.IsCancellationRequested)
                     {
                         Thread.Sleep(50);
                     }
-                }
+                };
+
+                _solver.IterationCompleted += result =>
+                {
+                    var elapsed = Watch.Elapsed;
+                    BeginInvoke(new Action(() =>
+                    {
+                        MovesCount += result.Moves.Count;
+                        Time = elapsed;
+                        HighScore = result.Fitness;
+                    }));
+                };
+
+                _solver.ClusterChanged += cube =>
+                {
+                    // Cluster changed - reset high score for new cluster
+                    HighScore = cube.Evaluate();
+                };
+
+                // Run solver - handles clusters, TrySolutions, everything
+                var finalResult = _solver.Solve(token);
             }
             catch (OperationCanceledException)
             {
