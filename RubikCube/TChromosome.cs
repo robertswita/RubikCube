@@ -6,8 +6,8 @@ namespace GA
     {
         public static int GenesLength;
         public double[] Genes = new double[GenesLength];
-        public static double[] MinGenes;
-        public static double[] MaxGenes;
+        public static double[] MinGenes = null!;
+        public static double[] MaxGenes = null!;
         public double Fitness { get; set; } = double.MaxValue;
         public static Random Rnd = new Random();
 

@@ -212,8 +212,10 @@ public class GeneticAlgorithm<T> where T : IChromosome, new()
             }
             else
             {
-                // No crossover - clone parent
-                nextGen.Add((T)parent1.Clone());
+                // No crossover - clone parent but reset fitness so it gets re-evaluated after mutation
+                var clone = (T)parent1.Clone();
+                clone.Fitness = _evaluator.WorstFitness;
+                nextGen.Add(clone);
             }
         }
 
@@ -223,6 +225,8 @@ public class GeneticAlgorithm<T> where T : IChromosome, new()
             if (State.Rng.NextDouble() < _config.MutationRate)
             {
                 _mutation.Mutate(nextGen[i], State.Rng);
+                // Reset fitness after mutation since genes changed
+                nextGen[i].Fitness = _evaluator.WorstFitness;
             }
         }
 

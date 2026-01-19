@@ -16,12 +16,12 @@ namespace GA
         public List<T> Population = new List<T>();
         public delegate void ProgressHandler(T best);
         public delegate double EvaluateHandler(T specimen);
-        public EvaluateHandler Evaluate;
-        public ProgressHandler Progress;
+        public EvaluateHandler Evaluate = null!;
+        public ProgressHandler? Progress;
 
         public enum TSelectionType { Rank, Tournament, Roulette, RouletteRank, Unique };
         public TSelectionType SelectionType;
-        public T Best;
+        public T Best = default!;
 
         public void Execute()
         {
@@ -42,7 +42,7 @@ namespace GA
                 if (Population[0].Fitness < Best.Fitness)
                     Best = Population[0];
                 var winnerCount = (int)(WinnerRatio * PopulationCount);
-                List<T> winners = null;
+                List<T>? winners = null;
                 switch (SelectionType)
                 {
                     case TSelectionType.Rank:
@@ -60,6 +60,7 @@ namespace GA
                         break;
                 }
                 Population = new List<T>();
+                if (winners == null) continue;
                 for (int i = 0; i < PopulationCount / 2; i++)
                 {
                     var splitIdx = TChromosome.Rnd.Next(TChromosome.GenesLength);

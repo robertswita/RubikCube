@@ -32,7 +32,7 @@ namespace TGL
         public TVector Origin = new TVector(N);
         public TAffine() { M.LoadIdentity(); }
         //public TAffine(TMatrix src) : base(N + 1, N + 1) { Assign(src); }
-        public static int[][] Planes;// = new int[N * (N - 1) / 2][];
+        public static int[][] Planes = null!;// = new int[N * (N - 1) / 2][];
         static TAffine()
         {
             N = 3;
@@ -212,7 +212,9 @@ namespace TGL
                 scale[i] = 0.45f;
             var error = (A - TAffine.CreateScale(scale).M).Norm;
             if (error > 1E-3)
-                ;
+            {
+                // Error threshold exceeded - validation check
+            }
             return angles;
         }
 

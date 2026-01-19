@@ -1,3 +1,4 @@
+using RubikCube;
 using TGL.GA.Interfaces;
 
 namespace TGL.GA.Operators.Mutation;
@@ -9,17 +10,6 @@ namespace TGL.GA.Operators.Mutation;
 /// <typeparam name="T">The chromosome type (must be IRubikChromosome for full functionality).</typeparam>
 public class ConjugationMutation<T> : IMutationOperator<T> where T : IChromosome
 {
-    private readonly Func<int, int> _invertAngle;
-
-    /// <summary>
-    /// Creates a conjugation mutation operator.
-    /// </summary>
-    /// <param name="invertAngle">Function to invert a move angle. Default: angle => 2 - angle</param>
-    public ConjugationMutation(Func<int, int>? invertAngle = null)
-    {
-        _invertAngle = invertAngle ?? (angle => 2 - angle);
-    }
-
     public void Mutate(T chromosome, Random rng)
     {
         // First validate/clean the chromosome
@@ -39,16 +29,10 @@ public class ConjugationMutation<T> : IMutationOperator<T> where T : IChromosome
             int sourceIdx = geneIdx - i;
             int targetIdx = geneIdx + i;
 
-            // Get the move and invert its angle
-            int moveCode = (int)chromosome.Genes[sourceIdx];
-
-            // Extract angle (assuming angle is encoded in lower bits)
-            // This is a simplified version - the actual TRubikGenome uses TMove.Decode
-            int angle = moveCode & 3; // Last 2 bits for angle
-            int invertedAngle = _invertAngle(angle);
-            int invertedMoveCode = (moveCode & ~3) | invertedAngle;
-
-            chromosome.Genes[targetIdx] = invertedMoveCode;
+            // Properly decode the move, invert angle, and re-encode
+            var move = TMove.Decode((int)chromosome.Genes[sourceIdx]);
+            move.Angle = 2 - move.Angle; // Invert angle: 0->2, 1->1, 2->0
+            chromosome.Genes[targetIdx] = move.Encode();
         }
     }
 }

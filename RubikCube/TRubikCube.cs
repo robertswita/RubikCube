@@ -12,10 +12,10 @@ namespace RubikCube
     {
         public static int Size = 3;
         public static float C;
-        public TCubie[] Cubies;
-        public TCubie ActiveCubie;
+        public TCubie[] Cubies = null!;
+        public TCubie? ActiveCubie;
         private List<TCubie> SolvedCubies = new List<TCubie>();
-        int[,] stateGrid;
+        private int[,]? stateGrid;
         public int[,] StateGrid
         {
             get
@@ -208,8 +208,8 @@ namespace RubikCube
             return freeGenes;
         }
 
-        private List<TCubie> activeCluster;
-        public List<TCubie> ActiveCluster
+        private List<TCubie>? activeCluster;
+        public List<TCubie>? ActiveCluster
         {
             get
             {

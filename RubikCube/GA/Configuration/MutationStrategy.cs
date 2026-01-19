@@ -6,6 +6,11 @@ namespace TGL.GA.Configuration;
 public enum MutationStrategy
 {
     /// <summary>
+    /// Single gene mutation - changes exactly one random gene (matches original TGA behavior).
+    /// </summary>
+    SingleGene,
+
+    /// <summary>
     /// Random mutation - replaces a gene with a random valid value.
     /// </summary>
     Random,

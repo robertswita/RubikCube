@@ -22,8 +22,8 @@ namespace TGL
         public List<TShape> Children = new List<TShape>();
         public List<Color> Colors = new List<Color>();
 
-        TShape _Parent;
-        public virtual TShape Parent
+        TShape? _Parent;
+        public virtual TShape? Parent
         {
             get { return _Parent; }
             set

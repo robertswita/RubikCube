@@ -55,6 +55,7 @@ public static class OperatorFactory
     {
         return strategy switch
         {
+            MutationStrategy.SingleGene => new SingleGeneMutation<T>(),
             MutationStrategy.Random => new RandomMutation<T>(),
             MutationStrategy.Conjugation => new ConjugationMutation<T>(),
             MutationStrategy.Swap => new SwapMutation<T>(),

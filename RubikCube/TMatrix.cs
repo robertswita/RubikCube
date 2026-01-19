@@ -9,10 +9,10 @@ namespace TGL
         public int ColsCount;
         public int RowsCount;
         public TCols Cols;
-        public int[] DimSizes;
+        public int[] DimSizes = null!;
         public class TCols
         {
-            public TMatrix M;
+            public TMatrix M = null!;
             public TVector this[int idx]
             {
                 get

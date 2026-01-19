@@ -11,16 +11,16 @@ public static class GAPresets
     /// </summary>
     public static GAConfig Default => new()
     {
-        PopulationSize = 100,
+        PopulationSize = 200,
         EliteCount = 2,
-        GenomeLength = 30,
+        GenomeLength = 50,
         Selection = SelectionStrategy.Unique,
         SelectionRatio = 0.1,
         TournamentSize = 5,
         Crossover = CrossoverStrategy.SinglePoint,
-        CrossoverRate = 0.8,
-        Mutation = MutationStrategy.Conjugation,
-        MutationRate = 1.0, // Original uses 100% mutation with domain-specific conjugation
+        CrossoverRate = 1.0, // Original always does crossover
+        Mutation = MutationStrategy.SingleGene,
+        MutationRate = 1.0, // Original mutates all non-elites
         Termination = new TerminationConfig
         {
             MaxGenerations = 100,
@@ -37,7 +37,7 @@ public static class GAPresets
     {
         PopulationSize = 200,
         EliteCount = 2,
-        GenomeLength = 30,
+        GenomeLength = 50,
         Selection = SelectionStrategy.Tournament,
         SelectionRatio = 0.4,
         TournamentSize = 3, // Lower pressure for more diversity
@@ -61,7 +61,7 @@ public static class GAPresets
     {
         PopulationSize = 50,
         EliteCount = 5,
-        GenomeLength = 30,
+        GenomeLength = 50,
         Selection = SelectionStrategy.Rank,
         SelectionRatio = 0.2,
         TournamentSize = 5,
@@ -85,7 +85,7 @@ public static class GAPresets
     {
         PopulationSize = 150,
         EliteCount = 3,
-        GenomeLength = 30,
+        GenomeLength = 50,
         Selection = SelectionStrategy.Tournament,
         SelectionRatio = 0.25,
         TournamentSize = 5,
@@ -109,7 +109,7 @@ public static class GAPresets
     {
         PopulationSize = 50,
         EliteCount = 2,
-        GenomeLength = 30,
+        GenomeLength = 50,
         Selection = SelectionStrategy.Rank,
         SelectionRatio = 0.1,
         TournamentSize = 3,

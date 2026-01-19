@@ -601,11 +601,8 @@ public partial class MainPage : ContentPage
 
         try
         {
-            // Configure GA using UI-selected settings
-            var gaConfig = _selectedGAConfig with
-            {
-                GenomeLength = 30
-            };
+            // Configure GA using UI-selected settings (use preset's GenomeLength, default is 50)
+            var gaConfig = _selectedGAConfig;
 
             var solverConfig = new SolverConfig
             {

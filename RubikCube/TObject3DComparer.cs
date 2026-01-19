@@ -8,11 +8,10 @@ namespace TGL
     class TObject3DComparer : IComparer<TShape>
     {
         //public TGLContext GLCanvas;
-        public int Compare(TShape first, TShape second)
+        public int Compare(TShape? first, TShape? second)
         {
-            //var projection = new double[16];
-            //var viewport = new int[4];
-            ////double zX = 0, zY = 0, zZ = 0;
+            if (first == null) return second == null ? 0 : 1;
+            if (second == null) return -1;
             var z1 = first.WorldTransform.Origin.Z;
             var z2 = second.WorldTransform.Origin.Z;
             //OpenGL.glGetDoublev(OpenGL.GL_PROJECTION_MATRIX, projection);

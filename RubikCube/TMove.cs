@@ -17,7 +17,7 @@ namespace RubikCube
         public int Slice;
         public int Plane; 
         public int Angle;
-        public static TMatrix SizeMatrix;
+        public static TMatrix SizeMatrix = null!;
         public static void UpdateSizeMatrix()
         {
             var sizes = new int[] { TAffine.N, TRubikCube.Size, TAffine.Planes.Length, 3 };
@@ -53,7 +53,9 @@ namespace RubikCube
                 if (Axis >= TAffine.N) return false;
                 if (Plane >= TAffine.Planes.Length) return false;
                 if (TAffine.Planes[Plane][0] == Axis || TAffine.Planes[Plane][1] == Axis)
-                    ;
+                {
+                    // Plane contains axis - this might be intentional empty check
+                }
                 return true;
             }
         }

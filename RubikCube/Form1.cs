@@ -166,7 +166,7 @@ namespace RubikCube
             {
                 label1.Text = Time.ToString();
                 MoveTimer.Stop();
-                if (Ga != null)
+                if (_solver != null)
                     Solve();
             }
         }
@@ -207,42 +207,6 @@ namespace RubikCube
 
             //label2.Refresh();
             //label4.Refresh();
-        }
-
-        double OnEvaluate(TRubikGenome specimen)
-        {
-            specimen.Check();
-            //specimen.Conjugate();
-            //specimen.Mutate(RubikCube.ActCubie);
-            specimen.Fitness = double.MaxValue;
-            var cube = new TRubikCube(RubikCube);
-            //string startCode = cube.Code;
-            for (int i = 0; i < specimen.Genes.Length; i++)
-            {
-                //if (!TRubikGenome.FreeMoves.Contains((int)specimen.Genes[i]))
-                //    ;
-                var move = TMove.Decode((int)specimen.Genes[i]);
-                // Final optimalization
-                if (i == 0)
-                {
-                    var actCubie = RubikCube.ActiveCubie;
-                    move.Slice = actCubie.Position[move.Axis];
-                    specimen.Genes[0] = move.Encode();
-                }
-                cube.Turn(move);
-                //var cubeCopy = new TRubikCube(cube);
-                //for (int j = i - 1; j >= 0; j--)
-                //    cube.ReTurn(TMove.Decode((int)specimen.Genes[j]));
-                double fitness = cube.Evaluate();
-                if (fitness < specimen.Fitness)// && cube.Code != startCode)
-                {
-                    specimen.Fitness = fitness;
-                    specimen.MovesCount = i + 1;
-                    //if (fitness == 0) break;
-                }
-                //cube = cubeCopy;
-            }
-            return specimen.Fitness;
         }
 
         bool TrySolutions = true;

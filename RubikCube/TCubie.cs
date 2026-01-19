@@ -10,8 +10,8 @@ namespace RubikCube
 {
     public class TCubie : TShape
     {
-        public static TShape Cube;
-        public static TMatrix SizeMatrix;
+        public static TShape Cube = null!;
+        public static TMatrix SizeMatrix = null!;
         public static int MaxScore;
         //public int X { get { return (int)Math.Round(Transform.Origin.X + TRubikCube.C); } }
         //public int Y { get { return (int)Math.Round(Transform.Origin.Y + TRubikCube.C); } }
@@ -77,7 +77,9 @@ namespace RubikCube
                 ValidState = false;
                 var state = State;
                 if (state != value)
-                    ;
+                {
+                    // State mismatch - this is a validation check
+                }
                 this.state = value;
                 ValidState = true;
                 if (this.state != 0)

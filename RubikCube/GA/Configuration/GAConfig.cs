@@ -10,7 +10,7 @@ public record GAConfig
     /// <summary>
     /// Number of individuals in the population.
     /// </summary>
-    public int PopulationSize { get; init; } = 100;
+    public int PopulationSize { get; init; } = 200;
 
     /// <summary>
     /// Number of best individuals to preserve unchanged (elitism).
@@ -20,7 +20,7 @@ public record GAConfig
     /// <summary>
     /// Length of each chromosome (number of genes).
     /// </summary>
-    public int GenomeLength { get; init; } = 30;
+    public int GenomeLength { get; init; } = 50;
 
     #endregion
 
@@ -53,7 +53,7 @@ public record GAConfig
     /// <summary>
     /// Probability of crossover occurring (0.0 to 1.0).
     /// </summary>
-    public double CrossoverRate { get; init; } = 0.8;
+    public double CrossoverRate { get; init; } = 1.0;
 
     #endregion
 
@@ -62,7 +62,7 @@ public record GAConfig
     /// <summary>
     /// The mutation strategy to use.
     /// </summary>
-    public MutationStrategy Mutation { get; init; } = MutationStrategy.Conjugation;
+    public MutationStrategy Mutation { get; init; } = MutationStrategy.SingleGene;
 
     /// <summary>
     /// Probability of mutation occurring per individual (0.0 to 1.0).
