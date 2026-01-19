@@ -201,6 +201,39 @@ Po mutacji z offset=2: Axis=2, Slice=1, Plane=? (odpowiadająca płaszczyzna)
 
 **Wpływ na rozwiązywanie:** Dla kostki 3D działa jak "rotacja układu współrzędnych" ruchu. Dla 4D+ eksploruje symetrie między różnymi hiperpłaszczyznami, co może pomóc w znajdowaniu rozwiązań działających w wyższych wymiarach. Szczególnie użyteczna gdy algorytm utknął w lokalnym minimum specyficznym dla jednej hiperpłaszczyzny.
 
+#### OrthogonalConjugationMutation (Koniugacja ortogonalna)
+Tworzy komutatory (wzorzec ABA'B') używając ruchów na ortogonalnych płaszczyznach.
+
+**Ortogonalność płaszczyzn:**
+Dwie płaszczyzny rotacji są ortogonalne, jeśli nie współdzielą żadnej wspólnej osi:
+- 3D (3 płaszczyzny): Brak par ortogonalnych (każda para dzieli jedną oś)
+- 4D (6 płaszczyzn): 3 pary ortogonalne:
+  - (0,1) ⊥ (2,3) - XY ortogonalna do ZW
+  - (0,2) ⊥ (1,3) - XZ ortogonalna do YW
+  - (0,3) ⊥ (1,2) - XW ortogonalna do YZ
+- 5D+: Więcej par ortogonalnych
+
+**Algorytm:**
+1. Wybierz losowy ruch A z chromosomu
+2. Znajdź płaszczyznę ortogonalną do płaszczyzny A (lub najbardziej odległą dla 3D)
+3. Wygeneruj ruch B na ortogonalnej płaszczyźnie
+4. Wstaw wzorzec komutatora: A, B, A', B' na pozycji
+
+**Przykład (kostka 4D):**
+```
+Ruch A: Plane=0 (XY)
+Ortogonalna płaszczyzna: Plane=5 (ZW)
+Ruch B: losowy ruch na płaszczyźnie ZW
+Wynik: [A_XY, B_ZW, A'_XY, B'_ZW]
+```
+
+**Specjalne właściwości ortogonalnych komutatorów:**
+- Wpływają na mniejszą liczbę elementów niż dowolne komutatory
+- Ruchy lepiej "komutują" - mniejsza interferencja między A i B
+- Tworzą bardziej "geometrycznie czyste" transformacje
+
+**Wpływ na rozwiązywanie:** Dla 4D+ kostek, ortogonalne komutatory są szczególnie efektywne do precyzyjnego przestawiania małej liczby elementów bez zakłócania reszty kostki. Dla 3D używa płaszczyzn o minimalnym nakładaniu się jako przybliżenia.
+
 ---
 
 ## Operatory Krzyżowania

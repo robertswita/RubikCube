@@ -428,15 +428,33 @@ public class OrthogonalCommutatorMutation<T> : IMutationOperator<T>
 - 4D: Pełne wykorzystanie - eksploruje symetrie między 8 komórkami 3D
 - 5D+: Skaluje się automatycznie do wyższych wymiarów
 
+### OrthogonalConjugationMutation (Koniugacja ortogonalna) ✅ ZAIMPLEMENTOWANY
+**Plik:** `GA/Operators/Mutation/OrthogonalConjugationMutation.cs`
+
+**Opis:** Tworzy komutatory (wzorzec ABA'B') używając ruchów na ortogonalnych płaszczyznach.
+
+**Ortogonalność płaszczyzn:**
+Dwie płaszczyzny rotacji są ortogonalne, jeśli nie współdzielą żadnej wspólnej osi:
+- 3D (3 płaszczyzny): Brak par ortogonalnych - używa płaszczyzn o minimalnym nakładaniu
+- 4D (6 płaszczyzn): 3 pary ortogonalne: (0,1)⊥(2,3), (0,2)⊥(1,3), (0,3)⊥(1,2)
+- 5D+: Więcej par ortogonalnych, skaluje się automatycznie
+
+**Algorytm:**
+1. Wybierz losowy ruch A z chromosomu
+2. Znajdź ortogonalną płaszczyznę dla ruchu B (lub najbardziej odległą dla 3D)
+3. Wygeneruj ruch B na ortogonalnej płaszczyźnie
+4. Wstaw komutator: A, B, A', B'
+
+**Dlaczego działa dla N wymiarów:** Operator buduje cache par ortogonalnych używając `TAffine.Planes`. Dla N >= 4 znajduje prawdziwe pary ortogonalne; dla N = 3 używa fallback wybierając płaszczyzny o minimalnym nakładaniu.
+
+**Kompatybilność:**
+- 3D: Działa z fallback (najbardziej odległe płaszczyzny) - mniej efektywne, ale poprawne
+- 4D: Pełne wykorzystanie ortogonalnych par
+- 5D+: Więcej opcji ortogonalnych, większa elastyczność
+
 ---
 
 ## Brakujące operatory specyficzne dla 4D+
-
-### OrthogonalConjugationMutation (Koniugacja ortogonalna)
-
-**Opis:** Tworzy koniugacje używając specyficznie ruchów na ortogonalnych płaszczyznach.
-
-**Uzasadnienie:** W 4D, koniugacje z ortogonalnymi płaszczyznami mają szczególne właściwości - wpływają na mniejszą liczbę elementów i są bardziej "czyste" geometrycznie.
 
 ### CellRotationMutation (Mutacja rotacji komórki)
 
@@ -629,7 +647,7 @@ Po rozszerzeniu `TMove`, następujące operatory wymagałyby aktualizacji:
 | LinearRankingSelection | ✅ | ✅ | ✅ | Gotowy | Liniowe prawdopodobieństwo |
 | ExponentialRankingSelection | ✅ | ✅ | ✅ | Gotowy | Wykładnicze prawdopodobieństwo |
 | HyperplaneMutation | ✅ | ✅ | ✅ | Gotowy | Przesunięcie osi/hiperpłaszczyzny |
-| OrthogonalConjugation | - | ❌ | ❌ | Brak | Do implementacji |
+| OrthogonalConjugation | ⚠️ | ✅ | ✅ | Gotowy | Ortogonalne komutatory (fallback dla 3D) |
 | DoubleRotationMutation | - | ❌ | ❌ | Brak | Wymaga rozszerzenia TMove |
 
 **Legenda:**

@@ -104,5 +104,12 @@ public enum MutationStrategy
     /// For 4D+ cubes: swaps moves to analogous moves in different 3D "cells".
     /// Exploits symmetries of N-dimensional cube structure.
     /// </summary>
-    Hyperplane
+    Hyperplane,
+
+    /// <summary>
+    /// Orthogonal conjugation mutation - creates commutators using orthogonal planes.
+    /// For 4D+: uses planes that share no common axes (e.g., XY ⊥ ZW).
+    /// Creates geometrically pure transformations affecting fewer pieces.
+    /// </summary>
+    OrthogonalConjugation
 }
