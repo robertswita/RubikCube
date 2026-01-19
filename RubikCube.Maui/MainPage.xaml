@@ -154,6 +154,7 @@
                                         <x:String>Simplify</x:String>
                                         <x:String>InverseSequence</x:String>
                                         <x:String>Insert</x:String>
+                                        <x:String>Shift</x:String>
                                     </x:Array>
                                 </Picker.ItemsSource>
                             </Picker>

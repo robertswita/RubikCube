@@ -64,5 +64,12 @@ public enum MutationStrategy
     /// <summary>
     /// Insert mutation - inserts a neutral move pair at a random position.
     /// </summary>
-    Insert
+    Insert,
+
+    /// <summary>
+    /// Shift mutation (circular rotation) - rotates genes in the chromosome.
+    /// Example: abcdef -> fabcde (right shift) or abcdef -> bcdefa (left shift).
+    /// Highly disruptive mutation useful for escaping local minima.
+    /// </summary>
+    Shift
 }

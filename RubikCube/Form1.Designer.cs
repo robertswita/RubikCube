@@ -753,7 +753,8 @@
             "Neighbor",
             "Simplify",
             "InverseSequence",
-            "Insert"});
+            "Insert",
+            "Shift"});
             this.cmbMutationType.Location = new System.Drawing.Point(300, 167);
             this.cmbMutationType.Name = "cmbMutationType";
             this.cmbMutationType.Size = new System.Drawing.Size(110, 24);

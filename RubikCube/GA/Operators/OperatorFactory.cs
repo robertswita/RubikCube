@@ -69,6 +69,7 @@ public static class OperatorFactory
             MutationStrategy.Simplify => new SimplifyMutation<T>(),
             MutationStrategy.InverseSequence => new InverseSequenceMutation<T>(),
             MutationStrategy.Insert => new InsertMutation<T>(),
+            MutationStrategy.Shift => new ShiftMutation<T>(),
             _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown mutation strategy")
         };
     }

@@ -517,6 +517,7 @@ public partial class MainPage : ContentPage
             MutationStrategy.Simplify => 8,
             MutationStrategy.InverseSequence => 9,
             MutationStrategy.Insert => 10,
+            MutationStrategy.Shift => 11,
             _ => 0
         };
 
@@ -570,6 +571,7 @@ public partial class MainPage : ContentPage
             8 => MutationStrategy.Simplify,
             9 => MutationStrategy.InverseSequence,
             10 => MutationStrategy.Insert,
+            11 => MutationStrategy.Shift,
             _ => MutationStrategy.SingleGene
         };
 
@@ -661,6 +663,7 @@ public partial class MainPage : ContentPage
             8 => MutationStrategy.Simplify,
             9 => MutationStrategy.InverseSequence,
             10 => MutationStrategy.Insert,
+            11 => MutationStrategy.Shift,
             _ => MutationStrategy.SingleGene
         };
 

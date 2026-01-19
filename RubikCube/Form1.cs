@@ -772,6 +772,7 @@ namespace RubikCube
                 8 => MutationStrategy.Simplify,
                 9 => MutationStrategy.InverseSequence,
                 10 => MutationStrategy.Insert,
+                11 => MutationStrategy.Shift,
                 _ => MutationStrategy.SingleGene
             };
             _selectedGAConfig = _selectedGAConfig with { Mutation = mutation };
@@ -891,6 +892,7 @@ namespace RubikCube
                 MutationStrategy.Simplify => 8,
                 MutationStrategy.InverseSequence => 9,
                 MutationStrategy.Insert => 10,
+                MutationStrategy.Shift => 11,
                 _ => 0
             };
         }
