@@ -303,23 +303,38 @@ Ta formuła odwraca kierunek obrotu:
 
 **Geometryczna interpretacja:** Koniugacja "przenosi" efekt sekwencji B w miejsce określone przez A. To działa tak samo w 3D, 4D czy 7D - zmienia się tylko przestrzeń, w której operujemy.
 
-#### CommutatorMutation (Mutacja komutatora)
+#### CommutatorMutation (Mutacja komutatora) ✅ ZOPTYMALIZOWANY
 **Plik:** `GA/Operators/Mutation/CommutatorMutation.cs`
 
 **Działanie:** Implementuje wzorzec komutatora ABA'B'.
 
 **Dlaczego działa dla N wymiarów:** Komutatory mierzą "nieprzemienność" dwóch operacji. W kostce Rubika (dowolnego wymiaru) komutator wpływa tylko na elementy, które są różnie traktowane przez A i B. Ta właściwość jest fundamentalna i niezależna od wymiarowości.
 
+**Optymalizacja dla 4D+:**
+W wymiarach >= 4 operator preferuje ruchy na ortogonalnych płaszczyznach dla ruchu B:
+- Buduje cache ortogonalnych płaszczyzn z `TAffine.Planes`
+- Najpierw przeszukuje pobliskie ruchy w chromosomie (okno 8 pozycji)
+- Jeśli nie znajdzie, generuje nowy ruch B na ortogonalnej płaszczyźnie
+- Dla 3D zachowuje poprzednie zachowanie (brak płaszczyzn ortogonalnych)
+
 **Kod:**
 ```csharp
+// For 4D+, try to find a move B on an orthogonal plane
+if (n >= 4 && TryFindOrthogonalMove(chromosome, startIdx, moveA.Plane, rng, out moveB))
+{
+    chromosome.Genes[startIdx + 1] = moveB.Encode();
+}
 // Create A' (inverse of A)
 moveAInverse.Angle = 2 - moveA.Angle;
-// Create B' (inverse of B)
-moveBInverse.Angle = 2 - moveB.Angle;
 // Apply: A B A' B'
 chromosome.Genes[startIdx + 2] = moveAInverse.Encode();
 chromosome.Genes[startIdx + 3] = moveBInverse.Encode();
 ```
+
+**Kompatybilność:**
+- 3D: ✅ Zachowanie bez zmian (brak par ortogonalnych)
+- 4D: ✅ Preferuje ortogonalne pary
+- 5D+: ✅ Więcej opcji ortogonalnych
 
 #### NeighborMutation (Mutacja sąsiedztwa)
 **Plik:** `GA/Operators/Mutation/NeighborMutation.cs`
@@ -396,26 +411,20 @@ if (AreOrthogonal(moveA.Plane, moveB.Plane))
 
 ## Operatory wymagające optymalizacji dla 4D+
 
-### ConjugationMutation i CommutatorMutation - algebraicznie poprawne, ale nie zoptymalizowane
+### ConjugationMutation - algebraicznie poprawny, ale nie zoptymalizowany
 
-**Problem:** Obecne implementacje wybierają losowe kolejne ruchy do utworzenia koniugacji/komutatora. W 3D to działa dobrze, ale w 4D+ nie wszystkie kombinacje są równie efektywne.
+**Problem:** Obecna implementacja wybiera losowe kolejne ruchy do utworzenia koniugacji. W 3D to działa dobrze, ale w 4D+ nie wszystkie kombinacje są równie efektywne.
 
 **W 4D najbardziej użyteczne są:**
 - Koniugacje używające ruchów na **ortogonalnych płaszczyznach** (wpływają na mniejszą liczbę elementów)
-- Komutatory z ruchami na **sąsiednich hyperściankach** (precyzyjniejsze manipulacje)
 
 **Proponowane ulepszenie dla 4D+:**
 ```csharp
-// Preferuj ruchy na ortogonalnych płaszczyznach dla efektywniejszych komutatorów
-public class OrthogonalCommutatorMutation<T> : IMutationOperator<T>
-{
-    public void Mutate(T chromosome, Random rng)
-    {
-        // Znajdź pary ruchów na ortogonalnych płaszczyznach
-        // Utwórz komutator z tych par
-    }
-}
+// Preferuj ruchy na ortogonalnych płaszczyznach dla efektywniejszych koniugacji
+// Wzorzec ABA' gdzie B jest na płaszczyźnie ortogonalnej do płaszczyzny A
 ```
+
+**Uwaga:** CommutatorMutation został już zoptymalizowany dla 4D+ (patrz sekcja operatorów domenowych).
 
 ---
 
@@ -643,7 +652,7 @@ Po rozszerzeniu `TMove`, następujące operatory wymagałyby aktualizacji:
 | SingleGeneMutation | ✅ | ✅ | ✅ | Gotowy | Używa ValidMoves |
 | RandomMutation | ✅ | ✅ | ✅ | Gotowy | Używa ValidMoves |
 | ConjugationMutation | ✅ | ✅ | ✅ | Do optymalizacji | Działa, ale nie optymalnie dla 4D+ |
-| CommutatorMutation | ✅ | ✅ | ✅ | Do optymalizacji | Działa, ale nie optymalnie dla 4D+ |
+| CommutatorMutation | ✅ | ✅ | ✅ | Gotowy | Ortogonalne pary dla 4D+ |
 | NeighborMutation | ✅ | ✅ | ✅ | Gotowy | Tylko modyfikuje Angle |
 | SimplifyMutation | ✅ | ✅ | ✅ | Gotowy | Wykrywa ortogonalne wzorce |
 | InverseSequenceMutation | ✅ | ✅ | ✅ | Gotowy | Generyczna inwersja |
