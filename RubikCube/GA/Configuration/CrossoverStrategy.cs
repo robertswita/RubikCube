@@ -33,5 +33,17 @@ public enum CrossoverStrategy
     /// <summary>
     /// Segment-preserving crossover - preserves effective segments from better parent.
     /// </summary>
-    SegmentPreserving
+    SegmentPreserving,
+
+    /// <summary>
+    /// Cycle Crossover (CX) - identifies cycles between parents and alternates inheritance.
+    /// Preserves position-value relationships within cycles.
+    /// </summary>
+    Cycle,
+
+    /// <summary>
+    /// Edge Recombination Crossover (ERX) - preserves edge (adjacency) relationships.
+    /// Builds children by following neighbor connections from both parents.
+    /// </summary>
+    EdgeRecombination
 }

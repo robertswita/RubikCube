@@ -113,6 +113,8 @@
     <Compile Include="..\RubikCube\GA\Operators\Crossover\SegmentPreservingCrossover.cs" Link="Core\GA\Operators\Crossover\SegmentPreservingCrossover.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Crossover\OrderCrossover.cs" Link="Core\GA\Operators\Crossover\OrderCrossover.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Crossover\PMXCrossover.cs" Link="Core\GA\Operators\Crossover\PMXCrossover.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Crossover\CycleCrossover.cs" Link="Core\GA\Operators\Crossover\CycleCrossover.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Crossover\EdgeRecombinationCrossover.cs" Link="Core\GA\Operators\Crossover\EdgeRecombinationCrossover.cs" />
 
     <Compile Include="..\RubikCube\GA\Operators\Mutation\RandomMutation.cs" Link="Core\GA\Operators\Mutation\RandomMutation.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Mutation\SwapMutation.cs" Link="Core\GA\Operators\Mutation\SwapMutation.cs" />

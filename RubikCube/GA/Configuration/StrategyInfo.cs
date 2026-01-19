@@ -106,6 +106,8 @@ public static class StrategyInfo
         CrossoverStrategy.OrderBased => "Order (OX)",
         CrossoverStrategy.PartiallyMapped => "PMX",
         CrossoverStrategy.SegmentPreserving => "Segment Pres.",
+        CrossoverStrategy.Cycle => "Cycle (CX)",
+        CrossoverStrategy.EdgeRecombination => "Edge (ERX)",
         _ => strategy.ToString()
     };
 
@@ -143,6 +145,8 @@ public static class StrategyInfo
             CrossoverStrategy.OrderBased => new OrderCrossover<T>(),
             CrossoverStrategy.PartiallyMapped => new PMXCrossover<T>(),
             CrossoverStrategy.SegmentPreserving => new SegmentPreservingCrossover<T>(),
+            CrossoverStrategy.Cycle => new CycleCrossover<T>(),
+            CrossoverStrategy.EdgeRecombination => new EdgeRecombinationCrossover<T>(),
             _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown crossover strategy")
         };
     }
