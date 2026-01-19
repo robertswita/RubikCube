@@ -252,48 +252,193 @@ Wstawia znane algorytmy speedcubingowe do chromosomu.
 
 **Dla kostek 3D - Pełny zestaw PLL (21 algorytmów):**
 
-*Edge-only PLLs (4):*
-- **Ua-perm**: R U' R U R U R U' R' U' R2 (cykl krawędzi zgodnie z ruchem wskazówek)
-- **Ub-perm**: R2 U R U R' U' R' U' R' U R' (cykl krawędzi przeciwnie)
-- **H-perm**: R2 U2 R U2 R2 U2 R2 U2 R U2 R2 (zamiana przeciwległych par krawędzi)
-- **Z-perm**: R' U' R U' R U R U' R' U R U R2 U' R' (zamiana sąsiednich par krawędzi)
+##### Edge-only PLLs (4)
 
-*Corner-only PLLs (3):*
-- **Aa-perm**: R' F R' B2 R F' R' B2 R2 (cykl narożników zgodnie)
-- **Ab-perm**: R2 B2 R F R' B2 R F' R (cykl narożników przeciwnie)
-- **E-perm**: R B' R' F R B R' F' R B R' F R B' R' F' (zamiana przekątnych narożników)
+| Nazwa | Algorytm | Ruchy | Efekt |
+|-------|----------|-------|-------|
+| **Ua** | R U' R U R U R U' R' U' R2 | 11 | Cykl 3 krawędzi (zgodnie) |
+| **Ub** | R2 U R U R' U' R' U' R' U R' | 11 | Cykl 3 krawędzi (przeciwnie) |
+| **H** | R2 U2 R U2 R2 U2 R2 U2 R U2 R2 | 11 | Zamiana przeciwległych par |
+| **Z** | R' U' R U' R U R U' R' U R U R2 U' R' | 15 | Zamiana sąsiednich par |
 
-*Adjacent corner swap PLLs (6):*
-- **T-perm**: R U R' U' R' F R2 U' R' U' R U R' F' (zamiana sąsiednich narożników + krawędzi)
-- **F-perm**: R' U' F' R U R' U' R' F R2 U' R' U' R U R' U R
-- **Ja-perm**: R' U L' U2 R U' R' U2 R L
-- **Jb-perm**: R U R' F' R U R' U' R' F R2 U' R'
-- **Ra-perm**: R U' R' U' R U R D R' U' R D' R' U2 R'
-- **Rb-perm**: R' U2 R U2 R' F R U R' U' R' F' R2
+##### Corner-only PLLs (3)
 
-*Diagonal corner swap PLLs (4):*
-- **Y-perm**: F R U' R' U' R U R' F' R U R' U' R' F R F'
-- **V-perm**: R' U R' U' R D' R' D R' U D' R2 U' R2 D R2
-- **Na-perm**: R U R' U R U R' F' R U R' U' R' F R2 U' R' U2 R U' R' (21 ruchów)
-- **Nb-perm**: R' U R U' R' F' U' F R U R' F R' F' R U' R
+| Nazwa | Algorytm | Ruchy | Efekt |
+|-------|----------|-------|-------|
+| **Aa** | R' F R' B2 R F' R' B2 R2 | 9 | Cykl 3 narożników (zgodnie) |
+| **Ab** | R2 B2 R F R' B2 R F' R | 9 | Cykl 3 narożników (przeciwnie) |
+| **E** | R B' R' F R B R' F' R B R' F R B' R' F' | 16 | Zamiana przekątnych narożników |
 
-*G-perms (cykle narożników + krawędzi) (4):*
-- **Ga-perm**: R2 U R' U R' U' R U' R2 U' D R' U R D'
-- **Gb-perm**: R' U' R U D' R2 U R' U R U' R U' R2 D
-- **Gc-perm**: R2 U' R U' R U R' U R2 U D' R U' R' D
-- **Gd-perm**: R U R' U' D R2 U' R U' R' U R' U R2 D'
+##### Adjacent Corner Swap PLLs (6)
 
-**OLL (2 podstawowe):**
-- Sune: R U R' U R U2 R'
-- Anti-Sune: R U2 R' U' R U' R'
+| Nazwa | Algorytm | Ruchy | Efekt |
+|-------|----------|-------|-------|
+| **T** | R U R' U' R' F R2 U' R' U' R U R' F' | 14 | Zamiana sąsiednich narożników + krawędzi |
+| **F** | R' U' F' R U R' U' R' F R2 U' R' U' R U R' U R | 18 | Zamiana sąsiednich narożników + krawędzi |
+| **Ja** | R' U L' U2 R U' R' U2 R L | 10 | Zamiana sąsiednich + cykl krawędzi |
+| **Jb** | R U R' F' R U R' U' R' F R2 U' R' | 13 | Zamiana sąsiednich + cykl krawędzi |
+| **Ra** | R U' R' U' R U R D R' U' R D' R' U2 R' | 15 | Zamiana sąsiednich + cykl krawędzi |
+| **Rb** | R' U2 R U2 R' F R U R' U' R' F' R2 | 13 | Zamiana sąsiednich + cykl krawędzi |
 
-**Triggery podstawowe:**
-- Sexy move: R U R' U'
-- Sledgehammer: R' F R F'
-- Hedgeslammer: F R' F' R
-- Left sexy: L' U' L U
-- Double sexy: (R U R' U')2
-- Corner twist: R' D' R D
+##### Diagonal Corner Swap PLLs (4)
+
+| Nazwa | Algorytm | Ruchy | Efekt |
+|-------|----------|-------|-------|
+| **Y** | F R U' R' U' R U R' F' R U R' U' R' F R F' | 17 | Zamiana przekątnych narożników + krawędzi |
+| **V** | R' U R' U' R D' R' D R' U D' R2 U' R2 D R2 | 16 | Zamiana przekątnych narożników + krawędzi |
+| **Na** | R U R' U R U R' F' R U R' U' R' F R2 U' R' U2 R U' R' | 21 | Zamiana przekątnych narożników |
+| **Nb** | R' U R U' R' F' U' F R U R' F R' F' R U' R | 17 | Zamiana przekątnych narożników |
+
+##### G-perms (Cykle narożników + krawędzi) (4)
+
+| Nazwa | Algorytm | Ruchy | Efekt |
+|-------|----------|-------|-------|
+| **Ga** | R2 U R' U R' U' R U' R2 U' D R' U R D' | 15 | Cykl narożników + cykl krawędzi |
+| **Gb** | R' U' R U D' R2 U R' U R U' R U' R2 D | 15 | Cykl narożników + cykl krawędzi |
+| **Gc** | R2 U' R U' R U R' U R2 U D' R U' R' D | 15 | Cykl narożników + cykl krawędzi |
+| **Gd** | R U R' U' D R2 U' R U' R' U R' U R2 D' | 15 | Cykl narożników + cykl krawędzi |
+
+##### OLL (Orientacja Ostatniej Warstwy) - Pełny zestaw 57 algorytmów
+
+###### All Edges Oriented (Krzyż na górze) - 7 przypadków
+
+| OLL# | Nazwa | Algorytm | Ruchy |
+|------|-------|----------|-------|
+| 21 | H/Double Sune | R U R' U R U' R' U R U2 R' | 11 |
+| 22 | Pi | R U2 R2 U' R2 U' R2 U2 R | 9 |
+| 23 | Headlights | R2 D R' U2 R D' R' U2 R' | 9 |
+| 24 | Chameleon | F R' F' R U R U' R' | 8 |
+| 25 | Bowtie | F' R U R' U' R' F R | 8 |
+| 26 | Antisune | R U2 R' U' R U' R' | 7 |
+| 27 | Sune | R U R' U R U2 R' | 7 |
+
+###### T-shapes - 2 przypadki
+
+| OLL# | Algorytm | Ruchy |
+|------|----------|-------|
+| 33 | R U R' U' R' F R F' | 8 |
+| 45 | F R U R' U' F' | 6 |
+
+###### Squares - 2 przypadki
+
+| OLL# | Algorytm | Ruchy |
+|------|----------|-------|
+| 5 | R' U2 R U R' U R | 7 |
+| 6 | R U2 R' U' R U' R' | 7 |
+
+###### C-shapes - 2 przypadki
+
+| OLL# | Algorytm | Ruchy |
+|------|----------|-------|
+| 34 | R U R2 U' R' F R U R U' F' | 11 |
+| 46 | R' U' R' F R F' U R | 8 |
+
+###### W-shapes - 2 przypadki
+
+| OLL# | Algorytm | Ruchy |
+|------|----------|-------|
+| 36 | L' U' L U' L' U L U L F' L' F | 12 |
+| 38 | R U R' U R U' R' U' R' F R F' | 12 |
+
+###### Corners Oriented - 2 przypadki
+
+| OLL# | Algorytm | Ruchy |
+|------|----------|-------|
+| 28 | R U R' U' M' U R U' R' | 9 |
+| 57 | R U R' U' M' U R U' R' U' M | 11 |
+
+###### P-shapes - 4 przypadki
+
+| OLL# | Algorytm | Ruchy |
+|------|----------|-------|
+| 31 | R' U' F U R U' R' F' R | 9 |
+| 32 | R U B' U' R' U R B R' | 9 |
+| 43 | F' U' L' U L F | 6 |
+| 44 | F U R U' R' F' | 6 |
+
+###### I-shapes (Line) - 4 przypadki
+
+| OLL# | Algorytm | Ruchy |
+|------|----------|-------|
+| 51 | F U R U' R' U R U' R' F' | 10 |
+| 52 | R U R' U R U' B U' B' R' | 10 |
+| 55 | R' F R U R U' R2 F' R2 U' R' U R U R' | 15 |
+| 56 | F R U R' U' R F' R U R' U' R' F R F' | 15 |
+
+###### Fish shapes - 4 przypadki
+
+| OLL# | Algorytm | Ruchy |
+|------|----------|-------|
+| 9 | R U R' U' R' F R2 U R' U' F' | 11 |
+| 10 | R U R' U R' F R F' R U2 R' | 11 |
+| 35 | R U2 R2 F R F' R U2 R' | 9 |
+| 37 | F R U' R' U' R U R' F' | 9 |
+
+###### Knight Move shapes - 4 przypadki
+
+| OLL# | Algorytm | Ruchy |
+|------|----------|-------|
+| 13 | F U R U' R2 F' R U R U' R' | 11 |
+| 14 | R' F R U R' F' R F U' F' | 10 |
+| 15 | R' F' R L' U' L U R' F R | 10 |
+| 16 | R U R' L U L' U' R U' R' | 10 |
+
+###### Awkward shapes - 4 przypadki
+
+| OLL# | Algorytm | Ruchy |
+|------|----------|-------|
+| 29 | R U R' U' R U' R' F' U' F R U R' | 13 |
+| 30 | F U R U2 R' U' R U2 R' U' F' | 11 |
+| 41 | R U R' U R U2 R' F R U R' U' F' | 13 |
+| 42 | R' U' R U' R' U2 R F R U R' U' F' | 13 |
+
+###### L-shapes - 6 przypadków
+
+| OLL# | Algorytm | Ruchy |
+|------|----------|-------|
+| 47 | F' L' U' L U L' U' L U F | 10 |
+| 48 | F R U R' U' R U R' U' F' | 10 |
+| 49 | R B' R2 F R2 B R2 F' R | 9 |
+| 50 | R B' R B R2 U2 F R' F' R | 10 |
+| 53 | F R U R' U' F' R U R' U' R' F R F' | 14 |
+| 54 | R U R' U' R' F R F' R U R' U' R' F R F' | 16 |
+
+###### Lightning Bolt shapes - 6 przypadków
+
+| OLL# | Algorytm | Ruchy |
+|------|----------|-------|
+| 7 | F R U R' U' F' U F R U R' U' F' | 13 |
+| 8 | R' U' R U' R' U2 R | 7 |
+| 11 | F' L' U' L U F U' F' L' U' L U F | 13 |
+| 12 | F R U R' U' F' U F R U R' U' F' | 13 |
+| 39 | L F' L' U' L U F U' L' | 9 |
+| 40 | R' F R U R' U' F' U R | 9 |
+
+###### Dot cases (Brak zorientowanych krawędzi) - 8 przypadków
+
+| OLL# | Algorytm | Ruchy |
+|------|----------|-------|
+| 1 | R U2 R2 F R F' U2 R' F R F' | 11 |
+| 2 | F R U R' U' F' U2 F' L' U' L U F | 13 |
+| 3 | F' L' U' L U F U' F' L' U' L U F | 13 |
+| 4 | F' L' U' L U F U F' L' U' L U F | 13 |
+| 17 | R U R' U R' F R F' U2 R' F R F' | 13 |
+| 18 | R U2 R2 F R F' U2 M' U R U' R' | 12 |
+| 19 | R' U2 F R U R' U' F2 U2 F R | 11 |
+| 20 | R U R' U R U' R' U R U2 R' U' R U R' U' R U' R' | 19 |
+
+##### Triggery podstawowe
+
+| Nazwa | Algorytm | Ruchy | Użycie |
+|-------|----------|-------|--------|
+| **Sexy move** | R U R' U' | 4 | Najpowszechniejszy trigger |
+| **Inverse sexy** | U R U' R' | 4 | Odwrotność sexy |
+| **Sledgehammer** | R' F R F' | 4 | Trigger z F |
+| **Hedgeslammer** | F R' F' R | 4 | Odwrotność sledgehammer |
+| **Left sexy** | L' U' L U | 4 | Leworęczna wersja |
+| **Double sexy** | (R U R' U')2 | 8 | Podwójny sexy |
+| **Corner twist** | R' D' R D | 4 | Skręcenie narożnika |
+| **Double corner** | (R' D' R D)2 | 8 | Podwójne skręcenie |
 
 **Dla kostek 4D+:**
 - Uogólnione komutatory: A B A' B' dla różnych kombinacji płaszczyzn

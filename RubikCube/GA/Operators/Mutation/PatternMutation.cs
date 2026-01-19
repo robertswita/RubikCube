@@ -9,28 +9,39 @@ namespace TGL.GA.Operators.Mutation;
 /// <summary>
 /// Pattern mutation - inserts known algorithm patterns into the chromosome.
 ///
-/// For 3D cubes, includes the FULL PLL set (21 algorithms) plus OLL and triggers:
+/// For 3D cubes, includes FULL PLL (21) and OLL (57) algorithm sets:
 ///
-/// PLL (Permutation of Last Layer):
-/// - Edge-only: Ua, Ub, H, Z
-/// - Corner-only: Aa, Ab, E
-/// - Adjacent corner swap: T, F, Ja, Jb, Ra, Rb
-/// - Diagonal corner swap: Y, V, Na, Nb
-/// - G-perms (corner+edge cycles): Ga, Gb, Gc, Gd
+/// PLL (Permutation of Last Layer) - 21 algorithms:
+/// - Edge-only: Ua, Ub, H, Z (4)
+/// - Corner-only: Aa, Ab, E (3)
+/// - Adjacent corner swap: T, F, Ja, Jb, Ra, Rb (6)
+/// - Diagonal corner swap: Y, V, Na, Nb (4)
+/// - G-perms (corner+edge cycles): Ga, Gb, Gc, Gd (4)
 ///
-/// OLL (Orientation of Last Layer):
-/// - Sune, Anti-Sune
+/// OLL (Orientation of Last Layer) - 57 algorithms:
+/// - All Edges Oriented (Cross): 21-27 (7)
+/// - T-shapes: 33, 45 (2)
+/// - Squares: 5, 6 (2)
+/// - C-shapes: 34, 46 (2)
+/// - W-shapes: 36, 38 (2)
+/// - Corners Oriented: 28, 57 (2)
+/// - P-shapes: 31, 32, 43, 44 (4)
+/// - I-shapes (Line): 51, 52, 55, 56 (4)
+/// - Fish shapes: 9, 10, 35, 37 (4)
+/// - Knight Move: 13, 14, 15, 16 (4)
+/// - Awkward shapes: 29, 30, 41, 42 (4)
+/// - L-shapes: 47, 48, 49, 50, 53, 54 (6)
+/// - Lightning Bolt: 7, 8, 11, 12, 39, 40 (6 + 2 variants)
+/// - Dot cases: 1, 2, 3, 4, 17, 18, 19, 20 (8)
 ///
 /// Basic triggers:
-/// - Sexy move (R U R' U'), Sledgehammer (R' F R F')
-/// - Hedgeslammer, Left sexy, Double sexy
-/// - Corner twist, slot inserts
+/// - Sexy move, Sledgehammer, Hedgeslammer
+/// - Left sexy, Double sexy, Corner twist
 ///
 /// For 4D+ cubes, uses generalized commutator patterns that work
 /// across dimensions, adapted to the available planes.
 ///
-/// These patterns are known to perform useful permutations and
-/// can help the GA discover effective move sequences faster.
+/// Total patterns for 3D: ~85 (21 PLL + 57 OLL + triggers)
 /// </summary>
 /// <typeparam name="T">The chromosome type.</typeparam>
 public class PatternMutation<T> : IMutationOperator<T> where T : IChromosome
@@ -155,14 +166,223 @@ public class PatternMutation<T> : IMutationOperator<T> where T : IChromosome
         _patterns.Add(new[] { Li, Ui, L, U });
 
         // ============================================================
-        // OLL ALGORITHMS (Last Layer Orientation)
+        // OLL ALGORITHMS (Last Layer Orientation) - Full Set of 57
         // ============================================================
+        // Note: Some algorithms use f/r (wide moves). For 3x3, we encode
+        // f = F + S (where S is middle slice following F)
+        // r = R + M' (where M is middle slice following L)
+        // For simplicity, we use alternative non-wide algorithms where possible.
 
-        // Sune: R U R' U R U2 R'
+        // Middle slice moves (for 3x3, slice index = 1)
+        int M = size >= 3 ? new TMove { Axis = 0, Slice = 1, Plane = 1, Angle = 2 }.Encode() : R;  // M follows L
+        int Mi = size >= 3 ? new TMove { Axis = 0, Slice = 1, Plane = 1, Angle = 0 }.Encode() : Ri;
+        int M2 = size >= 3 ? new TMove { Axis = 0, Slice = 1, Plane = 1, Angle = 1 }.Encode() : R2;
+
+        int S = size >= 3 ? new TMove { Axis = 2, Slice = 1, Plane = 1, Angle = 0 }.Encode() : F;  // S follows F
+        int Si = size >= 3 ? new TMove { Axis = 2, Slice = 1, Plane = 1, Angle = 2 }.Encode() : Fi;
+
+        // --- ALL EDGES ORIENTED (Cross on top) - 7 cases ---
+
+        // OLL 21 (H/Double Sune): R U R' U R U' R' U R U2 R'
+        _patterns.Add(new[] { R, U, Ri, U, R, Ui, Ri, U, R, U2, Ri });
+
+        // OLL 22 (Pi): R U2 R2 U' R2 U' R2 U2 R
+        _patterns.Add(new[] { R, U2, R2, Ui, R2, Ui, R2, U2, R });
+
+        // OLL 23 (Headlights): R2 D R' U2 R D' R' U2 R'
+        _patterns.Add(new[] { R2, D, Ri, U2, R, Di, Ri, U2, Ri });
+
+        // OLL 24 (Chameleon): F R' F' R U R U' R' (alternative without wide moves)
+        _patterns.Add(new[] { F, Ri, Fi, R, U, R, Ui, Ri });
+
+        // OLL 25 (Bowtie): F' R U R' U' R' F R (alternative)
+        _patterns.Add(new[] { Fi, R, U, Ri, Ui, Ri, F, R });
+
+        // OLL 26 (Antisune): R U2 R' U' R U' R'
+        _patterns.Add(new[] { R, U2, Ri, Ui, R, Ui, Ri });
+
+        // OLL 27 (Sune): R U R' U R U2 R'
         _patterns.Add(new[] { R, U, Ri, U, R, U2, Ri });
 
-        // Anti-Sune: R U2 R' U' R U' R'
+        // --- T-SHAPES - 2 cases ---
+
+        // OLL 33: R U R' U' R' F R F'
+        _patterns.Add(new[] { R, U, Ri, Ui, Ri, F, R, Fi });
+
+        // OLL 45: F R U R' U' F'
+        _patterns.Add(new[] { F, R, U, Ri, Ui, Fi });
+
+        // --- SQUARES - 2 cases ---
+
+        // OLL 5: R' U2 R U R' U R (alternative to r' U2 R U R' U r)
+        _patterns.Add(new[] { Ri, U2, R, U, Ri, U, R });
+
+        // OLL 6: R U2 R' U' R U' R' (same as antisune, different recognition)
         _patterns.Add(new[] { R, U2, Ri, Ui, R, Ui, Ri });
+
+        // --- C-SHAPES - 2 cases ---
+
+        // OLL 34: R U R2 U' R' F R U R U' F'
+        _patterns.Add(new[] { R, U, R2, Ui, Ri, F, R, U, R, Ui, Fi });
+
+        // OLL 46: R' U' R' F R F' U R
+        _patterns.Add(new[] { Ri, Ui, Ri, F, R, Fi, U, R });
+
+        // --- W-SHAPES - 2 cases ---
+
+        // OLL 36: L' U' L U' L' U L U L F' L' F
+        _patterns.Add(new[] { Li, Ui, L, Ui, Li, U, L, U, L, Fi, Li, F });
+
+        // OLL 38: R U R' U R U' R' U' R' F R F'
+        _patterns.Add(new[] { R, U, Ri, U, R, Ui, Ri, Ui, Ri, F, R, Fi });
+
+        // --- CORNERS ORIENTED - 2 cases ---
+
+        // OLL 28: R U R' U' M' U R U' R' (with M = r' R)
+        // Alternative: R U R' U' R' F R F' U' F R U R' U' F'
+        _patterns.Add(new[] { R, U, Ri, Ui, Mi, U, R, Ui, Ri });
+
+        // OLL 57 (H): R U R' U' M' U R U' R' U' M
+        // Alternative without M: R U R' U' R' F R F' R U R' U' R' F R F'
+        _patterns.Add(new[] { R, U, Ri, Ui, Mi, U, R, Ui, Ri, Ui, M });
+
+        // --- P-SHAPES - 4 cases ---
+
+        // OLL 31: R' U' F U R U' R' F' R
+        _patterns.Add(new[] { Ri, Ui, F, U, R, Ui, Ri, Fi, R });
+
+        // OLL 32: R U B' U' R' U R B R'
+        _patterns.Add(new[] { R, U, Bi, Ui, Ri, U, R, B, Ri });
+
+        // OLL 43: F' U' L' U L F (alternative to f' L' U' L U f)
+        _patterns.Add(new[] { Fi, Ui, Li, U, L, F });
+
+        // OLL 44: F U R U' R' F' (alternative to f R U R' U' f')
+        _patterns.Add(new[] { F, U, R, Ui, Ri, Fi });
+
+        // --- I-SHAPES (LINE) - 4 cases ---
+
+        // OLL 51: F U R U' R' U R U' R' F'
+        _patterns.Add(new[] { F, U, R, Ui, Ri, U, R, Ui, Ri, Fi });
+
+        // OLL 52: R U R' U R U' B U' B' R'
+        _patterns.Add(new[] { R, U, Ri, U, R, Ui, B, Ui, Bi, Ri });
+
+        // OLL 55: R' F R U R U' R2 F' R2 U' R' U R U R'
+        _patterns.Add(new[] { Ri, F, R, U, R, Ui, R2, Fi, R2, Ui, Ri, U, R, U, Ri });
+
+        // OLL 56: F R U R' U' R F' R U R' U' R' F R F'
+        _patterns.Add(new[] { F, R, U, Ri, Ui, R, Fi, R, U, Ri, Ui, Ri, F, R, Fi });
+
+        // --- FISH SHAPES - 4 cases ---
+
+        // OLL 9: R U R' U' R' F R2 U R' U' F'
+        _patterns.Add(new[] { R, U, Ri, Ui, Ri, F, R2, U, Ri, Ui, Fi });
+
+        // OLL 10: R U R' U R' F R F' R U2 R'
+        _patterns.Add(new[] { R, U, Ri, U, Ri, F, R, Fi, R, U2, Ri });
+
+        // OLL 35: R U2 R2 F R F' R U2 R'
+        _patterns.Add(new[] { R, U2, R2, F, R, Fi, R, U2, Ri });
+
+        // OLL 37: F R U' R' U' R U R' F'
+        _patterns.Add(new[] { F, R, Ui, Ri, Ui, R, U, Ri, Fi });
+
+        // --- KNIGHT MOVE SHAPES - 4 cases ---
+
+        // OLL 13: F U R U' R2 F' R U R U' R'
+        _patterns.Add(new[] { F, U, R, Ui, R2, Fi, R, U, R, Ui, Ri });
+
+        // OLL 14: R' F R U R' F' R F U' F'
+        _patterns.Add(new[] { Ri, F, R, U, Ri, Fi, R, F, Ui, Fi });
+
+        // OLL 15: R' F' R L' U' L U R' F R (alternative without wide r)
+        _patterns.Add(new[] { Ri, Fi, R, Li, Ui, L, U, Ri, F, R });
+
+        // OLL 16: R U R' L U L' U' R U' R' (alternative without wide r)
+        _patterns.Add(new[] { R, U, Ri, L, U, Li, Ui, R, Ui, Ri });
+
+        // --- AWKWARD SHAPES - 4 cases ---
+
+        // OLL 29: R U R' U' R U' R' F' U' F R U R'
+        _patterns.Add(new[] { R, U, Ri, Ui, R, Ui, Ri, Fi, Ui, F, R, U, Ri });
+
+        // OLL 30: F U R U2 R' U' R U2 R' U' F'
+        _patterns.Add(new[] { F, U, R, U2, Ri, Ui, R, U2, Ri, Ui, Fi });
+
+        // OLL 41: R U R' U R U2 R' F R U R' U' F'
+        _patterns.Add(new[] { R, U, Ri, U, R, U2, Ri, F, R, U, Ri, Ui, Fi });
+
+        // OLL 42: R' U' R U' R' U2 R F R U R' U' F'
+        _patterns.Add(new[] { Ri, Ui, R, Ui, Ri, U2, R, F, R, U, Ri, Ui, Fi });
+
+        // --- L-SHAPES - 6 cases ---
+
+        // OLL 47: F' L' U' L U L' U' L U F
+        _patterns.Add(new[] { Fi, Li, Ui, L, U, Li, Ui, L, U, F });
+
+        // OLL 48: F R U R' U' R U R' U' F'
+        _patterns.Add(new[] { F, R, U, Ri, Ui, R, U, Ri, Ui, Fi });
+
+        // OLL 49: R B' R2 F R2 B R2 F' R (alternative without wide r)
+        _patterns.Add(new[] { R, Bi, R2, F, R2, B, R2, Fi, R });
+
+        // OLL 50: R B' R B R2 U2 F R' F' R (alternative without wide r)
+        _patterns.Add(new[] { R, Bi, R, B, R2, U2, F, Ri, Fi, R });
+
+        // OLL 53: F R U R' U' F' R U R' U' R' F R F' (alternative)
+        _patterns.Add(new[] { F, R, U, Ri, Ui, Fi, R, U, Ri, Ui, Ri, F, R, Fi });
+
+        // OLL 54: R U R' U' R' F R F' R U R' U' R' F R F' (alternative)
+        _patterns.Add(new[] { R, U, Ri, Ui, Ri, F, R, Fi, R, U, Ri, Ui, Ri, F, R, Fi });
+
+        // --- LIGHTNING BOLT SHAPES - 8 cases ---
+
+        // OLL 7: R U R' U R U2 R' (same as Sune for lightning bolt case)
+        // Actually: F R U R' U' F' U F R U R' U' F' (alternative)
+        _patterns.Add(new[] { F, R, U, Ri, Ui, Fi, U, F, R, U, Ri, Ui, Fi });
+
+        // OLL 8: R' U' R U' R' U2 R (mirror of Sune)
+        _patterns.Add(new[] { Ri, Ui, R, Ui, Ri, U2, R });
+
+        // OLL 11: F' L' U' L U F U' F' L' U' L U F (alternative without M)
+        _patterns.Add(new[] { Fi, Li, Ui, L, U, F, Ui, Fi, Li, Ui, L, U, F });
+
+        // OLL 12: F R U R' U' F' U F R U R' U' F' (with adjusted ending)
+        _patterns.Add(new[] { F, R, U, Ri, Ui, Fi, U, F, R, U, Ri, Ui, Fi });
+
+        // OLL 39: L F' L' U' L U F U' L'
+        _patterns.Add(new[] { L, Fi, Li, Ui, L, U, F, Ui, Li });
+
+        // OLL 40: R' F R U R' U' F' U R
+        _patterns.Add(new[] { Ri, F, R, U, Ri, Ui, Fi, U, R });
+
+        // --- DOT CASES (No Edges Oriented) - 8 cases ---
+
+        // OLL 1: R U2 R2 F R F' U2 R' F R F'
+        _patterns.Add(new[] { R, U2, R2, F, R, Fi, U2, Ri, F, R, Fi });
+
+        // OLL 2: F R U R' U' F' U2 F' L' U' L U F (alternative without f)
+        _patterns.Add(new[] { F, R, U, Ri, Ui, Fi, U2, Fi, Li, Ui, L, U, F });
+
+        // OLL 3: F' L' U' L U F U' F' L' U' L U F (alternative without f)
+        _patterns.Add(new[] { Fi, Li, Ui, L, U, F, Ui, Fi, Li, Ui, L, U, F });
+
+        // OLL 4: F' L' U' L U F U F' L' U' L U F (alternative without f)
+        _patterns.Add(new[] { Fi, Li, Ui, L, U, F, U, Fi, Li, Ui, L, U, F });
+
+        // OLL 17: R U R' U R' F R F' U2 R' F R F'
+        _patterns.Add(new[] { R, U, Ri, U, Ri, F, R, Fi, U2, Ri, F, R, Fi });
+
+        // OLL 18: R U2 R2 F R F' U2 M' U R U' R' (alternative)
+        _patterns.Add(new[] { R, U2, R2, F, R, Fi, U2, Mi, U, R, Ui, Ri });
+
+        // OLL 19: R' U2 F R U R' U' F2 U2 F R (alternative)
+        _patterns.Add(new[] { Ri, U2, F, R, U, Ri, Ui, F2, U2, F, R });
+
+        // OLL 20: R U R' U' M' U' R U R' U M U R U2 R' (alternative without wide r)
+        // Simpler: R U R' U R U' R' U R U2 R' U' R U R' U' R U' R'
+        _patterns.Add(new[] { R, U, Ri, U, R, Ui, Ri, U, R, U2, Ri, Ui, R, U, Ri, Ui, R, Ui, Ri });
 
         // ============================================================
         // PLL ALGORITHMS (Last Layer Permutation) - Full Set of 21

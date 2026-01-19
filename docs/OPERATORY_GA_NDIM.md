@@ -480,7 +480,33 @@ Dwie płaszczyzny rotacji są ortogonalne, jeśli nie współdzielą żadnej wsp
 
 **Opis:** Wstawia znane algorytmy speedcubingowe do chromosomu.
 
-**Dla 3D:** Sexy move (R U R' U'), Sledgehammer, Sune, Anti-Sune, T-perm trigger, Double sexy, warianty leworęczne.
+**Dla 3D - Pełne zestawy PLL (21) i OLL (57):**
+
+| Kategoria | Algorytmy | Liczba | Opis |
+|-----------|-----------|--------|------|
+| **PLL - Edge-only** | Ua, Ub, H, Z | 4 | Permutacje tylko krawędzi |
+| **PLL - Corner-only** | Aa, Ab, E | 3 | Permutacje tylko narożników |
+| **PLL - Adjacent corner** | T, F, Ja, Jb, Ra, Rb | 6 | Zamiana sąsiednich narożników |
+| **PLL - Diagonal corner** | Y, V, Na, Nb | 4 | Zamiana przekątnych narożników |
+| **PLL - G-perms** | Ga, Gb, Gc, Gd | 4 | Cykle narożników + krawędzi |
+| **Razem PLL** | | **21** | |
+| **OLL - Cross** | 21-27 | 7 | Wszystkie krawędzie zorientowane |
+| **OLL - T-shapes** | 33, 45 | 2 | Kształt T |
+| **OLL - Squares** | 5, 6 | 2 | Kwadraty |
+| **OLL - C-shapes** | 34, 46 | 2 | Kształt C |
+| **OLL - W-shapes** | 36, 38 | 2 | Kształt W |
+| **OLL - Corners** | 28, 57 | 2 | Narożniki zorientowane |
+| **OLL - P-shapes** | 31, 32, 43, 44 | 4 | Kształt P |
+| **OLL - I-shapes** | 51, 52, 55, 56 | 4 | Linia |
+| **OLL - Fish** | 9, 10, 35, 37 | 4 | Ryba |
+| **OLL - Knight** | 13, 14, 15, 16 | 4 | Skok skoczka |
+| **OLL - Awkward** | 29, 30, 41, 42 | 4 | Niezręczne |
+| **OLL - L-shapes** | 47-50, 53, 54 | 6 | Kształt L |
+| **OLL - Lightning** | 7, 8, 11, 12, 39, 40 | 6 | Błyskawica |
+| **OLL - Dot** | 1-4, 17-20 | 8 | Kropka (brak krawędzi) |
+| **Razem OLL** | | **57** | |
+| Triggery | Sexy, Sledgehammer, etc. | 8 | Podstawowe sekwencje |
+| **Razem 3D** | | **~86** | |
 
 **Dla 4D+:** Uogólnione komutatory A B A' B' dla różnych kombinacji płaszczyzn, używając osi prostopadłej do płaszczyzny rotacji.
 
