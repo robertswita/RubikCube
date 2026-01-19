@@ -1,3 +1,4 @@
+using GA;
 using RubikCube;
 using TGL.GA.Configuration;
 using TGL.GA.Interfaces;
@@ -251,6 +252,9 @@ public class RubikGASolver
 
             ClusterChanged?.Invoke(_cube);
 
+            // Set static chromosome length (required by TChromosome)
+            TChromosome.GenesLength = _gaConfig.GenomeLength;
+
             var evaluator = new RubikFitnessEvaluator(_cube);
             var ga = new GeneticAlgorithm<TRubikGenome>(config, evaluator);
             _currentGA = ga;
@@ -414,6 +418,9 @@ public class RubikGASolver
                 MaxGenerations = _solverConfig.GenerationsPerIteration
             }
         };
+
+        // Set static chromosome length (required by TChromosome)
+        TChromosome.GenesLength = _gaConfig.GenomeLength;
 
         var evaluator = new RubikFitnessEvaluator(_cube);
         var ga = new GeneticAlgorithm<TRubikGenome>(config, evaluator);
