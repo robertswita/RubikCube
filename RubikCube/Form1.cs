@@ -232,6 +232,18 @@ namespace RubikCube
             IterElapsed += iterTime;
         }
 
+        // Thread-safe version called from background thread via BeginInvoke
+        void OnProgressThreadSafe(double fitness, TimeSpan elapsed)
+        {
+            _fitnessValues.Add(new ObservableValue(fitness));
+            if (_fitnessValues.Count > 500)
+                _fitnessValues.RemoveAt(0);
+
+            var iterTime = elapsed - IterElapsed;
+            IterTimeBox.Text = "Iter time:" + iterTime.TotalMilliseconds.ToString("F0") + "ms";
+            IterElapsed = elapsed;
+        }
+
         bool TrySolutions = true;
         Stopwatch Watch;
         TRubikGenome? _lastBest;
@@ -290,9 +302,6 @@ namespace RubikCube
                         break;
                     }
 
-                    // Clear fitness values on UI thread
-                    BeginInvoke(new Action(() => _fitnessValues.Clear()));
-
                     // Build GA config
                     var gaConfig = baseConfig with
                     {
@@ -320,8 +329,11 @@ namespace RubikCube
                         if (state.Best != null)
                         {
                             _lastBest = state.Best;
+                            // Capture elapsed time before invoking (thread-safe)
+                            var elapsed = Watch?.Elapsed ?? TimeSpan.Zero;
+                            var fitness = state.Best.Fitness;
                             // Update UI on UI thread
-                            BeginInvoke(new Action(() => OnProgress(state.Best)));
+                            BeginInvoke(new Action(() => OnProgressThreadSafe(fitness, elapsed)));
                         }
                     };
 
