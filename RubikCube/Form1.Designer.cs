@@ -30,30 +30,30 @@
         {
             this.components = new System.ComponentModel.Container();
             this.MoveTimer = new System.Windows.Forms.Timer(this.components);
-            this.panel1 = new System.Windows.Forms.Panel();
+            this.controlPanel = new System.Windows.Forms.Panel();
             this.MovesLbl = new System.Windows.Forms.Label();
-            this.label11 = new System.Windows.Forms.Label();
+            this.movesCountLbl = new System.Windows.Forms.Label();
             this.StateBox = new System.Windows.Forms.PictureBox();
             this.TransparencyBox = new System.Windows.Forms.CheckBox();
             this.SolutionLbl = new System.Windows.Forms.Label();
-            this.label10 = new System.Windows.Forms.Label();
+            this.solutionCountLbl = new System.Windows.Forms.Label();
             this.IterTimeBox = new System.Windows.Forms.Label();
             this.PauseBtn = new System.Windows.Forms.Button();
-            this.label9 = new System.Windows.Forms.Label();
+            this.slicesLbl = new System.Windows.Forms.Label();
             this.SlicesBox = new System.Windows.Forms.NumericUpDown();
-            this.label8 = new System.Windows.Forms.Label();
-            this.label7 = new System.Windows.Forms.Label();
-            this.label6 = new System.Windows.Forms.Label();
-            this.label5 = new System.Windows.Forms.Label();
-            this.chart1 = new LiveChartsCore.SkiaSharpView.WinForms.CartesianChart();
-            this.label4 = new System.Windows.Forms.Label();
-            this.label3 = new System.Windows.Forms.Label();
-            this.label2 = new System.Windows.Forms.Label();
-            this.button2 = new System.Windows.Forms.Button();
-            this.label1 = new System.Windows.Forms.Label();
-            this.button1 = new System.Windows.Forms.Button();
+            this.timeLbl = new System.Windows.Forms.Label();
+            this.errorLbl = new System.Windows.Forms.Label();
+            this.itersValueLbl = new System.Windows.Forms.Label();
+            this.itersLbl = new System.Windows.Forms.Label();
+            this.fitnessChart = new LiveChartsCore.SkiaSharpView.WinForms.CartesianChart();
+            this.statesValueLbl = new System.Windows.Forms.Label();
+            this.statesLbl = new System.Windows.Forms.Label();
+            this.errorValueLbl = new System.Windows.Forms.Label();
+            this.shuffleBtn = new System.Windows.Forms.Button();
+            this.timeValueLbl = new System.Windows.Forms.Label();
+            this.solveBtn = new System.Windows.Forms.Button();
             this.solveWorker = new System.ComponentModel.BackgroundWorker();
-            this.menuStrip1 = new System.Windows.Forms.MenuStrip();
+            this.mainMenu = new System.Windows.Forms.MenuStrip();
             this.fileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.openToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.saveToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -64,11 +64,11 @@
             this.pictureBox1 = new System.Windows.Forms.PictureBox();
             this.openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
             this.stateGridBindingSource = new System.Windows.Forms.BindingSource(this.components);
-            this.tglView1 = new TGL.TGLView();
+            this.cubeView = new TGL.TGLView();
             this.tRubikCubeBindingSource = new System.Windows.Forms.BindingSource(this.components);
-            this.label12 = new System.Windows.Forms.Label();
+            this.dimensionLbl = new System.Windows.Forms.Label();
             this.DimsBox = new System.Windows.Forms.NumericUpDown();
-            this.label13 = new System.Windows.Forms.Label();
+            this.transparencyLbl = new System.Windows.Forms.Label();
             this.gaConfigGroup = new System.Windows.Forms.GroupBox();
             this.resetGAConfigBtn = new System.Windows.Forms.Button();
             this.lblSolverMode = new System.Windows.Forms.Label();
@@ -99,10 +99,10 @@
             ((System.ComponentModel.ISupportInitialize)(this.numGenerations)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numElite)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numChromosomeLength)).BeginInit();
-            this.panel1.SuspendLayout();
+            this.controlPanel.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.StateBox)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.SlicesBox)).BeginInit();
-            this.menuStrip1.SuspendLayout();
+            this.mainMenu.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.stateGridBindingSource)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.tRubikCubeBindingSource)).BeginInit();
@@ -112,41 +112,41 @@
             // MoveTimer
             // 
             this.MoveTimer.Interval = 4;
-            this.MoveTimer.Tick += new System.EventHandler(this.timer1_Tick);
+            this.MoveTimer.Tick += new System.EventHandler(this.OnMoveTimerTick);
             //
             // panel1
             //
-            this.panel1.Controls.Add(this.ResetBtn);
-            this.panel1.Controls.Add(this.gaConfigGroup);
-            this.panel1.Controls.Add(this.label13);
-            this.panel1.Controls.Add(this.DimsBox);
-            this.panel1.Controls.Add(this.label12);
-            this.panel1.Controls.Add(this.MovesLbl);
-            this.panel1.Controls.Add(this.label11);
-            this.panel1.Controls.Add(this.StateBox);
-            this.panel1.Controls.Add(this.TransparencyBox);
-            this.panel1.Controls.Add(this.SolutionLbl);
-            this.panel1.Controls.Add(this.label10);
-            this.panel1.Controls.Add(this.IterTimeBox);
-            this.panel1.Controls.Add(this.PauseBtn);
-            this.panel1.Controls.Add(this.label9);
-            this.panel1.Controls.Add(this.SlicesBox);
-            this.panel1.Controls.Add(this.label8);
-            this.panel1.Controls.Add(this.label7);
-            this.panel1.Controls.Add(this.label6);
-            this.panel1.Controls.Add(this.label5);
-            this.panel1.Controls.Add(this.chart1);
-            this.panel1.Controls.Add(this.label4);
-            this.panel1.Controls.Add(this.label3);
-            this.panel1.Controls.Add(this.label2);
-            this.panel1.Controls.Add(this.button2);
-            this.panel1.Controls.Add(this.label1);
-            this.panel1.Controls.Add(this.button1);
-            this.panel1.Dock = System.Windows.Forms.DockStyle.Left;
-            this.panel1.Location = new System.Drawing.Point(0, 28);
-            this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(437, 790);
-            this.panel1.TabIndex = 8;
+            this.controlPanel.Controls.Add(this.ResetBtn);
+            this.controlPanel.Controls.Add(this.gaConfigGroup);
+            this.controlPanel.Controls.Add(this.transparencyLbl);
+            this.controlPanel.Controls.Add(this.DimsBox);
+            this.controlPanel.Controls.Add(this.dimensionLbl);
+            this.controlPanel.Controls.Add(this.MovesLbl);
+            this.controlPanel.Controls.Add(this.movesCountLbl);
+            this.controlPanel.Controls.Add(this.StateBox);
+            this.controlPanel.Controls.Add(this.TransparencyBox);
+            this.controlPanel.Controls.Add(this.SolutionLbl);
+            this.controlPanel.Controls.Add(this.solutionCountLbl);
+            this.controlPanel.Controls.Add(this.IterTimeBox);
+            this.controlPanel.Controls.Add(this.PauseBtn);
+            this.controlPanel.Controls.Add(this.slicesLbl);
+            this.controlPanel.Controls.Add(this.SlicesBox);
+            this.controlPanel.Controls.Add(this.timeLbl);
+            this.controlPanel.Controls.Add(this.errorLbl);
+            this.controlPanel.Controls.Add(this.itersValueLbl);
+            this.controlPanel.Controls.Add(this.itersLbl);
+            this.controlPanel.Controls.Add(this.fitnessChart);
+            this.controlPanel.Controls.Add(this.statesValueLbl);
+            this.controlPanel.Controls.Add(this.statesLbl);
+            this.controlPanel.Controls.Add(this.errorValueLbl);
+            this.controlPanel.Controls.Add(this.shuffleBtn);
+            this.controlPanel.Controls.Add(this.timeValueLbl);
+            this.controlPanel.Controls.Add(this.solveBtn);
+            this.controlPanel.Dock = System.Windows.Forms.DockStyle.Left;
+            this.controlPanel.Location = new System.Drawing.Point(0, 28);
+            this.controlPanel.Name = "panel1";
+            this.controlPanel.Size = new System.Drawing.Size(437, 790);
+            this.controlPanel.TabIndex = 8;
             // 
             // MovesLbl
             // 
@@ -159,12 +159,12 @@
             // 
             // label11
             // 
-            this.label11.AutoSize = true;
-            this.label11.Location = new System.Drawing.Point(256, 89);
-            this.label11.Name = "label11";
-            this.label11.Size = new System.Drawing.Size(85, 16);
-            this.label11.TabIndex = 31;
-            this.label11.Text = "Moves Count";
+            this.movesCountLbl.AutoSize = true;
+            this.movesCountLbl.Location = new System.Drawing.Point(256, 89);
+            this.movesCountLbl.Name = "label11";
+            this.movesCountLbl.Size = new System.Drawing.Size(85, 16);
+            this.movesCountLbl.TabIndex = 31;
+            this.movesCountLbl.Text = "Moves Count";
             //
             // StateBox
             //
@@ -198,12 +198,12 @@
             // 
             // label10
             // 
-            this.label10.AutoSize = true;
-            this.label10.Location = new System.Drawing.Point(256, 113);
-            this.label10.Name = "label10";
-            this.label10.Size = new System.Drawing.Size(92, 16);
-            this.label10.TabIndex = 27;
-            this.label10.Text = "Solution Count";
+            this.solutionCountLbl.AutoSize = true;
+            this.solutionCountLbl.Location = new System.Drawing.Point(256, 113);
+            this.solutionCountLbl.Name = "label10";
+            this.solutionCountLbl.Size = new System.Drawing.Size(92, 16);
+            this.solutionCountLbl.TabIndex = 27;
+            this.solutionCountLbl.Text = "Solution Count";
             //
             // IterTimeBox
             //
@@ -222,7 +222,7 @@
             this.PauseBtn.TabIndex = 23;
             this.PauseBtn.Text = "Pause";
             this.PauseBtn.UseVisualStyleBackColor = true;
-            this.PauseBtn.Click += new System.EventHandler(this.button3_Click_1);
+            this.PauseBtn.Click += new System.EventHandler(this.OnPauseClicked);
             //
             // ResetBtn
             //
@@ -236,12 +236,12 @@
             //
             // label9
             // 
-            this.label9.AutoSize = true;
-            this.label9.Location = new System.Drawing.Point(171, 9);
-            this.label9.Name = "label9";
-            this.label9.Size = new System.Drawing.Size(47, 16);
-            this.label9.TabIndex = 22;
-            this.label9.Text = "Slices:";
+            this.slicesLbl.AutoSize = true;
+            this.slicesLbl.Location = new System.Drawing.Point(171, 9);
+            this.slicesLbl.Name = "label9";
+            this.slicesLbl.Size = new System.Drawing.Size(47, 16);
+            this.slicesLbl.TabIndex = 22;
+            this.slicesLbl.Text = "Slices:";
             // 
             // SlicesBox
             // 
@@ -254,117 +254,117 @@
             0,
             0,
             0});
-            this.SlicesBox.ValueChanged += new System.EventHandler(this.numericUpDown1_ValueChanged);
+            this.SlicesBox.ValueChanged += new System.EventHandler(this.OnSlicesValueChanged);
             // 
             // label8
             // 
-            this.label8.AutoSize = true;
-            this.label8.Location = new System.Drawing.Point(33, 113);
-            this.label8.Name = "label8";
-            this.label8.Size = new System.Drawing.Size(35, 16);
-            this.label8.TabIndex = 20;
-            this.label8.Text = "time:";
+            this.timeLbl.AutoSize = true;
+            this.timeLbl.Location = new System.Drawing.Point(33, 113);
+            this.timeLbl.Name = "label8";
+            this.timeLbl.Size = new System.Drawing.Size(35, 16);
+            this.timeLbl.TabIndex = 20;
+            this.timeLbl.Text = "time:";
             // 
             // label7
             // 
-            this.label7.AutoSize = true;
-            this.label7.Location = new System.Drawing.Point(28, 89);
-            this.label7.Name = "label7";
-            this.label7.Size = new System.Drawing.Size(38, 16);
-            this.label7.TabIndex = 19;
-            this.label7.Text = "error:";
+            this.errorLbl.AutoSize = true;
+            this.errorLbl.Location = new System.Drawing.Point(28, 89);
+            this.errorLbl.Name = "label7";
+            this.errorLbl.Size = new System.Drawing.Size(38, 16);
+            this.errorLbl.TabIndex = 19;
+            this.errorLbl.Text = "error:";
             //
             // label6
             //
-            this.label6.AutoSize = true;
-            this.label6.Location = new System.Drawing.Point(171, 672);
-            this.label6.Name = "label6";
-            this.label6.Size = new System.Drawing.Size(44, 16);
-            this.label6.TabIndex = 18;
-            this.label6.Text = "label6";
+            this.itersValueLbl.AutoSize = true;
+            this.itersValueLbl.Location = new System.Drawing.Point(171, 672);
+            this.itersValueLbl.Name = "label6";
+            this.itersValueLbl.Size = new System.Drawing.Size(44, 16);
+            this.itersValueLbl.TabIndex = 18;
+            this.itersValueLbl.Text = "label6";
             //
             // label5
             //
-            this.label5.AutoSize = true;
-            this.label5.Location = new System.Drawing.Point(136, 672);
-            this.label5.Name = "label5";
-            this.label5.Size = new System.Drawing.Size(35, 16);
-            this.label5.TabIndex = 17;
-            this.label5.Text = "iters:";
+            this.itersLbl.AutoSize = true;
+            this.itersLbl.Location = new System.Drawing.Point(136, 672);
+            this.itersLbl.Name = "label5";
+            this.itersLbl.Size = new System.Drawing.Size(35, 16);
+            this.itersLbl.TabIndex = 17;
+            this.itersLbl.Text = "iters:";
             //
             // chart1
             //
-            this.chart1.Location = new System.Drawing.Point(0, 400);
-            this.chart1.Name = "chart1";
-            this.chart1.Size = new System.Drawing.Size(421, 269);
-            this.chart1.TabIndex = 14;
+            this.fitnessChart.Location = new System.Drawing.Point(0, 400);
+            this.fitnessChart.Name = "chart1";
+            this.fitnessChart.Size = new System.Drawing.Size(421, 269);
+            this.fitnessChart.TabIndex = 14;
             //
             // label4
             //
-            this.label4.AutoSize = true;
-            this.label4.Location = new System.Drawing.Point(59, 672);
-            this.label4.Name = "label4";
-            this.label4.Size = new System.Drawing.Size(44, 16);
-            this.label4.TabIndex = 13;
-            this.label4.Text = "label4";
+            this.statesValueLbl.AutoSize = true;
+            this.statesValueLbl.Location = new System.Drawing.Point(59, 672);
+            this.statesValueLbl.Name = "label4";
+            this.statesValueLbl.Size = new System.Drawing.Size(44, 16);
+            this.statesValueLbl.TabIndex = 13;
+            this.statesValueLbl.Text = "label4";
             //
             // label3
             //
-            this.label3.AutoSize = true;
-            this.label3.Location = new System.Drawing.Point(3, 672);
-            this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(46, 16);
-            this.label3.TabIndex = 12;
-            this.label3.Text = "states:";
+            this.statesLbl.AutoSize = true;
+            this.statesLbl.Location = new System.Drawing.Point(3, 672);
+            this.statesLbl.Name = "label3";
+            this.statesLbl.Size = new System.Drawing.Size(46, 16);
+            this.statesLbl.TabIndex = 12;
+            this.statesLbl.Text = "states:";
             // 
             // label2
             // 
-            this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(77, 89);
-            this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(44, 16);
-            this.label2.TabIndex = 11;
-            this.label2.Text = "label2";
+            this.errorValueLbl.AutoSize = true;
+            this.errorValueLbl.Location = new System.Drawing.Point(77, 89);
+            this.errorValueLbl.Name = "label2";
+            this.errorValueLbl.Size = new System.Drawing.Size(44, 16);
+            this.errorValueLbl.TabIndex = 11;
+            this.errorValueLbl.Text = "label2";
             // 
             // button2
             // 
-            this.button2.Location = new System.Drawing.Point(16, 37);
-            this.button2.Name = "button2";
-            this.button2.Size = new System.Drawing.Size(89, 39);
-            this.button2.TabIndex = 10;
-            this.button2.Text = "Shuffle";
-            this.button2.UseVisualStyleBackColor = true;
-            this.button2.Click += new System.EventHandler(this.button2_Click);
+            this.shuffleBtn.Location = new System.Drawing.Point(16, 37);
+            this.shuffleBtn.Name = "button2";
+            this.shuffleBtn.Size = new System.Drawing.Size(89, 39);
+            this.shuffleBtn.TabIndex = 10;
+            this.shuffleBtn.Text = "Shuffle";
+            this.shuffleBtn.UseVisualStyleBackColor = true;
+            this.shuffleBtn.Click += new System.EventHandler(this.OnShuffleClicked);
             // 
             // label1
             // 
-            this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(77, 113);
-            this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(44, 16);
-            this.label1.TabIndex = 9;
-            this.label1.Text = "label1";
+            this.timeValueLbl.AutoSize = true;
+            this.timeValueLbl.Location = new System.Drawing.Point(77, 113);
+            this.timeValueLbl.Name = "label1";
+            this.timeValueLbl.Size = new System.Drawing.Size(44, 16);
+            this.timeValueLbl.TabIndex = 9;
+            this.timeValueLbl.Text = "label1";
             // 
             // button1
             // 
-            this.button1.Location = new System.Drawing.Point(125, 37);
-            this.button1.Name = "button1";
-            this.button1.Size = new System.Drawing.Size(90, 39);
-            this.button1.TabIndex = 8;
-            this.button1.Text = "Solve!";
-            this.button1.UseVisualStyleBackColor = true;
-            this.button1.Click += new System.EventHandler(this.button1_Click);
+            this.solveBtn.Location = new System.Drawing.Point(125, 37);
+            this.solveBtn.Name = "button1";
+            this.solveBtn.Size = new System.Drawing.Size(90, 39);
+            this.solveBtn.TabIndex = 8;
+            this.solveBtn.Text = "Solve!";
+            this.solveBtn.UseVisualStyleBackColor = true;
+            this.solveBtn.Click += new System.EventHandler(this.OnSolveClicked);
             // 
             // menuStrip1
             // 
-            this.menuStrip1.ImageScalingSize = new System.Drawing.Size(20, 20);
-            this.menuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.mainMenu.ImageScalingSize = new System.Drawing.Size(20, 20);
+            this.mainMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.fileToolStripMenuItem});
-            this.menuStrip1.Location = new System.Drawing.Point(0, 0);
-            this.menuStrip1.Name = "menuStrip1";
-            this.menuStrip1.Size = new System.Drawing.Size(1202, 28);
-            this.menuStrip1.TabIndex = 9;
-            this.menuStrip1.Text = "menuStrip1";
+            this.mainMenu.Location = new System.Drawing.Point(0, 0);
+            this.mainMenu.Name = "menuStrip1";
+            this.mainMenu.Size = new System.Drawing.Size(1202, 28);
+            this.mainMenu.TabIndex = 9;
+            this.mainMenu.Text = "menuStrip1";
             // 
             // fileToolStripMenuItem
             // 
@@ -439,14 +439,14 @@
             // 
             // tglView1
             // 
-            this.tglView1.BackColor = System.Drawing.Color.White;
-            this.tglView1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.tglView1.Location = new System.Drawing.Point(437, 28);
-            this.tglView1.Name = "tglView1";
-            this.tglView1.Size = new System.Drawing.Size(765, 790);
-            this.tglView1.TabIndex = 0;
-            this.tglView1.MouseDown += new System.Windows.Forms.MouseEventHandler(this.tglView1_MouseDown);
-            this.tglView1.MouseMove += new System.Windows.Forms.MouseEventHandler(this.tglView1_MouseMove);
+            this.cubeView.BackColor = System.Drawing.Color.White;
+            this.cubeView.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.cubeView.Location = new System.Drawing.Point(437, 28);
+            this.cubeView.Name = "tglView1";
+            this.cubeView.Size = new System.Drawing.Size(765, 790);
+            this.cubeView.TabIndex = 0;
+            this.cubeView.MouseDown += new System.Windows.Forms.MouseEventHandler(this.OnCubeViewMouseDown);
+            this.cubeView.MouseMove += new System.Windows.Forms.MouseEventHandler(this.OnCubeViewMouseMove);
             // 
             // tRubikCubeBindingSource
             // 
@@ -454,12 +454,12 @@
             // 
             // label12
             // 
-            this.label12.AutoSize = true;
-            this.label12.Location = new System.Drawing.Point(12, 9);
-            this.label12.Name = "label12";
-            this.label12.Size = new System.Drawing.Size(74, 16);
-            this.label12.TabIndex = 33;
-            this.label12.Text = "Dimension:";
+            this.dimensionLbl.AutoSize = true;
+            this.dimensionLbl.Location = new System.Drawing.Point(12, 9);
+            this.dimensionLbl.Name = "label12";
+            this.dimensionLbl.Size = new System.Drawing.Size(74, 16);
+            this.dimensionLbl.TabIndex = 33;
+            this.dimensionLbl.Text = "Dimension:";
             // 
             // DimsBox
             // 
@@ -472,16 +472,16 @@
             0,
             0,
             0});
-            this.DimsBox.ValueChanged += new System.EventHandler(this.numericUpDown2_ValueChanged);
+            this.DimsBox.ValueChanged += new System.EventHandler(this.OnDimensionValueChanged);
             // 
             // label13
             // 
-            this.label13.AutoSize = true;
-            this.label13.Location = new System.Drawing.Point(299, 9);
-            this.label13.Name = "label13";
-            this.label13.Size = new System.Drawing.Size(94, 16);
-            this.label13.TabIndex = 35;
-            this.label13.Text = "Transparency:";
+            this.transparencyLbl.AutoSize = true;
+            this.transparencyLbl.Location = new System.Drawing.Point(299, 9);
+            this.transparencyLbl.Name = "label13";
+            this.transparencyLbl.Size = new System.Drawing.Size(94, 16);
+            this.transparencyLbl.TabIndex = 35;
+            this.transparencyLbl.Text = "Transparency:";
             //
             // gaConfigGroup
             //
@@ -763,20 +763,20 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1980, 1024);
-            this.Controls.Add(this.menuStrip1);
-            this.Controls.Add(this.panel1);
-            this.Controls.Add(this.tglView1);
+            this.Controls.Add(this.mainMenu);
+            this.Controls.Add(this.controlPanel);
+            this.Controls.Add(this.cubeView);
             this.Controls.Add(this.pictureBox1);
-            this.MainMenuStrip = this.menuStrip1;
+            this.MainMenuStrip = this.mainMenu;
             this.Name = "TRubikForm";
             this.Text = "Rubik\'s Cube";
             this.Load += new System.EventHandler(this.TRubikForm_Load);
-            this.panel1.ResumeLayout(false);
-            this.panel1.PerformLayout();
+            this.controlPanel.ResumeLayout(false);
+            this.controlPanel.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.StateBox)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.SlicesBox)).EndInit();
-            this.menuStrip1.ResumeLayout(false);
-            this.menuStrip1.PerformLayout();
+            this.mainMenu.ResumeLayout(false);
+            this.mainMenu.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.stateGridBindingSource)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.tRubikCubeBindingSource)).EndInit();
@@ -795,32 +795,32 @@
 
         #endregion
 
-        private TGL.TGLView tglView1;
+        private TGL.TGLView cubeView;
         private System.Windows.Forms.Timer MoveTimer;
-        private System.Windows.Forms.Panel panel1;
-        private System.Windows.Forms.Label label4;
-        private System.Windows.Forms.Label label3;
-        private System.Windows.Forms.Label label2;
-        private System.Windows.Forms.Button button2;
-        private System.Windows.Forms.Label label1;
-        private System.Windows.Forms.Button button1;
-        private LiveChartsCore.SkiaSharpView.WinForms.CartesianChart chart1;
+        private System.Windows.Forms.Panel controlPanel;
+        private System.Windows.Forms.Label statesValueLbl;
+        private System.Windows.Forms.Label statesLbl;
+        private System.Windows.Forms.Label errorValueLbl;
+        private System.Windows.Forms.Button shuffleBtn;
+        private System.Windows.Forms.Label timeValueLbl;
+        private System.Windows.Forms.Button solveBtn;
+        private LiveChartsCore.SkiaSharpView.WinForms.CartesianChart fitnessChart;
         private System.ComponentModel.BackgroundWorker solveWorker;
-        private System.Windows.Forms.MenuStrip menuStrip1;
+        private System.Windows.Forms.MenuStrip mainMenu;
         private System.Windows.Forms.ToolStripMenuItem fileToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem openToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem saveToolStripMenuItem;
-        private System.Windows.Forms.Label label6;
-        private System.Windows.Forms.Label label5;
-        private System.Windows.Forms.Label label8;
-        private System.Windows.Forms.Label label7;
+        private System.Windows.Forms.Label itersValueLbl;
+        private System.Windows.Forms.Label itersLbl;
+        private System.Windows.Forms.Label timeLbl;
+        private System.Windows.Forms.Label errorLbl;
         private System.Windows.Forms.PictureBox pictureBox1;
-        private System.Windows.Forms.Label label9;
+        private System.Windows.Forms.Label slicesLbl;
         private System.Windows.Forms.NumericUpDown SlicesBox;
         private System.Windows.Forms.Button PauseBtn;
         private System.Windows.Forms.Label IterTimeBox;
         private System.Windows.Forms.Label SolutionLbl;
-        private System.Windows.Forms.Label label10;
+        private System.Windows.Forms.Label solutionCountLbl;
         private System.Windows.Forms.ToolStripMenuItem saveClustersToolStripMenuItem;
         private System.Windows.Forms.OpenFileDialog openFileDialog1;
         private System.Windows.Forms.CheckBox TransparencyBox;
@@ -831,10 +831,10 @@
         private System.Windows.Forms.BindingSource stateGridBindingSource;
         private System.Windows.Forms.PictureBox StateBox;
         private System.Windows.Forms.Label MovesLbl;
-        private System.Windows.Forms.Label label11;
-        private System.Windows.Forms.Label label13;
+        private System.Windows.Forms.Label movesCountLbl;
+        private System.Windows.Forms.Label transparencyLbl;
         private System.Windows.Forms.NumericUpDown DimsBox;
-        private System.Windows.Forms.Label label12;
+        private System.Windows.Forms.Label dimensionLbl;
         private System.Windows.Forms.GroupBox gaConfigGroup;
         private System.Windows.Forms.Button resetGAConfigBtn;
         private System.Windows.Forms.Label lblSolverMode;

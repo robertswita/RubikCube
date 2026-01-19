@@ -54,32 +54,32 @@ namespace RubikCube
         public TRubikForm()
         {
             InitializeComponent();
-            //Camera = tglView1.Context.Camera;
+            //Camera = cubeView.Context.Camera;
             //Camera.Parent = Scene.Root;
             //var light = new TLight();
             //light.Parent = Camera;
             //light.Origin = new TVector(0, 0, 1);
             //TransparencyBox.Checked = true;
-            tglView1.MouseWheel += TglView1_MouseWheel;
+            cubeView.MouseWheel += TglView1_MouseWheel;
         }
 
         private void TglView1_MouseWheel(object sender, MouseEventArgs e)
         {
             Root.Rotate(Math.Min(TAffine.Planes.Length - 1, 2), (float)e.Delta / 60);
             Root.Rotate(Math.Min(TAffine.Planes.Length - 1, 3), (float)e.Delta / 60);
-            tglView1.Invalidate();
+            cubeView.Invalidate();
         }
 
         private void TRubikForm_Load(object sender, EventArgs e)
         {
-            tglView1.Context.Root = Root;
+            cubeView.Context.Root = Root;
             RubikCube = new TRubikCube();
             RubikCube.Parent = Root;
             _gaCube = new TRubikCube(); // Separate cube for GA
             LoadSolutions();
 
             // Initialize LiveCharts
-            chart1.Series = new ISeries[]
+            fitnessChart.Series = new ISeries[]
             {
                 new LineSeries<ObservableValue>
                 {
@@ -88,8 +88,8 @@ namespace RubikCube
                     GeometrySize = 0
                 }
             };
-            chart1.XAxes = new Axis[] { new Axis { Name = "Generation" } };
-            chart1.YAxes = new Axis[] { new Axis { Name = "Fitness" } };
+            fitnessChart.XAxes = new Axis[] { new Axis { Name = "Generation" } };
+            fitnessChart.YAxes = new Axis[] { new Axis { Name = "Fitness" } };
 
             // Initialize GA configuration controls
             cmbSolverMode.SelectedIndex = 0; // Iterative
@@ -101,22 +101,22 @@ namespace RubikCube
         }
 
         Point StartPos;
-        private void tglView1_MouseDown(object sender, MouseEventArgs e)
+        private void OnCubeViewMouseDown(object sender, MouseEventArgs e)
         {
             StartPos = e.Location;
         }
 
-        private void tglView1_MouseMove(object sender, MouseEventArgs e)
+        private void OnCubeViewMouseMove(object sender, MouseEventArgs e)
         {
-            tglView1.Cursor = Cursors.Hand;
+            cubeView.Cursor = Cursors.Hand;
             if (e.Button == MouseButtons.Left)
             {
                 var rot = new TVector();
-                rot.Y = -180 * (e.X - StartPos.X) / tglView1.Width;
-                rot.X = -180 * (e.Y - StartPos.Y) / tglView1.Height;
+                rot.Y = -180 * (e.X - StartPos.X) / cubeView.Width;
+                rot.X = -180 * (e.Y - StartPos.Y) / cubeView.Height;
                 Root.Rotate(1, rot.Y);
                 Root.Rotate(0, rot.X);
-                tglView1.Invalidate();
+                cubeView.Invalidate();
                 StartPos = e.Location;
             }
         }
@@ -139,7 +139,7 @@ namespace RubikCube
             ActSlice.Parent = null;
         }
 
-        private void timer1_Tick(object sender, EventArgs e)
+        private void OnMoveTimerTick(object sender, EventArgs e)
         {
             // Process moves from the queue if Moves list is empty
             if (MoveNo >= Moves.Count && Moves.Count == 0)
@@ -172,23 +172,23 @@ namespace RubikCube
                     FrameNo = 0;
                     MoveNo++;
                 }
-                tglView1.Invalidate();
+                cubeView.Invalidate();
             }
             else if (MoveNo > 0)
             {
                 MoveNo = 0;
                 Moves.Clear();
-                label2.Text = HighScore.ToString();
-                label4.Text = RubikCube.Code.Count(x => x != '\0').ToString();
+                errorValueLbl.Text = HighScore.ToString("F3");
+                statesValueLbl.Text = RubikCube.Code.Count(x => x != '\0').ToString();
                 GACount++;
-                label6.Text = GACount.ToString();
+                itersValueLbl.Text = GACount.ToString();
                 MovesLbl.Text = MovesCount.ToString();
                 StateBox.Invalidate();
             }
             else
             {
                 // No moves to process
-                label1.Text = Time.ToString();
+                timeValueLbl.Text = Time.ToString(@"hh\:mm\:ss");
 
                 // Only stop timer if GA is not running and no moves in queue
                 if (!_isGaRunning && _moveQueue.IsEmpty)
@@ -257,7 +257,7 @@ namespace RubikCube
             var token = _cts.Token;
 
             // Update UI
-            button1.Enabled = false;
+            solveBtn.Enabled = false;
 
             // Get UI values before starting background task
             var populationSize = (int)numPopulation.Value;
@@ -441,12 +441,12 @@ namespace RubikCube
                 {
                     _isGaRunning = false;
                     _solver = null;
-                    button1.Enabled = true;
+                    solveBtn.Enabled = true;
                 }));
             }
         }
 
-        private void button1_Click(object sender, EventArgs e)
+        private void OnSolveClicked(object sender, EventArgs e)
         {
             if (MoveTimer.Enabled && Moves.Count > 0) return;
             if (_isGaRunning) return;
@@ -461,7 +461,7 @@ namespace RubikCube
             StartGaBackground();
         }
 
-        private void button2_Click(object sender, EventArgs e)
+        private void OnShuffleClicked(object sender, EventArgs e)
         {
             if (MoveTimer.Enabled || _isGaRunning) return;
             IsPaused = true;
@@ -674,7 +674,7 @@ namespace RubikCube
                 RubikCube = new TRubikCube();
                 RubikCube.Parent = Root;
                 RubikCube.Code = code;
-                tglView1.Invalidate();
+                cubeView.Invalidate();
             }
         }
 
@@ -685,7 +685,7 @@ namespace RubikCube
             spaceForm.ShowDialog();
         }
 
-        private void numericUpDown1_ValueChanged(object sender, EventArgs e)
+        private void OnSlicesValueChanged(object sender, EventArgs e)
         {
             TRubikCube.Size = (int)SlicesBox.Value;
             UpdateView();
@@ -697,15 +697,15 @@ namespace RubikCube
             RubikCube = new TRubikCube();
             RubikCube.Parent = Root;
             _gaCube = new TRubikCube(); // Separate cube for GA, same initial state
-            tglView1.Context.Root = Root;
-            tglView1.Invalidate();
+            cubeView.Context.Root = Root;
+            cubeView.Invalidate();
             StateBox.Invalidate();
             Moves.Clear();
             // Clear move queue
             while (_moveQueue.TryDequeue(out _)) { }
         }
 
-        private void button3_Click_1(object sender, EventArgs e)
+        private void OnPauseClicked(object sender, EventArgs e)
         {
             IsPaused = !IsPaused;
             if (IsPaused)
@@ -714,7 +714,7 @@ namespace RubikCube
                 _cts?.Cancel();
                 _isGaRunning = false;
                 PauseBtn.BackColor = Color.Red;
-                button1.Enabled = true;
+                solveBtn.Enabled = true;
             }
             else
             {
@@ -754,7 +754,7 @@ namespace RubikCube
 
         private void TransparencyBox_CheckedChanged(object sender, EventArgs e)
         {
-            tglView1.Context.IsTransparencyOn = TransparencyBox.Checked;
+            cubeView.Context.IsTransparencyOn = TransparencyBox.Checked;
         }
 
         private void showClusterToolStripMenuItem_Click(object sender, EventArgs e)
@@ -763,7 +763,7 @@ namespace RubikCube
             //RubikCube.Parent = null;
             //RubikCube = new TRubikCube();
             //RubikCube.Parent = Root;
-            ////tglView1.Context.Root.LoadIdentity();
+            ////cubeView.Context.Root.LoadIdentity();
             //Root.Rotation = new TVector();
             //foreach (var cubie in RubikCube.Cubies)
             //{
@@ -781,9 +781,9 @@ namespace RubikCube
             //    }
             //}
             //Camera.Roll(45);
-            ////tglView1.Context.Root.RotateY(90);
+            ////cubeView.Context.Root.RotateY(90);
             //Camera.Pitch(225);
-            //tglView1.Invalidate();
+            //cubeView.Invalidate();
         }
 
         private void undoMovesToolStripMenuItem_Click(object sender, EventArgs e)
@@ -808,7 +808,7 @@ namespace RubikCube
             DisplayState(e.Graphics);
         }
 
-        private void numericUpDown2_ValueChanged(object sender, EventArgs e)
+        private void OnDimensionValueChanged(object sender, EventArgs e)
         {
             TAffine.N = (int)DimsBox.Value;
             UpdateView();
@@ -1006,13 +1006,13 @@ namespace RubikCube
             HighScore = 0;
 
             // Re-enable solve button
-            button1.Enabled = true;
+            solveBtn.Enabled = true;
 
             // Update UI
-            label2.Text = "0";
-            label1.Text = "00:00:00";
-            label4.Text = "0";
-            label6.Text = "0";
+            errorValueLbl.Text = "0.000";
+            timeValueLbl.Text = "00:00:00";
+            statesValueLbl.Text = "0";
+            itersValueLbl.Text = "0";
             MovesLbl.Text = "0";
             SolutionLbl.Text = Solutions.Count.ToString();
             _fitnessValues.Clear();

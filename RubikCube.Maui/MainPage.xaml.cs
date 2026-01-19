@@ -301,7 +301,7 @@ public partial class MainPage : ContentPage
         _fitnessValues.Clear();
 
         // Update UI
-        ErrorLabel.Text = "0";
+        ErrorLabel.Text = "0.000";
         TimeLabel.Text = "00:00:00";
         MovesLabel.Text = "0";
         SolutionLabel.Text = "0";
@@ -744,7 +744,7 @@ public partial class MainPage : ContentPage
         // Update UI on main thread
         MainThread.BeginInvokeOnMainThread(() =>
         {
-            ErrorLabel.Text = result.Fitness.ToString("F2");
+            ErrorLabel.Text = result.Fitness.ToString("F3");
             GACountLabel.Text = (++_gaCount).ToString();
             TimeLabel.Text = _time.ToString(@"hh\:mm\:ss");
         });
