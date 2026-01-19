@@ -174,6 +174,33 @@ Parametr σ (sigma) kontroluje siłę mutacji:
 
 **Implementacja:** Wykorzystuje transformację Box-Mullera do generowania liczb z rozkładu normalnego.
 
+#### HyperplaneMutation (Mutacja hyperplanarowa)
+Transformuje ruchy między różnymi hiperpłaszczyznami (3D "komórkami") w kostkach 4D+.
+
+**Struktura N-wymiarowej kostki:**
+- Kostka 3D: 6 ścian (komórki 2D)
+- Kostka 4D: 8 komórek (kostki 3D jako "ściany")
+- Kostka 5D: 10 komórek (hiperkostki 4D)
+
+**Algorytm:**
+1. Wybierz losowy gen (ruch)
+2. Przesuń oś ruchu o losowe przesunięcie: `newAxis = (axis + offset) % N`
+3. Znajdź odpowiadającą płaszczyznę rotacji dla nowej osi
+4. Zachowaj warstwę (slice) i kąt rotacji
+
+**Przykład (kostka 4D):**
+```
+Oryginalny ruch: Axis=0, Slice=1, Plane=0 (rotacja XY na warstwie 1 osi X)
+Po mutacji z offset=2: Axis=2, Slice=1, Plane=? (odpowiadająca płaszczyzna)
+```
+
+**Zachowywane właściwości:**
+- Pozycja warstwy (ta sama względna pozycja w nowej hiperpłaszczyźnie)
+- Kąt rotacji
+- Strukturalna relacja między osią a płaszczyzną (gdzie to możliwe)
+
+**Wpływ na rozwiązywanie:** Dla kostki 3D działa jak "rotacja układu współrzędnych" ruchu. Dla 4D+ eksploruje symetrie między różnymi hiperpłaszczyznami, co może pomóc w znajdowaniu rozwiązań działających w wyższych wymiarach. Szczególnie użyteczna gdy algorytm utknął w lokalnym minimum specyficznym dla jednej hiperpłaszczyzny.
+
 ---
 
 ## Operatory Krzyżowania

@@ -82,6 +82,7 @@ public static class StrategyInfo
             MutationStrategy.Translocation => new TranslocationMutation<T>(),
             MutationStrategy.Creep => new CreepMutation<T>(),
             MutationStrategy.Gaussian => new GaussianMutation<T>(),
+            MutationStrategy.Hyperplane => new HyperplaneMutation<T>(),
             _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown mutation strategy")
         };
     }

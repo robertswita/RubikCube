@@ -97,5 +97,12 @@ public enum MutationStrategy
     /// Noise magnitude determines mutation intensity.
     /// Common in evolution strategies (ES).
     /// </summary>
-    Gaussian
+    Gaussian,
+
+    /// <summary>
+    /// Hyperplane mutation - transforms moves between different hyperplanes.
+    /// For 4D+ cubes: swaps moves to analogous moves in different 3D "cells".
+    /// Exploits symmetries of N-dimensional cube structure.
+    /// </summary>
+    Hyperplane
 }

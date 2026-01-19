@@ -406,31 +406,31 @@ public class OrthogonalCommutatorMutation<T> : IMutationOperator<T>
 
 ---
 
-## Brakujące operatory specyficzne dla 4D+
+## Zaimplementowane operatory specyficzne dla 4D+
 
-### HyperplaneMutation (Mutacja hyperplanarowa)
+### HyperplaneMutation (Mutacja hyperplanarowa) ✅ ZAIMPLEMENTOWANY
+**Plik:** `GA/Operators/Mutation/HyperplaneMutation.cs`
 
-**Opis:** Zamienia ruchy między różnymi 3D "komórkami" w 4D kostce.
+**Opis:** Transformuje ruchy między różnymi 3D "komórkami" w 4D+ kostce poprzez przesunięcie osi.
 
 **Uzasadnienie:** W 4D kostka składa się z 8 komórek 3D (analogicznie jak 3D kostka ma 6 ścian 2D). Ruchy w różnych komórkach mogą mieć podobne efekty lokalne, ale różne efekty globalne.
 
-**Pseudokod:**
-```csharp
-public class HyperplaneMutation<T> : IMutationOperator<T>
-{
-    public void Mutate(T chromosome, Random rng)
-    {
-        // Wybierz ruch
-        var move = TMove.Decode((int)chromosome.Genes[idx]);
+**Algorytm:**
+1. Wybierz losowy gen (ruch) do mutacji
+2. Przesuń oś ruchu o losowe przesunięcie (1 do N-1): `newAxis = (axis + offset) % N`
+3. Znajdź odpowiadającą płaszczyznę rotacji zachowującą relację z nową osią
+4. Zachowaj warstwę (slice) i kąt rotacji
 
-        // Zamień na analogiczny ruch w innej komórce 3D
-        // (zmiana osi przy zachowaniu relacji płaszczyzna-warstwa)
-        move.Axis = (move.Axis + offset) % TAffine.N;
+**Dlaczego działa dla N wymiarów:** Operator używa `TAffine.N` do określenia zakresu osi i `TAffine.Planes` do znajdowania odpowiadających płaszczyzn. Mechanizm przesunięcia osi jest w pełni parametryczny względem N.
 
-        chromosome.Genes[idx] = move.Encode();
-    }
-}
-```
+**Kompatybilność:**
+- 3D: Działa jako "rotacja układu współrzędnych" ruchu (mniej użyteczne, ale poprawne)
+- 4D: Pełne wykorzystanie - eksploruje symetrie między 8 komórkami 3D
+- 5D+: Skaluje się automatycznie do wyższych wymiarów
+
+---
+
+## Brakujące operatory specyficzne dla 4D+
 
 ### OrthogonalConjugationMutation (Koniugacja ortogonalna)
 
@@ -628,7 +628,7 @@ Po rozszerzeniu `TMove`, następujące operatory wymagałyby aktualizacji:
 | TruncationSelection | ✅ | ✅ | ✅ | Gotowy | Top k% populacji |
 | LinearRankingSelection | ✅ | ✅ | ✅ | Gotowy | Liniowe prawdopodobieństwo |
 | ExponentialRankingSelection | ✅ | ✅ | ✅ | Gotowy | Wykładnicze prawdopodobieństwo |
-| HyperplaneMutation | - | ❌ | ❌ | Brak | Do implementacji |
+| HyperplaneMutation | ✅ | ✅ | ✅ | Gotowy | Przesunięcie osi/hiperpłaszczyzny |
 | OrthogonalConjugation | - | ❌ | ❌ | Brak | Do implementacji |
 | DoubleRotationMutation | - | ❌ | ❌ | Brak | Wymaga rozszerzenia TMove |
 
