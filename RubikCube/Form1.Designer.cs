@@ -92,6 +92,9 @@
             this.numElite = new System.Windows.Forms.NumericUpDown();
             this.lblMutationType = new System.Windows.Forms.Label();
             this.cmbMutationType = new System.Windows.Forms.ComboBox();
+            this.lblChromosomeLength = new System.Windows.Forms.Label();
+            this.numChromosomeLength = new System.Windows.Forms.NumericUpDown();
+            this.ResetBtn = new System.Windows.Forms.Button();
             this.gaConfigGroup.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numPopulation)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numMutation)).BeginInit();
