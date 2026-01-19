@@ -132,6 +132,7 @@
     <Compile Include="..\RubikCube\GA\MinimizingFitnessEvaluator.cs" Link="Core\GA\MinimizingFitnessEvaluator.cs" />
     <Compile Include="..\RubikCube\GA\RubikFitnessEvaluator.cs" Link="Core\GA\RubikFitnessEvaluator.cs" />
     <Compile Include="..\RubikCube\GA\RubikGASolver.cs" Link="Core\GA\RubikGASolver.cs" />
+    <Compile Include="..\RubikCube\GA\SolutionDatabase.cs" Link="Core\GA\SolutionDatabase.cs" />
 
     <!-- Domain logic - no changes needed -->
     <Compile Include="..\RubikCube\TMove.cs" Link="Core\TMove.cs" />

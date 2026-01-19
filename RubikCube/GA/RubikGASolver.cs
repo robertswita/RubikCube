@@ -55,6 +55,12 @@ public class RubikGASolver
     private readonly SolverConfig _solverConfig;
     private TRubikCube _cube;
     private GeneticAlgorithm<TRubikGenome>? _currentGA;
+    private TRubikGenome? _lastBest;
+
+    /// <summary>
+    /// Optional solution database for reusing previously found solutions.
+    /// </summary>
+    public SolutionDatabase? SolutionDb { get; set; }
 
     /// <summary>
     /// Raised when a new best solution is found during solving.
@@ -154,12 +160,19 @@ public class RubikGASolver
         int totalEvaluations = 0;
         double bestFitness = double.MaxValue;
         string? terminationReason = null;
+        bool trySolutions = false;
 
         while (!ct.IsCancellationRequested)
         {
             // Move to next cluster if needed
             if (bestFitness == 0 || _cube.ActiveCluster == null)
             {
+                // Save solution if we just solved a cluster with multiple cubies
+                if (bestFitness == 0 && _cube.ActiveCluster?.Count > 1 && _lastBest != null && SolutionDb != null)
+                {
+                    SolutionDb.SaveSolution(_cube.Code, _lastBest);
+                }
+
                 _cube.NextCluster();
                 if (_cube.ActiveCubie != null)
                 {
@@ -167,6 +180,7 @@ public class RubikGASolver
                 }
                 ClusterChanged?.Invoke(_cube);
                 bestFitness = double.MaxValue;
+                _lastBest = null;
             }
 
             if (_cube.ActiveCluster == null)
@@ -191,12 +205,39 @@ public class RubikGASolver
                 }
 
                 MovesReady?.Invoke(result.Moves);
+                trySolutions = true;
+            }
+
+            // Try saved solutions if we have a database
+            if (trySolutions && SolutionDb != null)
+            {
+                var solutionResult = SolutionDb.TrySolutions(_cube, bestFitness);
+                if (solutionResult != null)
+                {
+                    bestFitness = solutionResult.Fitness;
+                    allMoves.AddRange(solutionResult.Moves);
+
+                    // Apply moves to the cube
+                    foreach (var move in solutionResult.Moves)
+                    {
+                        _cube.Turn(move);
+                    }
+
+                    MovesReady?.Invoke(solutionResult.Moves);
+                }
+                trySolutions = false;
             }
 
             IterationCompleted?.Invoke(result);
 
-            if (result.IsSolved)
+            if (bestFitness == 0)
             {
+                // Save solution before moving to next cluster
+                if (_cube.ActiveCluster?.Count > 1 && _lastBest != null && SolutionDb != null)
+                {
+                    SolutionDb.SaveSolution(_cube.Code, _lastBest);
+                }
+
                 // Check if there are more clusters
                 _cube.NextCluster();
                 if (_cube.ActiveCluster == null)
@@ -206,6 +247,7 @@ public class RubikGASolver
                 }
                 ClusterChanged?.Invoke(_cube);
                 bestFitness = double.MaxValue;
+                _lastBest = null;
             }
         }
 
@@ -439,6 +481,7 @@ public class RubikGASolver
 
         ga.NewBestFound += best =>
         {
+            _lastBest = best;
             BestFound?.Invoke(best);
         };
 
@@ -449,6 +492,7 @@ public class RubikGASolver
         if (best.Fitness < double.MaxValue && best.MovesCount > 0)
         {
             moves = ExtractMoves(best);
+            _lastBest = best;
         }
 
         return new SolverResult

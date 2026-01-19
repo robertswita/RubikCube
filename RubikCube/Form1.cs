@@ -30,13 +30,13 @@ namespace RubikCube
         TimeSpan Time;
         int MovesCount;
         List<TMove> Moves = new List<TMove>();
-        Dictionary<string, List<TMove>> Solutions = new Dictionary<string, List<TMove>>();
         int MoveNo;
         double HighScore;
         public TRubikCube RubikCube;// Display cube
         public TRubikCube _gaCube; // Separate cube for GA calculations
         RubikGASolver? _solver;
         CancellationTokenSource? _cts;
+        SolutionDatabase _solutionDb;
 
         // Background thread for GA
         private Task? _gaTask;
@@ -76,7 +76,12 @@ namespace RubikCube
             RubikCube = new TRubikCube();
             RubikCube.Parent = Root;
             _gaCube = new TRubikCube(); // Separate cube for GA
-            LoadSolutions();
+
+            // Initialize solution database
+            _solutionDb = new SolutionDatabase(SolutionPath);
+            _solutionDb.Load();
+            _solutionDb.SolutionSaved += count => BeginInvoke(new Action(() => SolutionLbl.Text = count.ToString()));
+            SolutionLbl.Text = _solutionDb.Count.ToString();
 
             // Initialize LiveCharts
             fitnessChart.Series = new ISeries[]
@@ -350,7 +355,7 @@ namespace RubikCube
 
                     if (result.Fitness == 0 && _gaCube.ActiveCluster.Count > 1 && _lastBest != null)
                     {
-                        BeginInvoke(new Action(() => SaveSolution(_lastBest)));
+                        BeginInvoke(new Action(() => _solutionDb.SaveSolution(_gaCube.Code, _lastBest)));
                     }
 
                     if (result.Fitness < HighScore && result.Moves.Count > 0)
@@ -367,47 +372,20 @@ namespace RubikCube
 
                     if (TrySolutions)
                     {
-                        // Make thread-safe copies of collections before iterating
-                        var solutionsCopy = Solutions.ToList();
-                        var freeMovesCopy = TRubikGenome.FreeMoves.ToList();
-
-                        foreach (var solution in solutionsCopy)
+                        // Try saved solutions from database
+                        var solutionResult = _solutionDb.TrySolutions(_gaCube, HighScore);
+                        if (solutionResult != null)
                         {
-                            var tryMoves = DecodeSolutionThreadSafe(solution.Value, _gaCube);
-                            for (int j = -1; j < freeMovesCopy.Count; j++)
+                            HighScore = solutionResult.Fitness;
+                            // Apply moves to _gaCube AND queue them for display
+                            foreach (var m in solutionResult.Moves)
                             {
-                                var moves = new List<TMove>();
-                                if (j < 0)
-                                    moves.AddRange(tryMoves);
-                                else
-                                {
-                                    var move = TMove.Decode(freeMovesCopy[j]);
-                                    moves.Add(move);
-                                    moves.AddRange(tryMoves);
-                                    move = TMove.Decode(freeMovesCopy[j]);
-                                    move.Angle = 2 - move.Angle;
-                                    moves.Add(move);
-                                }
-                                var cube = new TRubikCube(_gaCube);
-                                foreach (var move in moves)
-                                    cube.Turn(move);
-                                var score = cube.Evaluate();
-                                if (score < HighScore)
-                                {
-                                    HighScore = score;
-                                    // Apply moves to _gaCube AND queue them for display
-                                    foreach (var m in moves)
-                                    {
-                                        _gaCube.Turn(m);
-                                        _moveQueue.Enqueue(m);
-                                    }
-                                }
+                                _gaCube.Turn(m);
+                                _moveQueue.Enqueue(m);
                             }
                         }
-                    }
-
-                    if (_moveQueue.IsEmpty)
                         TrySolutions = false;
+                    }
 
                     // Update stats
                     var elapsed = Watch.Elapsed;
@@ -485,128 +463,6 @@ namespace RubikCube
         }
 
         string SolutionPath = "solutions.bin";
-        List<TMove> DecodeSolution(List<TMove> solution)
-        {
-            var pos = RubikCube.ActiveCubie.Position;
-            var map = new List<int>();
-            var result = new List<TMove>();
-            var sliceCountInCluster = TAffine.N;
-            for (var i = 0; i < solution.Count; i++)
-            {
-                var move = solution[i];
-                if (!move.IsValid) continue;
-                var idx = map.IndexOf(move.Slice);
-                if (idx < 0)
-                {
-                    idx = map.IndexOf(TRubikCube.Size - 1 - move.Slice);
-                    if (idx < 0)
-                    {
-                        idx = map.Count;
-                        map.Add(move.Slice);
-                    }
-                    else
-                        idx += sliceCountInCluster;
-                }
-                if (idx < sliceCountInCluster)
-                    move.Slice = pos[idx];
-                else
-                    move.Slice = TRubikCube.Size - 1 - pos[idx - sliceCountInCluster];
-                result.Add(TMove.Decode(move.Encode()));
-            }
-            return result;
-        }
-
-        // Thread-safe version that takes the cube as parameter
-        List<TMove> DecodeSolutionThreadSafe(List<TMove> solution, TRubikCube cube)
-        {
-            if (cube.ActiveCubie == null) return new List<TMove>();
-            var pos = cube.ActiveCubie.Position;
-            var map = new List<int>();
-            var result = new List<TMove>();
-            var sliceCountInCluster = TAffine.N;
-            for (var i = 0; i < solution.Count; i++)
-            {
-                var move = solution[i];
-                if (!move.IsValid) continue;
-                var idx = map.IndexOf(move.Slice);
-                if (idx < 0)
-                {
-                    idx = map.IndexOf(TRubikCube.Size - 1 - move.Slice);
-                    if (idx < 0)
-                    {
-                        idx = map.Count;
-                        map.Add(move.Slice);
-                    }
-                    else
-                        idx += sliceCountInCluster;
-                }
-                if (idx < sliceCountInCluster)
-                    move.Slice = pos[idx];
-                else
-                    move.Slice = TRubikCube.Size - 1 - pos[idx - sliceCountInCluster];
-                result.Add(TMove.Decode(move.Encode()));
-            }
-            return result;
-        }
-
-        void LoadSolutions()
-        {
-            Solutions = new Dictionary<string, List<TMove>>();
-            try
-            {
-                var file = new FileStream(SolutionPath, FileMode.OpenOrCreate);
-                using (var reader = new BinaryReader(file))
-                {
-                    while (reader.BaseStream.Position != reader.BaseStream.Length)
-                    {
-                        var key = reader.ReadString();
-                        var movesCount = reader.ReadInt32();
-                        var solution = new List<TMove>();
-                        for (int i = 0; i < movesCount; i++)
-                        {
-                            var move = new TMove();
-                            move.Axis = reader.ReadByte();
-                            move.Slice = reader.ReadByte();
-                            move.Plane = reader.ReadByte();
-                            move.Angle = reader.ReadByte();
-                            solution.Add(move);
-                        }
-                        Solutions.Add(key, solution);
-                    }
-                }
-            }
-            catch (Exception) { };
-            SolutionLbl.Text = Solutions.Count.ToString();
-        }
-
-        void SaveSolution(TRubikGenome specimen)
-        {
-            var code = RubikCube.Code;
-            if (!Solutions.ContainsKey(code))
-            {
-                var solution = new List<TMove>();
-                var file = new FileStream(SolutionPath, FileMode.Append);
-                using (var writer = new BinaryWriter(file))
-                {
-                    writer.Write(code);
-                    writer.Write(specimen.MovesCount);
-                    //var genes = new List<int>(solution.MovesCount);
-                    for (int i = 0; i < specimen.MovesCount; i++)
-                    {
-                        //genes.Add((int)solution.Genes[i]);
-                        //writer.Write((int)solution.Genes[i]);
-                        var move = TMove.Decode((int)specimen.Genes[i]);
-                        writer.Write((byte)move.Axis);
-                        writer.Write((byte)move.Slice);
-                        writer.Write((byte)move.Plane);
-                        writer.Write((byte)move.Angle);
-                        solution.Add(move);
-                    }
-                    Solutions.Add(code, solution);
-                }
-            }
-            SolutionLbl.Text = Solutions.Count.ToString();
-        }
 
         private void saveToolStripMenuItem_Click(object sender, EventArgs e)
         {
@@ -1014,7 +870,7 @@ namespace RubikCube
             statesValueLbl.Text = "0";
             itersValueLbl.Text = "0";
             MovesLbl.Text = "0";
-            SolutionLbl.Text = Solutions.Count.ToString();
+            SolutionLbl.Text = _solutionDb.Count.ToString();
             _fitnessValues.Clear();
         }
 

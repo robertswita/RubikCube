@@ -44,7 +44,7 @@ public partial class MainPage : ContentPage
     private TRubikCube _rubikCube = null!;
     private TRubikCube _gaCube = null!; // Separate cube for GA calculations
     private TShape _root = new TShape();
-    private Dictionary<string, List<int>> _solutions = new();
+    private SolutionDatabase _solutionDb = null!;
 
     // Thread-safe move queue
     private readonly ConcurrentQueue<TMove> _moveQueue = new();
@@ -104,6 +104,15 @@ public partial class MainPage : ContentPage
         // Log startup
         DebugLog.Clear();
         DebugLog.WriteLine($"App started. Log path: {DebugLog.LogPath}");
+
+        // Initialize solution database
+        var solutionPath = Path.Combine(FileSystem.AppDataDirectory, "solutions.bin");
+        _solutionDb = new SolutionDatabase(solutionPath);
+        _solutionDb.Load();
+        _solutionDb.SolutionSaved += count =>
+        {
+            MainThread.BeginInvokeOnMainThread(() => SolutionLabel.Text = count.ToString());
+        };
 
         // Initialize cube
         InitializeCube();
@@ -232,7 +241,8 @@ public partial class MainPage : ContentPage
         DebugLog.WriteLine($"OnSolve: _gaCube unsolved={_gaCube.Cubies.Count(c => c.State != 0)}, " +
             $"_rubikCube unsolved={_rubikCube.Cubies.Count(c => c.State != 0)}");
 
-        LoadSolutions();
+        // Show current solution count
+        SolutionLabel.Text = _solutionDb.Count.ToString();
         StartGaBackground();
     }
 
@@ -660,8 +670,9 @@ public partial class MainPage : ContentPage
                 $"Mutation={gaConfig.MutationRate:P0}, Generations={_generationsPerIteration}");
             DebugLog.WriteLine($"Cube unsolved={_gaCube.Cubies.Count(c => c.State != 0)}");
 
-            // Create solver with the GA cube
+            // Create solver with the GA cube and solution database
             _solver = new RubikGASolver(_gaCube, gaConfig, solverConfig);
+            _solver.SolutionDb = _solutionDb;
 
             // Subscribe to solver events
             _solver.GenerationCompleted += OnGenerationCompleted;
@@ -729,17 +740,7 @@ public partial class MainPage : ContentPage
         _watch.Restart();
         _highScore = result.Fitness;
 
-        // Save solution if cluster is solved
-        if (result.IsSolved && _solver?.Cube.ActiveCluster?.Count > 1)
-        {
-            // Create a genome to save
-            var genome = new TRubikGenome { MovesCount = result.Moves.Count };
-            for (int i = 0; i < result.Moves.Count; i++)
-            {
-                genome.Genes[i] = result.Moves[i].Encode();
-            }
-            SaveSolution(genome);
-        }
+        // Solution saving is now handled by the solver via SolutionDb
 
         // Update UI on main thread
         MainThread.BeginInvokeOnMainThread(() =>
@@ -758,67 +759,6 @@ public partial class MainPage : ContentPage
             $"UnsolvedCount={cube.Cubies.Count(c => c.State != 0)}");
 
         _iterElapsed = TimeSpan.Zero;
-    }
-
-    #endregion
-
-    #region Solution Persistence
-
-    private string SolutionPath => Path.Combine(FileSystem.AppDataDirectory, "solutions.bin");
-
-    private void LoadSolutions()
-    {
-        _solutions.Clear();
-
-        try
-        {
-            if (File.Exists(SolutionPath))
-            {
-                using var reader = new BinaryReader(File.OpenRead(SolutionPath));
-                while (reader.BaseStream.Position != reader.BaseStream.Length)
-                {
-                    var key = reader.ReadString();
-                    var movesCount = reader.ReadInt32();
-                    var genes = new List<int>(movesCount);
-                    for (int i = 0; i < movesCount; i++)
-                        genes.Add(reader.ReadInt32());
-                    _solutions[key] = genes;
-                }
-            }
-        }
-        catch { /* Ignore errors */ }
-
-        SolutionLabel.Text = _solutions.Count.ToString();
-    }
-
-    private void SaveSolution(TRubikGenome solution)
-    {
-        var code = _gaCube.Code;
-        if (!_solutions.ContainsKey(code))
-        {
-            try
-            {
-                using var writer = new BinaryWriter(File.Open(SolutionPath, FileMode.Append));
-                writer.Write(code);
-                writer.Write(solution.MovesCount);
-
-                var genes = new List<int>(solution.MovesCount);
-                for (int i = 0; i < solution.MovesCount; i++)
-                {
-                    genes.Add((int)solution.Genes[i]);
-                    writer.Write(genes[i]);
-                }
-                _solutions[code] = genes;
-            }
-            catch { /* Ignore errors */ }
-        }
-
-        // Update UI on main thread
-        var count = _solutions.Count;
-        MainThread.BeginInvokeOnMainThread(() =>
-        {
-            SolutionLabel.Text = count.ToString();
-        });
     }
 
     #endregion
