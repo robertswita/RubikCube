@@ -168,6 +168,8 @@ public static class StrategyInfo
     {
         SelectionStrategy.RouletteRank => "Roulette Rank",
         SelectionStrategy.StochasticUniversalSampling => "SUS",
+        SelectionStrategy.LinearRanking => "Linear Rank",
+        SelectionStrategy.ExponentialRanking => "Exp. Rank",
         _ => strategy.ToString()
     };
 
@@ -206,6 +208,9 @@ public static class StrategyInfo
             SelectionStrategy.Unique => new UniqueSelection<T>(),
             SelectionStrategy.StochasticUniversalSampling => new SUSSelection<T>(),
             SelectionStrategy.Boltzmann => new BoltzmannSelection<T>(config?.BoltzmannTemperature ?? 10.0),
+            SelectionStrategy.Truncation => new TruncationSelection<T>(config?.TruncationRate ?? 0.5),
+            SelectionStrategy.LinearRanking => new LinearRankingSelection<T>(config?.LinearRankingPressure ?? 1.5),
+            SelectionStrategy.ExponentialRanking => new ExponentialRankingSelection<T>(config?.ExponentialRankingBase ?? 0.99),
             _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown selection strategy")
         };
     }

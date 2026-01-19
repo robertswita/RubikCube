@@ -50,6 +50,28 @@ public record GAConfig
     /// </summary>
     public double BoltzmannTemperature { get; init; } = 10.0;
 
+    /// <summary>
+    /// Truncation rate for Truncation selection (0.0 to 1.0).
+    /// Only the top TruncationRate% of population are eligible for selection.
+    /// Default 0.5 means top 50% can be selected.
+    /// </summary>
+    public double TruncationRate { get; init; } = 0.5;
+
+    /// <summary>
+    /// Selection pressure for Linear Ranking selection (1.0 to 2.0).
+    /// 1.0 = uniform selection, 2.0 = maximum linear pressure.
+    /// Default 1.5 provides moderate pressure.
+    /// </summary>
+    public double LinearRankingPressure { get; init; } = 1.5;
+
+    /// <summary>
+    /// Base for Exponential Ranking selection (0.0 to 1.0).
+    /// Higher values = less decay = more uniform selection.
+    /// Lower values = steeper decay = stronger pressure on top individuals.
+    /// Default 0.99 provides good balance.
+    /// </summary>
+    public double ExponentialRankingBase { get; init; } = 0.99;
+
     #endregion
 
     #region Crossover Settings

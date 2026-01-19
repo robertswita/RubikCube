@@ -38,5 +38,20 @@ public enum SelectionStrategy
     /// <summary>
     /// Boltzmann selection - temperature-based probability, good for simulated annealing hybrid.
     /// </summary>
-    Boltzmann
+    Boltzmann,
+
+    /// <summary>
+    /// Truncation selection - only top k% of population are eligible for selection.
+    /// </summary>
+    Truncation,
+
+    /// <summary>
+    /// Linear ranking selection - probability linearly proportional to rank.
+    /// </summary>
+    LinearRanking,
+
+    /// <summary>
+    /// Exponential ranking selection - probability exponentially proportional to rank.
+    /// </summary>
+    ExponentialRanking
 }

@@ -106,6 +106,9 @@
     <Compile Include="..\RubikCube\GA\Operators\Selection\UniqueSelection.cs" Link="Core\GA\Operators\Selection\UniqueSelection.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Selection\SUSSelection.cs" Link="Core\GA\Operators\Selection\SUSSelection.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Selection\BoltzmannSelection.cs" Link="Core\GA\Operators\Selection\BoltzmannSelection.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Selection\TruncationSelection.cs" Link="Core\GA\Operators\Selection\TruncationSelection.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Selection\LinearRankingSelection.cs" Link="Core\GA\Operators\Selection\LinearRankingSelection.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Selection\ExponentialRankingSelection.cs" Link="Core\GA\Operators\Selection\ExponentialRankingSelection.cs" />
 
     <Compile Include="..\RubikCube\GA\Operators\Crossover\SinglePointCrossover.cs" Link="Core\GA\Operators\Crossover\SinglePointCrossover.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Crossover\TwoPointCrossover.cs" Link="Core\GA\Operators\Crossover\TwoPointCrossover.cs" />
