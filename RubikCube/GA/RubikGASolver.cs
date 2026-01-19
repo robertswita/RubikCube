@@ -252,8 +252,9 @@ public class RubikGASolver
 
             ClusterChanged?.Invoke(_cube);
 
-            // Set static chromosome length (required by TChromosome)
+            // Set static chromosome properties (required by TChromosome/TRubikGenome)
             TChromosome.GenesLength = _gaConfig.GenomeLength;
+            TRubikGenome.FreeMoves = _cube.GetFreeMoves();
 
             var evaluator = new RubikFitnessEvaluator(_cube);
             var ga = new GeneticAlgorithm<TRubikGenome>(config, evaluator);
@@ -419,8 +420,9 @@ public class RubikGASolver
             }
         };
 
-        // Set static chromosome length (required by TChromosome)
+        // Set static chromosome properties (required by TChromosome/TRubikGenome)
         TChromosome.GenesLength = _gaConfig.GenomeLength;
+        TRubikGenome.FreeMoves = _cube.GetFreeMoves();
 
         var evaluator = new RubikFitnessEvaluator(_cube);
         var ga = new GeneticAlgorithm<TRubikGenome>(config, evaluator);

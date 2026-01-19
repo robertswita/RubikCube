@@ -14,16 +14,21 @@ namespace RubikCube.Maui;
 
 public static class DebugLog
 {
-    // Save to app data directory
-    public static readonly string LogPath = Path.Combine(FileSystem.AppDataDirectory, "debug.log");
+    // Save to fixed path for easier debugging
+    public static readonly string LogPath = "/Users/mateusz.kosikowski/Projects/RubikCube/debug_new.log";
 
     public static void WriteLine(string message)
     {
         try
         {
-            File.AppendAllText(LogPath, $"{DateTime.Now:HH:mm:ss.fff} {message}\n");
+            var line = $"{DateTime.Now:HH:mm:ss.fff} {message}\n";
+            File.AppendAllText(LogPath, line);
+            Console.Write(line);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Log error: {ex.Message}");
+        }
     }
 
     public static void Clear()
@@ -198,6 +203,8 @@ public partial class MainPage : ContentPage
 
     private void OnSolveClicked(object? sender, EventArgs e)
     {
+        DebugLog.WriteLine($"OnSolveClicked called, _isGaRunning={_isGaRunning}");
+
         if (_isGaRunning) return;
 
         // Reset statistics but don't touch animation - it can continue
@@ -206,7 +213,6 @@ public partial class MainPage : ContentPage
         _gaCount = 0;
         _highScore = 0;
         _fitnessValues.Clear();
-        DebugLog.Clear(); // Clear previous log
 
         // Debug: log cube state before solving
         DebugLog.WriteLine($"OnSolve: _gaCube unsolved={_gaCube.Cubies.Count(c => c.State != 0)}, " +
@@ -419,6 +425,8 @@ public partial class MainPage : ContentPage
 
     private void StartGaBackground()
     {
+        DebugLog.WriteLine("StartGaBackground called");
+
         if (_isGaRunning) return;
 
         _isGaRunning = true;
@@ -436,37 +444,43 @@ public partial class MainPage : ContentPage
         if (_moveTimer?.IsRunning != true)
             _moveTimer?.Start();
 
+        DebugLog.WriteLine("Starting background task");
+
         // Run GA on background thread
         _gaTask = Task.Run(() => RunGaLoop(token), token);
     }
 
     private void RunGaLoop(CancellationToken token)
     {
+        DebugLog.WriteLine("RunGaLoop started");
         _watch = Stopwatch.StartNew();
-
-        // Configure GA using presets (matches original TGA behavior)
-        var gaConfig = GAPresets.Default with
-        {
-            GenomeLength = 30
-        };
-
-        var solverConfig = new SolverConfig
-        {
-            Mode = SolverMode.Iterative,
-            GenerationsPerIteration = 100
-        };
-
-        // Create solver with the GA cube
-        _solver = new RubikGASolver(_gaCube, gaConfig, solverConfig);
-
-        // Subscribe to solver events
-        _solver.GenerationCompleted += OnGenerationCompleted;
-        _solver.MovesReady += OnMovesReady;
-        _solver.IterationCompleted += OnIterationCompleted;
-        _solver.ClusterChanged += OnClusterChanged;
 
         try
         {
+            // Configure GA using presets (matches original TGA behavior)
+            var gaConfig = GAPresets.Default with
+            {
+                GenomeLength = 30
+            };
+
+            var solverConfig = new SolverConfig
+            {
+                Mode = SolverMode.Iterative,
+                GenerationsPerIteration = 100
+            };
+
+            DebugLog.WriteLine($"Creating solver. Cube unsolved={_gaCube.Cubies.Count(c => c.State != 0)}");
+
+            // Create solver with the GA cube
+            _solver = new RubikGASolver(_gaCube, gaConfig, solverConfig);
+
+            // Subscribe to solver events
+            _solver.GenerationCompleted += OnGenerationCompleted;
+            _solver.MovesReady += OnMovesReady;
+            _solver.IterationCompleted += OnIterationCompleted;
+            _solver.ClusterChanged += OnClusterChanged;
+
+            DebugLog.WriteLine("Starting solver.Solve()");
             var result = _solver.Solve(token);
 
             DebugLog.WriteLine($"Solver completed: {result.TerminationReason}, " +
@@ -475,6 +489,11 @@ public partial class MainPage : ContentPage
         catch (OperationCanceledException)
         {
             DebugLog.WriteLine("Solver cancelled");
+        }
+        catch (Exception ex)
+        {
+            DebugLog.WriteLine($"Solver exception: {ex.GetType().Name}: {ex.Message}");
+            DebugLog.WriteLine($"Stack trace: {ex.StackTrace}");
         }
 
         // GA finished or cancelled
