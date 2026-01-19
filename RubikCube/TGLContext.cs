@@ -19,6 +19,11 @@ namespace TGL
         public TShape Root = new TShape();
         public TAffine Transform = new TAffine();
 
+        /// <summary>
+        /// Scale factor for the cube rendering. Default is 0.5 (half size).
+        /// </summary>
+        public float Scale = 0.5f;
+
         // Shader program
         private int _shaderProgram;
         private int _vao;
@@ -170,8 +175,10 @@ void main()
             GL.UseProgram(_shaderProgram);
 
             // Set MVP matrix (simple orthographic projection for now)
+            // Scale controls the cube size - smaller scale = larger cube, larger scale = smaller cube
             float aspect = (float)Viewport.Width / Viewport.Height;
-            var projection = Matrix4.CreateOrthographic(2f * aspect, 2f, -100f, 100f);
+            float orthoSize = 2f / Scale; // Inverse scale: 0.5 scale = 4f ortho size = half-size cube
+            var projection = Matrix4.CreateOrthographic(orthoSize * aspect, orthoSize, -100f, 100f);
             GL.UniformMatrix4(_mvpLocation, false, ref projection);
 
             // Draw

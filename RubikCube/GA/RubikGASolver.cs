@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using GA;
 using RubikCube;
+using TGL;
 using TGL.GA.Configuration;
 using TGL.GA.Interfaces;
 
@@ -170,7 +171,14 @@ public class RubikGASolver
                 // Save solution if we just solved a cluster with multiple cubies
                 if (bestFitness == 0 && _cube.ActiveCluster?.Count > 1 && _lastBest != null && SolutionDb != null)
                 {
-                    SolutionDb.SaveSolution(_cube.Code, _lastBest);
+                    try
+                    {
+                        SolutionDb.SaveSolution(_cube.Code, _lastBest);
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLog.WriteLine($"Error saving solution: {ex.Message}");
+                    }
                 }
 
                 _cube.NextCluster();
@@ -178,7 +186,12 @@ public class RubikGASolver
                 {
                     TRubikGenome.FreeMoves = _cube.GetFreeMoves();
                 }
-                ClusterChanged?.Invoke(_cube);
+
+                // Only invoke ClusterChanged if there's a valid cluster
+                if (_cube.ActiveCluster != null)
+                {
+                    ClusterChanged?.Invoke(_cube);
+                }
                 bestFitness = double.MaxValue;
                 _lastBest = null;
             }
@@ -235,7 +248,14 @@ public class RubikGASolver
                 // Save solution before moving to next cluster
                 if (_cube.ActiveCluster?.Count > 1 && _lastBest != null && SolutionDb != null)
                 {
-                    SolutionDb.SaveSolution(_cube.Code, _lastBest);
+                    try
+                    {
+                        SolutionDb.SaveSolution(_cube.Code, _lastBest);
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLog.WriteLine($"Error saving solution: {ex.Message}");
+                    }
                 }
 
                 // Check if there are more clusters
@@ -244,6 +264,11 @@ public class RubikGASolver
                 {
                     terminationReason = "All clusters solved";
                     break;
+                }
+
+                if (_cube.ActiveCubie != null)
+                {
+                    TRubikGenome.FreeMoves = _cube.GetFreeMoves();
                 }
                 ClusterChanged?.Invoke(_cube);
                 bestFitness = double.MaxValue;

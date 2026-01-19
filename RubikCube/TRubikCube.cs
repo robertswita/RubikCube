@@ -164,17 +164,22 @@ namespace RubikCube
 
         public double Evaluate()
         {
+            // Handle case when there's no active cluster (cube is solved or not initialized)
+            if (ActiveCluster == null || ActiveCluster.Count == 0)
+            {
+                // Check if all cubies are solved
+                var unsolvedCount = Cubies?.Count(c => c.State != 0) ?? 0;
+                return unsolvedCount == 0 ? 0 : unsolvedCount * 100;
+            }
+
             var score = 0d;
             double maxClusterState = (1 << 2 * TAffine.Planes.Length) * ActiveCluster.Count;
             foreach (var cubie in SolvedCubies)
                 if (cubie.State != 0)
                     score += ActiveCluster.Count + 1;
-                    //score += maxState + cubie.State;
-                    //score += (1 + cubie.Score) * ActiveCluster.Count;
             foreach (var cubie in ActiveCluster)
                 if (cubie.State != 0)
                     score += 1 + cubie.State / maxClusterState;
-                    //score += maxState + cubie.State;
             return 100 * score / (ActiveCluster.Count + 1);
         }
 

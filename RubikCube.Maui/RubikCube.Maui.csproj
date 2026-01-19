@@ -135,6 +135,9 @@
     <Compile Include="..\RubikCube\GA\RubikGASolver.cs" Link="Core\GA\RubikGASolver.cs" />
     <Compile Include="..\RubikCube\GA\SolutionDatabase.cs" Link="Core\GA\SolutionDatabase.cs" />
 
+    <!-- Shared utilities -->
+    <Compile Include="..\RubikCube\DebugLog.cs" Link="Core\DebugLog.cs" />
+
     <!-- Domain logic - no changes needed -->
     <Compile Include="..\RubikCube\TMove.cs" Link="Core\TMove.cs" />
     <Compile Include="..\RubikCube\TCubie.cs" Link="Core\TCubie.cs" />

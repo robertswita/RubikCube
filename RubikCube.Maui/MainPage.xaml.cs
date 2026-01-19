@@ -12,31 +12,6 @@ using TGL.GA.Configuration;
 
 namespace RubikCube.Maui;
 
-public static class DebugLog
-{
-    // Save to fixed path for easier debugging
-    public static readonly string LogPath = "/Users/mateusz.kosikowski/Projects/RubikCube/debug_new.log";
-
-    public static void WriteLine(string message)
-    {
-        try
-        {
-            var line = $"{DateTime.Now:HH:mm:ss.fff} {message}\n";
-            File.AppendAllText(LogPath, line);
-            Console.Write(line);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Log error: {ex.Message}");
-        }
-    }
-
-    public static void Clear()
-    {
-        try { File.Delete(LogPath); } catch { }
-    }
-}
-
 public partial class MainPage : ContentPage
 {
     // GA and cube state
@@ -103,6 +78,7 @@ public partial class MainPage : ContentPage
         BindingContext = this;
 
         // Log startup
+        DebugLog.ApplicationType = AppType.Maui;
         DebugLog.Clear();
         DebugLog.WriteLine($"App started. Log path: {DebugLog.LogPath}");
 
@@ -142,7 +118,11 @@ public partial class MainPage : ContentPage
 
         // Initialize GA configuration UI
         SolverModePicker.SelectedIndex = 0; // Iterative
-        PresetPicker.SelectedIndex = 0; // Default
+
+        // Select the last used preset
+        var lastUsedIndex = _presetManager.GetIndex(_presetManager.LastUsedPreset);
+        PresetPicker.SelectedIndex = lastUsedIndex >= 0 ? lastUsedIndex : 0;
+
         SelectionPicker.SelectedIndex = 0; // Unique
         CrossoverPicker.SelectedIndex = 0; // SinglePoint
         MutationPicker.SelectedIndex = 0; // SingleGene
@@ -496,6 +476,7 @@ public partial class MainPage : ContentPage
         if (PresetPicker.SelectedItem is string presetName)
         {
             _selectedGAConfig = _presetManager.GetConfig(presetName);
+            _presetManager.LastUsedPreset = presetName;
         }
 
         // Update sliders to match preset

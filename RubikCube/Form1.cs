@@ -73,6 +73,10 @@ namespace RubikCube
 
         private void TRubikForm_Load(object sender, EventArgs e)
         {
+            // Initialize logging
+            DebugLog.Clear();
+            DebugLog.WriteLine($"App started. Log path: {DebugLog.LogPath}");
+
             cubeView.Context.Root = Root;
             RubikCube = new TRubikCube();
             RubikCube.Parent = Root;
@@ -105,7 +109,11 @@ namespace RubikCube
 
             // Initialize GA configuration controls
             cmbSolverMode.SelectedIndex = 0; // Iterative
-            cmbPreset.SelectedIndex = 0; // Default
+
+            // Select the last used preset
+            var lastUsedIndex = _presetManager.GetIndex(_presetManager.LastUsedPreset);
+            cmbPreset.SelectedIndex = lastUsedIndex >= 0 ? lastUsedIndex : 0;
+
             cmbSelection.SelectedIndex = 0; // Unique
             cmbCrossover.SelectedIndex = 0; // SinglePoint
             cmbMutationType.SelectedIndex = 0; // SingleGene
@@ -280,9 +288,6 @@ namespace RubikCube
             _cts = new CancellationTokenSource();
             var token = _cts.Token;
 
-            // Update UI
-            solveBtn.Enabled = false;
-
             // Get UI values before starting background task
             var populationSize = (int)numPopulation.Value;
             var mutationRate = (double)numMutation.Value / 100.0;
@@ -302,6 +307,7 @@ namespace RubikCube
 
         void RunGaLoop(CancellationToken token, int populationSize, double mutationRate, int eliteCount, int genomeLength, int maxGenerations, SolverMode solverMode, GAConfig baseConfig)
         {
+            DebugLog.WriteLine($"RunGaLoop started: Population={populationSize}, Mutation={mutationRate:P0}, Mode={solverMode}");
             Watch = Stopwatch.StartNew();
             IterElapsed = TimeSpan.Zero;
 
@@ -326,6 +332,8 @@ namespace RubikCube
                     GenerationsPerIteration = maxGenerations
                 };
 
+                DebugLog.WriteLine($"Creating solver. Cube unsolved={_gaCube?.Cubies?.Count(c => c.State != 0) ?? -1}");
+
                 // Create solver once - it handles everything internally
                 _solver = new RubikGASolver(_gaCube, gaConfig, solverConfig);
                 _solver.SolutionDb = _solutionDb;
@@ -333,78 +341,137 @@ namespace RubikCube
                 // Subscribe to events
                 _solver.GenerationCompleted += state =>
                 {
-                    if (state.Best != null)
+                    try
                     {
-                        var elapsed = Watch?.Elapsed ?? TimeSpan.Zero;
-                        var fitness = state.Best.Fitness;
-                        BeginInvoke(new Action(() => OnProgressThreadSafe(fitness, elapsed)));
+                        if (state?.Best != null)
+                        {
+                            var elapsed = Watch?.Elapsed ?? TimeSpan.Zero;
+                            var fitness = state.Best.Fitness;
+                            BeginInvoke(new Action(() => OnProgressThreadSafe(fitness, elapsed)));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLog.WriteLine($"Error in GenerationCompleted: {ex.Message}");
                     }
                 };
 
                 _solver.MovesReady += moves =>
                 {
-                    // Queue moves for display cube animation
-                    foreach (var move in moves)
-                        _moveQueue.Enqueue(move);
-
-                    // Wait for animation to catch up
-                    while (!_moveQueue.IsEmpty && !token.IsCancellationRequested)
+                    try
                     {
-                        Thread.Sleep(50);
+                        if (moves == null) return;
+                        // Queue moves for display cube animation
+                        foreach (var move in moves)
+                            _moveQueue.Enqueue(move);
+
+                        // Wait for animation to catch up
+                        while (!_moveQueue.IsEmpty && !token.IsCancellationRequested)
+                        {
+                            Thread.Sleep(50);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLog.WriteLine($"Error in MovesReady: {ex.Message}");
                     }
                 };
 
                 _solver.IterationCompleted += result =>
                 {
-                    var elapsed = Watch.Elapsed;
-                    BeginInvoke(new Action(() =>
+                    try
                     {
-                        MovesCount += result.Moves.Count;
-                        Time = elapsed;
-                        HighScore = result.Fitness;
-                    }));
+                        if (result == null) return;
+                        var elapsed = Watch?.Elapsed ?? TimeSpan.Zero;
+                        BeginInvoke(new Action(() =>
+                        {
+                            MovesCount += result.Moves?.Count ?? 0;
+                            Time = elapsed;
+                            HighScore = result.Fitness;
+                        }));
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLog.WriteLine($"Error in IterationCompleted: {ex.Message}");
+                    }
                 };
 
                 _solver.ClusterChanged += cube =>
                 {
-                    // Cluster changed - reset high score for new cluster
-                    HighScore = cube.Evaluate();
+                    try
+                    {
+                        if (cube == null) return;
+                        // Cluster changed - reset high score for new cluster
+                        HighScore = cube.Evaluate();
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLog.WriteLine($"Error in ClusterChanged: {ex.Message}");
+                    }
                 };
 
                 // Run solver - handles clusters, TrySolutions, everything
+                DebugLog.WriteLine("Starting solver.Solve()");
                 var finalResult = _solver.Solve(token);
+                DebugLog.WriteLine($"Solver completed: {finalResult?.TerminationReason ?? "null"}, Fitness={finalResult?.Fitness ?? -1}, TotalGenerations={finalResult?.TotalGenerations ?? -1}");
             }
             catch (OperationCanceledException)
             {
-                // GA was cancelled
+                DebugLog.WriteLine("Solver cancelled");
             }
             catch (Exception ex)
             {
-                BeginInvoke(new Action(() => MessageBox.Show($"GA Error: {ex.Message}")));
+                DebugLog.WriteException("RunGaLoop exception", ex);
+                var errorMsg = $"GA Error: {ex.Message}\n\nStack trace:\n{ex.StackTrace}";
+                if (ex.InnerException != null)
+                {
+                    errorMsg += $"\n\nInner exception: {ex.InnerException.Message}\n{ex.InnerException.StackTrace}";
+                }
+                BeginInvoke(new Action(() => MessageBox.Show(errorMsg, "GA Error", MessageBoxButtons.OK, MessageBoxIcon.Error)));
             }
             finally
             {
+                DebugLog.WriteLine("RunGaLoop finally block entered");
                 // GA finished or cancelled - update UI on UI thread
-                BeginInvoke(new Action(() =>
+                try
                 {
-                    _isGaRunning = false;
-                    _solver = null;
-                    solveBtn.Enabled = true;
-                }));
+                    BeginInvoke(new Action(() =>
+                    {
+                        DebugLog.WriteLine("RunGaLoop finally: updating UI");
+                        _isGaRunning = false;
+                        _solver = null;
+                        solveBtn.Enabled = true;
+                        solveBtn.Text = "▶ Solve";
+                        solveBtn.BackColor = DefaultBackColor;
+                        DebugLog.WriteLine("RunGaLoop finally: UI updated");
+                    }));
+                }
+                catch (Exception finallyEx)
+                {
+                    DebugLog.WriteException("Error in finally block", finallyEx);
+                }
+                DebugLog.WriteLine("RunGaLoop finally block completed");
             }
         }
 
         private void OnSolveClicked(object sender, EventArgs e)
         {
-            if (MoveTimer.Enabled && Moves.Count > 0) return;
-            if (_isGaRunning) return;
+            DebugLog.WriteLine($"OnSolveClicked: _isGaRunning={_isGaRunning}");
 
+            if (_isGaRunning) return;
+            if (MoveTimer.Enabled && Moves.Count > 0) return;
+
+            // Start solving
+            DebugLog.WriteLine("OnSolveClicked: starting GA");
             MovesCount = 0;
             Time = TimeSpan.Zero;
             GACount = 0;
-            IsPaused = false;
             HighScore = 0;
             _fitnessValues.Clear();
+
+            // Disable button and show "Running"
+            solveBtn.Text = "Running...";
+            solveBtn.Enabled = false;
 
             StartGaBackground();
         }
@@ -532,26 +599,6 @@ namespace RubikCube
             while (_moveQueue.TryDequeue(out _)) { }
         }
 
-        private void OnPauseClicked(object sender, EventArgs e)
-        {
-            IsPaused = !IsPaused;
-            if (IsPaused)
-            {
-                // Stop GA
-                _cts?.Cancel();
-                _isGaRunning = false;
-                PauseBtn.BackColor = Color.Red;
-                solveBtn.Enabled = true;
-            }
-            else
-            {
-                PauseBtn.BackColor = DefaultBackColor;
-                _fitnessValues.Clear();
-                // Resume by starting GA again
-                StartGaBackground();
-            }
-        }
-
         private void OnClearSolutionsClicked(object sender, EventArgs e)
         {
             if (_isGaRunning) return;
@@ -676,6 +723,7 @@ namespace RubikCube
             if (cmbPreset.SelectedItem is string presetName)
             {
                 _selectedGAConfig = _presetManager.GetConfig(presetName);
+                _presetManager.LastUsedPreset = presetName;
             }
 
             // Update UI controls to match preset
@@ -892,8 +940,10 @@ namespace RubikCube
             GACount = 0;
             HighScore = 0;
 
-            // Re-enable solve button
+            // Reset solve button state
             solveBtn.Enabled = true;
+            solveBtn.Text = "▶ Solve";
+            solveBtn.BackColor = DefaultBackColor;
 
             // Update UI
             errorValueLbl.Text = "0.000";

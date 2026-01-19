@@ -80,6 +80,15 @@ public class GAConfigData
 }
 
 /// <summary>
+/// Data structure for persisting presets and settings to JSON.
+/// </summary>
+public class PresetStorage
+{
+    public List<NamedPreset> CustomPresets { get; set; } = new();
+    public string LastUsedPreset { get; set; } = "Default";
+}
+
+/// <summary>
 /// Manages GA presets including built-in defaults and user-defined presets.
 /// Persists custom presets to JSON file.
 /// </summary>
@@ -87,6 +96,7 @@ public class PresetManager
 {
     private readonly string _filePath;
     private readonly List<NamedPreset> _presets = new();
+    private string _lastUsedPreset = "Default";
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -102,6 +112,22 @@ public class PresetManager
     /// Gets all available presets (built-in and custom).
     /// </summary>
     public IReadOnlyList<NamedPreset> Presets => _presets;
+
+    /// <summary>
+    /// Gets or sets the last used preset name.
+    /// </summary>
+    public string LastUsedPreset
+    {
+        get => _lastUsedPreset;
+        set
+        {
+            if (_lastUsedPreset != value)
+            {
+                _lastUsedPreset = value;
+                Save();
+            }
+        }
+    }
 
     /// <summary>
     /// Gets preset names for UI binding.
@@ -173,11 +199,18 @@ public class PresetManager
             if (!File.Exists(_filePath)) return;
 
             var json = File.ReadAllText(_filePath);
-            var customPresets = JsonSerializer.Deserialize<List<NamedPreset>>(json, JsonOptions);
+            var storage = JsonSerializer.Deserialize<PresetStorage>(json, JsonOptions);
 
-            if (customPresets != null)
+            if (storage != null)
             {
-                foreach (var preset in customPresets)
+                // Load last used preset
+                if (!string.IsNullOrEmpty(storage.LastUsedPreset))
+                {
+                    _lastUsedPreset = storage.LastUsedPreset;
+                }
+
+                // Load custom presets
+                foreach (var preset in storage.CustomPresets)
                 {
                     preset.IsBuiltIn = false;
                     // Don't add if name already exists
@@ -195,14 +228,18 @@ public class PresetManager
     }
 
     /// <summary>
-    /// Saves custom presets to the JSON file.
+    /// Saves custom presets and settings to the JSON file.
     /// </summary>
     public void Save()
     {
         try
         {
-            var customPresets = _presets.FindAll(p => !p.IsBuiltIn);
-            var json = JsonSerializer.Serialize(customPresets, JsonOptions);
+            var storage = new PresetStorage
+            {
+                CustomPresets = _presets.FindAll(p => !p.IsBuiltIn),
+                LastUsedPreset = _lastUsedPreset
+            };
+            var json = JsonSerializer.Serialize(storage, JsonOptions);
             File.WriteAllText(_filePath, json);
         }
         catch (Exception)

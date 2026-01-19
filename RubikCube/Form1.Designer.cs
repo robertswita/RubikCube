@@ -39,7 +39,6 @@
             this.solutionCountLbl = new System.Windows.Forms.Label();
             this.clearSolutionsBtn = new System.Windows.Forms.Button();
             this.IterTimeBox = new System.Windows.Forms.Label();
-            this.PauseBtn = new System.Windows.Forms.Button();
             this.slicesLbl = new System.Windows.Forms.Label();
             this.SlicesBox = new System.Windows.Forms.NumericUpDown();
             this.shuffleLbl = new System.Windows.Forms.Label();
@@ -134,7 +133,6 @@
             this.controlPanel.Controls.Add(this.clearSolutionsBtn);
             this.controlPanel.Controls.Add(this.solutionCountLbl);
             this.controlPanel.Controls.Add(this.IterTimeBox);
-            this.controlPanel.Controls.Add(this.PauseBtn);
             this.controlPanel.Controls.Add(this.slicesLbl);
             this.controlPanel.Controls.Add(this.SlicesBox);
             this.controlPanel.Controls.Add(this.shuffleLbl);
@@ -231,24 +229,15 @@
             this.IterTimeBox.Size = new System.Drawing.Size(56, 16);
             this.IterTimeBox.TabIndex = 26;
             this.IterTimeBox.Text = "Iter time:";
-            // 
-            // PauseBtn
-            // 
-            this.PauseBtn.Location = new System.Drawing.Point(239, 37);
-            this.PauseBtn.Name = "PauseBtn";
-            this.PauseBtn.Size = new System.Drawing.Size(90, 39);
-            this.PauseBtn.TabIndex = 23;
-            this.PauseBtn.Text = "Pause";
-            this.PauseBtn.UseVisualStyleBackColor = true;
-            this.PauseBtn.Click += new System.EventHandler(this.OnPauseClicked);
             //
             // ResetBtn
             //
-            this.ResetBtn.Location = new System.Drawing.Point(335, 37);
+            this.ResetBtn.Location = new System.Drawing.Point(239, 37);
             this.ResetBtn.Name = "ResetBtn";
-            this.ResetBtn.Size = new System.Drawing.Size(90, 39);
+            this.ResetBtn.Size = new System.Drawing.Size(60, 39);
             this.ResetBtn.TabIndex = 37;
-            this.ResetBtn.Text = "Reset";
+            this.ResetBtn.Text = "↺";
+            this.ResetBtn.Font = new System.Drawing.Font("Segoe UI", 16F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
             this.ResetBtn.UseVisualStyleBackColor = true;
             this.ResetBtn.Click += new System.EventHandler(this.ResetBtn_Click);
             //
@@ -362,14 +351,15 @@
             this.errorValueLbl.Size = new System.Drawing.Size(44, 16);
             this.errorValueLbl.TabIndex = 11;
             this.errorValueLbl.Text = "0.000";
-            // 
-            // button2
-            // 
+            //
+            // shuffleBtn
+            //
             this.shuffleBtn.Location = new System.Drawing.Point(16, 37);
-            this.shuffleBtn.Name = "button2";
-            this.shuffleBtn.Size = new System.Drawing.Size(89, 39);
+            this.shuffleBtn.Name = "shuffleBtn";
+            this.shuffleBtn.Size = new System.Drawing.Size(60, 39);
             this.shuffleBtn.TabIndex = 10;
-            this.shuffleBtn.Text = "Shuffle";
+            this.shuffleBtn.Text = "🔀";
+            this.shuffleBtn.Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
             this.shuffleBtn.UseVisualStyleBackColor = true;
             this.shuffleBtn.Click += new System.EventHandler(this.OnShuffleClicked);
             // 
@@ -381,14 +371,15 @@
             this.timeValueLbl.Size = new System.Drawing.Size(44, 16);
             this.timeValueLbl.TabIndex = 9;
             this.timeValueLbl.Text = "00:00:00";
-            // 
-            // button1
-            // 
-            this.solveBtn.Location = new System.Drawing.Point(125, 37);
-            this.solveBtn.Name = "button1";
-            this.solveBtn.Size = new System.Drawing.Size(90, 39);
+            //
+            // solveBtn
+            //
+            this.solveBtn.Location = new System.Drawing.Point(96, 37);
+            this.solveBtn.Name = "solveBtn";
+            this.solveBtn.Size = new System.Drawing.Size(120, 39);
             this.solveBtn.TabIndex = 8;
-            this.solveBtn.Text = "Solve!";
+            this.solveBtn.Text = "▶ Solve";
+            this.solveBtn.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
             this.solveBtn.UseVisualStyleBackColor = true;
             this.solveBtn.Click += new System.EventHandler(this.OnSolveClicked);
             // 
@@ -554,11 +545,12 @@
             //
             // resetGAConfigBtn
             //
-            this.resetGAConfigBtn.Location = new System.Drawing.Point(280, 18);
+            this.resetGAConfigBtn.Location = new System.Drawing.Point(220, 18);
             this.resetGAConfigBtn.Name = "resetGAConfigBtn";
-            this.resetGAConfigBtn.Size = new System.Drawing.Size(130, 25);
+            this.resetGAConfigBtn.Size = new System.Drawing.Size(35, 25);
             this.resetGAConfigBtn.TabIndex = 0;
-            this.resetGAConfigBtn.Text = "Reset to Default";
+            this.resetGAConfigBtn.Text = "↺";
+            this.resetGAConfigBtn.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
             this.resetGAConfigBtn.UseVisualStyleBackColor = true;
             this.resetGAConfigBtn.Click += new System.EventHandler(this.resetGAConfigBtn_Click);
             //
@@ -566,9 +558,10 @@
             //
             this.savePresetBtn.Location = new System.Drawing.Point(180, 18);
             this.savePresetBtn.Name = "savePresetBtn";
-            this.savePresetBtn.Size = new System.Drawing.Size(95, 25);
+            this.savePresetBtn.Size = new System.Drawing.Size(35, 25);
             this.savePresetBtn.TabIndex = 66;
-            this.savePresetBtn.Text = "Save Preset";
+            this.savePresetBtn.Text = "💾";
+            this.savePresetBtn.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
             this.savePresetBtn.UseVisualStyleBackColor = true;
             this.savePresetBtn.Click += new System.EventHandler(this.OnSavePresetClicked);
             //
@@ -868,7 +861,6 @@
         private System.Windows.Forms.NumericUpDown SlicesBox;
         private System.Windows.Forms.Label shuffleLbl;
         private System.Windows.Forms.NumericUpDown numShuffleMoves;
-        private System.Windows.Forms.Button PauseBtn;
         private System.Windows.Forms.Label IterTimeBox;
         private System.Windows.Forms.Label SolutionLbl;
         private System.Windows.Forms.Label solutionCountLbl;
