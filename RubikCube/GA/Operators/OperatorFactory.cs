@@ -43,6 +43,7 @@ public static class OperatorFactory
             CrossoverStrategy.Uniform => new UniformCrossover<T>(),
             CrossoverStrategy.OrderBased => new SinglePointCrossover<T>(), // TODO: Implement OX
             CrossoverStrategy.PartiallyMapped => new SinglePointCrossover<T>(), // TODO: Implement PMX
+            CrossoverStrategy.SegmentPreserving => new SegmentPreservingCrossover<T>(),
             _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown crossover strategy")
         };
     }

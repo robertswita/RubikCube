@@ -106,6 +106,7 @@
     <Compile Include="..\RubikCube\GA\Operators\Crossover\SinglePointCrossover.cs" Link="Core\GA\Operators\Crossover\SinglePointCrossover.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Crossover\TwoPointCrossover.cs" Link="Core\GA\Operators\Crossover\TwoPointCrossover.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Crossover\UniformCrossover.cs" Link="Core\GA\Operators\Crossover\UniformCrossover.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Crossover\SegmentPreservingCrossover.cs" Link="Core\GA\Operators\Crossover\SegmentPreservingCrossover.cs" />
 
     <Compile Include="..\RubikCube\GA\Operators\Mutation\RandomMutation.cs" Link="Core\GA\Operators\Mutation\RandomMutation.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Mutation\SwapMutation.cs" Link="Core\GA\Operators\Mutation\SwapMutation.cs" />

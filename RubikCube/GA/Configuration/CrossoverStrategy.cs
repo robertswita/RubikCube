@@ -28,5 +28,10 @@ public enum CrossoverStrategy
     /// <summary>
     /// Partially Mapped Crossover (PMX) - maintains position-based relationships.
     /// </summary>
-    PartiallyMapped
+    PartiallyMapped,
+
+    /// <summary>
+    /// Segment-preserving crossover - preserves effective segments from better parent.
+    /// </summary>
+    SegmentPreserving
 }
