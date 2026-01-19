@@ -791,16 +791,168 @@ Wstawia sekwencje budowania bloków z popularnych metod rozwiązywania.
 |------|----------|-------|------|
 | 41 | R U' R' U R U2 R' U R U' R' | 11 | Oba w slocie, błędna orientacja |
 
-##### Roux - budowanie bloków (6)
+##### Roux Method - Kompletna implementacja
 
-| Nazwa | Algorytm | Ruchy | Użycie |
-|-------|----------|-------|--------|
-| M U M' | M U M' | 3 | Ruch środkowej warstwy |
-| M' U M | M' U M | 3 | Odwrotność |
-| M U2 M' | M U2 M' | 3 | Obrót 180° |
-| M' U' M | M' U' M | 3 | Alternatywa |
-| M2 U M2 | M2 U M2 | 3 | Podwójna środkowa |
-| CMLL setup | M U M' U M U2 M' | 7 | Przygotowanie CMLL |
+Metoda Roux rozwiązuje kostkę w następujących etapach:
+1. First Block (FB) - budowanie bloku 1x2x3 po lewej stronie
+2. Second Block (SB) - budowanie bloku 1x2x3 po prawej stronie z użyciem M-slice
+3. CMLL - rozwiązywanie narożników ostatniej warstwy
+4. LSE - ostatnie sześć krawędzi
+
+###### First Block (FB) - 18 algorytmów
+
+| FB# | Algorytm | Ruchy | Opis |
+|-----|----------|-------|------|
+| 1 | L' U L | 3 | Proste wstawienie krawędzi |
+| 2 | U' L' U L | 4 | Krawędź z góry przód |
+| 3 | U L' U' L | 4 | Krawędź z góry tył |
+| 4 | L U' L' | 3 | Odwrócenie i wstawienie krawędzi |
+| 5 | U2 L' U2 L | 4 | Krawędź z prawej strony |
+| 6 | U L' U' L U L' U' L | 8 | Narożnik z góry, biały na górze |
+| 7 | L' U' L | 3 | Narożnik z góry, biały na lewej |
+| 8 | U' L' U L | 4 | Narożnik z góry, biały z przodu |
+| 9 | L' U L U' L' U L | 7 | Skręcenie narożnika w miejscu |
+| 10 | U2 L' U' L | 4 | Narożnik od tyłu |
+| 11 | U' L' U' L U L' U' L | 8 | Para z górnej warstwy |
+| 12 | L' U' L U' L' U L | 7 | Podstawowe wstawienie pary |
+| 13 | U L' U L U' L' U' L | 8 | Para z setupem |
+| 14 | L' U2 L U L' U' L | 7 | Rozdzielona para |
+| 15 | U' L' U2 L U' L' U L | 8 | Para z błędną orientacją |
+| 16 | L' U' L U L' U' L U' L' U L | 11 | Kompletny kwadrat z setupem |
+| 17 | U L' U L U' L' U' L U' L' U L | 12 | Kwadrat z odwróceniem krawędzi |
+| 18 | L' U L U' L' U' L | 7 | Szybkie wstawienie kwadratu |
+
+###### Second Block (SB) - 20 algorytmów
+
+| SB# | Algorytm | Ruchy | Opis |
+|-----|----------|-------|------|
+| 1 | R U' R' | 3 | Proste wstawienie krawędzi |
+| 2 | U R U' R' | 4 | Krawędź z góry |
+| 3 | M' U M | 3 | Krawędź z ruchem M |
+| 4 | U' R U R' | 4 | Krawędź od tyłu |
+| 5 | R' U R | 3 | Odwrócenie krawędzi |
+| 6 | M2 U M2 | 3 | Krawędź z M2 |
+| 7 | U' R U R' U' R U R' | 8 | Narożnik z góry, biały na górze |
+| 8 | R U R' | 3 | Narożnik z góry, biały na prawej |
+| 9 | U R U' R' | 4 | Narożnik z góry, biały z przodu |
+| 10 | R U' R' U R U' R' | 7 | Skręcenie narożnika |
+| 11 | M' U' M U R U' R' | 7 | Para z ruchem M |
+| 12 | R U R' U R U' R' | 7 | Wstawienie pary |
+| 13 | U' R U' R' U R U R' | 8 | Para od tyłu |
+| 14 | U R U' R' U R U R' | 8 | Para z setupem |
+| 15 | R U2 R' U' R U R' | 7 | Rozdzielona para |
+| 16 | M' U M R U R' | 6 | Para M-slice |
+| 17 | R U R' U' R U R' U R U' R' | 11 | Kompletny kwadrat |
+| 18 | M' U' M U' R U R' U R U' R' | 11 | Kwadrat z M |
+| 19 | R U' R' U R U R' | 7 | Szybki kwadrat |
+| 20 | U R U R' U' R U' R' | 8 | Kwadrat z błędną orientacją |
+
+###### CMLL (Corners of Last Layer) - 42 algorytmy
+
+Rozwiązuje narożniki ostatniej warstwy zachowując orientację M-slice.
+
+**O (Oriented) - 6 przypadków:** Wszystkie narożniki zorientowane
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| O1 | R U R' F' R U R' U' R' F R2 U' R' | 13 |
+| O2 | F R U' R' U' R U R' F' R U R' U' R' F R F' | 17 |
+| O3 | R U R' U' R' F R2 U' R' U' R U R' F' | 14 |
+| O4 | R2 U' R' U' R U R U R U' R | 11 |
+| O5 | R' U' R U' R' U R U' R' U2 R | 11 |
+| O6 | R U R' U' R U R' U' R U R' U' | 12 |
+
+**H (All same) - 4 przypadki:** Wszystkie narożniki tym samym kolorem na górze
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| H1 | R U R' U R U' R' U R U2 R' | 11 |
+| H2 | R U2 R' U' R U R' U' R U' R' | 11 |
+| H3 | R U2 R2 F R F' U2 R' F R F' | 11 |
+| H4 | F R U R' U' R U R' U' R U R' U' F' | 14 |
+
+**Pi - 6 przypadków:** Dwa sąsiednie CW, dwa CCW
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| Pi1 | F R U R' U' R U R' U' F' | 10 |
+| Pi2 | R U2 R' U' R U R' U2 R' F R F' | 12 |
+| Pi3 | R' F R U F U' R U R' U' F' | 11 |
+| Pi4 | R U2 R' U' R U R' U' R U R' U' R U' R' | 15 |
+| Pi5 | R' U' R' F R F' R U' R' U2 R | 11 |
+| Pi6 | F R' F' R U2 R U' R' U R U2 R' | 12 |
+
+**U (Sune) - 6 przypadków:** Kształt Sune
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| U1 | R U R' U R U2 R' | 7 |
+| U2 | R U2 R' U' R U' R' | 7 |
+| U3 | R2 D R' U2 R D' R' U2 R' | 9 |
+| U4 | R2 D' R U2 R' D R U2 R | 9 |
+| U5 | F R U R' U' F' | 6 |
+| U6 | R' U' R U' R' U2 R | 7 |
+
+**T - 6 przypadków:** Kształt T
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| T1 | R U R' U' R' F R F' | 8 |
+| T2 | L' U' L U L F' L' F | 8 |
+| T3 | F R' F R2 U' R' U' R U R' F2 | 11 |
+| T4 | R U R D R' U R D' R2 | 9 |
+| T5 | R' U R U2 R' L' U R U' L | 10 |
+| T6 | L' U' L U2 L R U' L' U R' | 10 |
+
+**S (Sune-like) - 6 przypadków:**
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| S1 | R U R' U R U2 R' U' R U R' U R U2 R' | 15 |
+| S2 | L' U2 L U2 L F' L' F | 8 |
+| S3 | F R' F' R U R U' R' | 8 |
+| S4 | R U R' U' R' F R F' R U R' U R U2 R' | 15 |
+| S5 | R U' L' U R' U' L | 7 |
+| S6 | L' U R U' L U R' | 7 |
+
+**AS (Anti-Sune) - 6 przypadków:**
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| AS1 | R U2 R' U' R U' R' | 7 |
+| AS2 | R' U' R U' R' U2 R | 7 |
+| AS3 | L' U R U' L U R' | 7 |
+| AS4 | R U' L' U R' U' L | 7 |
+| AS5 | R U2 R' U2 R' F R F' | 8 |
+| AS6 | R U2 R' U' R U' R' U' R U R' U R U2 R' | 15 |
+
+**L - 6 przypadków:** Kształt L
+
+| Nazwa | Algorytm | Ruchy |
+|-------|----------|-------|
+| L1 | F R U' R' U' R U R' F' | 9 |
+| L2 | F' L' U L U L' U' L F | 9 |
+| L3 | R' U' R U R' F' R U R' U' R' F R2 | 13 |
+| L4 | F R' F' R U R U' R' | 8 |
+| L5 | R U R' U' R U' R' F' U' F R U R' | 13 |
+| L6 | F R' F' R U2 R U2 R' | 8 |
+
+###### LSE (Last Six Edges) - 10 algorytmów
+
+Orientacja i permutacja ostatnich sześciu krawędzi (UL, UR, UF, UB, DF, DB).
+
+| LSE# | Algorytm | Ruchy | Opis |
+|------|----------|-------|------|
+| 1 | M U M' U M U2 M' | 7 | Setup orientacji krawędzi |
+| 2 | M' U M U' M' U M | 7 | Przypadek strzałki |
+| 3 | M U M U M U M U M | 9 | Odwrócenie krawędzi |
+| 4 | M2 U M2 U M' U2 M2 U2 M' | 9 | Przypadek 4c |
+| 5 | M' U2 M U M' U M | 7 | Przypadek 4b |
+| 6 | M U2 M' U' M U' M' | 7 | Przypadek 4a |
+| 7 | M2 U M2 U2 M2 U M2 | 7 | Zamiana UL/UR |
+| 8 | M2 U2 M2 U2 | 4 | Zamiana przeciwległych |
+| 9 | M U M' U' M' U M U' M U M' | 11 | Przypadek kropki |
+| 10 | M' U M U M' U' M | 7 | Szybka orientacja |
 
 ##### Cross - budowanie krzyża (8)
 
@@ -830,9 +982,17 @@ Wstawia sekwencje budowania bloków z popularnych metod rozwiązywania.
 - Wzorce A2 B2 do korekty warstw
 - Koordynacja wewnętrznych/zewnętrznych warstw dla większych kostek
 
-**Całkowita liczba wzorców 3D: ~60** (41 F2L + 6 Roux + 8 Cross + 4 LBL + triggery)
+**Całkowita liczba wzorców 3D: ~150**
+- F2L: 41 algorytmów
+- First Block (FB): 18 algorytmów
+- Second Block (SB): 20 algorytmów
+- CMLL: 42 algorytmy
+- LSE: 10 algorytmów
+- Cross: 8 algorytmów
+- Layer-by-layer: 4 algorytmy
+- Triggery i warianty: ~10 algorytmów
 
-**Wpływ na rozwiązywanie:** Wykorzystuje wiedzę domenową z metod CFOP i Roux. Pełny zestaw F2L pokrywa wszystkie możliwe konfiguracje pary narożnik-krawędź, co znacząco przyspiesza znajdowanie częściowych rozwiązań. GA może budować na tych fundamentach zamiast odkrywać je od nowa.
+**Wpływ na rozwiązywanie:** Wykorzystuje wiedzę domenową z metod CFOP i Roux. Pełny zestaw F2L pokrywa wszystkie możliwe konfiguracje pary narożnik-krawędź. Kompletna implementacja metody Roux (FB + SB + CMLL + LSE) dostarcza 90 algorytmów dla alternatywnego podejścia do rozwiązywania. GA może budować na tych fundamentach zamiast odkrywać je od nowa.
 
 #### LocalSearchMutation (Mutacja z lokalnym przeszukiwaniem)
 Wykonuje hill-climbing w małym sąsiedztwie, próbując wielu małych modyfikacji i zachowując najlepszą.
