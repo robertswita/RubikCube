@@ -223,7 +223,7 @@ namespace RubikCube
         void OnProgress(TRubikGenome specimen)
         {
             _fitnessValues.Add(new ObservableValue(specimen.Fitness));
-            if (_fitnessValues.Count > 500)
+            if (_fitnessValues.Count > 100)
                 _fitnessValues.RemoveAt(0);
 
             var iterTime = Watch.Elapsed - IterElapsed;
@@ -236,7 +236,7 @@ namespace RubikCube
         void OnProgressThreadSafe(double fitness, TimeSpan elapsed)
         {
             _fitnessValues.Add(new ObservableValue(fitness));
-            if (_fitnessValues.Count > 500)
+            if (_fitnessValues.Count > 100)
                 _fitnessValues.RemoveAt(0);
 
             var iterTime = elapsed - IterElapsed;
@@ -356,27 +356,35 @@ namespace RubikCube
                     if (result.Fitness < HighScore && result.Moves.Count > 0)
                     {
                         HighScore = result.Fitness;
+                        // Apply moves to _gaCube AND queue them for display
                         foreach (var move in result.Moves)
+                        {
+                            _gaCube.Turn(move);
                             _moveQueue.Enqueue(move);
+                        }
                         TrySolutions = true;
                     }
 
                     if (TrySolutions)
                     {
-                        foreach (var solution in Solutions)
+                        // Make thread-safe copies of collections before iterating
+                        var solutionsCopy = Solutions.ToList();
+                        var freeMovesCopy = TRubikGenome.FreeMoves.ToList();
+
+                        foreach (var solution in solutionsCopy)
                         {
-                            var tryMoves = DecodeSolution(solution.Value);
-                            for (int j = -1; j < TRubikGenome.FreeMoves.Count; j++)
+                            var tryMoves = DecodeSolutionThreadSafe(solution.Value, _gaCube);
+                            for (int j = -1; j < freeMovesCopy.Count; j++)
                             {
                                 var moves = new List<TMove>();
                                 if (j < 0)
                                     moves.AddRange(tryMoves);
                                 else
                                 {
-                                    var move = TMove.Decode(TRubikGenome.FreeMoves[j]);
+                                    var move = TMove.Decode(freeMovesCopy[j]);
                                     moves.Add(move);
                                     moves.AddRange(tryMoves);
-                                    move = TMove.Decode(TRubikGenome.FreeMoves[j]);
+                                    move = TMove.Decode(freeMovesCopy[j]);
                                     move.Angle = 2 - move.Angle;
                                     moves.Add(move);
                                 }
@@ -387,9 +395,12 @@ namespace RubikCube
                                 if (score < HighScore)
                                 {
                                     HighScore = score;
-                                    // Queue these moves
+                                    // Apply moves to _gaCube AND queue them for display
                                     foreach (var m in moves)
+                                    {
+                                        _gaCube.Turn(m);
                                         _moveQueue.Enqueue(m);
+                                    }
                                 }
                             }
                         }
@@ -454,18 +465,21 @@ namespace RubikCube
         {
             if (MoveTimer.Enabled || _isGaRunning) return;
             IsPaused = true;
-            var size = TRubikCube.Size;
             var rnd = TChromosome.Rnd;
             for (int i = 0; i < 30; i++)
             {
-                RubikCube.ActiveCubie = RubikCube.Cubies[rnd.Next(RubikCube.Cubies.Length)];
-                TRubikGenome.FreeMoves = RubikCube.GetFreeMoves();
-                var code = TRubikGenome.FreeMoves[rnd.Next(TRubikGenome.FreeMoves.Count)];
+                // Use _gaCube consistently for both selecting moves AND applying them
+                // (like MAUI does) to keep _gaCube state consistent
+                _gaCube.ActiveCubie = _gaCube.Cubies[rnd.Next(_gaCube.Cubies.Length)];
+                var freeMoves = _gaCube.GetFreeMoves();
+                var code = freeMoves[rnd.Next(freeMoves.Count)];
                 var move = TMove.Decode(code);
-                Moves.Add(move);
-                // Apply move to GA cube immediately (no animation needed)
+
+                // Apply move to GA cube immediately
                 _gaCube.Turn(move);
-                RubikCube.ActiveCubie.State = RubikCube.ActiveCubie.State;
+
+                // Queue move for display cube animation
+                Moves.Add(move);
             }
             MoveTimer.Start();
         }
@@ -474,6 +488,39 @@ namespace RubikCube
         List<TMove> DecodeSolution(List<TMove> solution)
         {
             var pos = RubikCube.ActiveCubie.Position;
+            var map = new List<int>();
+            var result = new List<TMove>();
+            var sliceCountInCluster = TAffine.N;
+            for (var i = 0; i < solution.Count; i++)
+            {
+                var move = solution[i];
+                if (!move.IsValid) continue;
+                var idx = map.IndexOf(move.Slice);
+                if (idx < 0)
+                {
+                    idx = map.IndexOf(TRubikCube.Size - 1 - move.Slice);
+                    if (idx < 0)
+                    {
+                        idx = map.Count;
+                        map.Add(move.Slice);
+                    }
+                    else
+                        idx += sliceCountInCluster;
+                }
+                if (idx < sliceCountInCluster)
+                    move.Slice = pos[idx];
+                else
+                    move.Slice = TRubikCube.Size - 1 - pos[idx - sliceCountInCluster];
+                result.Add(TMove.Decode(move.Encode()));
+            }
+            return result;
+        }
+
+        // Thread-safe version that takes the cube as parameter
+        List<TMove> DecodeSolutionThreadSafe(List<TMove> solution, TRubikCube cube)
+        {
+            if (cube.ActiveCubie == null) return new List<TMove>();
+            var pos = cube.ActiveCubie.Position;
             var map = new List<int>();
             var result = new List<TMove>();
             var sliceCountInCluster = TAffine.N;
