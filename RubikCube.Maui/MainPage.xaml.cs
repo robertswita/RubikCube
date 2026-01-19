@@ -469,6 +469,7 @@ public partial class MainPage : ContentPage
         MutationSlider.Value = _selectedGAConfig.MutationRate;
         GenerationsSlider.Value = _selectedGAConfig.Termination.MaxGenerations;
         EliteSlider.Value = _selectedGAConfig.EliteCount;
+        ChromosomeLengthSlider.Value = _selectedGAConfig.GenomeLength;
 
         // Update pickers to match preset
         SelectionPicker.SelectedIndex = _selectedGAConfig.Selection switch
@@ -572,7 +573,8 @@ public partial class MainPage : ContentPage
         {
             PopulationSize = (int)PopulationSlider.Value,
             MutationRate = MutationSlider.Value,
-            EliteCount = (int)EliteSlider.Value
+            EliteCount = (int)EliteSlider.Value,
+            GenomeLength = (int)ChromosomeLengthSlider.Value
         };
         _generationsPerIteration = (int)GenerationsSlider.Value;
     }
@@ -583,6 +585,7 @@ public partial class MainPage : ContentPage
         MutationLabel.Text = $"{(int)(MutationSlider.Value * 100)}%";
         GenerationsLabel.Text = ((int)GenerationsSlider.Value).ToString();
         EliteLabel.Text = ((int)EliteSlider.Value).ToString();
+        ChromosomeLengthLabel.Text = ((int)ChromosomeLengthSlider.Value).ToString();
     }
 
     private void OnResetGAConfigClicked(object? sender, EventArgs e)
@@ -599,6 +602,7 @@ public partial class MainPage : ContentPage
         MutationSlider.Value = _selectedGAConfig.MutationRate;
         GenerationsSlider.Value = _selectedGAConfig.Termination.MaxGenerations;
         EliteSlider.Value = _selectedGAConfig.EliteCount;
+        ChromosomeLengthSlider.Value = _selectedGAConfig.GenomeLength;
         SelectionPicker.SelectedIndex = 0; // Unique
         CrossoverPicker.SelectedIndex = 0; // SinglePoint
         MutationPicker.SelectedIndex = 0; // SingleGene

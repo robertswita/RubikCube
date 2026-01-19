@@ -237,6 +237,7 @@ namespace RubikCube
                     PopulationSize = (int)numPopulation.Value,
                     MutationRate = (double)numMutation.Value / 100.0,
                     EliteCount = (int)numElite.Value,
+                    GenomeLength = (int)numChromosomeLength.Value,
                     Termination = _selectedGAConfig.Termination with
                     {
                         MaxGenerations = (int)numGenerations.Value
@@ -745,6 +746,7 @@ namespace RubikCube
             numMutation.Value = (int)(_selectedGAConfig.MutationRate * 100);
             numGenerations.Value = Math.Min(numGenerations.Maximum, _selectedGAConfig.Termination.MaxGenerations);
             numElite.Value = _selectedGAConfig.EliteCount;
+            numChromosomeLength.Value = Math.Min(numChromosomeLength.Maximum, _selectedGAConfig.GenomeLength);
 
             // Update selection combo
             cmbSelection.SelectedIndex = _selectedGAConfig.Selection switch
@@ -792,12 +794,50 @@ namespace RubikCube
                 PopulationSize = (int)numPopulation.Value,
                 MutationRate = (double)numMutation.Value / 100.0,
                 EliteCount = (int)numElite.Value,
+                GenomeLength = (int)numChromosomeLength.Value,
                 Termination = _selectedGAConfig.Termination with
                 {
                     MaxGenerations = (int)numGenerations.Value
                 }
             };
             _generationsPerIteration = (int)numGenerations.Value;
+        }
+
+        private void ResetBtn_Click(object sender, EventArgs e)
+        {
+            // Stop the solver if running
+            _cts?.Cancel();
+            _solver = null;
+            MoveTimer.Stop();
+
+            // Clear moves
+            Moves.Clear();
+            MoveNo = 0;
+
+            // Reset animation state
+            if (ActSlice != null)
+            {
+                UnGroup();
+            }
+            FrameNo = 0;
+
+            // Recreate cube
+            UpdateView();
+
+            // Reset statistics
+            MovesCount = 0;
+            Time = TimeSpan.Zero;
+            GACount = 0;
+            HighScore = 0;
+
+            // Update UI
+            label2.Text = "0";
+            label1.Text = "00:00:00";
+            label4.Text = "0";
+            label6.Text = "0";
+            MovesLbl.Text = "0";
+            SolutionLbl.Text = Solutions.Count.ToString();
+            chart1.Series[0].Points.Clear();
         }
 
         #endregion

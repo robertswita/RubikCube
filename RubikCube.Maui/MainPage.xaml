@@ -164,6 +164,13 @@
                             <Slider x:Name="EliteSlider" Minimum="0" Maximum="20" Value="2" WidthRequest="120" ValueChanged="OnGAParamChanged" />
                             <Label x:Name="EliteLabel" Text="2" VerticalOptions="Center" WidthRequest="40" />
                         </HorizontalStackLayout>
+
+                        <!-- Chromosome Length -->
+                        <HorizontalStackLayout Spacing="10">
+                            <Label Text="Chr. Length:" VerticalOptions="Center" WidthRequest="80" />
+                            <Slider x:Name="ChromosomeLengthSlider" Minimum="10" Maximum="200" Value="50" WidthRequest="120" ValueChanged="OnGAParamChanged" />
+                            <Label x:Name="ChromosomeLengthLabel" Text="50" VerticalOptions="Center" WidthRequest="40" />
+                        </HorizontalStackLayout>
                     </VerticalStackLayout>
                 </Frame>
 

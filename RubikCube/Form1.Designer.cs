@@ -97,6 +97,7 @@
             ((System.ComponentModel.ISupportInitialize)(this.numMutation)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numGenerations)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numElite)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numChromosomeLength)).BeginInit();
             this.panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.StateBox)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.SlicesBox)).BeginInit();
@@ -115,6 +116,7 @@
             //
             // panel1
             //
+            this.panel1.Controls.Add(this.ResetBtn);
             this.panel1.Controls.Add(this.gaConfigGroup);
             this.panel1.Controls.Add(this.label13);
             this.panel1.Controls.Add(this.DimsBox);
@@ -221,7 +223,17 @@
             this.PauseBtn.Text = "Pause";
             this.PauseBtn.UseVisualStyleBackColor = true;
             this.PauseBtn.Click += new System.EventHandler(this.button3_Click_1);
-            // 
+            //
+            // ResetBtn
+            //
+            this.ResetBtn.Location = new System.Drawing.Point(335, 37);
+            this.ResetBtn.Name = "ResetBtn";
+            this.ResetBtn.Size = new System.Drawing.Size(90, 39);
+            this.ResetBtn.TabIndex = 37;
+            this.ResetBtn.Text = "Reset";
+            this.ResetBtn.UseVisualStyleBackColor = true;
+            this.ResetBtn.Click += new System.EventHandler(this.ResetBtn_Click);
+            //
             // label9
             // 
             this.label9.AutoSize = true;
@@ -502,6 +514,8 @@
             this.gaConfigGroup.Controls.Add(this.cmbMutationType);
             this.gaConfigGroup.Controls.Add(this.lblElite);
             this.gaConfigGroup.Controls.Add(this.numElite);
+            this.gaConfigGroup.Controls.Add(this.lblChromosomeLength);
+            this.gaConfigGroup.Controls.Add(this.numChromosomeLength);
             this.gaConfigGroup.Location = new System.Drawing.Point(6, 132);
             this.gaConfigGroup.Name = "gaConfigGroup";
             this.gaConfigGroup.Size = new System.Drawing.Size(425, 260);
@@ -733,6 +747,26 @@
             this.numElite.Value = new decimal(new int[] { 2, 0, 0, 0 });
             this.numElite.ValueChanged += new System.EventHandler(this.numGAParam_ValueChanged);
             //
+            // lblChromosomeLength
+            //
+            this.lblChromosomeLength.AutoSize = true;
+            this.lblChromosomeLength.Location = new System.Drawing.Point(170, 200);
+            this.lblChromosomeLength.Name = "lblChromosomeLength";
+            this.lblChromosomeLength.Size = new System.Drawing.Size(85, 16);
+            this.lblChromosomeLength.TabIndex = 20;
+            this.lblChromosomeLength.Text = "Chr. Length:";
+            //
+            // numChromosomeLength
+            //
+            this.numChromosomeLength.Location = new System.Drawing.Point(260, 198);
+            this.numChromosomeLength.Maximum = new decimal(new int[] { 200, 0, 0, 0 });
+            this.numChromosomeLength.Minimum = new decimal(new int[] { 10, 0, 0, 0 });
+            this.numChromosomeLength.Name = "numChromosomeLength";
+            this.numChromosomeLength.Size = new System.Drawing.Size(60, 22);
+            this.numChromosomeLength.TabIndex = 21;
+            this.numChromosomeLength.Value = new decimal(new int[] { 50, 0, 0, 0 });
+            this.numChromosomeLength.ValueChanged += new System.EventHandler(this.numGAParam_ValueChanged);
+            //
             // TRubikForm
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -763,6 +797,7 @@
             ((System.ComponentModel.ISupportInitialize)(this.numMutation)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numGenerations)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numElite)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numChromosomeLength)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -831,6 +866,9 @@
         private System.Windows.Forms.NumericUpDown numElite;
         private System.Windows.Forms.Label lblMutationType;
         private System.Windows.Forms.ComboBox cmbMutationType;
+        private System.Windows.Forms.Label lblChromosomeLength;
+        private System.Windows.Forms.NumericUpDown numChromosomeLength;
+        private System.Windows.Forms.Button ResetBtn;
     }
 }
 
