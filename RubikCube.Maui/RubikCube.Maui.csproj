@@ -117,6 +117,7 @@
     <Compile Include="..\RubikCube\GA\Operators\Mutation\NeighborMutation.cs" Link="Core\GA\Operators\Mutation\NeighborMutation.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Mutation\SimplifyMutation.cs" Link="Core\GA\Operators\Mutation\SimplifyMutation.cs" />
     <Compile Include="..\RubikCube\GA\Operators\Mutation\InverseSequenceMutation.cs" Link="Core\GA\Operators\Mutation\InverseSequenceMutation.cs" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\InsertMutation.cs" Link="Core\GA\Operators\Mutation\InsertMutation.cs" />
 
     <Compile Include="..\RubikCube\GA\Operators\OperatorFactory.cs" Link="Core\GA\Operators\OperatorFactory.cs" />
 

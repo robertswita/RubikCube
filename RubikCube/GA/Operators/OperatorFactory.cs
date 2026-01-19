@@ -66,7 +66,7 @@ public static class OperatorFactory
             MutationStrategy.Neighbor => new NeighborMutation<T>(),
             MutationStrategy.Simplify => new SimplifyMutation<T>(),
             MutationStrategy.InverseSequence => new InverseSequenceMutation<T>(),
-            MutationStrategy.Insert => throw new NotImplementedException("InsertMutation not yet implemented"),
+            MutationStrategy.Insert => new InsertMutation<T>(),
             _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown mutation strategy")
         };
     }
