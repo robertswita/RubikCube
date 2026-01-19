@@ -128,6 +128,7 @@ public partial class MainPage : ContentPage
         PresetPicker.SelectedIndex = 0; // Default
         SelectionPicker.SelectedIndex = 0; // Unique
         CrossoverPicker.SelectedIndex = 0; // SinglePoint
+        MutationPicker.SelectedIndex = 0; // SingleGene
         UpdateGAConfigLabels();
 
         // Subscribe to scroll wheel events
@@ -484,6 +485,22 @@ public partial class MainPage : ContentPage
             CrossoverStrategy.SinglePoint => 0,
             CrossoverStrategy.TwoPoint => 1,
             CrossoverStrategy.Uniform => 2,
+            CrossoverStrategy.SegmentPreserving => 3,
+            _ => 0
+        };
+        MutationPicker.SelectedIndex = _selectedGAConfig.Mutation switch
+        {
+            MutationStrategy.SingleGene => 0,
+            MutationStrategy.Random => 1,
+            MutationStrategy.Swap => 2,
+            MutationStrategy.Inversion => 3,
+            MutationStrategy.Scramble => 4,
+            MutationStrategy.Conjugation => 5,
+            MutationStrategy.Commutator => 6,
+            MutationStrategy.Neighbor => 7,
+            MutationStrategy.Simplify => 8,
+            MutationStrategy.InverseSequence => 9,
+            MutationStrategy.Insert => 10,
             _ => 0
         };
 
@@ -516,10 +533,34 @@ public partial class MainPage : ContentPage
             0 => CrossoverStrategy.SinglePoint,
             1 => CrossoverStrategy.TwoPoint,
             2 => CrossoverStrategy.Uniform,
+            3 => CrossoverStrategy.SegmentPreserving,
             _ => CrossoverStrategy.SinglePoint
         };
 
         _selectedGAConfig = _selectedGAConfig with { Crossover = crossover };
+    }
+
+    private void OnMutationStrategyChanged(object? sender, EventArgs e)
+    {
+        if (MutationPicker.SelectedIndex < 0) return;
+
+        var mutation = MutationPicker.SelectedIndex switch
+        {
+            0 => MutationStrategy.SingleGene,
+            1 => MutationStrategy.Random,
+            2 => MutationStrategy.Swap,
+            3 => MutationStrategy.Inversion,
+            4 => MutationStrategy.Scramble,
+            5 => MutationStrategy.Conjugation,
+            6 => MutationStrategy.Commutator,
+            7 => MutationStrategy.Neighbor,
+            8 => MutationStrategy.Simplify,
+            9 => MutationStrategy.InverseSequence,
+            10 => MutationStrategy.Insert,
+            _ => MutationStrategy.SingleGene
+        };
+
+        _selectedGAConfig = _selectedGAConfig with { Mutation = mutation };
     }
 
     private void OnGAParamChanged(object? sender, ValueChangedEventArgs e)
@@ -560,6 +601,7 @@ public partial class MainPage : ContentPage
         EliteSlider.Value = _selectedGAConfig.EliteCount;
         SelectionPicker.SelectedIndex = 0; // Unique
         CrossoverPicker.SelectedIndex = 0; // SinglePoint
+        MutationPicker.SelectedIndex = 0; // SingleGene
         UpdateGAConfigLabels();
     }
 

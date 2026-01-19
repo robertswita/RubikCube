@@ -130,6 +130,29 @@
                                         <x:String>SinglePoint</x:String>
                                         <x:String>TwoPoint</x:String>
                                         <x:String>Uniform</x:String>
+                                        <x:String>SegmentPreserving</x:String>
+                                    </x:Array>
+                                </Picker.ItemsSource>
+                            </Picker>
+                        </HorizontalStackLayout>
+
+                        <!-- Mutation Strategy -->
+                        <HorizontalStackLayout Spacing="10">
+                            <Label Text="Mut. Type:" VerticalOptions="Center" WidthRequest="80" />
+                            <Picker x:Name="MutationPicker" WidthRequest="150" SelectedIndexChanged="OnMutationStrategyChanged">
+                                <Picker.ItemsSource>
+                                    <x:Array Type="{x:Type x:String}">
+                                        <x:String>SingleGene</x:String>
+                                        <x:String>Random</x:String>
+                                        <x:String>Swap</x:String>
+                                        <x:String>Inversion</x:String>
+                                        <x:String>Scramble</x:String>
+                                        <x:String>Conjugation</x:String>
+                                        <x:String>Commutator</x:String>
+                                        <x:String>Neighbor</x:String>
+                                        <x:String>Simplify</x:String>
+                                        <x:String>InverseSequence</x:String>
+                                        <x:String>Insert</x:String>
                                     </x:Array>
                                 </Picker.ItemsSource>
                             </Picker>
