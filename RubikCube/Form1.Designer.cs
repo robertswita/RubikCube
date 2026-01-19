@@ -90,6 +90,8 @@
             this.cmbCrossover = new System.Windows.Forms.ComboBox();
             this.lblElite = new System.Windows.Forms.Label();
             this.numElite = new System.Windows.Forms.NumericUpDown();
+            this.lblMutationType = new System.Windows.Forms.Label();
+            this.cmbMutationType = new System.Windows.Forms.ComboBox();
             this.gaConfigGroup.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numPopulation)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numMutation)).BeginInit();
@@ -496,6 +498,8 @@
             this.gaConfigGroup.Controls.Add(this.cmbSelection);
             this.gaConfigGroup.Controls.Add(this.lblCrossover);
             this.gaConfigGroup.Controls.Add(this.cmbCrossover);
+            this.gaConfigGroup.Controls.Add(this.lblMutationType);
+            this.gaConfigGroup.Controls.Add(this.cmbMutationType);
             this.gaConfigGroup.Controls.Add(this.lblElite);
             this.gaConfigGroup.Controls.Add(this.numElite);
             this.gaConfigGroup.Location = new System.Drawing.Point(6, 132);
@@ -671,12 +675,44 @@
             this.cmbCrossover.Items.AddRange(new object[] {
             "SinglePoint",
             "TwoPoint",
-            "Uniform"});
+            "Uniform",
+            "SegmentPreserving"});
             this.cmbCrossover.Location = new System.Drawing.Point(100, 167);
             this.cmbCrossover.Name = "cmbCrossover";
             this.cmbCrossover.Size = new System.Drawing.Size(120, 24);
             this.cmbCrossover.TabIndex = 15;
             this.cmbCrossover.SelectedIndexChanged += new System.EventHandler(this.cmbCrossover_SelectedIndexChanged);
+            //
+            // lblMutationType
+            //
+            this.lblMutationType.AutoSize = true;
+            this.lblMutationType.Location = new System.Drawing.Point(230, 170);
+            this.lblMutationType.Name = "lblMutationType";
+            this.lblMutationType.Size = new System.Drawing.Size(65, 16);
+            this.lblMutationType.TabIndex = 18;
+            this.lblMutationType.Text = "Mut.Type:";
+            //
+            // cmbMutationType
+            //
+            this.cmbMutationType.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbMutationType.FormattingEnabled = true;
+            this.cmbMutationType.Items.AddRange(new object[] {
+            "SingleGene",
+            "Random",
+            "Swap",
+            "Inversion",
+            "Scramble",
+            "Conjugation",
+            "Commutator",
+            "Neighbor",
+            "Simplify",
+            "InverseSequence",
+            "Insert"});
+            this.cmbMutationType.Location = new System.Drawing.Point(300, 167);
+            this.cmbMutationType.Name = "cmbMutationType";
+            this.cmbMutationType.Size = new System.Drawing.Size(110, 24);
+            this.cmbMutationType.TabIndex = 19;
+            this.cmbMutationType.SelectedIndexChanged += new System.EventHandler(this.cmbMutationType_SelectedIndexChanged);
             //
             // lblElite
             //
@@ -793,6 +829,8 @@
         private System.Windows.Forms.ComboBox cmbCrossover;
         private System.Windows.Forms.Label lblElite;
         private System.Windows.Forms.NumericUpDown numElite;
+        private System.Windows.Forms.Label lblMutationType;
+        private System.Windows.Forms.ComboBox cmbMutationType;
     }
 }
 

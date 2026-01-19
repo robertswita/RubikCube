@@ -70,6 +70,7 @@ namespace RubikCube
             cmbPreset.SelectedIndex = 0; // Default
             cmbSelection.SelectedIndex = 0; // Unique
             cmbCrossover.SelectedIndex = 0; // SinglePoint
+            cmbMutationType.SelectedIndex = 0; // SingleGene
             UpdateGAConfigFromUI();
         }
 
@@ -689,9 +690,30 @@ namespace RubikCube
                 0 => CrossoverStrategy.SinglePoint,
                 1 => CrossoverStrategy.TwoPoint,
                 2 => CrossoverStrategy.Uniform,
+                3 => CrossoverStrategy.SegmentPreserving,
                 _ => CrossoverStrategy.SinglePoint
             };
             _selectedGAConfig = _selectedGAConfig with { Crossover = crossover };
+        }
+
+        private void cmbMutationType_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            var mutation = cmbMutationType.SelectedIndex switch
+            {
+                0 => MutationStrategy.SingleGene,
+                1 => MutationStrategy.Random,
+                2 => MutationStrategy.Swap,
+                3 => MutationStrategy.Inversion,
+                4 => MutationStrategy.Scramble,
+                5 => MutationStrategy.Conjugation,
+                6 => MutationStrategy.Commutator,
+                7 => MutationStrategy.Neighbor,
+                8 => MutationStrategy.Simplify,
+                9 => MutationStrategy.InverseSequence,
+                10 => MutationStrategy.Insert,
+                _ => MutationStrategy.SingleGene
+            };
+            _selectedGAConfig = _selectedGAConfig with { Mutation = mutation };
         }
 
         private void numGAParam_ValueChanged(object sender, EventArgs e)
@@ -711,6 +733,7 @@ namespace RubikCube
             cmbPreset.SelectedIndex = 0;
             cmbSelection.SelectedIndex = 0;
             cmbCrossover.SelectedIndex = 0;
+            cmbMutationType.SelectedIndex = 0;
 
             // Update numeric controls
             UpdateGAConfigUI();
@@ -740,6 +763,24 @@ namespace RubikCube
                 CrossoverStrategy.SinglePoint => 0,
                 CrossoverStrategy.TwoPoint => 1,
                 CrossoverStrategy.Uniform => 2,
+                CrossoverStrategy.SegmentPreserving => 3,
+                _ => 0
+            };
+
+            // Update mutation type combo
+            cmbMutationType.SelectedIndex = _selectedGAConfig.Mutation switch
+            {
+                MutationStrategy.SingleGene => 0,
+                MutationStrategy.Random => 1,
+                MutationStrategy.Swap => 2,
+                MutationStrategy.Inversion => 3,
+                MutationStrategy.Scramble => 4,
+                MutationStrategy.Conjugation => 5,
+                MutationStrategy.Commutator => 6,
+                MutationStrategy.Neighbor => 7,
+                MutationStrategy.Simplify => 8,
+                MutationStrategy.InverseSequence => 9,
+                MutationStrategy.Insert => 10,
                 _ => 0
             };
         }
