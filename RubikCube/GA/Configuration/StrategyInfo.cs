@@ -196,8 +196,8 @@ public static class StrategyInfo
             SelectionStrategy.Roulette => new RouletteSelection<T>(),
             SelectionStrategy.RouletteRank => new RouletteRankSelection<T>(),
             SelectionStrategy.Unique => new UniqueSelection<T>(),
-            SelectionStrategy.StochasticUniversalSampling => new RouletteSelection<T>(), // TODO: Implement SUS
-            SelectionStrategy.Boltzmann => new TournamentSelection<T>(), // TODO: Implement Boltzmann
+            SelectionStrategy.StochasticUniversalSampling => new SUSSelection<T>(),
+            SelectionStrategy.Boltzmann => new BoltzmannSelection<T>(config?.BoltzmannTemperature ?? 10.0),
             _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown selection strategy")
         };
     }

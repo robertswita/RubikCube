@@ -43,6 +43,13 @@ public record GAConfig
     /// </summary>
     public int TournamentSize { get; init; } = 5;
 
+    /// <summary>
+    /// Temperature for Boltzmann selection.
+    /// Higher values (50-100) give more uniform selection (exploration).
+    /// Lower values (1-10) strongly favor better individuals (exploitation).
+    /// </summary>
+    public double BoltzmannTemperature { get; init; } = 10.0;
+
     #endregion
 
     #region Crossover Settings
