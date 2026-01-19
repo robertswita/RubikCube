@@ -38,5 +38,31 @@ public enum MutationStrategy
     /// <summary>
     /// Adaptive mutation - rate varies based on fitness (higher fitness = lower rate).
     /// </summary>
-    Adaptive
+    Adaptive,
+
+    /// <summary>
+    /// Commutator mutation - domain-specific for Rubik's cube (ABA'B' pattern).
+    /// Affects only a small number of pieces, useful for precise solving.
+    /// </summary>
+    Commutator,
+
+    /// <summary>
+    /// Neighbor mutation - changes a move to a similar one (same axis, different angle).
+    /// </summary>
+    Neighbor,
+
+    /// <summary>
+    /// Simplify mutation - detects and removes redundant move patterns.
+    /// </summary>
+    Simplify,
+
+    /// <summary>
+    /// Inverse sequence mutation - replaces a segment with its inverse.
+    /// </summary>
+    InverseSequence,
+
+    /// <summary>
+    /// Insert mutation - inserts a neutral move pair at a random position.
+    /// </summary>
+    Insert
 }

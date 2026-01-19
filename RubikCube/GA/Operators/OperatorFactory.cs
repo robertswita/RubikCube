@@ -62,6 +62,11 @@ public static class OperatorFactory
             MutationStrategy.Inversion => new InversionMutation<T>(),
             MutationStrategy.Scramble => new ScrambleMutation<T>(),
             MutationStrategy.Adaptive => new ScrambleMutation<T>(), // TODO: Implement Adaptive
+            MutationStrategy.Commutator => new CommutatorMutation<T>(),
+            MutationStrategy.Neighbor => throw new NotImplementedException("NeighborMutation not yet implemented"),
+            MutationStrategy.Simplify => throw new NotImplementedException("SimplifyMutation not yet implemented"),
+            MutationStrategy.InverseSequence => throw new NotImplementedException("InverseSequenceMutation not yet implemented"),
+            MutationStrategy.Insert => throw new NotImplementedException("InsertMutation not yet implemented"),
             _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown mutation strategy")
         };
     }
