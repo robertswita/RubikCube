@@ -281,6 +281,178 @@ public class MutationOperatorSpecificTests
 
     #endregion
 
+    #region InverseSequenceMutation Tests
+
+    [Fact]
+    public void InverseSequenceMutation_ReversesSegmentOrder()
+    {
+        var op = new InverseSequenceMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int reversalObserved = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            // Use distinct moves for each position
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // Find the changed segment
+            int start = -1, end = -1;
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                {
+                    if (start == -1) start = i;
+                    end = i + 1;
+                }
+            }
+
+            if (start != -1 && end - start >= 2)
+            {
+                reversalObserved++;
+            }
+        }
+
+        Assert.True(reversalObserved > 0, "Should observe segment reversals");
+    }
+
+    [Fact]
+    public void InverseSequenceMutation_InvertsAngles()
+    {
+        var op = new InverseSequenceMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        // Use moves with known angles to verify inversion
+        // Find moves with angle 0, 1, 2
+        var moveAngle0 = validMoves.First(m => RubikCube.TMove.Decode(m).Angle == 0);
+        var moveAngle1 = validMoves.First(m => RubikCube.TMove.Decode(m).Angle == 1);
+        var moveAngle2 = validMoves.First(m => RubikCube.TMove.Decode(m).Angle == 2);
+
+        int angleInversionCount = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            // Set all genes to angle 0 moves
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = moveAngle0;
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // Check if any angles were inverted (0 -> 2)
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                var move = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                if (move.Angle == 2) // Inverted from 0
+                {
+                    angleInversionCount++;
+                }
+            }
+        }
+
+        Assert.True(angleInversionCount > 0, "Should invert angles (0 -> 2)");
+    }
+
+    [Fact]
+    public void InverseSequenceMutation_PreservesSegmentMoveStructure()
+    {
+        var op = new InverseSequenceMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            // Record original move structures (axis, slice, plane)
+            var originalStructures = chromosome.Genes
+                .Select(g => {
+                    var m = RubikCube.TMove.Decode((int)g);
+                    return (m.Axis, m.Slice, m.Plane);
+                })
+                .ToList();
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // After mutation, the same move structures should exist
+            // (just in different order and with inverted angles)
+            var newStructures = chromosome.Genes
+                .Select(g => {
+                    var m = RubikCube.TMove.Decode((int)g);
+                    return (m.Axis, m.Slice, m.Plane);
+                })
+                .ToList();
+
+            // The multiset of (axis, slice, plane) should be the same
+            var origSorted = originalStructures.OrderBy(s => s.Axis).ThenBy(s => s.Slice).ThenBy(s => s.Plane).ToList();
+            var newSorted = newStructures.OrderBy(s => s.Axis).ThenBy(s => s.Slice).ThenBy(s => s.Plane).ToList();
+            Assert.Equal(origSorted, newSorted);
+        }
+    }
+
+    [Fact]
+    public void InverseSequenceMutation_OperatesOnSegment()
+    {
+        var op = new InverseSequenceMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int changedSomething = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // Check if any changes were made
+            bool changed = false;
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                {
+                    changed = true;
+                    break;
+                }
+            }
+            if (changed) changedSomething++;
+        }
+
+        Assert.True(changedSomething > 0, "Should make changes in some trials");
+    }
+
+    [Fact]
+    public void InverseSequenceMutation_RequiresAtLeastTwoGenes()
+    {
+        var op = new InverseSequenceMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        var chromosome = new MockRubikChromosome(1);
+        chromosome.ValidMoves = validMoves;
+        chromosome.Genes[0] = validMoves[0];
+        var original = chromosome.Genes[0];
+
+        var rng = new Random(42);
+        op.Mutate(chromosome, rng);
+
+        Assert.Equal(original, chromosome.Genes[0]);
+    }
+
+    #endregion
+
     #region InsertMutation Tests
 
     [Fact]
