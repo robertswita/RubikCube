@@ -186,7 +186,7 @@
             // TransparencyBox
             // 
             this.TransparencyBox.AutoSize = true;
-            this.TransparencyBox.Location = new System.Drawing.Point(510, 10);
+            this.TransparencyBox.Location = new System.Drawing.Point(365, 10);
             this.TransparencyBox.Name = "TransparencyBox";
             this.TransparencyBox.Size = new System.Drawing.Size(18, 17);
             this.TransparencyBox.TabIndex = 29;
@@ -244,7 +244,7 @@
             // label9
             // 
             this.slicesLbl.AutoSize = true;
-            this.slicesLbl.Location = new System.Drawing.Point(171, 9);
+            this.slicesLbl.Location = new System.Drawing.Point(90, 9);
             this.slicesLbl.Name = "label9";
             this.slicesLbl.Size = new System.Drawing.Size(47, 16);
             this.slicesLbl.TabIndex = 22;
@@ -252,9 +252,9 @@
             // 
             // SlicesBox
             // 
-            this.SlicesBox.Location = new System.Drawing.Point(224, 7);
+            this.SlicesBox.Location = new System.Drawing.Point(137, 7);
             this.SlicesBox.Name = "SlicesBox";
-            this.SlicesBox.Size = new System.Drawing.Size(64, 22);
+            this.SlicesBox.Size = new System.Drawing.Size(32, 22);
             this.SlicesBox.TabIndex = 21;
             this.SlicesBox.Value = new decimal(new int[] {
             3,
@@ -266,7 +266,7 @@
             // shuffleLbl
             //
             this.shuffleLbl.AutoSize = true;
-            this.shuffleLbl.Location = new System.Drawing.Point(295, 9);
+            this.shuffleLbl.Location = new System.Drawing.Point(179, 9);
             this.shuffleLbl.Name = "shuffleLbl";
             this.shuffleLbl.Size = new System.Drawing.Size(52, 16);
             this.shuffleLbl.TabIndex = 63;
@@ -274,11 +274,11 @@
             //
             // numShuffleMoves
             //
-            this.numShuffleMoves.Location = new System.Drawing.Point(353, 7);
+            this.numShuffleMoves.Location = new System.Drawing.Point(231, 7);
             this.numShuffleMoves.Maximum = new decimal(new int[] { 100, 0, 0, 0 });
             this.numShuffleMoves.Minimum = new decimal(new int[] { 5, 0, 0, 0 });
             this.numShuffleMoves.Name = "numShuffleMoves";
-            this.numShuffleMoves.Size = new System.Drawing.Size(64, 22);
+            this.numShuffleMoves.Size = new System.Drawing.Size(42, 22);
             this.numShuffleMoves.TabIndex = 64;
             this.numShuffleMoves.Value = new decimal(new int[] { 30, 0, 0, 0 });
             //
@@ -487,13 +487,13 @@
             this.dimensionLbl.Name = "label12";
             this.dimensionLbl.Size = new System.Drawing.Size(74, 16);
             this.dimensionLbl.TabIndex = 33;
-            this.dimensionLbl.Text = "Dimension:";
+            this.dimensionLbl.Text = "Dim:";
             // 
             // DimsBox
             // 
-            this.DimsBox.Location = new System.Drawing.Point(88, 7);
+            this.DimsBox.Location = new System.Drawing.Point(48, 7);
             this.DimsBox.Name = "DimsBox";
-            this.DimsBox.Size = new System.Drawing.Size(64, 22);
+            this.DimsBox.Size = new System.Drawing.Size(32, 22);
             this.DimsBox.TabIndex = 34;
             this.DimsBox.Value = new decimal(new int[] {
             3,
@@ -505,7 +505,7 @@
             // label13
             // 
             this.transparencyLbl.AutoSize = true;
-            this.transparencyLbl.Location = new System.Drawing.Point(425, 9);
+            this.transparencyLbl.Location = new System.Drawing.Point(273, 9);
             this.transparencyLbl.Name = "label13";
             this.transparencyLbl.Size = new System.Drawing.Size(94, 16);
             this.transparencyLbl.TabIndex = 35;
