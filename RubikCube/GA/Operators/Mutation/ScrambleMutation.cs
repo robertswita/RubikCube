@@ -15,7 +15,7 @@ public class ScrambleMutation<T> : IMutationOperator<T> where T : IChromosome
         if (length < 2) return;
 
         int start = rng.Next(length - 1);
-        int end = rng.Next(start + 1, length);
+        int end = rng.Next(start + 1, length + 1);
         int segmentLength = end - start;
 
         if (segmentLength < 2) return;

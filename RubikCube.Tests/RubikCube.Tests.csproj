@@ -31,6 +31,15 @@
     <Compile Include="..\RubikCube\GA\Operators\Selection\*.cs" LinkBase="GA\Operators\Selection" />
     <!-- Crossover operators -->
     <Compile Include="..\RubikCube\GA\Operators\Crossover\*.cs" LinkBase="GA\Operators\Crossover" />
+    <!-- Mutation operators (excluding GaussianMutation and CreepMutation which depend on Rubik-specific types) -->
+    <Compile Include="..\RubikCube\GA\Interfaces\IMutationOperator.cs" LinkBase="GA\Interfaces" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\SwapMutation.cs" LinkBase="GA\Operators\Mutation" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\InversionMutation.cs" LinkBase="GA\Operators\Mutation" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\ScrambleMutation.cs" LinkBase="GA\Operators\Mutation" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\ShiftMutation.cs" LinkBase="GA\Operators\Mutation" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\DisplacementMutation.cs" LinkBase="GA\Operators\Mutation" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\TranslocationMutation.cs" LinkBase="GA\Operators\Mutation" />
+    <Compile Include="..\RubikCube\GA\Operators\Mutation\RandomMutation.cs" LinkBase="GA\Operators\Mutation" />
   </ItemGroup>
 
 </Project>

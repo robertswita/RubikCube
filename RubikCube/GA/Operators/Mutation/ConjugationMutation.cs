@@ -10,7 +10,7 @@ namespace TGL.GA.Operators.Mutation;
 /// Conjugation mutation - domain-specific mutation for Rubik's cube.
 /// Implements the ABA' conjugation pattern using group theory symmetry.
 ///
-/// 4D+ Optimization:
+/// 4D+ Optimiztion:
 /// In dimensions >= 4, the operator ensures the central "B" move is on an
 /// orthogonal plane relative to the surrounding "A" moves. This creates
 /// "purer" conjugations that affect fewer pieces.
@@ -66,7 +66,7 @@ public class ConjugationMutation<T> : IMutationOperator<T> where T : IChromosome
     }
 
     /// <summary>
-    /// Optimize the central "B" move to be on an orthogonal plane relative to surrounding "A" moves.
+    /// Optimie the central "B" move to be on an orthogonal plane relative to surrounding "A" moves.
     /// </summary>
     private static void OptimizeCentralMove(T chromosome, int geneIdx, Random rng)
     {
@@ -76,7 +76,7 @@ public class ConjugationMutation<T> : IMutationOperator<T> where T : IChromosome
         var moveA = TMove.Decode((int)chromosome.Genes[geneIdx - 1]);
         int planeA = moveA.Plane;
 
-        // Check if current central move is already orthogonal
+        // Check if the current central move is already orthogonal
         var currentB = TMove.Decode((int)chromosome.Genes[geneIdx]);
         if (_orthogonalPlanes.TryGetValue(planeA, out var orthPlanes) && orthPlanes.Contains(currentB.Plane))
         {

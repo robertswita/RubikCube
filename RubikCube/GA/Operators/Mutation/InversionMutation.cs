@@ -15,7 +15,7 @@ public class InversionMutation<T> : IMutationOperator<T> where T : IChromosome
         if (length < 2) return;
 
         int start = rng.Next(length - 1);
-        int end = rng.Next(start + 1, length);
+        int end = rng.Next(start + 1, length + 1);
 
         // Reverse the segment [start, end)
         Array.Reverse(chromosome.Genes, start, end - start);
