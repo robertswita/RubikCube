@@ -281,6 +281,222 @@ public class MutationOperatorSpecificTests
 
     #endregion
 
+    #region CreepMutation Tests
+
+    [Fact]
+    public void CreepMutation_MakesSmallChanges()
+    {
+        var op = new CreepMutation<MockChromosome>(genesToMutate: 1, creepRange: 1.0);
+        var changes = new List<double>();
+
+        for (int trial = 0; trial < 500; trial++)
+        {
+            var chromosome = MockChromosome.WithGenes(50, 50, 50, 50, 50, 50, 50, 50, 50, 50);
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+
+            op.Mutate(chromosome, rng);
+
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                double delta = Math.Abs(chromosome.Genes[i] - original[i]);
+                if (delta > 0.001)
+                    changes.Add(delta);
+            }
+        }
+
+        // All changes should be within creepRange
+        Assert.All(changes, delta => Assert.True(delta <= 1.0,
+            $"Change {delta} exceeds creepRange 1.0"));
+    }
+
+    [Fact]
+    public void CreepMutation_CreepRangeControlsMaxChange()
+    {
+        double creepRange = 0.5;
+        var op = new CreepMutation<MockChromosome>(genesToMutate: 1, creepRange: creepRange);
+        var changes = new List<double>();
+
+        for (int trial = 0; trial < 500; trial++)
+        {
+            var chromosome = MockChromosome.WithGenes(100, 100, 100, 100, 100, 100, 100, 100, 100, 100);
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+
+            op.Mutate(chromosome, rng);
+
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                double delta = Math.Abs(chromosome.Genes[i] - original[i]);
+                if (delta > 0.001)
+                    changes.Add(delta);
+            }
+        }
+
+        // All changes should be within creepRange
+        Assert.True(changes.Count > 0, "No changes were made");
+        Assert.All(changes, delta => Assert.True(delta <= creepRange + 0.001,
+            $"Change {delta} exceeds creepRange {creepRange}"));
+    }
+
+    [Fact]
+    public void CreepMutation_ChangesCanBePositiveOrNegative()
+    {
+        var op = new CreepMutation<MockChromosome>(genesToMutate: 1, creepRange: 1.0);
+        int positiveCount = 0;
+        int negativeCount = 0;
+
+        for (int trial = 0; trial < 500; trial++)
+        {
+            var chromosome = MockChromosome.WithGenes(50, 50, 50, 50, 50, 50, 50, 50, 50, 50);
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+
+            op.Mutate(chromosome, rng);
+
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                double delta = chromosome.Genes[i] - original[i];
+                if (delta > 0.001) positiveCount++;
+                if (delta < -0.001) negativeCount++;
+            }
+        }
+
+        Assert.True(positiveCount > 100, "Should have positive changes");
+        Assert.True(negativeCount > 100, "Should have negative changes");
+    }
+
+    [Fact]
+    public void CreepMutation_GenesToMutateControlsCount()
+    {
+        for (int genesToMutate = 1; genesToMutate <= 5; genesToMutate++)
+        {
+            var op = new CreepMutation<MockChromosome>(genesToMutate: genesToMutate, creepRange: 1.0);
+            var mutationCounts = new List<int>();
+
+            for (int trial = 0; trial < 100; trial++)
+            {
+                var chromosome = MockChromosome.WithGenes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+                var original = chromosome.Genes.ToArray();
+                var rng = new Random(trial);
+
+                op.Mutate(chromosome, rng);
+
+                int changed = 0;
+                for (int i = 0; i < chromosome.Length; i++)
+                {
+                    if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                        changed++;
+                }
+                mutationCounts.Add(changed);
+            }
+
+            double avgMutations = mutationCounts.Average();
+            Assert.True(avgMutations >= genesToMutate * 0.5,
+                $"With genesToMutate={genesToMutate}, expected avg ~{genesToMutate}, got {avgMutations}");
+        }
+    }
+
+    [Fact]
+    public void CreepMutation_WithRubikChromosome_CreepsAngle()
+    {
+        var op = new CreepMutation<MockRubikChromosome>(genesToMutate: 10, creepRange: 1.0);
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int angleChanges = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            // Initialize with a specific move (angle 0)
+            int baseMoveCode = validMoves[0];
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = baseMoveCode;
+
+            var originalMoves = chromosome.Genes.Select(g => RubikCube.TMove.Decode((int)g)).ToList();
+            var rng = new Random(trial);
+
+            op.Mutate(chromosome, rng);
+
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                var newMove = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                var origMove = originalMoves[i];
+                if (newMove.Angle != origMove.Angle)
+                    angleChanges++;
+            }
+        }
+
+        Assert.True(angleChanges > 0, "CreepMutation with Rubik chromosome never creeps angles");
+    }
+
+    [Fact]
+    public void CreepMutation_WithRubikChromosome_CreepsSlice()
+    {
+        var op = new CreepMutation<MockRubikChromosome>(genesToMutate: 10, creepRange: 1.0);
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int sliceChanges = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            // Initialize with middle slice moves
+            int baseMoveCode = validMoves.First(m => RubikCube.TMove.Decode(m).Slice == 1);
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = baseMoveCode;
+
+            var originalMoves = chromosome.Genes.Select(g => RubikCube.TMove.Decode((int)g)).ToList();
+            var rng = new Random(trial);
+
+            op.Mutate(chromosome, rng);
+
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                var newMove = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                var origMove = originalMoves[i];
+                if (newMove.Slice != origMove.Slice)
+                    sliceChanges++;
+            }
+        }
+
+        Assert.True(sliceChanges > 0, "CreepMutation with Rubik chromosome never creeps slices");
+    }
+
+    [Fact]
+    public void CreepMutation_WithRubikChromosome_CreepsPlane()
+    {
+        var op = new CreepMutation<MockRubikChromosome>(genesToMutate: 10, creepRange: 1.0);
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int planeChanges = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            int baseMoveCode = validMoves[0];
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = baseMoveCode;
+
+            var originalMoves = chromosome.Genes.Select(g => RubikCube.TMove.Decode((int)g)).ToList();
+            var rng = new Random(trial);
+
+            op.Mutate(chromosome, rng);
+
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                var newMove = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                var origMove = originalMoves[i];
+                if (newMove.Plane != origMove.Plane)
+                    planeChanges++;
+            }
+        }
+
+        Assert.True(planeChanges > 0, "CreepMutation with Rubik chromosome never creeps planes");
+    }
+
+    #endregion
+
     #region GaussianMutation Tests
 
     [Fact]
