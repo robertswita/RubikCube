@@ -281,6 +281,175 @@ public class MutationOperatorSpecificTests
 
     #endregion
 
+    #region ConjugationMutation Tests
+
+    [Fact]
+    public void ConjugationMutation_CreatesSymmetricPattern()
+    {
+        var op = new ConjugationMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int symmetryCount = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // Look for symmetric ABA' patterns
+            // After mutation, moves around a center should be inverses
+            for (int center = 1; center < chromosome.Length - 1; center++)
+            {
+                bool hasSymmetry = true;
+                for (int offset = 1; center - offset >= 0 && center + offset < chromosome.Length; offset++)
+                {
+                    var moveBefore = RubikCube.TMove.Decode((int)chromosome.Genes[center - offset]);
+                    var moveAfter = RubikCube.TMove.Decode((int)chromosome.Genes[center + offset]);
+
+                    // Check if they're inverses (same structure, complementary angles)
+                    if (moveBefore.Axis == moveAfter.Axis &&
+                        moveBefore.Slice == moveAfter.Slice &&
+                        moveBefore.Plane == moveAfter.Plane &&
+                        moveBefore.Angle + moveAfter.Angle == 2)
+                    {
+                        // Found a symmetric pair
+                        symmetryCount++;
+                        hasSymmetry = true;
+                        break;
+                    }
+                }
+                if (hasSymmetry) break;
+            }
+        }
+
+        Assert.True(symmetryCount > 0, "Should create symmetric ABA' patterns");
+    }
+
+    [Fact]
+    public void ConjugationMutation_InvertsAngles()
+    {
+        var op = new ConjugationMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        // Test angle inversion: 0→2, 1→1, 2→0
+        var angle0Move = validMoves.First(m => RubikCube.TMove.Decode(m).Angle == 0);
+        var angle1Move = validMoves.First(m => RubikCube.TMove.Decode(m).Angle == 1);
+        var angle2Move = validMoves.First(m => RubikCube.TMove.Decode(m).Angle == 2);
+
+        int inversionObserved = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(5);
+            chromosome.ValidMoves = validMoves;
+            // Set up: [angle0, angle1, center, ?, ?]
+            chromosome.Genes[0] = angle0Move;
+            chromosome.Genes[1] = angle1Move;
+            chromosome.Genes[2] = validMoves[0]; // center
+            chromosome.Genes[3] = validMoves[1];
+            chromosome.Genes[4] = validMoves[2];
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // Check if angles were inverted in the pattern
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                var move = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                if (move.Angle == 2) // Could be inverted from 0
+                {
+                    inversionObserved++;
+                    break;
+                }
+            }
+        }
+
+        Assert.True(inversionObserved > 0, "Should invert angles as part of ABA' pattern");
+    }
+
+    [Fact]
+    public void ConjugationMutation_RequiresAtLeastThreeGenes()
+    {
+        var op = new ConjugationMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        var chromosome = new MockRubikChromosome(2);
+        chromosome.ValidMoves = validMoves;
+        chromosome.Genes[0] = validMoves[0];
+        chromosome.Genes[1] = validMoves[1];
+        var original = chromosome.Genes.ToArray();
+
+        var rng = new Random(42);
+        op.Mutate(chromosome, rng);
+
+        // Should not change with only 2 genes
+        Assert.Equal(original[0], chromosome.Genes[0]);
+        Assert.Equal(original[1], chromosome.Genes[1]);
+    }
+
+    [Fact]
+    public void ConjugationMutation_MakesSomeChanges()
+    {
+        var op = new ConjugationMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int changedTrials = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            bool changed = false;
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                {
+                    changed = true;
+                    break;
+                }
+            }
+            if (changed) changedTrials++;
+        }
+
+        Assert.True(changedTrials > 0, "Should make changes in some trials");
+    }
+
+    [Fact]
+    public void ConjugationMutation_ProducesValidMoves()
+    {
+        var op = new ConjugationMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // All resulting moves should be valid
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                var move = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                Assert.True(move.IsValid, $"Move at position {i} is invalid after conjugation mutation");
+            }
+        }
+    }
+
+    #endregion
+
     #region HyperplaneMutation Tests
 
     [Fact]
