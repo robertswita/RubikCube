@@ -281,6 +281,168 @@ public class MutationOperatorSpecificTests
 
     #endregion
 
+    #region OrthogonalConjugationMutation Tests
+
+    [Fact]
+    public void OrthogonalConjugationMutation_DoesNotThrow()
+    {
+        var op = new OrthogonalConjugationMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+
+            var exception = Record.Exception(() => op.Mutate(chromosome, rng));
+            Assert.Null(exception);
+        }
+    }
+
+    [Fact]
+    public void OrthogonalConjugationMutation_CreatesCommutatorPattern()
+    {
+        var op = new OrthogonalConjugationMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int commutatorCount = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // Look for A, B, A', B' pattern (commutator)
+            for (int i = 0; i < chromosome.Length - 3; i++)
+            {
+                var moveA = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                var moveB = RubikCube.TMove.Decode((int)chromosome.Genes[i + 1]);
+                var moveAInv = RubikCube.TMove.Decode((int)chromosome.Genes[i + 2]);
+                var moveBInv = RubikCube.TMove.Decode((int)chromosome.Genes[i + 3]);
+
+                // Check if A and A' are inverses
+                bool aInverse = moveA.Axis == moveAInv.Axis &&
+                                moveA.Slice == moveAInv.Slice &&
+                                moveA.Plane == moveAInv.Plane;
+
+                // Check if B and B' are inverses
+                bool bInverse = moveB.Axis == moveBInv.Axis &&
+                                moveB.Slice == moveBInv.Slice &&
+                                moveB.Plane == moveBInv.Plane;
+
+                if (aInverse && bInverse)
+                {
+                    commutatorCount++;
+                    break;
+                }
+            }
+        }
+
+        Assert.True(commutatorCount > 50,
+            $"Should create commutator patterns, found {commutatorCount}/100");
+    }
+
+    [Fact]
+    public void OrthogonalConjugationMutation_RequiresAtLeastFourGenes()
+    {
+        var op = new OrthogonalConjugationMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        var chromosome = new MockRubikChromosome(3);
+        chromosome.ValidMoves = validMoves;
+        for (int i = 0; i < 3; i++)
+            chromosome.Genes[i] = validMoves[i];
+        var original = chromosome.Genes.ToArray();
+
+        var rng = new Random(42);
+        op.Mutate(chromosome, rng);
+
+        // Should not change with only 3 genes
+        Assert.Equal(original[0], chromosome.Genes[0]);
+        Assert.Equal(original[1], chromosome.Genes[1]);
+        Assert.Equal(original[2], chromosome.Genes[2]);
+    }
+
+    [Fact]
+    public void OrthogonalConjugationMutation_ProducesValidMoves()
+    {
+        var op = new OrthogonalConjugationMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // All resulting moves should be valid
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                var move = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                Assert.True(move.IsValid, $"Move at position {i} is invalid");
+            }
+        }
+    }
+
+    [Fact]
+    public void OrthogonalConjugationMutation_DifferentPlanesForAAndB()
+    {
+        var op = new OrthogonalConjugationMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int differentPlaneCount = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // Look for the commutator pattern and check planes
+            for (int i = 0; i < chromosome.Length - 3; i++)
+            {
+                var moveA = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                var moveB = RubikCube.TMove.Decode((int)chromosome.Genes[i + 1]);
+                var moveAInv = RubikCube.TMove.Decode((int)chromosome.Genes[i + 2]);
+                var moveBInv = RubikCube.TMove.Decode((int)chromosome.Genes[i + 3]);
+
+                // Check if this is a commutator pattern
+                bool isCommutator = moveA.Axis == moveAInv.Axis &&
+                                    moveA.Slice == moveAInv.Slice &&
+                                    moveA.Plane == moveAInv.Plane &&
+                                    moveB.Axis == moveBInv.Axis &&
+                                    moveB.Slice == moveBInv.Slice &&
+                                    moveB.Plane == moveBInv.Plane;
+
+                if (isCommutator && moveA.Plane != moveB.Plane)
+                {
+                    differentPlaneCount++;
+                    break;
+                }
+            }
+        }
+
+        Assert.True(differentPlaneCount > 80,
+            $"A and B should use different planes, found {differentPlaneCount}/100");
+    }
+
+    #endregion
+
     #region ConjugationMutation Tests
 
     [Fact]
