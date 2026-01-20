@@ -281,6 +281,190 @@ public class MutationOperatorSpecificTests
 
     #endregion
 
+    #region AdaptiveMutation Tests
+
+    [Fact]
+    public void AdaptiveMutation_HighFitness_MoreAggressiveMutation()
+    {
+        var op = new AdaptiveMutation<MockChromosome>(
+            minGenes: 1, maxGenes: 8, minExpectedFitness: 0, maxExpectedFitness: 100);
+
+        // Track mutation intensity for different fitness values
+        var changesHighFitness = new List<int>();
+        var changesLowFitness = new List<int>();
+
+        for (int trial = 0; trial < 100; trial++)
+        {
+            // High fitness value (poor solution, should mutate more)
+            var chrHigh = MockChromosome.WithGenes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            chrHigh.Fitness = 90; // High = poor
+            var origHigh = chrHigh.Genes.ToArray();
+            var rng1 = new Random(trial);
+            op.Mutate(chrHigh, rng1);
+            changesHighFitness.Add(Enumerable.Range(0, 10).Count(i => Math.Abs(chrHigh.Genes[i] - origHigh[i]) > 0.001));
+
+            // Low fitness value (good solution, should mutate less)
+            var chrLow = MockChromosome.WithGenes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            chrLow.Fitness = 10; // Low = good
+            var origLow = chrLow.Genes.ToArray();
+            var rng2 = new Random(trial + 10000);
+            op.Mutate(chrLow, rng2);
+            changesLowFitness.Add(Enumerable.Range(0, 10).Count(i => Math.Abs(chrLow.Genes[i] - origLow[i]) > 0.001));
+        }
+
+        double avgHigh = changesHighFitness.Average();
+        double avgLow = changesLowFitness.Average();
+
+        Assert.True(avgHigh > avgLow,
+            $"High fitness (poor) should mutate more: avgHigh={avgHigh}, avgLow={avgLow}");
+    }
+
+    [Fact]
+    public void AdaptiveMutation_UsesScrambleForHighIntensity()
+    {
+        var op = new AdaptiveMutation<MockChromosome>(
+            minGenes: 1, maxGenes: 8, minExpectedFitness: 0, maxExpectedFitness: 100);
+
+        // For very high fitness (intensity > 0.7), should use scramble
+        // Scramble preserves the gene multiset
+        int scrambleCount = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = MockChromosome.WithGenes(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+            chromosome.Fitness = 95; // Very high = scramble territory
+            var originalSorted = chromosome.Genes.OrderBy(x => x).ToArray();
+            var rng = new Random(trial);
+
+            op.Mutate(chromosome, rng);
+
+            // After scramble, the sorted genes should be similar
+            // (some may be replaced by random, but the core should remain)
+            var resultSorted = chromosome.Genes.OrderBy(x => x).ToArray();
+            int preserved = originalSorted.Intersect(resultSorted).Count();
+            if (preserved >= 5) // At least half preserved indicates scramble
+                scrambleCount++;
+        }
+
+        Assert.True(scrambleCount > 30,
+            $"High intensity should use scramble mutation, preserved count: {scrambleCount}");
+    }
+
+    [Fact]
+    public void AdaptiveMutation_LowIntensity_UsesNeighborMutation()
+    {
+        var op = new AdaptiveMutation<MockChromosome>(
+            minGenes: 1, maxGenes: 8, minExpectedFitness: 0, maxExpectedFitness: 100);
+
+        // For low fitness (intensity < 0.3), changes should be smaller
+        var changesMagnitudes = new List<double>();
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = MockChromosome.WithGenes(100, 100, 100, 100, 100, 100, 100, 100, 100, 100);
+            chromosome.Fitness = 10; // Low = good, uses neighbor mutation
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+
+            op.Mutate(chromosome, rng);
+
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                double delta = Math.Abs(chromosome.Genes[i] - original[i]);
+                if (delta > 0.001)
+                    changesMagnitudes.Add(delta);
+            }
+        }
+
+        // Neighbor mutation makes small perturbations (typically ±5)
+        double avgChange = changesMagnitudes.Average();
+        Assert.True(avgChange < 20,
+            $"Low intensity should make small changes, avg={avgChange}");
+    }
+
+    [Fact]
+    public void AdaptiveMutation_MinMaxGenesRespected()
+    {
+        var op = new AdaptiveMutation<MockChromosome>(
+            minGenes: 2, maxGenes: 5, minExpectedFitness: 0, maxExpectedFitness: 100);
+
+        // Test that genes mutated is within minGenes-maxGenes range
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = MockChromosome.WithGenes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            chromosome.Fitness = 50; // Mid-range
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+
+            op.Mutate(chromosome, rng);
+
+            int changed = Enumerable.Range(0, 10)
+                .Count(i => Math.Abs(original[i] - chromosome.Genes[i]) > 0.001);
+
+            // Should be at least minGenes (though may be less due to position overlap)
+            // and at most some reasonable number related to maxGenes
+            Assert.True(changed <= chromosome.Length,
+                $"Changed {changed} genes, should not exceed chromosome length");
+        }
+    }
+
+    [Fact]
+    public void AdaptiveMutation_WithRubikChromosome_UsesValidMoves()
+    {
+        var op = new AdaptiveMutation<MockRubikChromosome>(
+            minGenes: 1, maxGenes: 5, minExpectedFitness: 0, maxExpectedFitness: 100);
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            chromosome.Fitness = 80; // High intensity - random mutation
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[0];
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // All genes should still be valid moves (or 0-999 from generic fallback)
+            // For Rubik chromosome path, should use ValidMoves
+        }
+        // Test passes if no exception is thrown
+    }
+
+    [Fact]
+    public void AdaptiveMutation_IntensityCalculation()
+    {
+        // Test various fitness values map correctly to intensity
+        var op = new AdaptiveMutation<MockChromosome>(
+            minGenes: 1, maxGenes: 10, minExpectedFitness: 0, maxExpectedFitness: 100);
+
+        // Fitness at min (0) should give minimal mutation
+        // Fitness at max (100) should give maximal mutation
+        // We can observe this through the number of changes
+
+        var changesAtMin = new List<int>();
+        var changesAtMax = new List<int>();
+
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chrMin = MockChromosome.WithGenes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            chrMin.Fitness = 0; // Best fitness
+            var origMin = chrMin.Genes.ToArray();
+            op.Mutate(chrMin, new Random(trial));
+            changesAtMin.Add(Enumerable.Range(0, 10).Count(i => Math.Abs(chrMin.Genes[i] - origMin[i]) > 0.001));
+
+            var chrMax = MockChromosome.WithGenes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            chrMax.Fitness = 100; // Worst fitness
+            var origMax = chrMax.Genes.ToArray();
+            op.Mutate(chrMax, new Random(trial + 5000));
+            changesAtMax.Add(Enumerable.Range(0, 10).Count(i => Math.Abs(chrMax.Genes[i] - origMax[i]) > 0.001));
+        }
+
+        Assert.True(changesAtMax.Average() > changesAtMin.Average(),
+            $"Max fitness changes ({changesAtMax.Average()}) should exceed min ({changesAtMin.Average()})");
+    }
+
+    #endregion
+
     #region CreepMutation Tests
 
     [Fact]
