@@ -281,6 +281,202 @@ public class MutationOperatorSpecificTests
 
     #endregion
 
+    #region HyperplaneMutation Tests
+
+    [Fact]
+    public void HyperplaneMutation_ChangesAxis()
+    {
+        var op = new HyperplaneMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int axisChangedCount = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var originalMoves = chromosome.Genes.Select(g => RubikCube.TMove.Decode((int)g)).ToList();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+            var newMoves = chromosome.Genes.Select(g => RubikCube.TMove.Decode((int)g)).ToList();
+
+            // Check if any axis changed
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (originalMoves[i].Axis != newMoves[i].Axis)
+                {
+                    axisChangedCount++;
+                    break;
+                }
+            }
+        }
+
+        Assert.True(axisChangedCount > 50,
+            $"Should change axis frequently, changed in {axisChangedCount}/100 trials");
+    }
+
+    [Fact]
+    public void HyperplaneMutation_PreservesSlice()
+    {
+        var op = new HyperplaneMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int slicePreservedCount = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var originalMoves = chromosome.Genes.Select(g => RubikCube.TMove.Decode((int)g)).ToList();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+            var newMoves = chromosome.Genes.Select(g => RubikCube.TMove.Decode((int)g)).ToList();
+
+            // Find the changed gene and verify slice is preserved
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (Math.Abs(originalMoves[i].Encode() - newMoves[i].Encode()) > 0)
+                {
+                    if (originalMoves[i].Slice == newMoves[i].Slice)
+                        slicePreservedCount++;
+                    break;
+                }
+            }
+        }
+
+        Assert.True(slicePreservedCount > 90,
+            $"Should preserve slice, preserved in {slicePreservedCount}/100");
+    }
+
+    [Fact]
+    public void HyperplaneMutation_PreservesAngle()
+    {
+        var op = new HyperplaneMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int anglePreservedCount = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var originalMoves = chromosome.Genes.Select(g => RubikCube.TMove.Decode((int)g)).ToList();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+            var newMoves = chromosome.Genes.Select(g => RubikCube.TMove.Decode((int)g)).ToList();
+
+            // Find the changed gene and verify angle is preserved
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (Math.Abs(originalMoves[i].Encode() - newMoves[i].Encode()) > 0)
+                {
+                    if (originalMoves[i].Angle == newMoves[i].Angle)
+                        anglePreservedCount++;
+                    break;
+                }
+            }
+        }
+
+        Assert.True(anglePreservedCount > 90,
+            $"Should preserve angle, preserved in {anglePreservedCount}/100");
+    }
+
+    [Fact]
+    public void HyperplaneMutation_ChangesExactlyOneGene()
+    {
+        var op = new HyperplaneMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            int changedCount = 0;
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                    changedCount++;
+            }
+
+            Assert.True(changedCount <= 1, $"Should change at most 1 gene, changed {changedCount}");
+        }
+    }
+
+    [Fact]
+    public void HyperplaneMutation_ProducesValidMoves()
+    {
+        var op = new HyperplaneMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // All resulting moves should be valid
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                var move = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                Assert.True(move.IsValid, $"Move at position {i} is invalid after hyperplane mutation");
+            }
+        }
+    }
+
+    [Fact]
+    public void HyperplaneMutation_AllPositionsCanBeSelected()
+    {
+        var op = new HyperplaneMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+        var positionCounts = new int[10];
+
+        for (int trial = 0; trial < 1000; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                {
+                    positionCounts[i]++;
+                    break;
+                }
+            }
+        }
+
+        for (int i = 0; i < 10; i++)
+        {
+            Assert.True(positionCounts[i] > 0,
+                $"Position {i} was never selected for hyperplane mutation");
+        }
+    }
+
+    #endregion
+
     #region NeighborMutation Tests
 
     [Fact]
