@@ -281,6 +281,159 @@ public class MutationOperatorSpecificTests
 
     #endregion
 
+    #region CommutatorMutation Tests
+
+    [Fact]
+    public void CommutatorMutation_DoesNotThrow()
+    {
+        var op = new CommutatorMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            var exception = Record.Exception(() => op.Mutate(chromosome, rng));
+            Assert.Null(exception);
+        }
+    }
+
+    [Fact]
+    public void CommutatorMutation_RequiresAtLeastFourGenes()
+    {
+        var op = new CommutatorMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        var chromosome = new MockRubikChromosome(3);
+        chromosome.ValidMoves = validMoves;
+        for (int i = 0; i < 3; i++)
+            chromosome.Genes[i] = validMoves[i];
+        var original = chromosome.Genes.ToArray();
+
+        var rng = new Random(42);
+        op.Mutate(chromosome, rng);
+
+        // Should not change with only 3 genes
+        Assert.Equal(original[0], chromosome.Genes[0]);
+        Assert.Equal(original[1], chromosome.Genes[1]);
+        Assert.Equal(original[2], chromosome.Genes[2]);
+    }
+
+    [Fact]
+    public void CommutatorMutation_CreatesCommutatorPattern()
+    {
+        var op = new CommutatorMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int commutatorCount = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // Look for ABA'B' pattern
+            for (int i = 0; i < chromosome.Length - 3; i++)
+            {
+                var moveA = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                var moveB = RubikCube.TMove.Decode((int)chromosome.Genes[i + 1]);
+                var moveAInv = RubikCube.TMove.Decode((int)chromosome.Genes[i + 2]);
+                var moveBInv = RubikCube.TMove.Decode((int)chromosome.Genes[i + 3]);
+
+                // Check for commutator structure
+                bool aInverse = moveA.Axis == moveAInv.Axis &&
+                                moveA.Slice == moveAInv.Slice &&
+                                moveA.Plane == moveAInv.Plane;
+                bool bInverse = moveB.Axis == moveBInv.Axis &&
+                                moveB.Slice == moveBInv.Slice &&
+                                moveB.Plane == moveBInv.Plane;
+
+                if (aInverse && bInverse)
+                {
+                    commutatorCount++;
+                    break;
+                }
+            }
+        }
+
+        Assert.True(commutatorCount > 50,
+            $"Should create commutator patterns, found {commutatorCount}/100");
+    }
+
+    [Fact]
+    public void CommutatorMutation_ProducesValidMoves()
+    {
+        var op = new CommutatorMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // All resulting moves should be valid
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                var move = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                Assert.True(move.IsValid, $"Move at position {i} is invalid");
+            }
+        }
+    }
+
+    [Fact]
+    public void CommutatorMutation_InvertsAnglesCorrectly()
+    {
+        var op = new CommutatorMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int correctInversionCount = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // Look for inverse angle relationships in commutator patterns
+            for (int i = 0; i < chromosome.Length - 3; i++)
+            {
+                var moveA = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                var moveAInv = RubikCube.TMove.Decode((int)chromosome.Genes[i + 2]);
+
+                // Check if A and A' have correct inverse angles (sum = 2)
+                if (moveA.Axis == moveAInv.Axis &&
+                    moveA.Slice == moveAInv.Slice &&
+                    moveA.Plane == moveAInv.Plane &&
+                    moveA.Angle + moveAInv.Angle == 2)
+                {
+                    correctInversionCount++;
+                    break;
+                }
+            }
+        }
+
+        Assert.True(correctInversionCount > 50,
+            $"Should invert angles correctly (sum = 2), found {correctInversionCount}/100");
+    }
+
+    #endregion
+
     #region OrthogonalConjugationMutation Tests
 
     [Fact]
