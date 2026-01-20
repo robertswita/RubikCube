@@ -2913,4 +2913,150 @@ public class MutationOperatorSpecificTests
 
     #endregion
 
+    #region LocalSearchMutation Tests
+
+    [Fact]
+    public void LocalSearchMutation_DoesNotThrow()
+    {
+        var op = new LocalSearchMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            var exception = Record.Exception(() => op.Mutate(chromosome, rng));
+            Assert.Null(exception);
+        }
+    }
+
+    [Fact]
+    public void LocalSearchMutation_RequiresAtLeastTwoGenes()
+    {
+        var op = new LocalSearchMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        // With 1 gene, should not mutate
+        var smallChromosome = new MockRubikChromosome(1);
+        smallChromosome.ValidMoves = validMoves;
+        smallChromosome.Genes[0] = validMoves[0];
+        var original = smallChromosome.Genes[0];
+
+        var rng = new Random(42);
+        op.Mutate(smallChromosome, rng);
+
+        // Gene should be unchanged
+        Assert.Equal(original, smallChromosome.Genes[0]);
+
+        // With 2+ genes, should mutate in some trials
+        int changeCount = 0;
+        for (int trial = 0; trial < 20; trial++)
+        {
+            var normalChromosome = new MockRubikChromosome(10);
+            normalChromosome.ValidMoves = validMoves;
+            for (int i = 0; i < 10; i++)
+                normalChromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var original2 = normalChromosome.Genes.ToArray();
+            rng = new Random(trial);
+            op.Mutate(normalChromosome, rng);
+
+            for (int i = 0; i < original2.Length; i++)
+            {
+                if (Math.Abs(original2[i] - normalChromosome.Genes[i]) > 0.001)
+                    changeCount++;
+            }
+        }
+
+        Assert.True(changeCount > 0, "LocalSearchMutation never mutated a chromosome");
+    }
+
+    [Fact]
+    public void LocalSearchMutation_PerformsLocalSearch()
+    {
+        var op = new LocalSearchMutation<MockRubikChromosome>(neighborhoodSize: 10, maxIterations: 5);
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int changedTrials = 0;
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            bool changed = false;
+            for (int i = 0; i < original.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                {
+                    changed = true;
+                    break;
+                }
+            }
+
+            if (changed) changedTrials++;
+        }
+
+        Assert.True(changedTrials > 0, "LocalSearchMutation never modified any chromosome");
+    }
+
+    [Fact]
+    public void LocalSearchMutation_ProducesValidMoves()
+    {
+        var op = new LocalSearchMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // All genes should be valid moves
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                int moveCode = (int)chromosome.Genes[i];
+                var move = RubikCube.TMove.Decode(moveCode);
+                Assert.True(move.IsValid, $"Gene {i} has invalid move code {moveCode}");
+            }
+        }
+    }
+
+    [Fact]
+    public void LocalSearchMutation_PreservesChromosomeLength()
+    {
+        var op = new LocalSearchMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(12);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < 12; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            int originalLength = chromosome.Length;
+            var rng = new Random(trial);
+
+            op.Mutate(chromosome, rng);
+
+            Assert.Equal(originalLength, chromosome.Length);
+        }
+    }
+
+    #endregion
+
 }
