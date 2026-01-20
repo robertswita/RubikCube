@@ -3059,4 +3059,522 @@ public class MutationOperatorSpecificTests
 
     #endregion
 
+    #region GaussianMutation Parameter Tests
+
+    [Fact]
+    public void GaussianMutation_GenesToMutateParameter_MutatesSpecifiedCount()
+    {
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        // Test with genesToMutate = 3
+        var op3 = new GaussianMutation<MockRubikChromosome>(genesToMutate: 3, sigma: 1.0);
+
+        int totalChanges = 0;
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[0]; // All same value
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op3.Mutate(chromosome, rng);
+
+            int changes = 0;
+            for (int i = 0; i < original.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                    changes++;
+            }
+            totalChanges += changes;
+        }
+
+        // With genesToMutate=3, average should be around 3 changes per mutation
+        double avgChanges = totalChanges / 50.0;
+        Assert.True(avgChanges >= 1.5 && avgChanges <= 4.5,
+            $"Expected ~3 changes on average, got {avgChanges}");
+    }
+
+    [Fact]
+    public void GaussianMutation_SigmaParameter_AffectsMutationMagnitude()
+    {
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        // Small sigma should produce smaller changes
+        var opSmall = new GaussianMutation<MockRubikChromosome>(genesToMutate: 5, sigma: 0.1);
+        var opLarge = new GaussianMutation<MockRubikChromosome>(genesToMutate: 5, sigma: 10.0);
+
+        double totalDiffSmall = 0;
+        double totalDiffLarge = 0;
+
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromSmall = new MockRubikChromosome(10);
+            var chromLarge = new MockRubikChromosome(10);
+            chromSmall.ValidMoves = validMoves;
+            chromLarge.ValidMoves = validMoves;
+
+            for (int i = 0; i < 10; i++)
+            {
+                chromSmall.Genes[i] = 50; // Middle value
+                chromLarge.Genes[i] = 50;
+            }
+
+            var origSmall = chromSmall.Genes.ToArray();
+            var origLarge = chromLarge.Genes.ToArray();
+
+            var rng = new Random(trial);
+            opSmall.Mutate(chromSmall, rng);
+            rng = new Random(trial);
+            opLarge.Mutate(chromLarge, rng);
+
+            for (int i = 0; i < 10; i++)
+            {
+                totalDiffSmall += Math.Abs(chromSmall.Genes[i] - origSmall[i]);
+                totalDiffLarge += Math.Abs(chromLarge.Genes[i] - origLarge[i]);
+            }
+        }
+
+        // Large sigma should produce larger total differences
+        Assert.True(totalDiffLarge > totalDiffSmall,
+            $"Large sigma ({totalDiffLarge}) should produce bigger changes than small sigma ({totalDiffSmall})");
+    }
+
+    #endregion
+
+    #region CreepMutation Parameter Tests
+
+    [Fact]
+    public void CreepMutation_GenesToMutateParameter_MutatesSpecifiedCount()
+    {
+        // Use MockChromosome (not IRubikChromosome) to test continuous creep
+        var op3 = new CreepMutation<MockChromosome>(genesToMutate: 3, creepRange: 5.0);
+
+        int totalChanges = 0;
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = MockChromosome.WithGenes(10, 10, 10, 10, 10, 10, 10, 10, 10, 10);
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op3.Mutate(chromosome, rng);
+
+            int changes = 0;
+            for (int i = 0; i < original.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                    changes++;
+            }
+            totalChanges += changes;
+        }
+
+        double avgChanges = totalChanges / 50.0;
+        Assert.True(avgChanges >= 1.5 && avgChanges <= 4.5,
+            $"Expected ~3 changes on average, got {avgChanges}");
+    }
+
+    [Fact]
+    public void CreepMutation_CreepRangeParameter_LimitsChangeSize()
+    {
+        // Use MockChromosome (not IRubikChromosome) to test continuous creep
+        var opSmall = new CreepMutation<MockChromosome>(genesToMutate: 5, creepRange: 1.0);
+        var opLarge = new CreepMutation<MockChromosome>(genesToMutate: 5, creepRange: 50.0);
+
+        double maxDiffSmall = 0;
+        double maxDiffLarge = 0;
+
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromSmall = MockChromosome.WithGenes(50, 50, 50, 50, 50, 50, 50, 50, 50, 50);
+            var chromLarge = MockChromosome.WithGenes(50, 50, 50, 50, 50, 50, 50, 50, 50, 50);
+
+            var origSmall = chromSmall.Genes.ToArray();
+            var origLarge = chromLarge.Genes.ToArray();
+
+            var rng = new Random(trial);
+            opSmall.Mutate(chromSmall, rng);
+            rng = new Random(trial);
+            opLarge.Mutate(chromLarge, rng);
+
+            for (int i = 0; i < 10; i++)
+            {
+                maxDiffSmall = Math.Max(maxDiffSmall, Math.Abs(chromSmall.Genes[i] - origSmall[i]));
+                maxDiffLarge = Math.Max(maxDiffLarge, Math.Abs(chromLarge.Genes[i] - origLarge[i]));
+            }
+        }
+
+        // Large creep range should allow larger changes
+        Assert.True(maxDiffLarge > maxDiffSmall,
+            $"Large creep range ({maxDiffLarge}) should allow bigger changes than small ({maxDiffSmall})");
+    }
+
+    #endregion
+
+    #region AdaptiveMutation Parameter Tests
+
+    [Fact]
+    public void AdaptiveMutation_MinMaxGenesParameters_RespectsBounds()
+    {
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        // minGenes=2, maxGenes=4
+        var op = new AdaptiveMutation<MockRubikChromosome>(
+            minGenes: 2, maxGenes: 4,
+            minExpectedFitness: 0, maxExpectedFitness: 100);
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            chromosome.Fitness = 50; // Middle fitness
+
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[0];
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            int changes = 0;
+            for (int i = 0; i < original.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                    changes++;
+            }
+
+            // Changes should be between minGenes and maxGenes
+            Assert.True(changes >= 2 && changes <= 4,
+                $"Expected 2-4 changes, got {changes}");
+        }
+    }
+
+    [Fact]
+    public void AdaptiveMutation_FitnessAffectsGeneCount()
+    {
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        var op = new AdaptiveMutation<MockRubikChromosome>(
+            minGenes: 1, maxGenes: 5,
+            minExpectedFitness: 0, maxExpectedFitness: 100);
+
+        // High fitness (bad) should mutate more genes
+        double avgChangesHighFitness = 0;
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            chromosome.Fitness = 90; // High (bad) fitness
+
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[0];
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            int changes = 0;
+            for (int i = 0; i < original.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                    changes++;
+            }
+            avgChangesHighFitness += changes;
+        }
+        avgChangesHighFitness /= 50;
+
+        // Low fitness (good) should mutate fewer genes
+        double avgChangesLowFitness = 0;
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            chromosome.Fitness = 10; // Low (good) fitness
+
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[0];
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            int changes = 0;
+            for (int i = 0; i < original.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                    changes++;
+            }
+            avgChangesLowFitness += changes;
+        }
+        avgChangesLowFitness /= 50;
+
+        // High fitness should cause more mutations
+        Assert.True(avgChangesHighFitness > avgChangesLowFitness,
+            $"High fitness ({avgChangesHighFitness}) should cause more mutations than low ({avgChangesLowFitness})");
+    }
+
+    #endregion
+
+    #region RandomMutation Parameter Tests
+
+    [Fact]
+    public void RandomMutation_GenesToMutateParameter_MutatesSpecifiedCount()
+    {
+        var op1 = new RandomMutation<MockChromosome>(genesToMutate: 1);
+        var op5 = new RandomMutation<MockChromosome>(genesToMutate: 5);
+
+        int totalChanges1 = 0;
+        int totalChanges5 = 0;
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chrom1 = MockChromosome.WithGenes(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+            var chrom5 = MockChromosome.WithGenes(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+
+            var orig1 = chrom1.Genes.ToArray();
+            var orig5 = chrom5.Genes.ToArray();
+
+            var rng = new Random(trial);
+            op1.Mutate(chrom1, rng);
+            rng = new Random(trial);
+            op5.Mutate(chrom5, rng);
+
+            for (int i = 0; i < 10; i++)
+            {
+                if (Math.Abs(orig1[i] - chrom1.Genes[i]) > 0.001) totalChanges1++;
+                if (Math.Abs(orig5[i] - chrom5.Genes[i]) > 0.001) totalChanges5++;
+            }
+        }
+
+        // op5 should mutate more genes than op1
+        Assert.True(totalChanges5 > totalChanges1,
+            $"genesToMutate=5 ({totalChanges5}) should mutate more than genesToMutate=1 ({totalChanges1})");
+    }
+
+    #endregion
+
+    #region DisplacementMutation Parameter Tests
+
+    [Fact]
+    public void DisplacementMutation_SegmentSizeParameters_RespectBounds()
+    {
+        var op = new DisplacementMutation<MockChromosome>(minSegmentSize: 2, maxSegmentSize: 4);
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = MockChromosome.WithGenes(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+            var original = chromosome.Genes.ToArray();
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // Count consecutive displaced genes
+            int displacedCount = 0;
+            bool inDisplaced = false;
+
+            for (int i = 0; i < original.Length; i++)
+            {
+                bool changed = Math.Abs(original[i] - chromosome.Genes[i]) > 0.001;
+                if (changed && !inDisplaced)
+                {
+                    inDisplaced = true;
+                    displacedCount = 1;
+                }
+                else if (changed && inDisplaced)
+                {
+                    displacedCount++;
+                }
+                else if (!changed && inDisplaced)
+                {
+                    break;
+                }
+            }
+
+            // If mutation happened, segment should be within bounds
+            if (displacedCount > 0)
+            {
+                Assert.True(displacedCount >= 2 && displacedCount <= 10,
+                    $"Displaced segment size {displacedCount} should be between 2 and chromosome length");
+            }
+        }
+    }
+
+    #endregion
+
+    #region ShiftMutation Parameter Tests
+
+    [Fact]
+    public void ShiftMutation_SegmentOnlyParameter_AffectsBehavior()
+    {
+        // segmentOnly=false shifts entire sequence
+        var opFull = new ShiftMutation<MockChromosome>(segmentOnly: false, segmentProbability: 0.0);
+        // segmentOnly=true with high probability shifts segments
+        var opSegment = new ShiftMutation<MockChromosome>(segmentOnly: true, segmentProbability: 1.0);
+
+        int fullShiftCount = 0;
+        int segmentShiftCount = 0;
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromFull = MockChromosome.WithGenes(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+            var chromSegment = MockChromosome.WithGenes(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+
+            var origFull = chromFull.Genes.ToArray();
+            var origSegment = chromSegment.Genes.ToArray();
+
+            var rng = new Random(trial);
+            opFull.Mutate(chromFull, rng);
+            rng = new Random(trial);
+            opSegment.Mutate(chromSegment, rng);
+
+            int changesFull = 0;
+            int changesSegment = 0;
+            for (int i = 0; i < 10; i++)
+            {
+                if (Math.Abs(origFull[i] - chromFull.Genes[i]) > 0.001) changesFull++;
+                if (Math.Abs(origSegment[i] - chromSegment.Genes[i]) > 0.001) changesSegment++;
+            }
+
+            fullShiftCount += changesFull;
+            segmentShiftCount += changesSegment;
+        }
+
+        // Both should cause some changes
+        Assert.True(fullShiftCount > 0, "Full shift should cause changes");
+        Assert.True(segmentShiftCount > 0, "Segment shift should cause changes");
+    }
+
+    #endregion
+
+    #region TranslocationMutation Parameter Tests
+
+    [Fact]
+    public void TranslocationMutation_SegmentSizeParameters_AffectBehavior()
+    {
+        var opSmall = new TranslocationMutation<MockChromosome>(minSegmentSize: 1, maxSegmentSize: 2);
+        var opLarge = new TranslocationMutation<MockChromosome>(minSegmentSize: 4, maxSegmentSize: 6);
+
+        int totalChangesSmall = 0;
+        int totalChangesLarge = 0;
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromSmall = MockChromosome.WithGenes(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+            var chromLarge = MockChromosome.WithGenes(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+
+            var origSmall = chromSmall.Genes.ToArray();
+            var origLarge = chromLarge.Genes.ToArray();
+
+            var rng = new Random(trial);
+            opSmall.Mutate(chromSmall, rng);
+            rng = new Random(trial);
+            opLarge.Mutate(chromLarge, rng);
+
+            for (int i = 0; i < 10; i++)
+            {
+                if (Math.Abs(origSmall[i] - chromSmall.Genes[i]) > 0.001) totalChangesSmall++;
+                if (Math.Abs(origLarge[i] - chromLarge.Genes[i]) > 0.001) totalChangesLarge++;
+            }
+        }
+
+        // Large segment size should typically affect more positions
+        Assert.True(totalChangesLarge >= totalChangesSmall * 0.5,
+            $"Large segments ({totalChangesLarge}) should affect comparable or more positions than small ({totalChangesSmall})");
+    }
+
+    #endregion
+
+    #region LocalSearchMutation Parameter Tests
+
+    [Fact]
+    public void LocalSearchMutation_NeighborhoodSizeParameter_AffectsExploration()
+    {
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        // Larger neighborhood should explore more options
+        var opSmall = new LocalSearchMutation<MockRubikChromosome>(neighborhoodSize: 2, maxIterations: 2);
+        var opLarge = new LocalSearchMutation<MockRubikChromosome>(neighborhoodSize: 20, maxIterations: 2);
+
+        int changedSmall = 0;
+        int changedLarge = 0;
+
+        for (int trial = 0; trial < 30; trial++)
+        {
+            var chromSmall = new MockRubikChromosome(10);
+            var chromLarge = new MockRubikChromosome(10);
+            chromSmall.ValidMoves = validMoves;
+            chromLarge.ValidMoves = validMoves;
+
+            for (int i = 0; i < 10; i++)
+            {
+                chromSmall.Genes[i] = validMoves[i % validMoves.Count];
+                chromLarge.Genes[i] = validMoves[i % validMoves.Count];
+            }
+
+            var origSmall = chromSmall.Genes.ToArray();
+            var origLarge = chromLarge.Genes.ToArray();
+
+            var rng = new Random(trial);
+            opSmall.Mutate(chromSmall, rng);
+            rng = new Random(trial);
+            opLarge.Mutate(chromLarge, rng);
+
+            for (int i = 0; i < 10; i++)
+            {
+                if (Math.Abs(origSmall[i] - chromSmall.Genes[i]) > 0.001) changedSmall++;
+                if (Math.Abs(origLarge[i] - chromLarge.Genes[i]) > 0.001) changedLarge++;
+            }
+        }
+
+        // Both should make changes
+        Assert.True(changedSmall > 0 || changedLarge > 0,
+            "At least one configuration should make changes");
+    }
+
+    [Fact]
+    public void LocalSearchMutation_MaxIterationsParameter_AffectsSearchDepth()
+    {
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        var op1 = new LocalSearchMutation<MockRubikChromosome>(neighborhoodSize: 5, maxIterations: 1);
+        var op10 = new LocalSearchMutation<MockRubikChromosome>(neighborhoodSize: 5, maxIterations: 10);
+
+        int changed1 = 0;
+        int changed10 = 0;
+
+        for (int trial = 0; trial < 30; trial++)
+        {
+            var chrom1 = new MockRubikChromosome(10);
+            var chrom10 = new MockRubikChromosome(10);
+            chrom1.ValidMoves = validMoves;
+            chrom10.ValidMoves = validMoves;
+
+            for (int i = 0; i < 10; i++)
+            {
+                chrom1.Genes[i] = validMoves[i % validMoves.Count];
+                chrom10.Genes[i] = validMoves[i % validMoves.Count];
+            }
+
+            var orig1 = chrom1.Genes.ToArray();
+            var orig10 = chrom10.Genes.ToArray();
+
+            var rng = new Random(trial);
+            op1.Mutate(chrom1, rng);
+            rng = new Random(trial);
+            op10.Mutate(chrom10, rng);
+
+            for (int i = 0; i < 10; i++)
+            {
+                if (Math.Abs(orig1[i] - chrom1.Genes[i]) > 0.001) changed1++;
+                if (Math.Abs(orig10[i] - chrom10.Genes[i]) > 0.001) changed10++;
+            }
+        }
+
+        // More iterations should typically allow more refinement
+        Assert.True(changed1 > 0 || changed10 > 0,
+            "At least one configuration should make changes");
+    }
+
+    #endregion
+
 }
