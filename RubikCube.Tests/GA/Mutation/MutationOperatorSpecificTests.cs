@@ -281,6 +281,130 @@ public class MutationOperatorSpecificTests
 
     #endregion
 
+    #region PatternMutation Tests
+
+    [Fact]
+    public void PatternMutation_DoesNotThrow()
+    {
+        var op = new PatternMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            var exception = Record.Exception(() => op.Mutate(chromosome, rng));
+            Assert.Null(exception);
+        }
+    }
+
+    [Fact]
+    public void PatternMutation_RequiresAtLeastFourGenes()
+    {
+        var op = new PatternMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        var chromosome = new MockRubikChromosome(3);
+        chromosome.ValidMoves = validMoves;
+        for (int i = 0; i < 3; i++)
+            chromosome.Genes[i] = validMoves[i];
+        var original = chromosome.Genes.ToArray();
+
+        var rng = new Random(42);
+        op.Mutate(chromosome, rng);
+
+        // Should not change with only 3 genes
+        Assert.Equal(original[0], chromosome.Genes[0]);
+        Assert.Equal(original[1], chromosome.Genes[1]);
+        Assert.Equal(original[2], chromosome.Genes[2]);
+    }
+
+    [Fact]
+    public void PatternMutation_InsertsPatterns()
+    {
+        var op = new PatternMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int changedTrials = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            // Use a single move so we can detect pattern insertion
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[0];
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            bool changed = false;
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                {
+                    changed = true;
+                    break;
+                }
+            }
+            if (changed) changedTrials++;
+        }
+
+        Assert.True(changedTrials > 0, "Should insert patterns in some trials");
+    }
+
+    [Fact]
+    public void PatternMutation_ProducesValidMoves()
+    {
+        var op = new PatternMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // All resulting moves should be valid
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                var move = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                Assert.True(move.IsValid, $"Move at position {i} is invalid");
+            }
+        }
+    }
+
+    [Fact]
+    public void PatternMutation_PreservesChromosomeLength()
+    {
+        var op = new PatternMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            int originalLength = chromosome.Length;
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            Assert.Equal(originalLength, chromosome.Length);
+        }
+    }
+
+    #endregion
+
     #region SimplifyMutation Tests
 
     [Fact]
