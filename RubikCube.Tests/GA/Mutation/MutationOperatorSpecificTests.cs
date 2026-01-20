@@ -281,6 +281,185 @@ public class MutationOperatorSpecificTests
 
     #endregion
 
+    #region NeighborMutation Tests
+
+    [Fact]
+    public void NeighborMutation_ChangesOnlyAngle()
+    {
+        var op = new NeighborMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int structurePreservedCount = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var originalMoves = chromosome.Genes.Select(g => RubikCube.TMove.Decode((int)g)).ToList();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+            var newMoves = chromosome.Genes.Select(g => RubikCube.TMove.Decode((int)g)).ToList();
+
+            // Find which gene changed
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (Math.Abs(originalMoves[i].Encode() - newMoves[i].Encode()) > 0)
+                {
+                    // Axis, Slice, Plane should be preserved
+                    if (originalMoves[i].Axis == newMoves[i].Axis &&
+                        originalMoves[i].Slice == newMoves[i].Slice &&
+                        originalMoves[i].Plane == newMoves[i].Plane)
+                    {
+                        structurePreservedCount++;
+                    }
+                    break;
+                }
+            }
+        }
+
+        Assert.True(structurePreservedCount > 80,
+            $"Should preserve axis/slice/plane, preserved {structurePreservedCount}/100");
+    }
+
+    [Fact]
+    public void NeighborMutation_ChangesExactlyOneGene()
+    {
+        var op = new NeighborMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            int changedCount = 0;
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                    changedCount++;
+            }
+
+            Assert.True(changedCount <= 1, $"Should change at most 1 gene, changed {changedCount}");
+        }
+    }
+
+    [Fact]
+    public void NeighborMutation_AngleChangesToDifferentValue()
+    {
+        var op = new NeighborMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int angleChangedCount = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            // Use moves with angle 0
+            var angle0Move = validMoves.First(m => RubikCube.TMove.Decode(m).Angle == 0);
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = angle0Move;
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // Check if any angle changed
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                var newMove = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                if (newMove.Angle != 0) // Changed from 0
+                {
+                    angleChangedCount++;
+                    break;
+                }
+            }
+        }
+
+        Assert.True(angleChangedCount > 80,
+            $"Should change angles frequently, changed {angleChangedCount}/100");
+    }
+
+    [Fact]
+    public void NeighborMutation_CanInvertAngle()
+    {
+        var op = new NeighborMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int invertCount = 0;
+        int rotateCount = 0;
+
+        for (int trial = 0; trial < 200; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            // Use moves with angle 0
+            var angle0Move = validMoves.First(m => RubikCube.TMove.Decode(m).Angle == 0);
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = angle0Move;
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // Check the new angle
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                var newMove = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                if (newMove.Angle == 2) // Inverted: 0 -> 2
+                    invertCount++;
+                else if (newMove.Angle == 1) // Rotated: 0 -> 1
+                    rotateCount++;
+            }
+        }
+
+        // Both strategies should occur
+        Assert.True(invertCount > 20, $"Should sometimes invert angles, got {invertCount}");
+        Assert.True(rotateCount > 20, $"Should sometimes rotate angles, got {rotateCount}");
+    }
+
+    [Fact]
+    public void NeighborMutation_AllPositionsCanBeSelected()
+    {
+        var op = new NeighborMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+        var positionCounts = new int[10];
+
+        for (int trial = 0; trial < 1000; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                {
+                    positionCounts[i]++;
+                    break;
+                }
+            }
+        }
+
+        for (int i = 0; i < 10; i++)
+        {
+            Assert.True(positionCounts[i] > 0,
+                $"Position {i} was never selected for neighbor mutation");
+        }
+    }
+
+    #endregion
+
     #region InverseSequenceMutation Tests
 
     [Fact]
