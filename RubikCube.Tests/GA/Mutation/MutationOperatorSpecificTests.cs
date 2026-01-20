@@ -281,6 +281,169 @@ public class MutationOperatorSpecificTests
 
     #endregion
 
+    #region InsertMutation Tests
+
+    [Fact]
+    public void InsertMutation_ChangesExactlyTwoAdjacentGenes()
+    {
+        var op = new InsertMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            // Use distinct values that won't match any valid move encoding
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = -1000 - i;
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // Find which indices changed
+            var changedIndices = new List<int>();
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                    changedIndices.Add(i);
+            }
+
+            Assert.Equal(2, changedIndices.Count);
+            Assert.Equal(1, changedIndices[1] - changedIndices[0]); // Adjacent
+        }
+    }
+
+    [Fact]
+    public void InsertMutation_InsertedMovesHaveSameAxisSlicePlane()
+    {
+        var op = new InsertMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int sameStructureCount = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = -1000 - i;
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // Find the changed pair
+            for (int i = 0; i < chromosome.Length - 1; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001 &&
+                    Math.Abs(original[i + 1] - chromosome.Genes[i + 1]) > 0.001)
+                {
+                    var move1 = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                    var move2 = RubikCube.TMove.Decode((int)chromosome.Genes[i + 1]);
+
+                    // Both moves should have same axis, slice, plane (neutral pair structure)
+                    if (move1.Axis == move2.Axis &&
+                        move1.Slice == move2.Slice &&
+                        move1.Plane == move2.Plane)
+                    {
+                        sameStructureCount++;
+                    }
+                    break;
+                }
+            }
+        }
+
+        Assert.True(sameStructureCount > 90,
+            $"Inserted pairs should have same structure, found {sameStructureCount}/100");
+    }
+
+    [Fact]
+    public void InsertMutation_UsesValidMoves()
+    {
+        var op = new InsertMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+        var validMovesSet = new HashSet<int>(validMoves);
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[0];
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // Changed genes should be valid moves
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                int geneValue = (int)chromosome.Genes[i];
+                if (geneValue != validMoves[0])
+                {
+                    Assert.True(validMovesSet.Contains(geneValue),
+                        $"Gene {i} has invalid move code {geneValue}");
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void InsertMutation_AllPositionsCanBeSelected()
+    {
+        var op = new InsertMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+        var positionCounts = new int[9]; // 0-8 for length 10 chromosome
+
+        for (int trial = 0; trial < 1000; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = -1000 - i;
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // Find first changed position
+            for (int i = 0; i < chromosome.Length - 1; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                {
+                    positionCounts[i]++;
+                    break;
+                }
+            }
+        }
+
+        // All positions 0-8 should be selectable
+        for (int i = 0; i < 9; i++)
+        {
+            Assert.True(positionCounts[i] > 0,
+                $"Position {i} was never selected for insertion");
+        }
+    }
+
+    [Fact]
+    public void InsertMutation_RequiresAtLeastTwoGenes()
+    {
+        var op = new InsertMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        var chromosome = new MockRubikChromosome(1);
+        chromosome.ValidMoves = validMoves;
+        chromosome.Genes[0] = validMoves[0];
+        var original = chromosome.Genes[0];
+
+        var rng = new Random(42);
+        op.Mutate(chromosome, rng);
+
+        // Should not change anything with only 1 gene
+        Assert.Equal(original, chromosome.Genes[0]);
+    }
+
+    #endregion
+
     #region AdaptiveMutation Tests
 
     [Fact]
