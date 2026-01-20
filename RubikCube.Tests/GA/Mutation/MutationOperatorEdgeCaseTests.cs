@@ -20,6 +20,12 @@ public class MutationOperatorEdgeCaseTests
     [InlineData(typeof(DisplacementMutation<MockChromosome>))]
     [InlineData(typeof(TranslocationMutation<MockChromosome>))]
     [InlineData(typeof(RandomMutation<MockChromosome>))]
+    [InlineData(typeof(GaussianMutation<MockChromosome>))]
+    [InlineData(typeof(CreepMutation<MockChromosome>))]
+    [InlineData(typeof(AdaptiveMutation<MockChromosome>))]
+    [InlineData(typeof(NeighborMutation<MockChromosome>))]
+    [InlineData(typeof(HyperplaneMutation<MockChromosome>))]
+    [InlineData(typeof(SimplifyMutation<MockChromosome>))]
     public void AllOperators_SingleGene_DoesNotCrash(Type operatorType)
     {
         var op = CreateOperator(operatorType);
@@ -41,6 +47,12 @@ public class MutationOperatorEdgeCaseTests
     [InlineData(typeof(DisplacementMutation<MockChromosome>))]
     [InlineData(typeof(TranslocationMutation<MockChromosome>))]
     [InlineData(typeof(RandomMutation<MockChromosome>))]
+    [InlineData(typeof(GaussianMutation<MockChromosome>))]
+    [InlineData(typeof(CreepMutation<MockChromosome>))]
+    [InlineData(typeof(AdaptiveMutation<MockChromosome>))]
+    [InlineData(typeof(NeighborMutation<MockChromosome>))]
+    [InlineData(typeof(HyperplaneMutation<MockChromosome>))]
+    [InlineData(typeof(SimplifyMutation<MockChromosome>))]
     public void AllOperators_TwoGenes_DoesNotCrash(Type operatorType)
     {
         var op = CreateOperator(operatorType);
@@ -60,6 +72,12 @@ public class MutationOperatorEdgeCaseTests
     [InlineData(typeof(DisplacementMutation<MockChromosome>))]
     [InlineData(typeof(TranslocationMutation<MockChromosome>))]
     [InlineData(typeof(RandomMutation<MockChromosome>))]
+    [InlineData(typeof(GaussianMutation<MockChromosome>))]
+    [InlineData(typeof(CreepMutation<MockChromosome>))]
+    [InlineData(typeof(AdaptiveMutation<MockChromosome>))]
+    [InlineData(typeof(NeighborMutation<MockChromosome>))]
+    [InlineData(typeof(HyperplaneMutation<MockChromosome>))]
+    [InlineData(typeof(SimplifyMutation<MockChromosome>))]
     public void AllOperators_ThreeGenes_DoesNotCrash(Type operatorType)
     {
         var op = CreateOperator(operatorType);
@@ -129,6 +147,7 @@ public class MutationOperatorEdgeCaseTests
 
     #region Numerical Edge Cases
 
+    // Note: HyperplaneMutation excluded - it uses TMove.Decode which expects valid move codes
     [Theory]
     [InlineData(typeof(SwapMutation<MockChromosome>))]
     [InlineData(typeof(InversionMutation<MockChromosome>))]
@@ -137,6 +156,8 @@ public class MutationOperatorEdgeCaseTests
     [InlineData(typeof(DisplacementMutation<MockChromosome>))]
     [InlineData(typeof(TranslocationMutation<MockChromosome>))]
     [InlineData(typeof(RandomMutation<MockChromosome>))]
+    [InlineData(typeof(GaussianMutation<MockChromosome>))]
+    [InlineData(typeof(CreepMutation<MockChromosome>))]
     public void AllOperators_NegativeGeneValues_HandlesCorrectly(Type operatorType)
     {
         var op = CreateOperator(operatorType);
@@ -156,6 +177,12 @@ public class MutationOperatorEdgeCaseTests
     [InlineData(typeof(DisplacementMutation<MockChromosome>))]
     [InlineData(typeof(TranslocationMutation<MockChromosome>))]
     [InlineData(typeof(RandomMutation<MockChromosome>))]
+    [InlineData(typeof(GaussianMutation<MockChromosome>))]
+    [InlineData(typeof(CreepMutation<MockChromosome>))]
+    [InlineData(typeof(AdaptiveMutation<MockChromosome>))]
+    [InlineData(typeof(NeighborMutation<MockChromosome>))]
+    [InlineData(typeof(HyperplaneMutation<MockChromosome>))]
+    [InlineData(typeof(SimplifyMutation<MockChromosome>))]
     public void AllOperators_VeryLargeGeneValues_HandlesCorrectly(Type operatorType)
     {
         var op = CreateOperator(operatorType);
@@ -175,6 +202,12 @@ public class MutationOperatorEdgeCaseTests
     [InlineData(typeof(DisplacementMutation<MockChromosome>))]
     [InlineData(typeof(TranslocationMutation<MockChromosome>))]
     [InlineData(typeof(RandomMutation<MockChromosome>))]
+    [InlineData(typeof(GaussianMutation<MockChromosome>))]
+    [InlineData(typeof(CreepMutation<MockChromosome>))]
+    [InlineData(typeof(AdaptiveMutation<MockChromosome>))]
+    [InlineData(typeof(NeighborMutation<MockChromosome>))]
+    [InlineData(typeof(HyperplaneMutation<MockChromosome>))]
+    [InlineData(typeof(SimplifyMutation<MockChromosome>))]
     public void AllOperators_AllZeroGenes_HandlesCorrectly(Type operatorType)
     {
         var op = CreateOperator(operatorType);
@@ -331,6 +364,18 @@ public class MutationOperatorEdgeCaseTests
             return new TranslocationMutation<MockChromosome>();
         if (operatorType == typeof(RandomMutation<MockChromosome>))
             return new RandomMutation<MockChromosome>();
+        if (operatorType == typeof(GaussianMutation<MockChromosome>))
+            return new GaussianMutation<MockChromosome>();
+        if (operatorType == typeof(CreepMutation<MockChromosome>))
+            return new CreepMutation<MockChromosome>();
+        if (operatorType == typeof(AdaptiveMutation<MockChromosome>))
+            return new AdaptiveMutation<MockChromosome>();
+        if (operatorType == typeof(NeighborMutation<MockChromosome>))
+            return new NeighborMutation<MockChromosome>();
+        if (operatorType == typeof(HyperplaneMutation<MockChromosome>))
+            return new HyperplaneMutation<MockChromosome>();
+        if (operatorType == typeof(SimplifyMutation<MockChromosome>))
+            return new SimplifyMutation<MockChromosome>();
 
         throw new ArgumentException($"Unknown operator type: {operatorType}");
     }

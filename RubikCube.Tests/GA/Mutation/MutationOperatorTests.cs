@@ -21,6 +21,20 @@ public class MutationOperatorTests
     [InlineData(typeof(DisplacementMutation<MockChromosome>))]
     [InlineData(typeof(TranslocationMutation<MockChromosome>))]
     [InlineData(typeof(RandomMutation<MockChromosome>))]
+    [InlineData(typeof(GaussianMutation<MockChromosome>))]
+    [InlineData(typeof(CreepMutation<MockChromosome>))]
+    [InlineData(typeof(AdaptiveMutation<MockChromosome>))]
+    [InlineData(typeof(InsertMutation<MockChromosome>))]
+    [InlineData(typeof(InverseSequenceMutation<MockChromosome>))]
+    [InlineData(typeof(NeighborMutation<MockChromosome>))]
+    [InlineData(typeof(HyperplaneMutation<MockChromosome>))]
+    [InlineData(typeof(ConjugationMutation<MockChromosome>))]
+    [InlineData(typeof(OrthogonalConjugationMutation<MockChromosome>))]
+    [InlineData(typeof(CommutatorMutation<MockChromosome>))]
+    [InlineData(typeof(SimplifyMutation<MockChromosome>))]
+    [InlineData(typeof(PatternMutation<MockChromosome>))]
+    [InlineData(typeof(BlockBuildingMutation<MockChromosome>))]
+    [InlineData(typeof(LocalSearchMutation<MockChromosome>))]
     public void AllOperators_DoesNotThrow(Type operatorType)
     {
         var op = CreateOperator(operatorType);
@@ -40,6 +54,20 @@ public class MutationOperatorTests
     [InlineData(typeof(DisplacementMutation<MockChromosome>))]
     [InlineData(typeof(TranslocationMutation<MockChromosome>))]
     [InlineData(typeof(RandomMutation<MockChromosome>))]
+    [InlineData(typeof(GaussianMutation<MockChromosome>))]
+    [InlineData(typeof(CreepMutation<MockChromosome>))]
+    [InlineData(typeof(AdaptiveMutation<MockChromosome>))]
+    [InlineData(typeof(InsertMutation<MockChromosome>))]
+    [InlineData(typeof(InverseSequenceMutation<MockChromosome>))]
+    [InlineData(typeof(NeighborMutation<MockChromosome>))]
+    [InlineData(typeof(HyperplaneMutation<MockChromosome>))]
+    [InlineData(typeof(ConjugationMutation<MockChromosome>))]
+    [InlineData(typeof(OrthogonalConjugationMutation<MockChromosome>))]
+    [InlineData(typeof(CommutatorMutation<MockChromosome>))]
+    [InlineData(typeof(SimplifyMutation<MockChromosome>))]
+    [InlineData(typeof(PatternMutation<MockChromosome>))]
+    [InlineData(typeof(BlockBuildingMutation<MockChromosome>))]
+    [InlineData(typeof(LocalSearchMutation<MockChromosome>))]
     public void AllOperators_PreservesLength(Type operatorType)
     {
         var op = CreateOperator(operatorType);
@@ -85,6 +113,11 @@ public class MutationOperatorTests
     [InlineData(typeof(DisplacementMutation<MockChromosome>))]
     [InlineData(typeof(TranslocationMutation<MockChromosome>))]
     [InlineData(typeof(RandomMutation<MockChromosome>))]
+    [InlineData(typeof(GaussianMutation<MockChromosome>))]
+    [InlineData(typeof(CreepMutation<MockChromosome>))]
+    [InlineData(typeof(NeighborMutation<MockChromosome>))]
+    [InlineData(typeof(HyperplaneMutation<MockChromosome>))]
+    [InlineData(typeof(SimplifyMutation<MockChromosome>))]
     public void AllOperators_CanChangeChromosome(Type operatorType)
     {
         var op = CreateOperator(operatorType);
@@ -115,6 +148,20 @@ public class MutationOperatorTests
     [InlineData(typeof(DisplacementMutation<MockChromosome>))]
     [InlineData(typeof(TranslocationMutation<MockChromosome>))]
     [InlineData(typeof(RandomMutation<MockChromosome>))]
+    [InlineData(typeof(GaussianMutation<MockChromosome>))]
+    [InlineData(typeof(CreepMutation<MockChromosome>))]
+    [InlineData(typeof(AdaptiveMutation<MockChromosome>))]
+    [InlineData(typeof(InsertMutation<MockChromosome>))]
+    [InlineData(typeof(InverseSequenceMutation<MockChromosome>))]
+    [InlineData(typeof(NeighborMutation<MockChromosome>))]
+    [InlineData(typeof(HyperplaneMutation<MockChromosome>))]
+    [InlineData(typeof(ConjugationMutation<MockChromosome>))]
+    [InlineData(typeof(OrthogonalConjugationMutation<MockChromosome>))]
+    [InlineData(typeof(CommutatorMutation<MockChromosome>))]
+    [InlineData(typeof(SimplifyMutation<MockChromosome>))]
+    [InlineData(typeof(PatternMutation<MockChromosome>))]
+    [InlineData(typeof(BlockBuildingMutation<MockChromosome>))]
+    [InlineData(typeof(LocalSearchMutation<MockChromosome>))]
     public void AllOperators_MutatesInPlace(Type operatorType)
     {
         var op = CreateOperator(operatorType);
@@ -140,6 +187,11 @@ public class MutationOperatorTests
     [InlineData(typeof(DisplacementMutation<MockChromosome>))]
     [InlineData(typeof(TranslocationMutation<MockChromosome>))]
     [InlineData(typeof(RandomMutation<MockChromosome>))]
+    [InlineData(typeof(GaussianMutation<MockChromosome>))]
+    [InlineData(typeof(CreepMutation<MockChromosome>))]
+    [InlineData(typeof(NeighborMutation<MockChromosome>))]
+    [InlineData(typeof(HyperplaneMutation<MockChromosome>))]
+    [InlineData(typeof(SimplifyMutation<MockChromosome>))]
     public void AllOperators_SameSeed_SameResult(Type operatorType)
     {
         var op1 = CreateOperator(operatorType);
@@ -165,6 +217,11 @@ public class MutationOperatorTests
     [InlineData(typeof(DisplacementMutation<MockChromosome>))]
     [InlineData(typeof(TranslocationMutation<MockChromosome>))]
     [InlineData(typeof(RandomMutation<MockChromosome>))]
+    [InlineData(typeof(GaussianMutation<MockChromosome>))]
+    [InlineData(typeof(CreepMutation<MockChromosome>))]
+    [InlineData(typeof(NeighborMutation<MockChromosome>))]
+    [InlineData(typeof(HyperplaneMutation<MockChromosome>))]
+    [InlineData(typeof(SimplifyMutation<MockChromosome>))]
     public void AllOperators_DifferentSeeds_LikelyDifferentResults(Type operatorType)
     {
         var op = CreateOperator(operatorType);
@@ -197,6 +254,20 @@ public class MutationOperatorTests
     [InlineData(typeof(DisplacementMutation<MockChromosome>))]
     [InlineData(typeof(TranslocationMutation<MockChromosome>))]
     [InlineData(typeof(RandomMutation<MockChromosome>))]
+    [InlineData(typeof(GaussianMutation<MockChromosome>))]
+    [InlineData(typeof(CreepMutation<MockChromosome>))]
+    [InlineData(typeof(AdaptiveMutation<MockChromosome>))]
+    [InlineData(typeof(InsertMutation<MockChromosome>))]
+    [InlineData(typeof(InverseSequenceMutation<MockChromosome>))]
+    [InlineData(typeof(NeighborMutation<MockChromosome>))]
+    [InlineData(typeof(HyperplaneMutation<MockChromosome>))]
+    [InlineData(typeof(ConjugationMutation<MockChromosome>))]
+    [InlineData(typeof(OrthogonalConjugationMutation<MockChromosome>))]
+    [InlineData(typeof(CommutatorMutation<MockChromosome>))]
+    [InlineData(typeof(SimplifyMutation<MockChromosome>))]
+    [InlineData(typeof(PatternMutation<MockChromosome>))]
+    [InlineData(typeof(BlockBuildingMutation<MockChromosome>))]
+    [InlineData(typeof(LocalSearchMutation<MockChromosome>))]
     public void AllOperators_MultipleMutations_DoNotCorruptState(Type operatorType)
     {
         var op = CreateOperator(operatorType);
@@ -234,6 +305,34 @@ public class MutationOperatorTests
             return new TranslocationMutation<MockChromosome>();
         if (operatorType == typeof(RandomMutation<MockChromosome>))
             return new RandomMutation<MockChromosome>();
+        if (operatorType == typeof(GaussianMutation<MockChromosome>))
+            return new GaussianMutation<MockChromosome>();
+        if (operatorType == typeof(CreepMutation<MockChromosome>))
+            return new CreepMutation<MockChromosome>();
+        if (operatorType == typeof(AdaptiveMutation<MockChromosome>))
+            return new AdaptiveMutation<MockChromosome>();
+        if (operatorType == typeof(InsertMutation<MockChromosome>))
+            return new InsertMutation<MockChromosome>();
+        if (operatorType == typeof(InverseSequenceMutation<MockChromosome>))
+            return new InverseSequenceMutation<MockChromosome>();
+        if (operatorType == typeof(NeighborMutation<MockChromosome>))
+            return new NeighborMutation<MockChromosome>();
+        if (operatorType == typeof(HyperplaneMutation<MockChromosome>))
+            return new HyperplaneMutation<MockChromosome>();
+        if (operatorType == typeof(ConjugationMutation<MockChromosome>))
+            return new ConjugationMutation<MockChromosome>();
+        if (operatorType == typeof(OrthogonalConjugationMutation<MockChromosome>))
+            return new OrthogonalConjugationMutation<MockChromosome>();
+        if (operatorType == typeof(CommutatorMutation<MockChromosome>))
+            return new CommutatorMutation<MockChromosome>();
+        if (operatorType == typeof(SimplifyMutation<MockChromosome>))
+            return new SimplifyMutation<MockChromosome>();
+        if (operatorType == typeof(PatternMutation<MockChromosome>))
+            return new PatternMutation<MockChromosome>();
+        if (operatorType == typeof(BlockBuildingMutation<MockChromosome>))
+            return new BlockBuildingMutation<MockChromosome>();
+        if (operatorType == typeof(LocalSearchMutation<MockChromosome>))
+            return new LocalSearchMutation<MockChromosome>();
 
         throw new ArgumentException($"Unknown operator type: {operatorType}");
     }
