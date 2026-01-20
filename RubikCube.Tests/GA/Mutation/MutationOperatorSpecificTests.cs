@@ -281,6 +281,190 @@ public class MutationOperatorSpecificTests
 
     #endregion
 
+    #region GaussianMutation Tests
+
+    [Fact]
+    public void GaussianMutation_AddsNoiseToGeneValues()
+    {
+        var op = new GaussianMutation<MockChromosome>(genesToMutate: 1, sigma: 1.0);
+
+        int changedCount = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = MockChromosome.WithGenes(50, 50, 50, 50, 50, 50, 50, 50, 50, 50);
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+
+            op.Mutate(chromosome, rng);
+
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                    changedCount++;
+            }
+        }
+
+        Assert.True(changedCount > 0, "GaussianMutation never changed any genes");
+    }
+
+    [Fact]
+    public void GaussianMutation_NoiseIsCenteredAroundZero()
+    {
+        var op = new GaussianMutation<MockChromosome>(genesToMutate: 1, sigma: 1.0);
+        var deltas = new List<double>();
+
+        for (int trial = 0; trial < 1000; trial++)
+        {
+            var chromosome = MockChromosome.WithGenes(100, 100, 100, 100, 100, 100, 100, 100, 100, 100);
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+
+            op.Mutate(chromosome, rng);
+
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                double delta = chromosome.Genes[i] - original[i];
+                if (Math.Abs(delta) > 0.0001)
+                    deltas.Add(delta);
+            }
+        }
+
+        // Mean should be close to 0 for Gaussian noise
+        double mean = deltas.Average();
+        Assert.True(Math.Abs(mean) < 0.2,
+            $"Mean of Gaussian noise should be near 0, got {mean}");
+    }
+
+    [Fact]
+    public void GaussianMutation_SigmaControlsSpread()
+    {
+        var opSmall = new GaussianMutation<MockChromosome>(genesToMutate: 1, sigma: 0.5);
+        var opLarge = new GaussianMutation<MockChromosome>(genesToMutate: 1, sigma: 2.0);
+
+        var deltasSmall = new List<double>();
+        var deltasLarge = new List<double>();
+
+        for (int trial = 0; trial < 500; trial++)
+        {
+            var chr1 = MockChromosome.WithGenes(50, 50, 50, 50, 50, 50, 50, 50, 50, 50);
+            var chr2 = MockChromosome.WithGenes(50, 50, 50, 50, 50, 50, 50, 50, 50, 50);
+            var rng1 = new Random(trial);
+            var rng2 = new Random(trial + 10000);
+
+            opSmall.Mutate(chr1, rng1);
+            opLarge.Mutate(chr2, rng2);
+
+            for (int i = 0; i < chr1.Length; i++)
+            {
+                if (Math.Abs(chr1.Genes[i] - 50) > 0.001)
+                    deltasSmall.Add(Math.Abs(chr1.Genes[i] - 50));
+                if (Math.Abs(chr2.Genes[i] - 50) > 0.001)
+                    deltasLarge.Add(Math.Abs(chr2.Genes[i] - 50));
+            }
+        }
+
+        double avgSmall = deltasSmall.Average();
+        double avgLarge = deltasLarge.Average();
+
+        // Larger sigma should produce larger average absolute changes
+        Assert.True(avgLarge > avgSmall,
+            $"Larger sigma should produce larger changes. Small: {avgSmall}, Large: {avgLarge}");
+    }
+
+    [Fact]
+    public void GaussianMutation_GenesToMutateControlsCount()
+    {
+        for (int genesToMutate = 1; genesToMutate <= 5; genesToMutate++)
+        {
+            var op = new GaussianMutation<MockChromosome>(genesToMutate: genesToMutate, sigma: 1.0);
+            var mutationCounts = new List<int>();
+
+            for (int trial = 0; trial < 100; trial++)
+            {
+                var chromosome = MockChromosome.WithGenes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+                var original = chromosome.Genes.ToArray();
+                var rng = new Random(trial);
+
+                op.Mutate(chromosome, rng);
+
+                int changed = 0;
+                for (int i = 0; i < chromosome.Length; i++)
+                {
+                    if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                        changed++;
+                }
+                mutationCounts.Add(changed);
+            }
+
+            // Average mutations should be close to genesToMutate
+            // (may be less if same gene selected twice)
+            double avgMutations = mutationCounts.Average();
+            Assert.True(avgMutations >= genesToMutate * 0.5,
+                $"With genesToMutate={genesToMutate}, expected avg ~{genesToMutate}, got {avgMutations}");
+        }
+    }
+
+    [Fact]
+    public void GaussianMutation_ProducesApproximatelyNormalDistribution()
+    {
+        var op = new GaussianMutation<MockChromosome>(genesToMutate: 1, sigma: 1.0);
+        var deltas = new List<double>();
+
+        for (int trial = 0; trial < 2000; trial++)
+        {
+            var chromosome = MockChromosome.WithGenes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            var rng = new Random(trial);
+
+            op.Mutate(chromosome, rng);
+
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (Math.Abs(chromosome.Genes[i]) > 0.0001)
+                    deltas.Add(chromosome.Genes[i]);
+            }
+        }
+
+        // For normal distribution, ~68% should be within 1 sigma
+        int withinOneSigma = deltas.Count(d => Math.Abs(d) <= 1.0);
+        double proportionWithin = (double)withinOneSigma / deltas.Count;
+
+        // Allow some tolerance (expect 0.68, allow 0.55-0.80)
+        Assert.True(proportionWithin > 0.55 && proportionWithin < 0.80,
+            $"Expected ~68% within 1σ, got {proportionWithin * 100:F1}%");
+    }
+
+    [Fact]
+    public void GaussianMutation_WithRubikChromosome_ChangesMove()
+    {
+        var op = new GaussianMutation<MockRubikChromosome>(genesToMutate: 1, sigma: 1.0);
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int changedCount = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            // Initialize with valid moves
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+
+            op.Mutate(chromosome, rng);
+
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                    changedCount++;
+            }
+        }
+
+        Assert.True(changedCount > 0, "GaussianMutation with RubikChromosome never changed any genes");
+    }
+
+    #endregion
+
     #region SwapMutation Tests
 
     [Fact]
