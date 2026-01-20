@@ -1,6 +1,7 @@
 using RubikCube.Tests.Mocks;
 using TGL.GA.Operators.Mutation;
 using Xunit;
+using MockTChromosome = global::GA.TChromosome;
 
 namespace RubikCube.Tests.GA.Mutation;
 
@@ -10,6 +11,276 @@ namespace RubikCube.Tests.GA.Mutation;
 /// </summary>
 public class MutationOperatorSpecificTests
 {
+    #region SingleGeneMutation Tests
+
+    [Fact]
+    public void SingleGeneMutation_DoesNotThrow()
+    {
+        var op = new SingleGeneMutation<RubikCube.TRubikGenome>();
+        var genome = new RubikCube.TRubikGenome();
+        var rng = new Random(42);
+
+        var exception = Record.Exception(() => op.Mutate(genome, rng));
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void SingleGeneMutation_ChangesExactlyOneGene()
+    {
+        var op = new SingleGeneMutation<RubikCube.TRubikGenome>();
+
+        int singleChangeCount = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var genome = new RubikCube.TRubikGenome();
+            var original = genome.Genes.ToArray();
+            var rng = new Random(trial);
+
+            op.Mutate(genome, rng);
+
+            int differences = 0;
+            for (int i = 0; i < original.Length; i++)
+            {
+                if (Math.Abs(original[i] - genome.Genes[i]) > 0.001)
+                    differences++;
+            }
+
+            // Should change exactly 0 or 1 gene (0 if new value happens to equal old)
+            Assert.True(differences <= 1, $"Changed {differences} genes, expected at most 1");
+            if (differences == 1)
+                singleChangeCount++;
+        }
+
+        Assert.True(singleChangeCount > 0, "SingleGeneMutation never changed a gene in 100 trials");
+    }
+
+    [Fact]
+    public void SingleGeneMutation_UsesValidMovesFromFreeMoves()
+    {
+        var op = new SingleGeneMutation<RubikCube.TRubikGenome>();
+        var validMoves = new HashSet<int>(RubikCube.TRubikGenome.FreeMoves);
+
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var genome = new RubikCube.TRubikGenome();
+            // Set genes to values NOT in FreeMoves to detect changes
+            for (int i = 0; i < genome.Length; i++)
+                genome.Genes[i] = -1;
+
+            var rng = new Random(trial);
+            op.Mutate(genome, rng);
+
+            // Find which gene was changed
+            for (int i = 0; i < genome.Length; i++)
+            {
+                if (genome.Genes[i] != -1)
+                {
+                    // The new value should be in FreeMoves
+                    Assert.True(validMoves.Contains((int)genome.Genes[i]),
+                        $"Gene value {genome.Genes[i]} is not a valid move from FreeMoves");
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void SingleGeneMutation_AllPositionsCanBeSelected()
+    {
+        var op = new SingleGeneMutation<RubikCube.TRubikGenome>();
+        var positionChangeCounts = new int[MockTChromosome.GenesLength];
+
+        for (int trial = 0; trial < 1000; trial++)
+        {
+            var genome = new RubikCube.TRubikGenome();
+            // Set genes to sentinel values
+            for (int i = 0; i < genome.Length; i++)
+                genome.Genes[i] = -1 - i; // Unique negative values
+
+            var rng = new Random(trial);
+            op.Mutate(genome, rng);
+
+            for (int i = 0; i < genome.Length; i++)
+            {
+                if (genome.Genes[i] != -1 - i)
+                    positionChangeCounts[i]++;
+            }
+        }
+
+        // All positions should be affected at least sometimes
+        for (int i = 0; i < positionChangeCounts.Length; i++)
+        {
+            Assert.True(positionChangeCounts[i] > 0,
+                $"Position {i} was never selected for mutation");
+        }
+    }
+
+    [Fact]
+    public void SingleGeneMutation_PositionSelectionIsReasonablyUniform()
+    {
+        var op = new SingleGeneMutation<RubikCube.TRubikGenome>();
+        var positionChangeCounts = new int[MockTChromosome.GenesLength];
+
+        for (int trial = 0; trial < 1000; trial++)
+        {
+            var genome = new RubikCube.TRubikGenome();
+            for (int i = 0; i < genome.Length; i++)
+                genome.Genes[i] = -1 - i;
+
+            var rng = new Random(trial);
+            op.Mutate(genome, rng);
+
+            for (int i = 0; i < genome.Length; i++)
+            {
+                if (genome.Genes[i] != -1 - i)
+                    positionChangeCounts[i]++;
+            }
+        }
+
+        // Each position should be selected with roughly equal probability
+        // Expected: ~1000 / 10 = ~100 per position, allow 50% tolerance
+        double expectedPerPosition = 1000.0 / MockTChromosome.GenesLength;
+        double tolerance = expectedPerPosition * 0.5;
+
+        for (int i = 0; i < positionChangeCounts.Length; i++)
+        {
+            Assert.True(positionChangeCounts[i] > expectedPerPosition - tolerance,
+                $"Position {i} selected too infrequently: {positionChangeCounts[i]} (expected ~{expectedPerPosition})");
+        }
+    }
+
+    [Fact]
+    public void SingleGeneMutation_SameSeedSameResult()
+    {
+        var op1 = new SingleGeneMutation<RubikCube.TRubikGenome>();
+        var op2 = new SingleGeneMutation<RubikCube.TRubikGenome>();
+
+        var genome1 = new RubikCube.TRubikGenome();
+        var genome2 = new RubikCube.TRubikGenome();
+
+        // Ensure same initial state
+        for (int i = 0; i < genome1.Length; i++)
+        {
+            genome1.Genes[i] = i;
+            genome2.Genes[i] = i;
+        }
+
+        var rng1 = new Random(12345);
+        var rng2 = new Random(12345);
+
+        op1.Mutate(genome1, rng1);
+        op2.Mutate(genome2, rng2);
+
+        Assert.Equal(genome1.Genes, genome2.Genes);
+    }
+
+    [Fact]
+    public void SingleGeneMutation_DifferentSeedsDifferentResults()
+    {
+        var op = new SingleGeneMutation<RubikCube.TRubikGenome>();
+
+        var results = new List<double[]>();
+        for (int seed = 0; seed < 20; seed++)
+        {
+            var genome = new RubikCube.TRubikGenome();
+            for (int i = 0; i < genome.Length; i++)
+                genome.Genes[i] = i;
+
+            var rng = new Random(seed);
+            op.Mutate(genome, rng);
+            results.Add(genome.Genes.ToArray());
+        }
+
+        int uniqueCount = results.Select(r => string.Join(",", r)).Distinct().Count();
+        Assert.True(uniqueCount > 1, "All results were identical with different seeds");
+    }
+
+    [Fact]
+    public void SingleGeneMutation_IgnoresNonTRubikGenome()
+    {
+        var op = new SingleGeneMutation<MockChromosome>();
+        var chromosome = MockChromosome.WithGenes(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+        var original = chromosome.Genes.ToArray();
+        var rng = new Random(42);
+
+        op.Mutate(chromosome, rng);
+
+        // Should not change anything since MockChromosome is not TRubikGenome
+        Assert.Equal(original, chromosome.Genes);
+    }
+
+    [Fact]
+    public void SingleGeneMutation_PreservesOtherGenes()
+    {
+        var op = new SingleGeneMutation<RubikCube.TRubikGenome>();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var genome = new RubikCube.TRubikGenome();
+            // Set distinct values
+            for (int i = 0; i < genome.Length; i++)
+                genome.Genes[i] = i * 100;
+
+            var original = genome.Genes.ToArray();
+            var rng = new Random(trial);
+
+            op.Mutate(genome, rng);
+
+            // Find which gene changed
+            int changedIndex = -1;
+            for (int i = 0; i < genome.Length; i++)
+            {
+                if (Math.Abs(original[i] - genome.Genes[i]) > 0.001)
+                {
+                    changedIndex = i;
+                    break;
+                }
+            }
+
+            // Verify all other genes are unchanged
+            for (int i = 0; i < genome.Length; i++)
+            {
+                if (i != changedIndex)
+                {
+                    Assert.Equal(original[i], genome.Genes[i], 3);
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void SingleGeneMutation_MultipleMutationsDoNotCorruptState()
+    {
+        var op = new SingleGeneMutation<RubikCube.TRubikGenome>();
+        var genome = new RubikCube.TRubikGenome();
+        var rng = new Random(42);
+        var validMoves = new HashSet<int>(RubikCube.TRubikGenome.FreeMoves);
+
+        // Perform many mutations
+        for (int i = 0; i < 100; i++)
+        {
+            op.Mutate(genome, rng);
+
+            // Verify genome is still valid
+            Assert.Equal(MockTChromosome.GenesLength, genome.Length);
+            Assert.NotNull(genome.Genes);
+        }
+    }
+
+    [Fact]
+    public void SingleGeneMutation_FreeMovesArePopulated()
+    {
+        // Verify that FreeMoves contains valid move codes
+        Assert.True(RubikCube.TRubikGenome.FreeMoves.Count > 0,
+            "FreeMoves should be populated with valid moves");
+
+        // For 3D cube (N=3) with Size=3 and 3 planes, total moves = 3 * 3 * 3 * 3 = 81
+        // All should be valid
+        int expectedMoves = TGL.TAffine.N * RubikCube.TRubikCube.Size * TGL.TAffine.Planes.Length * 3;
+        Assert.Equal(expectedMoves, RubikCube.TRubikGenome.FreeMoves.Count);
+    }
+
+    #endregion
+
     #region SwapMutation Tests
 
     [Fact]
