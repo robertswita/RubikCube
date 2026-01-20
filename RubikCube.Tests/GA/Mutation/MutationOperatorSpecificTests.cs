@@ -281,6 +281,141 @@ public class MutationOperatorSpecificTests
 
     #endregion
 
+    #region SimplifyMutation Tests
+
+    [Fact]
+    public void SimplifyMutation_DoesNotThrow()
+    {
+        var op = new SimplifyMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            var exception = Record.Exception(() => op.Mutate(chromosome, rng));
+            Assert.Null(exception);
+        }
+    }
+
+    [Fact]
+    public void SimplifyMutation_CombinesConsecutiveSameMoves()
+    {
+        var op = new SimplifyMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int combinedCount = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+
+            // Set up consecutive identical moves
+            var baseMove = validMoves[0];
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = baseMove;
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // Check if any simplification occurred
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                {
+                    combinedCount++;
+                    break;
+                }
+            }
+        }
+
+        Assert.True(combinedCount > 0,
+            "Should combine consecutive identical moves sometimes");
+    }
+
+    [Fact]
+    public void SimplifyMutation_RequiresAtLeastTwoGenes()
+    {
+        var op = new SimplifyMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        var chromosome = new MockRubikChromosome(1);
+        chromosome.ValidMoves = validMoves;
+        chromosome.Genes[0] = validMoves[0];
+        var original = chromosome.Genes[0];
+
+        var rng = new Random(42);
+        op.Mutate(chromosome, rng);
+
+        Assert.Equal(original, chromosome.Genes[0]);
+    }
+
+    [Fact]
+    public void SimplifyMutation_ProducesValidMoves()
+    {
+        var op = new SimplifyMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // All resulting moves should be valid
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                var move = RubikCube.TMove.Decode((int)chromosome.Genes[i]);
+                Assert.True(move.IsValid, $"Move at position {i} is invalid");
+            }
+        }
+    }
+
+    [Fact]
+    public void SimplifyMutation_MakesSomeChanges()
+    {
+        var op = new SimplifyMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int changedTrials = 0;
+        for (int trial = 0; trial < 100; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            // Use moves that might create simplification opportunities
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % 3]; // Repeat pattern
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            bool changed = false;
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                {
+                    changed = true;
+                    break;
+                }
+            }
+            if (changed) changedTrials++;
+        }
+
+        Assert.True(changedTrials > 0, "Should make changes in some trials");
+    }
+
+    #endregion
+
     #region CommutatorMutation Tests
 
     [Fact]
