@@ -80,4 +80,104 @@ public class MockChromosome : IChromosome
             .Select(i => new MockChromosome((double)i))
             .ToList();
     }
+
+    /// <summary>
+    /// Creates a mock chromosome with specified genes.
+    /// </summary>
+    public static MockChromosome WithGenes(params double[] genes)
+    {
+        var chromosome = new MockChromosome(genes.Length);
+        Array.Copy(genes, chromosome.Genes, genes.Length);
+        return chromosome;
+    }
+
+    /// <summary>
+    /// Creates a mock chromosome with integer genes for easier testing.
+    /// </summary>
+    public static MockChromosome WithIntGenes(params int[] genes)
+    {
+        var chromosome = new MockChromosome(genes.Length);
+        for (int i = 0; i < genes.Length; i++)
+            chromosome.Genes[i] = genes[i];
+        return chromosome;
+    }
+}
+
+/// <summary>
+/// A mock chromosome that implements IRubikChromosome for testing crossover operators.
+/// </summary>
+public class MockRubikChromosome : IRubikChromosome
+{
+    private readonly double[] _genes;
+    private IReadOnlyList<int> _validMoves = Array.Empty<int>();
+
+    public double Fitness { get; set; } = double.MaxValue;
+
+    public double[] Genes => _genes;
+
+    public int Length => _genes.Length;
+
+    public int MovesCount { get; set; }
+
+    public IReadOnlyList<int> ValidMoves
+    {
+        get => _validMoves;
+        set => _validMoves = value;
+    }
+
+    public MockRubikChromosome() : this(10)
+    {
+    }
+
+    public MockRubikChromosome(int length)
+    {
+        _genes = new double[length];
+        MovesCount = length;
+    }
+
+    public MockRubikChromosome(double fitness, int length = 10, int movesCount = -1) : this(length)
+    {
+        Fitness = fitness;
+        MovesCount = movesCount < 0 ? length : movesCount;
+    }
+
+    public void Randomize(Random rng)
+    {
+        for (int i = 0; i < _genes.Length; i++)
+        {
+            _genes[i] = rng.NextDouble() * 100;
+        }
+    }
+
+    public void Validate()
+    {
+        // No-op for mock
+    }
+
+    public int CompareTo(IChromosome? other)
+    {
+        if (other == null) return -1;
+        return Fitness.CompareTo(other.Fitness);
+    }
+
+    public object Clone()
+    {
+        var clone = new MockRubikChromosome(_genes.Length)
+        {
+            Fitness = Fitness,
+            MovesCount = MovesCount
+        };
+        Array.Copy(_genes, clone._genes, _genes.Length);
+        return clone;
+    }
+
+    /// <summary>
+    /// Creates a mock Rubik chromosome with specified genes.
+    /// </summary>
+    public static MockRubikChromosome WithGenes(double fitness, int movesCount, params double[] genes)
+    {
+        var chromosome = new MockRubikChromosome(fitness, genes.Length, movesCount);
+        Array.Copy(genes, chromosome.Genes, genes.Length);
+        return chromosome;
+    }
 }

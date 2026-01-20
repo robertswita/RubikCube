@@ -21,13 +21,16 @@
     </PackageReference>
   </ItemGroup>
 
-  <!-- Include only the GA files needed for testing selection operators -->
+  <!-- Include GA files needed for testing -->
   <ItemGroup>
     <!-- Interfaces -->
     <Compile Include="..\RubikCube\GA\Interfaces\IChromosome.cs" LinkBase="GA\Interfaces" />
     <Compile Include="..\RubikCube\GA\Interfaces\ISelectionOperator.cs" LinkBase="GA\Interfaces" />
+    <Compile Include="..\RubikCube\GA\Interfaces\ICrossoverOperator.cs" LinkBase="GA\Interfaces" />
     <!-- Selection operators -->
     <Compile Include="..\RubikCube\GA\Operators\Selection\*.cs" LinkBase="GA\Operators\Selection" />
+    <!-- Crossover operators -->
+    <Compile Include="..\RubikCube\GA\Operators\Crossover\*.cs" LinkBase="GA\Operators\Crossover" />
   </ItemGroup>
 
 </Project>
