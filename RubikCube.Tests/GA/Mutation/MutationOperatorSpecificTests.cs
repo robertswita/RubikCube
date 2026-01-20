@@ -2748,4 +2748,169 @@ public class MutationOperatorSpecificTests
 
     #endregion
 
+    #region BlockBuildingMutation Tests
+
+    [Fact]
+    public void BlockBuildingMutation_DoesNotThrow()
+    {
+        var op = new BlockBuildingMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(10);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < chromosome.Length; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            var exception = Record.Exception(() => op.Mutate(chromosome, rng));
+            Assert.Null(exception);
+        }
+    }
+
+    [Fact]
+    public void BlockBuildingMutation_RequiresAtLeastThreeGenes()
+    {
+        var op = new BlockBuildingMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        // With 2 genes, should not mutate
+        var smallChromosome = new MockRubikChromosome(2);
+        smallChromosome.ValidMoves = validMoves;
+        smallChromosome.Genes[0] = validMoves[0];
+        smallChromosome.Genes[1] = validMoves[1];
+        var original = smallChromosome.Genes.ToArray();
+
+        var rng = new Random(42);
+        op.Mutate(smallChromosome, rng);
+
+        // Genes should be unchanged
+        Assert.Equal(original[0], smallChromosome.Genes[0]);
+        Assert.Equal(original[1], smallChromosome.Genes[1]);
+
+        // With 3+ genes, should mutate in some trials
+        int changeCount = 0;
+        for (int trial = 0; trial < 20; trial++)
+        {
+            var normalChromosome = new MockRubikChromosome(10);
+            normalChromosome.ValidMoves = validMoves;
+            for (int i = 0; i < 10; i++)
+                normalChromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var original3 = normalChromosome.Genes.ToArray();
+            rng = new Random(trial);
+            op.Mutate(normalChromosome, rng);
+
+            for (int i = 0; i < original3.Length; i++)
+            {
+                if (Math.Abs(original3[i] - normalChromosome.Genes[i]) > 0.001)
+                    changeCount++;
+            }
+        }
+
+        Assert.True(changeCount > 0, "BlockBuildingMutation never mutated a chromosome");
+    }
+
+    [Fact]
+    public void BlockBuildingMutation_InsertsBuildingBlock()
+    {
+        var op = new BlockBuildingMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        int totalChanges = 0;
+        int consecutiveChangeCount = 0;
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            // Use a longer chromosome to allow building blocks
+            var chromosome = new MockRubikChromosome(20);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < 20; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var original = chromosome.Genes.ToArray();
+            var rng = new Random(trial);
+
+            op.Mutate(chromosome, rng);
+
+            // Count changed genes
+            int changes = 0;
+            int firstChanged = -1;
+            int lastChanged = -1;
+            for (int i = 0; i < original.Length; i++)
+            {
+                if (Math.Abs(original[i] - chromosome.Genes[i]) > 0.001)
+                {
+                    changes++;
+                    if (firstChanged < 0) firstChanged = i;
+                    lastChanged = i;
+                }
+            }
+
+            totalChanges += changes;
+
+            // Building blocks are contiguous - check if changes span a contiguous region
+            if (changes > 0 && firstChanged >= 0 && lastChanged >= 0)
+            {
+                // Changed region length should equal number of changes (all contiguous)
+                if ((lastChanged - firstChanged + 1) == changes)
+                    consecutiveChangeCount++;
+            }
+        }
+
+        Assert.True(totalChanges > 0, "BlockBuildingMutation never changed any genes");
+        Assert.True(consecutiveChangeCount > 0, "BlockBuildingMutation never inserted a contiguous building block");
+    }
+
+    [Fact]
+    public void BlockBuildingMutation_ProducesValidMoves()
+    {
+        var op = new BlockBuildingMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(15);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < 15; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            var rng = new Random(trial);
+            op.Mutate(chromosome, rng);
+
+            // All genes should be valid moves
+            for (int i = 0; i < chromosome.Length; i++)
+            {
+                int moveCode = (int)chromosome.Genes[i];
+                var move = RubikCube.TMove.Decode(moveCode);
+                Assert.True(move.IsValid, $"Gene {i} has invalid move code {moveCode}");
+            }
+        }
+    }
+
+    [Fact]
+    public void BlockBuildingMutation_PreservesChromosomeLength()
+    {
+        var op = new BlockBuildingMutation<MockRubikChromosome>();
+        var validMoves = RubikCube.TRubikGenome.FreeMoves.ToList();
+
+        for (int trial = 0; trial < 50; trial++)
+        {
+            var chromosome = new MockRubikChromosome(12);
+            chromosome.ValidMoves = validMoves;
+            for (int i = 0; i < 12; i++)
+                chromosome.Genes[i] = validMoves[i % validMoves.Count];
+
+            int originalLength = chromosome.Length;
+            var rng = new Random(trial);
+
+            op.Mutate(chromosome, rng);
+
+            Assert.Equal(originalLength, chromosome.Length);
+        }
+    }
+
+    #endregion
+
 }
