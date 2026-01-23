@@ -96,6 +96,7 @@
             this.lblChromosomeLength = new System.Windows.Forms.Label();
             this.numChromosomeLength = new System.Windows.Forms.NumericUpDown();
             this.ResetBtn = new System.Windows.Forms.Button();
+            this.infoGAConfigBtn = new System.Windows.Forms.Button();
             this.gaConfigGroup.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numPopulation)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numMutation)).BeginInit();
@@ -513,6 +514,7 @@
             //
             // gaConfigGroup
             //
+            this.gaConfigGroup.Controls.Add(this.infoGAConfigBtn);
             this.gaConfigGroup.Controls.Add(this.resetGAConfigBtn);
             this.gaConfigGroup.Controls.Add(this.savePresetBtn);
             this.gaConfigGroup.Controls.Add(this.lblSolverMode);
@@ -564,6 +566,17 @@
             this.savePresetBtn.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
             this.savePresetBtn.UseVisualStyleBackColor = true;
             this.savePresetBtn.Click += new System.EventHandler(this.OnSavePresetClicked);
+            //
+            // infoGAConfigBtn
+            //
+            this.infoGAConfigBtn.Location = new System.Drawing.Point(260, 18);
+            this.infoGAConfigBtn.Name = "infoGAConfigBtn";
+            this.infoGAConfigBtn.Size = new System.Drawing.Size(35, 25);
+            this.infoGAConfigBtn.TabIndex = 67;
+            this.infoGAConfigBtn.Text = "?";
+            this.infoGAConfigBtn.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.infoGAConfigBtn.UseVisualStyleBackColor = true;
+            this.infoGAConfigBtn.Click += new System.EventHandler(this.OnGAInfoClicked);
             //
             // lblSolverMode
             //
@@ -884,6 +897,7 @@
         private System.Windows.Forms.Label lblChromosomeLength;
         private System.Windows.Forms.NumericUpDown numChromosomeLength;
         private System.Windows.Forms.Button ResetBtn;
+        private System.Windows.Forms.Button infoGAConfigBtn;
     }
 }
 

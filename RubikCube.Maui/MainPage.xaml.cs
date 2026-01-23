@@ -601,6 +601,11 @@ public partial class MainPage : ContentPage
         ChromosomeLengthLabel.Text = ((int)ChromosomeLengthSlider.Value).ToString();
     }
 
+    private async void OnGAInfoClicked(object? sender, EventArgs e)
+    {
+        await Navigation.PushModalAsync(new GAInfoPage());
+    }
+
     private void OnResetGAConfigClicked(object? sender, EventArgs e)
     {
         // Reset to original settings (Default preset, Iterative mode)

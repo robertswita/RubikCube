@@ -857,6 +857,12 @@ namespace RubikCube
             _generationsPerIteration = (int)numGenerations.Value;
         }
 
+        private void OnGAInfoClicked(object sender, EventArgs e)
+        {
+            using var infoForm = new GAInfoForm();
+            infoForm.ShowDialog(this);
+        }
+
         private void ResetBtn_Click(object sender, EventArgs e)
         {
             // Stop the solver if running

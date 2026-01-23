@@ -61,6 +61,8 @@
                     <VerticalStackLayout Spacing="8">
                         <HorizontalStackLayout Spacing="10">
                             <Label Text="GA Configuration" FontAttributes="Bold" VerticalOptions="Center" />
+                            <Button Text="?" WidthRequest="30" HeightRequest="30" Padding="0"
+                                    FontSize="14" Clicked="OnGAInfoClicked" ToolTipProperties.Text="GA Operators Info" />
                             <Button Text="Reset to Default" Clicked="OnResetGAConfigClicked" Padding="5,2" FontSize="12" />
                         </HorizontalStackLayout>
 
