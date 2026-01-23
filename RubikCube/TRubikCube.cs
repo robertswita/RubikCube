@@ -137,12 +137,13 @@ namespace RubikCube
             //if (!TRubikGenome.FreeMoves.Contains(move.Encode()))
             //    ;
             int angle = 90 * (move.Angle + 1);
-            var rotation = TAffine.CreateRotation(move.Plane, angle);
+            //var rotation = TAffine.CreateRotation(move.Plane, angle);
             var selection = SelectSlice(move);
             for (int i = 0; i < selection.Count; i++)
             {
                 var cubie = selection[i];
-                cubie.Transform = rotation * cubie.Transform;
+                cubie.Rotate(move.Plane, angle);
+                //cubie.Transform = rotation * cubie.Transform;
                 //Cubies[cubie.W, cubie.Z, cubie.Y, cubie.X] = cubie;
                 cubie.ValidState = false;
                 cubie.Transparency = cubie.State != 0 ? 0.1f : 1;
@@ -164,19 +165,49 @@ namespace RubikCube
 
         public double Evaluate()
         {
-            var score = 0d;
-            double maxClusterState = (1 << 2 * TAffine.Planes.Length) * ActiveCluster.Count;
-            foreach (var cubie in SolvedCubies)
-                if (cubie.State != 0)
-                    score += ActiveCluster.Count + 1;
-                    //score += maxState + cubie.State;
-                    //score += (1 + cubie.Score) * ActiveCluster.Count;
+            double score = 0;
+            var maxState = 1 << (2 * TAffine.Planes.Length + 3);
             foreach (var cubie in ActiveCluster)
                 if (cubie.State != 0)
-                    score += 1 + cubie.State / maxClusterState;
-                    //score += maxState + cubie.State;
-            return 100 * score / (ActiveCluster.Count + 1);
+                    score += maxState + cubie.State + (cubie.RotationCount << 2 * TAffine.Planes.Length);
+            score /= maxState * ActiveCluster.Count;
+            foreach (var cubie in SolvedCubies)
+                if (cubie.State != 0)
+                    score += 2;
+            return 50 * score;
         }
+
+        public List<int> GetAllMoves()
+        {
+            var freeGenes = new List<int>();
+            var pos = ActiveCubie.Position;
+            for (int axis = 0; axis < TAffine.N; axis++)
+                for (int coord = 0; coord < TAffine.N; coord++)
+                    for (int side = 0; side < 2; side++)
+                        for (int plane = 0; plane < TAffine.Planes.Length; plane++)
+                        //for (int plane = 0; plane < TAffine.N - 1; plane++)
+                        {
+                            var move = new TMove();
+                            move.Plane = plane;
+                            var planeAxes = move.GetPlaneAxes();
+                            if (planeAxes[0] == axis || planeAxes[1] == axis)
+                                continue;
+                            move.Axis = axis;
+                            if (side == 0)
+                                move.Slice = pos[coord];
+                            else
+                                move.Slice = Size - 1 - pos[coord];
+                            var gene = move.Encode();
+                            if (freeGenes.IndexOf(gene) < 0)
+                            {
+                                freeGenes.Add(gene + 0);
+                                freeGenes.Add(gene + 1);
+                                freeGenes.Add(gene + 2);
+                            }
+                        }
+            return freeGenes;
+        }
+
 
         public List<int> GetFreeMoves()
         {
@@ -186,6 +217,7 @@ namespace RubikCube
                 for (int coord = 0; coord < TAffine.N; coord++)
                     for (int side = 0; side < 2; side++)
                         for (int plane = 0; plane < TAffine.Planes.Length; plane++)
+                        //for (int plane = 0; plane < TAffine.N - 1; plane++)
                         {
                             var move = new TMove();
                             move.Plane = plane;
@@ -194,9 +226,9 @@ namespace RubikCube
                                 continue;
                             move.Axis = axis;
                             if (side == 0)
-                                move.Slice = (int)pos[coord];
+                                move.Slice = pos[coord];
                             else
-                                move.Slice = Size - 1 - (int)pos[coord];
+                                move.Slice = Size - 1 - pos[coord];
                             var gene = move.Encode();
                             if (freeGenes.IndexOf(gene) < 0)
                             {

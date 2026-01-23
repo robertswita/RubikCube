@@ -19,7 +19,7 @@ public class OpenGLCubeView : Microsoft.Maui.Controls.View
 {
     public TShape Root { get; set; } = new TShape();
     public bool IsTransparencyOn { get; set; }
-    public Color ClearColor { get; set; } = Colors.DarkSlateGray;
+    public Color ClearColor { get; set; } = Colors.White;//Colors.DarkSlateGray;
     public NativeCubeView? NativeViewParent { get; set; }
 
     private OpenGLCubeViewHandler? _handler;
@@ -64,6 +64,9 @@ class OpenGLPanel : SwapChainPanel
         {
             var windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(
                 Microsoft.Maui.MauiWinUIApplication.Current.Application.Windows[0].Handler?.PlatformView as Microsoft.UI.Xaml.Window);
+            //Microsoft.UI.Xaml.Application.Current.Resources["NavigationViewContentBackground"] =
+            //    new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent);
+
             Hwnd = windowHandle;
         }
         catch
@@ -97,7 +100,8 @@ public class OpenGLCubeViewHandler : ViewHandler<OpenGLCubeView, SwapChainPanel>
             [nameof(IView.Background)] = MapBackground
         };
 
-    static void MapBackground(OpenGLCubeViewHandler handler, OpenGLCubeView view) { }
+    static void MapBackground(OpenGLCubeViewHandler handler, OpenGLCubeView view) {
+    }
 
     public OpenGLCubeViewHandler() : base(PropertyMapper) { }
 
@@ -241,15 +245,16 @@ public class OpenGLCubeViewHandler : ViewHandler<OpenGLCubeView, SwapChainPanel>
     {
         _root = root;
         _isTransparencyOn = isTransparencyOn;
-        _bgR = backgroundColor.Red;
-        _bgG = backgroundColor.Green;
-        _bgB = backgroundColor.Blue;
-        _bgA = backgroundColor.Alpha;
+        //_bgR = backgroundColor.Red;
+        //_bgG = backgroundColor.Green;
+        //_bgB = backgroundColor.Blue;
+        //_bgA = backgroundColor.Alpha;
+        //_bgR = 0;
 
-        if (_renderer != null)
-        {
-            _renderer.SetBackgroundColor(_bgR, _bgG, _bgB, _bgA);
-        }
+        //if (_renderer != null)
+        //{
+        //    _renderer.SetBackgroundColor(_bgR, _bgG, _bgB, _bgA);
+        //}
     }
 
     internal void Draw()
@@ -269,6 +274,8 @@ public class OpenGLCubeViewHandler : ViewHandler<OpenGLCubeView, SwapChainPanel>
         {
             System.Diagnostics.Debug.WriteLine($"OpenGL render failed: {ex.Message}");
         }
+
+
     }
 
     protected override void DisconnectHandler(SwapChainPanel platformView)

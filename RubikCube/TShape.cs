@@ -21,6 +21,7 @@ namespace TGL
         public List<int> Faces = new List<int>();
         public List<TShape> Children = new List<TShape>();
         public List<Color> Colors = new List<Color>();
+        public List<TVector> EulerAngles;
 
         TShape _Parent;
         public virtual TShape Parent
@@ -34,7 +35,17 @@ namespace TGL
                 _Parent?.Children.Add(this);
             }
         }
-        public TAffine Transform = new TAffine();
+        //public TAffine Transform = new TAffine();
+        TAffine transform = new TAffine();
+        public TAffine Transform
+        {
+            get { return transform; }
+            set
+            {
+                transform = value;
+                //EulerAngles = transform.GetEulerAngles();
+            }
+        }
         public TAffine WorldTransform = new TAffine();
         //public TVector Origin
         //{
@@ -45,10 +56,11 @@ namespace TGL
         {
             Transform = TAffine.CreateScale(s) * Transform;
         }
-        public void Rotate(int axis, double angle)
+        public void Rotate(int plane, double angle)
         {
-            if (angle != 0 && axis < TAffine.Planes.Length)
-                Transform = TAffine.CreateRotation(axis, angle) * Transform;
+            if (angle != 0 && plane < TAffine.Planes.Length)
+                //Transform = TAffine.CreateRotation(axis, angle) * Transform;
+                Transform.Rotate(plane, angle);
         }
         //public void Translate(TVector t)
         //{
@@ -105,48 +117,39 @@ namespace TGL
         }
 
 
-        public static TShape CreateHyperCube()
+public static TShape CreateHyperCube()
+{
+    var cube = new TShape();
+    var lbn = new TVector(TAffine.N) - 1;
+    var rtf = new TVector(TAffine.N) + 1;
+    for (int i = 0; i < 1 << TAffine.N; i++)
+    {
+        var p = lbn.Clone();
+        for (int dim = 0; dim < TAffine.N; dim++)
+            if ((i & 1 << dim) != 0) p[dim] = rtf[dim];
+        cube.Vertices.Add(p);
+    }
+    var colorCount = TAffine.Planes.Length * (1 << TAffine.N - 2);
+    var pal = CreatePalette();
+    var colorIdx = 0;
+    for (int plane = 0; plane < TAffine.Planes.Length; plane++)
+    {
+        var axis1 = 1 << TAffine.Planes[plane][0];
+        var axis2 = 1 << TAffine.Planes[plane][1];
+        for (int i = 0; i < 1 << TAffine.N - 2; i++)
         {
-            var obj = new TShape();
-            var lbn = new TVector(TAffine.N) - 1;
-            var rtf = new TVector(TAffine.N) + 1;
-            for (int i = 0; i < 1 << TAffine.N; i++)
-            {
-                var p = lbn.Clone();
-                for (int dim = 0; dim < TAffine.N; dim++)
-                    if ((i & 1 << dim) != 0) p[dim] = rtf[dim];
-                obj.Vertices.Add(p);
-            }
-            var colorCount = TAffine.Planes.Length * (1 << TAffine.N - 2);
-            var pal = CreatePalette();
-            var colorIdx = 0;
-            for (int plane = 0; plane < TAffine.Planes.Length; plane++)
-            {
-                var axis1 = 1 << TAffine.Planes[plane][0];
-                var axis2 = 1 << TAffine.Planes[plane][1];
-                var axes = axis1 | axis2;
-                for (int i = 0; i < 1 << TAffine.N - 2; i++)
-                {
-                    var firstIdx = i & (axis1 - 1) | (i & ~(axis1 - 1)) << 1;
-                    firstIdx = firstIdx & (axis2 - 1) | (firstIdx & ~(axis2 - 1)) << 1;
-                    var quad = new int[4];
-                    for (int j = 0; j < 4; j++)
-                    {
-                        var idx = firstIdx;
-                        if ((j & 1) != 0) idx |= axis1;
-                        if ((j >> 1) != 0) idx |= axis2;
-                        quad[j] = idx;
-                    }
-                    obj.Faces.Add(quad[0]);
-                    obj.Faces.Add(quad[1]);
-                    obj.Faces.Add(quad[3]);
-                    obj.Faces.Add(quad[2]);
-                    obj.Colors.Add(pal[255 * colorIdx / colorCount]);
-                    colorIdx++;
-                }
-            }
-            return obj;
+            var firstIdx = i & (axis1 - 1) | (i & ~(axis1 - 1)) << 1;
+            firstIdx = firstIdx & (axis2 - 1) | (firstIdx & ~(axis2 - 1)) << 1;
+            cube.Faces.Add(firstIdx);
+            cube.Faces.Add(firstIdx | axis1);
+            cube.Faces.Add(firstIdx | axis1 | axis2);
+            cube.Faces.Add(firstIdx | axis2);
+            cube.Colors.Add(pal[255 * colorIdx / colorCount]);
+            colorIdx++;
         }
+    }
+    return cube;
+}
 
     }
 }

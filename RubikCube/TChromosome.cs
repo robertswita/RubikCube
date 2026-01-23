@@ -45,5 +45,7 @@ namespace GA
         {
             return Fitness.CompareTo(other.Fitness);
         }
+
+        public virtual double Evaluate() { return Fitness; }
     }
 }

@@ -287,7 +287,7 @@ fragment float4 fragment_main(VertexOut in [[stage_in]]) {
         _bgA = backgroundColor.Alpha;
 
         // Rebuild vertex buffer with new state
-        float scale = 0.4f;
+        float scale = 0.33f;
         var vertices = _bufferBuilder.BuildVertices(_root, scale, _isTransparencyOn);
         _vertexCount = vertices.Length;
 

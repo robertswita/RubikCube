@@ -40,15 +40,16 @@ namespace TGL
             //if (Vector.IsHardwareAccelerated)
             //{
             //    var simdLen = Vector<float>.Count;
-            //    for (; i <= dest.Size - simdLen; i += simdLen)
+            //    for (; i <= dest.Size; i += simdLen)
             //    {
             //        var l = new Vector<float>(left.Data, i);
             //        var r = new Vector<float>(right.Data, i);
             //        Vector.Add(l, r).CopyTo(dest.Data, i);
             //    }
             //}
-            for (; i < dest.Size; i++)
-                dest[i] += right[i];
+            //else
+                for (; i < dest.Size; i++)
+                    dest[i] += right[i];
             return dest;
         }
         public static TVector operator -(TVector left, TVector right)
@@ -165,6 +166,14 @@ namespace TGL
                 y_[i] = y[j - 1] * (1 - ratio) + y[j] * ratio;
             }
             return y_;
+        }
+
+        public virtual void Rotate(int axis1, int axis2, float cosA, float sinA)
+        {
+            var t1 = Data[axis1];
+            var t2 = Data[axis2];
+            Data[axis1] = cosA * t1 - sinA * t2;
+            Data[axis2] = sinA * t1 + cosA * t2;
         }
 
 

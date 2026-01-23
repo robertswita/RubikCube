@@ -97,7 +97,7 @@
         <!-- Right Panel - Cube View (Native GPU rendering: Metal on macOS, OpenGL on Windows) -->
         <controls:NativeCubeView x:Name="CubeViewControl"
                                  Grid.Column="1"
-                                 BackgroundColor="DarkSlateGray">
+                                 BackgroundColor="Transparent">
             <controls:NativeCubeView.GestureRecognizers>
                 <PanGestureRecognizer PanUpdated="OnCubeViewPanUpdated" />
                 <PinchGestureRecognizer PinchUpdated="OnCubeViewPinchUpdated" />

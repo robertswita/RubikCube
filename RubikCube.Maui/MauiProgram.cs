@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Maui.LifecycleEvents;
 using SkiaSharp.Views.Maui.Controls.Hosting;
 
 namespace RubikCube.Maui;
@@ -24,6 +25,15 @@ public static class MauiProgram
 #elif WINDOWS
                 handlers.AddHandler<Platforms.Windows.Rendering.OpenGLCubeView,
                     Platforms.Windows.Rendering.OpenGLCubeViewHandler>();
+                //builder.ConfigureLifecycleEvents(events => {
+                //    events.AddWindows(lifecycle => {
+                //        lifecycle.OnWindowCreated(window => {
+                //            // Remove the default WinUI background
+                //            Microsoft.UI.Xaml.Application.Current.Resources["NavigationViewContentBackground"] =
+                //                new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent);
+                //        });
+                //    });
+                //});
 #endif
             });
 

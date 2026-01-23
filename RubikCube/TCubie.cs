@@ -47,11 +47,12 @@ namespace RubikCube
                 {
                     state = 0;
                     var shift = 0;
-                    var angles = Transform.GetEulerAngles();
+                    //var angles = Transform.GetEulerAngles();
+                    EulerAngles = Transform.GetEulerAngles();
                     RotationCount = 0;
-                    for (int i = 0; i < angles.Count; i++)
+                    for (int i = 0; i < EulerAngles.Count; i++)
                     {
-                        var angle = GetAngle(angles[i].X, angles[i].Y);
+                        var angle = GetAngle(EulerAngles[i].X, EulerAngles[i].Y);
                         state |= angle << shift;
                         shift += 2;
                         if (angle > 0) RotationCount++;
@@ -85,10 +86,10 @@ namespace RubikCube
             }
         }
 
-        public double Score
-        {
-            get { return (double)State / MaxScore; }
-        }
+        //public double Score
+        //{
+        //    get { return (double)State / MaxScore; }
+        //}
 
         //public TVector GetStartPos()
         //{

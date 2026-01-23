@@ -337,7 +337,8 @@ public partial class MainPage : ContentPage
                 double angle = 90 * (_currentMove.Angle + 1);
                 if (angle > 180) angle -= 360;
                 angle *= (double)_frameNo / FrameCount;
-                _actSlice!.Transform = TAffine.CreateRotation(_currentMove.Plane, angle);
+                _actSlice!.Transform = new TAffine();
+                _actSlice!.Transform.Rotate(_currentMove.Plane, angle);
             }
             else
             {
@@ -543,7 +544,7 @@ public partial class MainPage : ContentPage
         if (_gaCts?.Token.IsCancellationRequested == true)
             throw new OperationCanceledException();
 
-        specimen.Check();
+        specimen.Correct();
         specimen.Fitness = double.MaxValue;
 
         // Use the GA cube copy for evaluation

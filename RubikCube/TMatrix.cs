@@ -102,7 +102,7 @@ namespace TGL
                 dest.Cols[i] = left * right.Cols[i];
             return dest;
         }
-        public static TVector operator *(TMatrix m, TVector v)
+        public static TVector Mult(TMatrix m, TVector v)
         {
             TVector dest = new TVector(m.RowsCount);
             for (int i = 0; i < m.ColsCount; i++)
@@ -110,10 +110,18 @@ namespace TGL
                     dest += m.Cols[i] * v[i];
             return dest;
         }
-        public static TVector operator *(TVector v, TMatrix m)
+        public static TVector operator *(TMatrix m, TVector v)
         {
-            return m.Transpose() * v;
+            TVector dest = new TVector(m.RowsCount);
+            for (int y = 0; y < m.RowsCount; y++)
+                for (int x = 0; x < m.ColsCount; x++)
+                    dest[y] += m[y, x] * v[x];
+            return dest;
         }
+        //public static TVector operator *(TVector v, TMatrix m)
+        //{
+        //    return m.Transpose() * v;
+        //}
         float _Det;
         public float Det
         {
@@ -190,11 +198,28 @@ namespace TGL
                 this[i, i] = 1;
         }
 
-        public void Rotate(int i, int j, float cosA, float sinA)
+        public override void Rotate(int axis1, int axis2, float cosA, float sinA)
+        {
+            int row1 = axis1;
+            int row2 = axis2;
+            for (int n = 0; n < ColsCount; n++)
+            {
+                float a = Data[row1];
+                float b = Data[row2];
+                Data[row1] = cosA * a - sinA * b;
+                Data[row2] = sinA * a + cosA * b;
+                row1 += RowsCount;
+                row2 += RowsCount;
+            }
+        }
+
+
+        public void RotatePost(int i, int j, float cosA, float sinA)
         {
             int colA = i * RowsCount;
             int colB = j * RowsCount;
             for (int n = 0; n < RowsCount; n++)
+            //while (colA < colA + RowsCount)
             {
                 float a = Data[colA];
                 float b = Data[colB];
@@ -203,8 +228,8 @@ namespace TGL
                 colA++;
                 colB++;
             }
-            //var iCol = Cols[i] * cosA - Cols[j] * sinA;
-            //var jCol = Cols[i] * sinA + Cols[j] * cosA;
+            //var iCol = Cols[i] * cosA + Cols[j] * sinA;
+            //var jCol = -Cols[i] * sinA + Cols[j] * cosA;
             //Cols[i] = iCol;
             //Cols[j] = jCol;
         }

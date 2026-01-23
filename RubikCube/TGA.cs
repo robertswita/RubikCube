@@ -35,7 +35,7 @@ namespace GA
             while (Best.Fitness >= HighScore && IterCount < GenerationsCount)
             {
                 foreach (var specimen in Population)
-                    specimen.Fitness = Evaluate(specimen);
+                    specimen.Evaluate();
                 Population.Sort();
                 if (Progress != null)
                     Progress(Population[0]);
@@ -76,7 +76,7 @@ namespace GA
                 var mutationsCount = (int)(MutationRatio * PopulationCount);
                 for (int i = 0; i < mutationsCount; i++)
                 {
-                    var mutant = Population[TChromosome.Rnd.Next(PopulationCount)];
+                    var mutant = Population[TChromosome.Rnd.Next(Population.Count)];
                     mutant.Mutate();
                 }
                 IterCount++;

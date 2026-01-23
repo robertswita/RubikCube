@@ -14,10 +14,13 @@ public class OpenGLRenderer : ICubeRenderer
     private uint _vao;
     private uint _vbo;
     private uint _shaderProgram;
+    private uint Texture;
+    public ContentView View;
 
     private readonly VertexBufferBuilder _bufferBuilder = new();
     private float _width, _height;
-    private float _bgR = 0.18f, _bgG = 0.31f, _bgB = 0.31f, _bgA = 1.0f;
+    //private float _bgR = 0.18f, _bgG = 0.31f, _bgB = 0.31f, _bgA = 1.0f;
+    private float _bgR = 1f, _bgG = 1f, _bgB = 1f, _bgA = 1.0f;
 
     private bool _isInitialized;
 
@@ -198,6 +201,17 @@ void main()
         _gl.UseProgram(_shaderProgram);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)vertices.Length);
     }
+
+    //internal void DrawScene()
+    //{
+    //    var image = View.FrameBuffer;
+    //    if (image == null) return;
+    //    _gl.BindTexture(GLEnum.Texture2D, Texture);
+    //    _gl.TexImage2D(GLEnum.Texture2D, 0, 4, image.Width, image.Height, 0, GLEnum.Bgra, GLEnum.UnsignedByte, image.Pixels);
+    //    //_gl.FramebufferTexture2D(GLEnum.ReadFramebuffer, GLEnum.ColorAttachment0, GLEnum.Texture2D, Texture, 0);
+    //    //_gl.BlitFramebuffer(0, image.Height, image.Width, -1, 0, 0, View.Width, View.Height, GLEnum.ColorBufferBit, GLEnum.Nearest);
+    //}
+
 
     public void Dispose()
     {

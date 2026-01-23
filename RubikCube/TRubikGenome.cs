@@ -10,7 +10,15 @@ namespace RubikCube
     {
         public int MovesCount;
         public static List<int> FreeMoves;
+        public static TRubikCube RubikCube;
 
+        public TRubikGenome(): base()
+        {
+            //Correct();
+            //var geneIdx = Rnd.Next(Genes.Length - 3);
+            //Commute(geneIdx);
+            //Mutate();
+        }
         public override void MutateGene(int idx)
         {
             Genes[idx] = FreeMoves[Rnd.Next(FreeMoves.Count)];
@@ -21,10 +29,9 @@ namespace RubikCube
             //}
         }
 
-        public void Conjugate()
+        public void Conjugate(int geneIdx)
         {
             //Check();
-            var geneIdx = Rnd.Next(Genes.Length / 2);
 
             for (int i = 1; i <= geneIdx; i++)
             {
@@ -34,18 +41,24 @@ namespace RubikCube
             }
         }
 
+        public void Commute(int geneIdx)
+        {
+            //Check();
+            //var geneIdx = Rnd.Next(Genes.Length - 3);
+            for (int i = 0; i < 2; i++)
+            {
+                var move = TMove.Decode((int)Genes[geneIdx + i]);
+                move.Angle = 2 - move.Angle;
+                Genes[geneIdx + 2 + i] = move.Encode();
+            }
+        }
+
 
         public override void Mutate()
         {
-            //MutateGene(Rnd.Next(Genes.Length));
-            Check();
             var geneIdx = Rnd.Next(Genes.Length / 2);
-            for (int i = 1; i <= geneIdx; i++)
-            {
-                var move = TMove.Decode((int)Genes[geneIdx - i]);
-                move.Angle = 2 - move.Angle;
-                Genes[geneIdx + i] = move.Encode();
-            }
+            Conjugate(geneIdx);
+            //Commute(geneIdx);
         }
 
         public override TChromosome Crossover(TChromosome other, int splitIdx)
@@ -53,12 +66,12 @@ namespace RubikCube
             var child = new TRubikGenome();
             Array.Copy(Genes, child.Genes, splitIdx);
             Array.Copy(other.Genes, splitIdx, child.Genes, splitIdx, Genes.Length - splitIdx);
-            //child.Check();
+            child.Correct();
             return child;
         }
 
         //bool IsChecked;
-        public void Check()
+        public void Correct()
         {
             //if (IsChecked) return;
             for (int idx = 1; idx < Genes.Length; idx++)
@@ -82,7 +95,6 @@ namespace RubikCube
                             RemoveGene(prevIdx);
                             idx--;
                         }
-
                         RemoveGene(idx);
                         idx--;
                         break;
@@ -105,6 +117,43 @@ namespace RubikCube
             }
             Genes[Genes.Length - 1] = lastMove.Encode();
         }
+
+        public override double Evaluate()
+        {
+            //Correct();
+            //specimen.Conjugate();
+            //specimen.Mutate(RubikCube.ActCubie);
+            Fitness = double.MaxValue;
+            var cube = new TRubikCube(RubikCube);
+            //string startCode = cube.Code;
+            for (int i = 0; i < Genes.Length; i++)
+            {
+                //if (!TRubikGenome.FreeMoves.Contains((int)specimen.Genes[i]))
+                //    ;
+                var move = TMove.Decode((int)Genes[i]);
+                // Final optimalization
+                if (i == 0)
+                {
+                    var actCubie = RubikCube.ActiveCubie;
+                    move.Slice = actCubie.Position[move.Axis];
+                    Genes[0] = move.Encode();
+                }
+                cube.Turn(move);
+                //var cubeCopy = new TRubikCube(cube);
+                //for (int j = i - 1; j >= 0; j--)
+                //    cube.ReTurn(TMove.Decode((int)specimen.Genes[j]));
+                double fitness = cube.Evaluate();
+                if (fitness < Fitness)// && cube.Code != startCode)
+                {
+                    Fitness = fitness;
+                    MovesCount = i + 1;
+                    //if (fitness == 0) break;
+                }
+                //cube = cubeCopy;
+            }
+            return Fitness;
+        }
+
 
     }
 

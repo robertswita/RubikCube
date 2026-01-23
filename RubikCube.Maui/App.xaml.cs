@@ -9,6 +9,16 @@ public partial class App : Application
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        return new Window(new MainPage()) { Title = "Rubik's Cube 4D Solver" };
+        var window = new Window(new MainPage()) { Title = "Rubik's Cube 4D Solver" };
+        //builder.ConfigureLifecycleEvents(events => {
+        //    events.AddWindows(lifecycle => {
+        //        lifecycle.OnWindowCreated(window => {
+        //            // Remove the default WinUI background
+        //            Microsoft.UI.Xaml.Application.Current.Resources["NavigationViewContentBackground"] =
+        //                new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent);
+        //        });
+        //    });
+        //});
+        return window;
     }
 }

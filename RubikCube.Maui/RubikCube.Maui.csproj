@@ -46,13 +46,13 @@
     <_EnableMacCatalystSupport>false</_EnableMacCatalystSupport>
     <SkipValidation>true</SkipValidation>
     <SkipCodeSigningValidation>true</SkipCodeSigningValidation>
+    <UseWindowsForms>False</UseWindowsForms>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.10" />
     <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
-    <PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="2.88.8" />
     <PackageReference Include="LiveChartsCore.SkiaSharpView.Maui" Version="2.0.0-rc2" />
   </ItemGroup>
 

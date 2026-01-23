@@ -28,9 +28,9 @@ public class NativeCubeView : ContentView
     private View? _platformView;
     private bool _isInitialized;
 
-    public TShape Root { get; set; } = new TShape();
+    public TShape Root { get; set; }// = new TShape();
     public bool IsTransparencyOn { get; set; }
-    public new Color BackgroundColor { get; set; } = Colors.DarkSlateGray;
+    //public new Color BackgroundColor { get; set; } = Colors.Black;// Colors.DarkSlateGray;
 
     /// <summary>
     /// Event raised when the scroll wheel is used over the view.
@@ -43,6 +43,7 @@ public class NativeCubeView : ContentView
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
         SizeChanged += OnSizeChanged;
+        BackgroundColor = Colors.Transparent;
     }
 
     private void OnLoaded(object? sender, EventArgs e)
