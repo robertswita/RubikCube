@@ -27,10 +27,12 @@ namespace RubikCube
         int MoveNo;
         double HighScore;
         public TRubikCube RubikCube;// = new TRubikCube();
+        int Iteration;
         //public TScene Scene = new TScene();
         //public TCamera Camera;
         TGA<TRubikGenome> Ga;
         TShape Root = new TShape();
+        //int Scrambled;
         public TRubikForm()
         {
             InitializeComponent();
@@ -45,8 +47,10 @@ namespace RubikCube
 
         private void TglView1_MouseWheel(object sender, MouseEventArgs e)
         {
-            Root.Rotate(Math.Min(TAffine.Planes.Length - 1, 2), (float)e.Delta / 60);
-            Root.Rotate(Math.Min(TAffine.Planes.Length - 1, 3), (float)e.Delta / 60);
+            for (int i = 2; i < TAffine.Planes.Length; i++)
+                Root.Rotate(i, (float)e.Delta / 60);
+            //Root.Rotate(Math.Min(TAffine.Planes.Length - 1, 2), (float)e.Delta / 60);
+            //Root.Rotate(Math.Min(TAffine.Planes.Length - 1, 3), (float)e.Delta / 60);
             tglView1.Invalidate();
         }
 
@@ -55,7 +59,7 @@ namespace RubikCube
             tglView1.Context.Root = Root;
             RubikCube = new TRubikCube();
             RubikCube.Parent = Root;
-            //LoadSolutions();
+            LoadSolutions();
         }
 
         Point StartPos;
@@ -110,9 +114,9 @@ namespace RubikCube
                     double angle = 90 * (move.Angle + 1);
                     if (angle > 180) angle -= 360;
                     angle *= (double)FrameNo / FrameCount;
-                    //ActSlice.Transform = TAffine.CreateRotation(move.Plane, angle);
-                    ActSlice.Transform = new TAffine();
-                    ActSlice.Rotate(move.Plane, angle);
+                    ActSlice.Transform = TAffine.CreateRotation(move.Plane, angle);
+                    //ActSlice.Transform = new TAffine();
+                    //ActSlice.Rotate(move.Plane, angle);
                 }
                 else
                 {
@@ -128,7 +132,9 @@ namespace RubikCube
                 MoveNo = 0;
                 Moves.Clear();
                 label2.Text = HighScore.ToString();
-                label4.Text = RubikCube.Code.Count(x => x != '\0').ToString();
+                //var scrambled = RubikCube.Code.Count(x => x != '\0');
+                label4.Text = RubikCube.ScrambledCount().ToString();
+                //Scrambled = scrambled;
                 MovesLbl.Text = MovesCount.ToString();
                 StateBox.Invalidate();
                 //if (RubikCube.ActiveCubie != null)
@@ -150,7 +156,23 @@ namespace RubikCube
             else
             {
                 label1.Text = Time.ToString();
+                //SeqCountLbl.Text = "SeqCount:" +Ga.Best.MoveCount.ToString();
                 MoveTimer.Stop();
+                var freeCubies = new List<TCubie>();
+                foreach (var cubie in RubikCube.ActiveCluster)
+                    if (cubie.State != 0)
+                    {
+                        //RubikCube.ActiveCubie = cubie;
+                        //break;
+                        freeCubies.Add(cubie);
+                    }
+                //if (RubikCube.ActiveCubie != null)
+                //    RubikCube.ActiveCubie.GetReversedSeq();
+                if (freeCubies.Count > 0)
+                {
+                    RubikCube.ActiveCubie = freeCubies[TChromosome.Rnd.Next(freeCubies.Count)];
+                    RubikCube.GetReversedSeq();
+                }
                 if (Ga != null)
                     Solve();
             }
@@ -162,12 +184,11 @@ namespace RubikCube
         {
             var grid = RubikCube.StateGrid;
             var bmp = new Bitmap(grid.GetLength(0), grid.GetLength(1));
+            using (Graphics g = Graphics.FromImage(bmp)) { g.Clear(Color.White); }
             for (int y = 0; y < bmp.Height; y++)
                 for (int x = 0; x < bmp.Width; x++)
                 {
-                    if (grid[y, x] == 0)
-                        bmp.SetPixel(x, y, Color.White);
-                    else
+                    if (grid[y, x] != 0)
                     {
                         var r = 255 / 16.0 * (1 + grid[y, x] & 0xF);
                         var g = 255 / 16.0 * (1 + (grid[y, x] >> 4) & 0xF);
@@ -210,9 +231,10 @@ namespace RubikCube
                 {
                     TRubikGenome.FreeMoves = RubikCube.GetFreeMoves();
                     HighScore = RubikCube.Evaluate();
+                    RubikCube.GetReversedSeq();
                 }
             }
-            if (RubikCube.ActiveCluster != null)
+            if (RubikCube.ActiveCubie != null)
             {
                 Watch = Stopwatch.StartNew();
                 IterElapsed = TimeSpan.Zero;
@@ -224,9 +246,11 @@ namespace RubikCube
                 TRubikGenome.FreeMoves = RubikCube.GetFreeMoves();
                 Ga = new TGA<TRubikGenome>();
                 Ga.GenerationsCount = 50;
-                Ga.PopulationCount = RubikCube.Cubies.Length * TRubikGenome.FreeMoves.Count;
+                //Iteration++;
+                //var level = 1 + (int)(10 - HighScore / 10) + RubikCube.SolvedCubies.Count;
+                Ga.PopulationCount = 1000;//TRubikGenome.FreeMoves.Count * 100;
                 Ga.WinnerRatio = 0.01;
-                Ga.MutationRatio = 10;
+                Ga.MutationRatio = 10;// 0.05;
                 Ga.SelectionType = TGA<TRubikGenome>.TSelectionType.Unique;
                 //Ga.Evaluate = OnEvaluate;
                 Ga.Progress = OnProgress;
@@ -234,14 +258,34 @@ namespace RubikCube
                 Ga.Execute();
                 if (Ga.HighScore == 0 && RubikCube.ActiveCluster.Count > 1)
                 {
-                    //SaveSolution(Ga.Best);
+                    SaveSolution(Ga.Best);
                 }
                 if (Ga.HighScore < HighScore)
                 {
-                    HighScore = Ga.HighScore;
-                    for (int i = 0; i < Ga.Best.MovesCount; i++)
-                        Moves.Add(TMove.Decode((int)Ga.Best.Genes[i]));
-                    TrySolutions = true;
+                    //var scrambled = RubikCube.Code.Count(x => x != '\0');
+                    //if (scrambled > Scrambled)
+                    //{
+                    //    ;
+                    //    var score = RubikCube.Evaluate();
+                    //    for (int i = 0; i < Ga.Best.MovesCount; i++)
+                    //        RubikCube.Turn(TMove.Decode((int)Ga.Best.Genes[i]));
+                    //    score = RubikCube.Evaluate();
+                    //    scrambled = RubikCube.Code.Count(x => x != '\0');
+                    //}
+                    //Scrambled = scrambled;
+                    //if (Ga.HighScore == 0 ||
+                    //    RubikCube.ScrambledCount() >= RubikCube.ActiveCluster.Count ||
+                    //    Ga.HighScore >= 100f / RubikCube.ActiveCluster.Count)
+                    {
+                        //Ga.Best.Correct();
+                        //Ga.Best.Evaluate();
+                        Iteration = 0;
+                        HighScore = Ga.HighScore;
+                        Ga.Best.Correct();
+                        for (int i = 0; i < Ga.Best.MoveCount; i++)
+                            Moves.Add(TMove.Decode((int)Ga.Best.Genes[i]));
+                        TrySolutions = true;
+                    }
                 }
                 if (TrySolutions)
                 {
@@ -296,6 +340,7 @@ namespace RubikCube
             //RubikCube.GetActCubie();
             //HighScore = RubikCube.Evaluate();
             HighScore = 0;
+            RubikCube.ActiveCubie = null;
             Solve();
         }
 
@@ -305,7 +350,7 @@ namespace RubikCube
             IsPaused = true;
             var size = TRubikCube.Size;
             var rnd = TChromosome.Rnd;
-            for (int i = 0; i < 30; i++)
+            for (int i = 0; i < 3 * RubikCube.Cubies.Length; i++)
             {
                 RubikCube.ActiveCubie = RubikCube.Cubies[rnd.Next(RubikCube.Cubies.Length)];
                 var allMoves = RubikCube.GetAllMoves();
@@ -389,9 +434,9 @@ namespace RubikCube
                 using (var writer = new BinaryWriter(file))
                 {
                     writer.Write(code);
-                    writer.Write(specimen.MovesCount);
+                    writer.Write(specimen.MoveCount);
                     //var genes = new List<int>(solution.MovesCount);
-                    for (int i = 0; i < specimen.MovesCount; i++)
+                    for (int i = 0; i < specimen.MoveCount; i++)
                     {
                         //genes.Add((int)solution.Genes[i]);
                         //writer.Write((int)solution.Genes[i]);
@@ -423,7 +468,9 @@ namespace RubikCube
             //        S.WriteLine(move.Angle);
             //    }
             //}
-            SaveConfig();
+            saveFileDialog1.InitialDirectory = Application.StartupPath;
+            if (saveFileDialog1.ShowDialog() == DialogResult.OK)
+                SaveConfig(saveFileDialog1.FileName);
         }
 
         private void openToolStripMenuItem_Click(object sender, EventArgs e)
@@ -447,7 +494,7 @@ namespace RubikCube
             openFileDialog1.InitialDirectory = Application.StartupPath;
             if (openFileDialog1.ShowDialog() == DialogResult.OK)
             {
-                LoadConfig(Path.GetFileName(openFileDialog1.FileName));
+                LoadConfig(openFileDialog1.FileName);
             }
         }
 
@@ -455,9 +502,11 @@ namespace RubikCube
         void SaveConfig(string fileName = null)
         {
             if (fileName == null) fileName = ConfigPath;
-            var S = new StreamWriter(Application.StartupPath + "/" + fileName);
+            var S = new StreamWriter(fileName);
             using (S)
             {
+                S.WriteLine(TAffine.N);
+                S.WriteLine(TRubikCube.Size);
                 S.Write(RubikCube.Code);
             }
         }
@@ -465,16 +514,15 @@ namespace RubikCube
         void LoadConfig(string fileName = null)
         {
             if (fileName == null) fileName = ConfigPath;
-            var S = new StreamReader(Application.StartupPath + "/" + fileName);
+            var S = new StreamReader(fileName);
             using (S)
             {
-                var code = S.ReadLine();
-                TRubikCube.Size = (int)Math.Round(Math.Pow(code.Length, 0.33));
-                RubikCube.Parent = null;
-                RubikCube = new TRubikCube();
-                RubikCube.Parent = Root;
-                RubikCube.Code = code;
-                tglView1.Invalidate();
+                Root = null;
+                DimsBox.Value = int.Parse(S.ReadLine());
+                SlicesBox.Value = int.Parse(S.ReadLine());
+                Root = new TShape();
+                UpdateView();
+                RubikCube.Code = S.ReadToEnd();
             }
         }
 
@@ -493,13 +541,16 @@ namespace RubikCube
 
         void UpdateView()
         {
-            Root = new TShape();
-            RubikCube = new TRubikCube();
-            RubikCube.Parent = Root;
-            tglView1.Context.Root = Root;
-            tglView1.Invalidate();
-            StateBox.Invalidate();
-            Moves.Clear();
+            if (Root != null)
+            {
+                Root = new TShape();
+                RubikCube = new TRubikCube();
+                RubikCube.Parent = Root;
+                tglView1.Context.Root = Root;
+                tglView1.Invalidate();
+                StateBox.Invalidate();
+                Moves.Clear();
+            }
         }
 
         private void button3_Click_1(object sender, EventArgs e)
@@ -602,6 +653,11 @@ namespace RubikCube
         {
             TAffine.N = (int)DimsBox.Value;
             UpdateView();
+        }
+
+        private void label12_Click(object sender, EventArgs e)
+        {
+
         }
     }
 }

@@ -1,3 +1,4 @@
+using RubikCube;
 using System;
 using System.Collections.Generic;
 #if MAUI
@@ -117,39 +118,81 @@ namespace TGL
         }
 
 
-public static TShape CreateHyperCube()
-{
-    var cube = new TShape();
-    var lbn = new TVector(TAffine.N) - 1;
-    var rtf = new TVector(TAffine.N) + 1;
-    for (int i = 0; i < 1 << TAffine.N; i++)
-    {
-        var p = lbn.Clone();
-        for (int dim = 0; dim < TAffine.N; dim++)
-            if ((i & 1 << dim) != 0) p[dim] = rtf[dim];
-        cube.Vertices.Add(p);
-    }
-    var colorCount = TAffine.Planes.Length * (1 << TAffine.N - 2);
-    var pal = CreatePalette();
-    var colorIdx = 0;
-    for (int plane = 0; plane < TAffine.Planes.Length; plane++)
-    {
-        var axis1 = 1 << TAffine.Planes[plane][0];
-        var axis2 = 1 << TAffine.Planes[plane][1];
-        for (int i = 0; i < 1 << TAffine.N - 2; i++)
+        public static TShape CreateHyperCube()
         {
-            var firstIdx = i & (axis1 - 1) | (i & ~(axis1 - 1)) << 1;
-            firstIdx = firstIdx & (axis2 - 1) | (firstIdx & ~(axis2 - 1)) << 1;
-            cube.Faces.Add(firstIdx);
-            cube.Faces.Add(firstIdx | axis1);
-            cube.Faces.Add(firstIdx | axis1 | axis2);
-            cube.Faces.Add(firstIdx | axis2);
-            cube.Colors.Add(pal[255 * colorIdx / colorCount]);
-            colorIdx++;
+            var cube = new TShape();
+            var lbn = new TVector(TAffine.N) - 1;
+            var rtf = new TVector(TAffine.N) + 1;
+            for (int i = 0; i < 1 << TAffine.N; i++)
+            {
+                var p = lbn.Clone();
+                for (int dim = 0; dim < TAffine.N; dim++)
+                    if ((i & 1 << dim) != 0) p[dim] = rtf[dim];
+                cube.Vertices.Add(p);
+            }
+            var colorCount = TAffine.Planes.Length * (1 << TAffine.N - 2);
+            var pal = CreatePalette();
+            var colorIdx = 0;
+            for (int plane = 0; plane < TAffine.Planes.Length; plane++)
+            {
+                var axis1 = 1 << TAffine.Planes[plane][0];
+                var axis2 = 1 << TAffine.Planes[plane][1];
+                for (int i = 0; i < 1 << TAffine.N - 2; i++)
+                {
+                    var firstIdx = i & (axis1 - 1) | (i & ~(axis1 - 1)) << 1;
+                    firstIdx = firstIdx & (axis2 - 1) | (firstIdx & ~(axis2 - 1)) << 1;
+                    cube.Faces.Add(firstIdx);
+                    cube.Faces.Add(firstIdx | axis1);
+                    cube.Faces.Add(firstIdx | axis1 | axis2);
+                    cube.Faces.Add(firstIdx | axis2);
+                    cube.Colors.Add(pal[255 * colorIdx / colorCount]);
+                    colorIdx++;
+                }
+            }
+            return cube;
         }
-    }
-    return cube;
-}
+
+        public static TShape CreateHyperWireCube()
+        {
+            var cube = new TShape();
+            var lbn = new TVector(TAffine.N) - 1;
+            var rtf = new TVector(TAffine.N) + 1;
+            for (int i = 0; i < 1 << TAffine.N; i++)
+            {
+                var p = lbn.Clone();
+                for (int axis = 0; axis < TAffine.N; axis++)
+                    if ((i & 1 << axis) != 0) p[axis] = rtf[axis];
+                cube.Vertices.Add(p);
+            }
+            var colorCount = TAffine.Planes.Length * (1 << TAffine.N - 2);
+            var pal = CreatePalette();
+            var colorIdx = 0;
+            //for (int plane = 0; plane < TAffine.Planes.Length; plane++)
+            //{
+            //    var axis1 = 1 << TAffine.Planes[plane][0];
+            //    var axis2 = 1 << TAffine.Planes[plane][1];
+            //    for (int i = 0; i < 1 << TAffine.N - 2; i++)
+            //    {
+            //        var firstIdx = i & (axis1 - 1) | (i & ~(axis1 - 1)) << 1;
+            //        firstIdx = firstIdx & (axis2 - 1) | (firstIdx & ~(axis2 - 1)) << 1;
+            //        cube.Faces.Add(firstIdx);
+            //        cube.Faces.Add(firstIdx | axis1);
+            //        cube.Faces.Add(firstIdx | axis1 | axis2);
+            //        cube.Faces.Add(firstIdx | axis2);
+            //        cube.Colors.Add(pal[255 * colorIdx / colorCount]);
+            //        colorIdx++;
+            //    }
+            //}
+            for (int axis = 0; axis < TAffine.N; axis++)
+            {
+                for (int slice = 0; slice < TRubikCube.Size; slice++)
+                {
+
+                }
+            }
+            return cube;
+        }
+
 
     }
 }

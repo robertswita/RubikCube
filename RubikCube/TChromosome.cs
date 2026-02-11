@@ -19,7 +19,17 @@ namespace GA
         {
             for (var i = 0; i < GenesLength; i++)
                 MutateGene(i);
-        } 
+        }
+
+        public virtual TChromosome Clone()
+        {
+            var clone = (TChromosome)Activator.CreateInstance(GetType());
+            Array.Copy(Genes, clone.Genes, Genes.Length);
+            clone.Fitness = Fitness;
+            return clone;
+        }
+
+        public virtual void Correct() { }
 
         public virtual void MutateGene(int idx)
         {

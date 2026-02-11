@@ -200,16 +200,17 @@ namespace TGL
 
         public override void Rotate(int axis1, int axis2, float cosA, float sinA)
         {
-            int row1 = axis1;
-            int row2 = axis2;
-            for (int n = 0; n < ColsCount; n++)
+            //int row1n = axis1;
+            //int row2n = axis2;
+            //for (int n = 0; n < ColsCount; n++)
+            for (int i = axis1, j = axis2; i < Size; i += RowsCount, j += RowsCount)
             {
-                float a = Data[row1];
-                float b = Data[row2];
-                Data[row1] = cosA * a - sinA * b;
-                Data[row2] = sinA * a + cosA * b;
-                row1 += RowsCount;
-                row2 += RowsCount;
+                var a = Data[i];
+                var b = Data[j];
+                Data[i] = cosA * a - sinA * b;
+                Data[j] = sinA * a + cosA * b;
+                //row1n += RowsCount;
+                //row2n += RowsCount;
             }
         }
 

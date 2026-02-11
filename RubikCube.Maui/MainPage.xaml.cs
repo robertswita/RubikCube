@@ -490,7 +490,7 @@ public partial class MainPage : ContentPage
                 _highScore = _ga.HighScore;
 
                 // Queue moves for animation
-                for (int i = 0; i < _ga.Best.MovesCount; i++)
+                for (int i = 0; i < _ga.Best.MoveCount; i++)
                 {
                     var move = TMove.Decode((int)_ga.Best.Genes[i]);
                     _moveQueue.Enqueue(move);
@@ -571,7 +571,7 @@ public partial class MainPage : ContentPage
             if (fitness < specimen.Fitness)
             {
                 specimen.Fitness = fitness;
-                specimen.MovesCount = i + 1;
+                specimen.MoveCount = i + 1;
             }
         }
 
@@ -624,10 +624,10 @@ public partial class MainPage : ContentPage
             {
                 using var writer = new BinaryWriter(File.Open(SolutionPath, FileMode.Append));
                 writer.Write(code);
-                writer.Write(solution.MovesCount);
+                writer.Write(solution.MoveCount);
 
-                var genes = new List<int>(solution.MovesCount);
-                for (int i = 0; i < solution.MovesCount; i++)
+                var genes = new List<int>(solution.MoveCount);
+                for (int i = 0; i < solution.MoveCount; i++)
                 {
                     genes.Add((int)solution.Genes[i]);
                     writer.Write(genes[i]);

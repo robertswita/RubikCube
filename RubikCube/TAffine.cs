@@ -22,6 +22,8 @@ namespace TGL
                 var idx = 0;
                 for (int col = 1; col < n; col++)
                     for (int row = 0; row < col; row++)
+                    //for (int row = 0; row < n - 1; row++)
+                    //    for (int col = row + 1; col < n; col++)
                     {
                         Planes[idx] = new int[] { row, col };
                         idx++;
@@ -88,10 +90,10 @@ namespace TGL
             Rotate(Planes[plane][0], Planes[plane][1], angle);
         }
 
-        //public static TAffine CreateRotation(int plane, double angle)
-        //{
-        //    return CreateRotation(Planes[plane][0], Planes[plane][1], angle);
-        //}
+        public static TAffine CreateRotation(int plane, double angle)
+        {
+            return CreateRotation(Planes[plane][0], Planes[plane][1], angle);
+        }
 
         //public static TAffine CreateTranslation(TVector t)
         //{
@@ -129,6 +131,8 @@ namespace TGL
             var A = (TMatrix)M.Clone();
             for (int axis2 = 1; axis2 < n; axis2++)
                 for (int axis1 = 0; axis1 < axis2; axis1++)
+                //for (int axis1 = 0; axis1 < n - 1; axis1++)
+                //    for (int axis2 = axis1 + 1; axis2 < n; axis2++)
                 {
                     var a = A[axis1, axis1];
                     var b = A[axis2, axis1];
@@ -145,10 +149,48 @@ namespace TGL
                 }
             //var scale = new TVector(N);
             //for (int i = 0; i < N; i++)
-            //    scale[i] = 0.45f;
+            //    scale[i] = (float)A.Cols[0].Norm;
             //var error = (A - TAffine.CreateScale(scale).M).Norm;
             //if (error > 1E-3)
             //    ;
+            return angles;
+        }
+
+        public List<TVector> GetReversedEulerAngles()
+        {
+            //var angles = new List<TVector>();
+            //var A = (TMatrix)M.Clone();
+            //for (int axis2 = n - 1; axis2 >= 1; axis2--)
+            //    for (int axis1 = axis2 - 1; axis1 >= 0; axis1--)
+            //    //for (int axis1 = 0; axis1 < n - 1; axis1++)
+            //    //    for (int axis2 = axis1 + 1; axis2 < n; axis2++)
+            //    {
+            //        var a = A[axis1, axis1];
+            //        var b = A[axis2, axis1];
+            //        var r = (float)Math.Sqrt(a * a + b * b);
+            //        if (r < 0.1)
+            //            angles.Add(new TVector(1, 0));
+            //        else
+            //        {
+            //            var cosA = a / r;
+            //            var sinA = b / r;
+            //            angles.Add(new TVector(cosA, sinA));
+            //            A.Rotate(axis1, axis2, cosA, -sinA);
+            //        }
+            //    }
+            //var scale = new TVector(N);
+            //for (int i = 0; i < N; i++)
+            //    scale[i] = (float)A.Cols[0].Norm;
+            //var error = (A - TAffine.CreateScale(scale).M).Norm;
+            //if (error > 1E-3)
+            //    ;
+
+            var A = (TMatrix)M.Clone();
+            M = M.Transpose();
+            var angles = GetEulerAngles();
+            M = A;
+            for (int i = 0; i < angles.Count; i++)
+                angles[i][1] *= -1;
             return angles;
         }
 

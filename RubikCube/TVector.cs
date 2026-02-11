@@ -144,6 +144,14 @@ namespace TGL
                 result += Data[i];
             return result;
         }
+        public float Max()
+        {
+            var result = float.MinValue;
+            for (int i = 0; i < Data.Length; i++)
+                if (Data[i] > result)
+                    result = Data[i];
+            return result;
+        }
 
         public static TVector Uniform(int n)
         {

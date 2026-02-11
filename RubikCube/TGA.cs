@@ -32,6 +32,7 @@ namespace GA
                 Population.Add(chromosome);
             }
             Best = Population[0];
+            //Best = (T)Population[0].Clone();
             while (Best.Fitness >= HighScore && IterCount < GenerationsCount)
             {
                 foreach (var specimen in Population)
@@ -40,7 +41,10 @@ namespace GA
                 if (Progress != null)
                     Progress(Population[0]);
                 if (Population[0].Fitness < Best.Fitness)
+                {
                     Best = Population[0];
+                    //Best = (T)Population[0].Clone();
+                }
                 var winnerCount = (int)(WinnerRatio * PopulationCount);
                 List<T> winners = null;
                 switch (SelectionType)
@@ -67,7 +71,7 @@ namespace GA
                     var mom = winners[momIdx];
                     //winners.RemoveAt(momIdx);
                     var dad = winners[TChromosome.Rnd.Next(winners.Count)];
-                    winners.Add(mom);
+                    //winners.Add(mom);
                     var child = (T)mom.Crossover(dad, splitIdx);
                     Population.Add(child);
                     child = (T)dad.Crossover(mom, splitIdx);
@@ -147,8 +151,11 @@ namespace GA
             {
                 var specimen = Population[i];
                 if (specimen.Fitness != sel[sel.Count - 1].Fitness || Population.Count - 1 - i < count - sel.Count)
+                {
+                    specimen.Correct();
                     sel.Add(specimen);
-                if (sel.Count == count) break;
+                }
+                if (sel.Count >= count) break;
             }
             return sel;
         }

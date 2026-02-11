@@ -13,13 +13,11 @@ namespace RubikCube
         public static TShape Cube;
         public static TMatrix SizeMatrix;
         public static int MaxScore;
-        //public int X { get { return (int)Math.Round(Transform.Origin.X + TRubikCube.C); } }
-        //public int Y { get { return (int)Math.Round(Transform.Origin.Y + TRubikCube.C); } }
-        //public int Z { get { return (int)Math.Round(Transform.Origin.Z + TRubikCube.C); } }
-        //public int W { get { return (int)Math.Round(Transform.Origin.W + TRubikCube.C); } }
         //public double Error;
         public int StartIndex;
         public int RotationCount;
+        public static TVector Scaling;
+        public bool IsReversedSeq;
 
         public TCubie()
         {
@@ -28,7 +26,7 @@ namespace RubikCube
             Colors = Cube.Colors;
         }
 
-        int GetAngle(double cosA, double sinA)
+        public int GetAngle(double cosA, double sinA)
         {
             if (cosA > 0.1) return 0;
             if (sinA > 0.1) return 1;
@@ -46,18 +44,22 @@ namespace RubikCube
                 if (!ValidState)
                 {
                     state = 0;
-                    var shift = 0;
-                    //var angles = Transform.GetEulerAngles();
                     EulerAngles = Transform.GetEulerAngles();
                     RotationCount = 0;
+                    var shift = (EulerAngles.Count - 1) << 1;
                     for (int i = 0; i < EulerAngles.Count; i++)
                     {
                         var angle = GetAngle(EulerAngles[i].X, EulerAngles[i].Y);
                         state |= angle << shift;
-                        shift += 2;
-                        if (angle > 0) RotationCount++;
+                        shift -= 2;
+                        if (angle > 0)
+                        {
+                            RotationCount++;
+                        }
                     }
-                    //state |= moveCount << 2 * angles.Count;
+
+                    //state |= RotationCount << 2 * EulerAngles.Count;
+
                     //var xform = TAffine.CreateScale(new TVector(0.45f, 0.45f, 0.45f, 0.45f));
                     //for (int i = TAffine.Planes.Length - 1; i >= 0; i--)
                     //    xform = TAffine.CreateRotation(i, 90 * (state >> 2 * i & 3)) * xform;
@@ -65,23 +67,31 @@ namespace RubikCube
                     //if (Error > 0.01)
                     //    ;
                     ValidState = true;
+                    //for (int i = 0; i < TAffine.N; i++)
+                    //    if (Math.Abs(Transform.M[i, i] - Scaling[i]) > 1E-3)
+                    //    {
+                    //        state = 1;
+                    //        break;
+                    //    }
                 }
                 return state;
             }
             set
             {
-                var org = Transform.Origin;
-                Transform = TAffine.CreateScale(new TVector(0.45f, 0.45f, 0.45f, 0.45f));
+                Transform = TAffine.CreateScale(Scaling);
+                Index = StartIndex;
                 for (int i = TAffine.Planes.Length - 1; i >= 0; i--)
-                    Rotate(i, 90 * (value >> 2 * i & 3));
-                Transform.Origin = org;
+                {
+                    var shift = (TAffine.Planes.Length - 1 - i) << 1;
+                    Transform.Rotate(i, 90 * (value >> shift & 3));
+                }
                 ValidState = false;
-                var state = State;
-                if (state != value)
+                var state_ = State;
+                if (state_ != value)
                     ;
-                this.state = value;
+                state = value;
                 ValidState = true;
-                if (this.state != 0)
+                if (state != 0)
                     Transparency = 0.5f;
             }
         }
@@ -112,28 +122,14 @@ namespace RubikCube
             return dest;
         }
 
-        //int index;
         public int Index
         {
             get
             {
                 return SizeMatrix.Coords2Index(Position);
-                //var index = (int)pos[pos.Size - 1];
-                //for (int i = pos.Size - 2; i >= 0; i--)
-                //    index = index * TRubikCube.Size + (int)pos[i];
-                //return index;
             }
             set 
             {
-                //var stride = (int)Math.Pow(TRubikCube.Size, TAffine.N);
-                //var subs = new TVector(TAffine.N);
-                //for (int i = TAffine.N - 1; i >= 0; i--)
-                //{
-                //    stride /= TRubikCube.Size;
-                //    var sub = value / stride;
-                //    value -= sub * stride;
-                //    subs[i] = sub;
-                //}
                 var pos = SizeMatrix.Index2Coords(value);
                 Transform.Origin = pos - TRubikCube.C;
             }
