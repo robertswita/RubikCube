@@ -59,7 +59,7 @@ namespace RubikCube
             tglView1.Context.Root = Root;
             RubikCube = new TRubikCube();
             RubikCube.Parent = Root;
-            LoadSolutions();
+            //LoadSolutions();
         }
 
         Point StartPos;
@@ -258,7 +258,7 @@ namespace RubikCube
                 Ga.Execute();
                 if (Ga.HighScore == 0 && RubikCube.ActiveCluster.Count > 1)
                 {
-                    SaveSolution(Ga.Best);
+                    //SaveSolution(Ga.Best);
                 }
                 if (Ga.HighScore < HighScore)
                 {
@@ -282,7 +282,7 @@ namespace RubikCube
                         Iteration = 0;
                         HighScore = Ga.HighScore;
                         Ga.Best.Correct();
-                        for (int i = 0; i < Ga.Best.MoveCount; i++)
+                        for (int i = Ga.Best.StartIndex; i < Ga.Best.MoveCount; i++)
                             Moves.Add(TMove.Decode((int)Ga.Best.Genes[i]));
                         TrySolutions = true;
                     }

@@ -8,6 +8,7 @@ namespace RubikCube
 {
     public class TRubikGenome: TChromosome
     {
+        public int StartIndex;
         public int MoveCount;
         public static List<int> FreeMoves;
         public static TRubikCube RubikCube;
@@ -88,7 +89,7 @@ namespace RubikCube
             //var coinToss = Rnd.Next(2);
             //var seq = coinToss != 0 ? RubikCube.Seq : RubikCube.RevSeq;
             var seq = RubikCube.ActSeq;
-            for (int i = 0; i < seq.Count; i++)
+            for (int i = StartIndex; i < seq.Count; i++)
             {
                 Genes[i] = seq[i];
                 //if (!FreeMoves.Contains((int)Genes[i]))
@@ -101,7 +102,7 @@ namespace RubikCube
             //rndMove.Angle = 2 - rndMove.Angle;
             //Genes[seq.Count] = rndMove.Encode();
             Conjugate();
-            for (int i = 0; i < seq.Count; i++)
+            for (int i = StartIndex; i < seq.Count; i++)
                 Genes[i] = seq[i];
         }
 
@@ -125,10 +126,10 @@ namespace RubikCube
             //var fitness = Evaluate();
             //var oldGenes = (double[])Genes.Clone();
             //if (IsChecked) return;
-            for (int idx = 1; idx < MoveCount; idx++)
+            for (int idx = StartIndex; idx < MoveCount; idx++)
             {
                 var move = TMove.Decode((int)Genes[idx]);
-                for (int prevIdx = idx - 1; prevIdx >= 0; prevIdx--)
+                for (int prevIdx = idx - 1; prevIdx >= StartIndex; prevIdx--)
                 {
                     var prevMove = TMove.Decode((int)Genes[prevIdx]);
                     if (prevMove.Axis != move.Axis) break;
@@ -190,32 +191,36 @@ namespace RubikCube
             //specimen.Conjugate();
             //specimen.Mutate(RubikCube.ActCubie);
             Fitness = double.MaxValue;
-            var cube = new TRubikCube(RubikCube);
             //string startCode = cube.Code;
-            for (int i = 0; i < Genes.Length; i++)
+            for (int j = 0; j < 1; j++)
             {
-                //if (!TRubikGenome.FreeMoves.Contains((int)specimen.Genes[i]))
-                //    ;
-                var move = TMove.Decode((int)Genes[i]);
-                // Final optimalization
-                //if (i == 0)
-                //{
-                //    var actCubie = RubikCube.ActiveCubie;
-                //    move.Slice = actCubie.Position[move.Axis];
-                //    Genes[0] = move.Encode();
-                //}
-                cube.Turn(move);
-                //var cubeCopy = new TRubikCube(cube);
-                //for (int j = i - 1; j >= 0; j--)
-                //    cube.ReTurn(TMove.Decode((int)specimen.Genes[j]));
-                double fitness = cube.Evaluate();
-                if (fitness < Fitness)// && cube.Code != startCode)
+                var cube = new TRubikCube(RubikCube);
+                for (int i = j; i < Genes.Length; i++)
                 {
-                    Fitness = fitness;
-                    MoveCount = i + 1;
-                    //if (fitness == 0) break;
+                    //if (!TRubikGenome.FreeMoves.Contains((int)specimen.Genes[i]))
+                    //    ;
+                    var move = TMove.Decode((int)Genes[i]);
+                    // Final optimalization
+                    //if (i == 0)
+                    //{
+                    //    var actCubie = RubikCube.ActiveCubie;
+                    //    move.Slice = actCubie.Position[move.Axis];
+                    //    Genes[0] = move.Encode();
+                    //}
+                    cube.Turn(move);
+                    //var cubeCopy = new TRubikCube(cube);
+                    //for (int j = i - 1; j >= 0; j--)
+                    //    cube.ReTurn(TMove.Decode((int)specimen.Genes[j]));
+                    double fitness = cube.Evaluate();
+                    if (fitness < Fitness)// && cube.Code != startCode)
+                    {
+                        Fitness = fitness;
+                        StartIndex = j;
+                        MoveCount = i + 1;
+                        //if (fitness == 0) break;
+                    }
+                    //cube = cubeCopy;
                 }
-                //cube = cubeCopy;
             }
             return Fitness;
         }
