@@ -1,7 +1,5 @@
 # Kompletna Dokumentacja Operatorów Algorytmu Genetycznego dla Kostki Rubika
 
-**Autor:** Dr. inż. Mateusz Kosikowski
-
 Ten dokument stanowi wyczerpujące omówienie wszystkich operatorów algorytmu genetycznego zaimplementowanych w solverze kostki Rubika. Opisane operatory zostały zaprojektowane z myślą o rozwiązywaniu pełnej superkostki Rubika N×N×N w wymiarach od 3D do wyższych. Dokument łączy wiedzę teoretyczną z teorii grup z praktycznymi aspektami implementacji, prezentując zarówno klasyczne operatory GA, jak i nowatorskie rozwiązania domenowe opracowane specjalnie dla tego problemu.
 
 ---
@@ -1367,6 +1365,5 @@ Podwójna rotacja **nie może** być rozłożona na sekwencję prostych rotacji 
 
 ---
 
-*Dokument wygenerowany dla projektu RubikCube — Solver kostki Rubika oparty na algorytmie genetycznym*
+*Dokument stworzony dla projektu RubikCube — Solver kostki Rubika oparty na algorytmie genetycznym*
 
-*© Dr. inż. Mateusz Kosikowski*
