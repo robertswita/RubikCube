@@ -13,6 +13,8 @@ namespace RubikCube
         public static TShape Cube = null!;
         public static TMatrix SizeMatrix = null!;
         public static int MaxScore;
+        public static TVector Scaling = null!;
+        public List<TVector> EulerAngles = null!;
         //public int X { get { return (int)Math.Round(Transform.Origin.X + TRubikCube.C); } }
         //public int Y { get { return (int)Math.Round(Transform.Origin.Y + TRubikCube.C); } }
         //public int Z { get { return (int)Math.Round(Transform.Origin.Z + TRubikCube.C); } }
@@ -28,7 +30,7 @@ namespace RubikCube
             Colors = Cube.Colors;
         }
 
-        int GetAngle(double cosA, double sinA)
+        public int GetAngle(double cosA, double sinA)
         {
             if (cosA > 0.1) return 0;
             if (sinA > 0.1) return 1;
@@ -46,23 +48,16 @@ namespace RubikCube
                 if (!ValidState)
                 {
                     state = 0;
-                    var shift = 0;
-                    var angles = Transform.GetEulerAngles();
+                    EulerAngles = Transform.GetEulerAngles();
                     RotationCount = 0;
-                    for (int i = 0; i < angles.Count; i++)
+                    var shift = (EulerAngles.Count - 1) << 1;
+                    for (int i = 0; i < EulerAngles.Count; i++)
                     {
-                        var angle = GetAngle(angles[i].X, angles[i].Y);
+                        var angle = GetAngle(EulerAngles[i].X, EulerAngles[i].Y);
                         state |= angle << shift;
-                        shift += 2;
+                        shift -= 2;
                         if (angle > 0) RotationCount++;
                     }
-                    //state |= moveCount << 2 * angles.Count;
-                    //var xform = TAffine.CreateScale(new TVector(0.45f, 0.45f, 0.45f, 0.45f));
-                    //for (int i = TAffine.Planes.Length - 1; i >= 0; i--)
-                    //    xform = TAffine.CreateRotation(i, 90 * (state >> 2 * i & 3)) * xform;
-                    //var Error = (xform.M - Transform.M).Norm;
-                    //if (Error > 0.01)
-                    //    ;
                     ValidState = true;
                 }
                 return state;
@@ -70,19 +65,20 @@ namespace RubikCube
             set
             {
                 var org = Transform.Origin;
-                Transform = TAffine.CreateScale(new TVector(0.45f, 0.45f, 0.45f, 0.45f));
+                Transform = TAffine.CreateScale(Scaling);
+                Index = StartIndex;
                 for (int i = TAffine.Planes.Length - 1; i >= 0; i--)
-                    Rotate(i, 90 * (value >> 2 * i & 3));
+                {
+                    var shift = (TAffine.Planes.Length - 1 - i) << 1;
+                    Transform.Rotate(i, 90 * (value >> shift & 3));
+                }
                 Transform.Origin = org;
                 ValidState = false;
-                var state = State;
-                if (state != value)
-                {
-                    // State mismatch - this is a validation check
-                }
-                this.state = value;
+                var state_ = State;
+                if (state_ != value) { }
+                state = value;
                 ValidState = true;
-                if (this.state != 0)
+                if (state != 0)
                     Transparency = 0.5f;
             }
         }

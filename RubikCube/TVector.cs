@@ -167,6 +167,14 @@ namespace TGL
             return y_;
         }
 
+        public virtual void Rotate(int axis1, int axis2, float cosA, float sinA)
+        {
+            var t1 = Data[axis1];
+            var t2 = Data[axis2];
+            Data[axis1] = cosA * t1 - sinA * t2;
+            Data[axis2] = sinA * t1 + cosA * t2;
+        }
+
 
         //public static implicit operator TComplex[] (TVector v)
         //{

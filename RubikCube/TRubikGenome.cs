@@ -45,15 +45,7 @@ namespace RubikCube
 
         public override void Mutate()
         {
-            //MutateGene(Rnd.Next(Genes.Length));
-            Check();
-            var geneIdx = Rnd.Next(Genes.Length / 2);
-            for (int i = 1; i <= geneIdx; i++)
-            {
-                var move = TMove.Decode((int)Genes[geneIdx - i]);
-                move.Angle = 2 - move.Angle;
-                Genes[geneIdx + i] = move.Encode();
-            }
+            Conjugate();
         }
 
         public override TChromosome Crossover(TChromosome other, int splitIdx)
@@ -61,7 +53,7 @@ namespace RubikCube
             var child = new TRubikGenome();
             Array.Copy(Genes, child.Genes, splitIdx);
             Array.Copy(other.Genes, splitIdx, child.Genes, splitIdx, Genes.Length - splitIdx);
-            //child.Check();
+            child.Check();
             return child;
         }
 
@@ -69,7 +61,7 @@ namespace RubikCube
         public void Check()
         {
             //if (IsChecked) return;
-            for (int idx = 1; idx < Genes.Length; idx++)
+            for (int idx = 1; idx < MovesCount; idx++)
             {
                 var move = TMove.Decode((int)Genes[idx]);
                 for (int prevIdx = idx - 1; prevIdx >= 0; prevIdx--)
@@ -112,6 +104,7 @@ namespace RubikCube
                 planeAxes = TAffine.Planes[lastMove.Plane];
             }
             Genes[Genes.Length - 1] = lastMove.Encode();
+            MovesCount--;
         }
 
         public override void Validate()

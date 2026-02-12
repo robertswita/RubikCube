@@ -27,7 +27,7 @@ namespace RubikCube
                     for (int pos = 0; pos < Cubies.Length; pos++)
                     {
                         var cubie = Cubies[pos];
-                        stateGrid[pos, cubie.Index] = cubie.State | 1 << 31;
+                        stateGrid[cubie.Index, pos] = cubie.State | 1 << 31;
                     }
                 }
                 return stateGrid;
@@ -38,14 +38,14 @@ namespace RubikCube
         {
             var size = 1;
             var scale = new TVector(TAffine.N);
-            var cubieScale = new TVector(TAffine.N);
+            TCubie.Scaling = new TVector(TAffine.N);
             var dimSizes = new int[TAffine.N];
             for (int dim = 0; dim < TAffine.N; dim++)
             {
                 size *= Size;
                 dimSizes[dim] = Size;
                 scale[dim] = 1f / Size;
-                cubieScale[dim] = 0.45f;
+                TCubie.Scaling[dim] = 0.9f / (Size - 1);
             }
             Cubies = new TCubie[size];
             TCubie.SizeMatrix = new TMatrix(size, 1);
@@ -58,7 +58,7 @@ namespace RubikCube
             for (int pos = 0; pos < Cubies.Length; pos++)
             {
                 var cubie = new TCubie();
-                cubie.Transform = TAffine.CreateScale(cubieScale);
+                cubie.Transform = TAffine.CreateScale(TCubie.Scaling);
                 cubie.Index = pos;
                 cubie.StartIndex = pos;
                 cubie.Parent = this;
@@ -134,23 +134,15 @@ namespace RubikCube
 
         public void Turn(TMove move)
         {
-            //if (!TRubikGenome.FreeMoves.Contains(move.Encode()))
-            //    ;
             int angle = 90 * (move.Angle + 1);
-            var rotation = TAffine.CreateRotation(move.Plane, angle);
             var selection = SelectSlice(move);
             for (int i = 0; i < selection.Count; i++)
             {
                 var cubie = selection[i];
-                cubie.Transform = rotation * cubie.Transform;
-                //Cubies[cubie.W, cubie.Z, cubie.Y, cubie.X] = cubie;
+                cubie.Transform.Rotate(move.Plane, angle);
                 cubie.ValidState = false;
-                cubie.Transparency = cubie.State != 0 ? 0.1f : 1;
+                cubie.Transparency = cubie.State == 0 ? 0.1f : 1;
                 cubie.Parent = this;
-                //var startPos = cubie.GetStartPos();
-                //var idx = Size * (Size * (Size * startPos.W + startPos.Z) + startPos.Y) + startPos.X;
-                //if (idx != cubie.OriginalPos)
-                //    ;
             }
             stateGrid = null;
         }
@@ -238,16 +230,19 @@ namespace RubikCube
 
         public void NextCluster()
         {
-            if (activeCluster != null)
+            if (ActiveCubie != null)
                 SolvedCubies.AddRange(ActiveCluster);
             var minDist = float.MaxValue;
             ActiveCubie = null;
             foreach (var cubie in Cubies)
             {
                 if (cubie.State == 0) continue;
-                var dist = 0f;
-                for (int dim = 0; dim < TAffine.N; dim++)
-                    dist += Math.Abs(cubie.Transform.Origin[dim]);
+                var pos = new int[TAffine.N];
+                for (int dim = 0; dim < pos.Length; dim++)
+                    pos[dim] = (int)Math.Round(Math.Abs(cubie.Transform.Origin[dim]) + C);
+                Array.Sort(pos);
+                Array.Reverse(pos);
+                var dist = TCubie.SizeMatrix.Coords2Index(pos);
                 if (dist < minDist)
                 {
                     minDist = dist;

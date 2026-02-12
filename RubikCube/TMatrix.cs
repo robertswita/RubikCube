@@ -190,7 +190,18 @@ namespace TGL
                 this[i, i] = 1;
         }
 
-        public void Rotate(int i, int j, float cosA, float sinA)
+        public override void Rotate(int axis1, int axis2, float cosA, float sinA)
+        {
+            for (int i = axis1, j = axis2; i < Size; i += RowsCount, j += RowsCount)
+            {
+                var a = Data[i];
+                var b = Data[j];
+                Data[i] = cosA * a - sinA * b;
+                Data[j] = sinA * a + cosA * b;
+            }
+        }
+
+        public void RotateCol(int i, int j, float cosA, float sinA)
         {
             int colA = i * RowsCount;
             int colB = j * RowsCount;
@@ -203,10 +214,6 @@ namespace TGL
                 colA++;
                 colB++;
             }
-            //var iCol = Cols[i] * cosA - Cols[j] * sinA;
-            //var jCol = Cols[i] * sinA + Cols[j] * cosA;
-            //Cols[i] = iCol;
-            //Cols[j] = jCol;
         }
     };
 
