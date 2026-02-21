@@ -29,10 +29,13 @@
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
+            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea2 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            System.Windows.Forms.DataVisualization.Charting.Series series2 = new System.Windows.Forms.DataVisualization.Charting.Series();
             System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
             System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
             this.MoveTimer = new System.Windows.Forms.Timer(this.components);
             this.panel1 = new System.Windows.Forms.Panel();
+            this.SeqCountLbl = new System.Windows.Forms.Label();
             this.label13 = new System.Windows.Forms.Label();
             this.DimsBox = new System.Windows.Forms.NumericUpDown();
             this.label12 = new System.Windows.Forms.Label();
@@ -69,10 +72,10 @@
             this.pictureBox1 = new System.Windows.Forms.PictureBox();
             this.openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
             this.stateGridBindingSource = new System.Windows.Forms.BindingSource(this.components);
-            this.saveFileDialog1 = new System.Windows.Forms.SaveFileDialog();
-            this.SeqCountLbl = new System.Windows.Forms.Label();
-            this.tglView1 = new TGL.TGLView();
             this.tRubikCubeBindingSource = new System.Windows.Forms.BindingSource(this.components);
+            this.saveFileDialog1 = new System.Windows.Forms.SaveFileDialog();
+            this.tglView1 = new TGL.TGLView();
+            this.chart2 = new System.Windows.Forms.DataVisualization.Charting.Chart();
             this.panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.DimsBox)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.StateBox)).BeginInit();
@@ -82,6 +85,7 @@
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.stateGridBindingSource)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.tRubikCubeBindingSource)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.chart2)).BeginInit();
             this.SuspendLayout();
             // 
             // MoveTimer
@@ -91,6 +95,7 @@
             // 
             // panel1
             // 
+            this.panel1.Controls.Add(this.chart2);
             this.panel1.Controls.Add(this.SeqCountLbl);
             this.panel1.Controls.Add(this.label13);
             this.panel1.Controls.Add(this.DimsBox);
@@ -119,8 +124,17 @@
             this.panel1.Dock = System.Windows.Forms.DockStyle.Left;
             this.panel1.Location = new System.Drawing.Point(0, 28);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(437, 790);
+            this.panel1.Size = new System.Drawing.Size(498, 790);
             this.panel1.TabIndex = 8;
+            // 
+            // SeqCountLbl
+            // 
+            this.SeqCountLbl.AutoSize = true;
+            this.SeqCountLbl.Location = new System.Drawing.Point(337, 404);
+            this.SeqCountLbl.Name = "SeqCountLbl";
+            this.SeqCountLbl.Size = new System.Drawing.Size(69, 16);
+            this.SeqCountLbl.TabIndex = 36;
+            this.SeqCountLbl.Text = "SeqCount:";
             // 
             // label13
             // 
@@ -290,17 +304,17 @@
             // 
             // chart1
             // 
-            chartArea1.AxisX.Title = "iteration";
-            chartArea1.AxisY.Title = "error";
-            chartArea1.Name = "ChartArea1";
-            this.chart1.ChartAreas.Add(chartArea1);
+            chartArea2.AxisX.Title = "iteration";
+            chartArea2.AxisY.Title = "error";
+            chartArea2.Name = "ChartArea1";
+            this.chart1.ChartAreas.Add(chartArea2);
             this.chart1.Location = new System.Drawing.Point(0, 132);
             this.chart1.Name = "chart1";
-            series1.ChartArea = "ChartArea1";
-            series1.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
-            series1.Name = "Series1";
-            this.chart1.Series.Add(series1);
-            this.chart1.Size = new System.Drawing.Size(421, 269);
+            series2.ChartArea = "ChartArea1";
+            series2.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
+            series2.Name = "Series1";
+            this.chart1.Series.Add(series2);
+            this.chart1.Size = new System.Drawing.Size(244, 269);
             this.chart1.TabIndex = 14;
             this.chart1.Text = "chart1";
             // 
@@ -387,40 +401,40 @@
             // openToolStripMenuItem
             // 
             this.openToolStripMenuItem.Name = "openToolStripMenuItem";
-            this.openToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.openToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
             this.openToolStripMenuItem.Text = "Open";
             this.openToolStripMenuItem.Click += new System.EventHandler(this.openToolStripMenuItem_Click);
             // 
             // saveToolStripMenuItem
             // 
             this.saveToolStripMenuItem.Name = "saveToolStripMenuItem";
-            this.saveToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.saveToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
             this.saveToolStripMenuItem.Text = "Save";
             this.saveToolStripMenuItem.Click += new System.EventHandler(this.saveToolStripMenuItem_Click);
             // 
             // saveClustersToolStripMenuItem
             // 
             this.saveClustersToolStripMenuItem.Name = "saveClustersToolStripMenuItem";
-            this.saveClustersToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.saveClustersToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
             this.saveClustersToolStripMenuItem.Text = "Save Clusters";
             this.saveClustersToolStripMenuItem.Click += new System.EventHandler(this.saveClustersToolStripMenuItem_Click);
             // 
             // showClusterToolStripMenuItem
             // 
             this.showClusterToolStripMenuItem.Name = "showClusterToolStripMenuItem";
-            this.showClusterToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.showClusterToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
             this.showClusterToolStripMenuItem.Text = "Show Cluster";
             this.showClusterToolStripMenuItem.Click += new System.EventHandler(this.showClusterToolStripMenuItem_Click);
             // 
             // makeMovesToolStripMenuItem
             // 
             this.makeMovesToolStripMenuItem.Name = "makeMovesToolStripMenuItem";
-            this.makeMovesToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.makeMovesToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
             // 
             // undoMovesToolStripMenuItem
             // 
             this.undoMovesToolStripMenuItem.Name = "undoMovesToolStripMenuItem";
-            this.undoMovesToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.undoMovesToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
             this.undoMovesToolStripMenuItem.Text = "Undo Moves";
             this.undoMovesToolStripMenuItem.Click += new System.EventHandler(this.undoMovesToolStripMenuItem_Click);
             // 
@@ -442,29 +456,36 @@
             this.stateGridBindingSource.DataMember = "StateGrid";
             this.stateGridBindingSource.DataSource = this.tRubikCubeBindingSource;
             // 
-            // SeqCountLbl
+            // tRubikCubeBindingSource
             // 
-            this.SeqCountLbl.AutoSize = true;
-            this.SeqCountLbl.Location = new System.Drawing.Point(337, 404);
-            this.SeqCountLbl.Name = "SeqCountLbl";
-            this.SeqCountLbl.Size = new System.Drawing.Size(69, 16);
-            this.SeqCountLbl.TabIndex = 36;
-            this.SeqCountLbl.Text = "SeqCount:";
+            this.tRubikCubeBindingSource.DataSource = typeof(RubikCube.TRubikCube);
             // 
             // tglView1
             // 
             this.tglView1.BackColor = System.Drawing.Color.White;
             this.tglView1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.tglView1.Location = new System.Drawing.Point(437, 28);
+            this.tglView1.Location = new System.Drawing.Point(498, 28);
             this.tglView1.Name = "tglView1";
-            this.tglView1.Size = new System.Drawing.Size(765, 790);
+            this.tglView1.Size = new System.Drawing.Size(704, 790);
             this.tglView1.TabIndex = 0;
             this.tglView1.MouseDown += new System.Windows.Forms.MouseEventHandler(this.tglView1_MouseDown);
             this.tglView1.MouseMove += new System.Windows.Forms.MouseEventHandler(this.tglView1_MouseMove);
             // 
-            // tRubikCubeBindingSource
+            // chart2
             // 
-            this.tRubikCubeBindingSource.DataSource = typeof(RubikCube.TRubikCube);
+            chartArea1.AxisX.Title = "iteration";
+            chartArea1.AxisY.Title = "error";
+            chartArea1.Name = "ChartArea1";
+            this.chart2.ChartAreas.Add(chartArea1);
+            this.chart2.Location = new System.Drawing.Point(250, 132);
+            this.chart2.Name = "chart2";
+            series1.ChartArea = "ChartArea1";
+            series1.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
+            series1.Name = "Series1";
+            this.chart2.Series.Add(series1);
+            this.chart2.Size = new System.Drawing.Size(244, 269);
+            this.chart2.TabIndex = 37;
+            this.chart2.Text = "chart2";
             // 
             // TRubikForm
             // 
@@ -490,6 +511,7 @@
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.stateGridBindingSource)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.tRubikCubeBindingSource)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.chart2)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -539,6 +561,7 @@
         private System.Windows.Forms.Label label12;
         private System.Windows.Forms.SaveFileDialog saveFileDialog1;
         private System.Windows.Forms.Label SeqCountLbl;
+        private System.Windows.Forms.DataVisualization.Charting.Chart chart2;
     }
 }
 

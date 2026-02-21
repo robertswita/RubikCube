@@ -125,7 +125,6 @@
     <EmbeddedResource Include="TSpaceForm.resx">
       <DependentUpon>TSpaceForm.cs</DependentUpon>
     </EmbeddedResource>
-    <None Include="packages.config" />
     <None Include="Properties\DataSources\TRubikCube.datasource" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>

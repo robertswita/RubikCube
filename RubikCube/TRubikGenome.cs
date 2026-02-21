@@ -47,6 +47,9 @@ namespace RubikCube
                 move.Angle = 2 - move.Angle;
                 Genes[geneIdx + i] = move.Encode();
             }
+            var lastMove = TMove.Decode((int)Genes[geneIdx]);
+            lastMove.Angle = 2 - lastMove.Angle;
+            Genes[2 * geneIdx + 1] = lastMove.Encode();
             //var geneIdx = Rnd.Next(Genes.Length - 4);
             //for (int i = 0; i < 2; i++)
             //{
@@ -79,6 +82,7 @@ namespace RubikCube
         {
             //var geneIdx = Rnd.Next(Genes.Length);
             //MutateGene(geneIdx);
+
             //Conjugate();
             //Commute(geneIdx);
             //var flipCoin = Rnd.Next(2);
@@ -89,29 +93,76 @@ namespace RubikCube
             //var coinToss = Rnd.Next(2);
             //var seq = coinToss != 0 ? RubikCube.Seq : RubikCube.RevSeq;
             var seq = RubikCube.ActSeq;
-            for (int i = StartIndex; i < seq.Count; i++)
+            for (int i = 0; i < seq.Count; i++)
             {
                 Genes[i] = seq[i];
                 //if (!FreeMoves.Contains((int)Genes[i]))
                 //    ;
             }
-            //MutateGene(seq.Count / 2);
-            //var rndGene = FreeMoves[Rnd.Next(FreeMoves.Count)];
-            //Genes[seq.Count / 2] = rndGene;
-            //var rndMove = TMove.Decode(rndGene);
-            //rndMove.Angle = 2 - rndMove.Angle;
-            //Genes[seq.Count] = rndMove.Encode();
             Conjugate();
             for (int i = StartIndex; i < seq.Count; i++)
                 Genes[i] = seq[i];
+            //Conjugate();
+
+
+            //var seq = RubikCube.ActSeq;
+            //for (int i = 0; i < seq.Count; i++)
+            //{
+            //    Genes[i] = seq[i];
+            //    //if (!FreeMoves.Contains((int)Genes[i]))
+            //    //    ;
+            //}
+            //var setupMoves = 1 + Rnd.Next(10);
+            ////MutateGene(seq.Count / 2);
+            //for (int i = 0; i < setupMoves; i++)
+            //{
+            //    var rndGene = FreeMoves[Rnd.Next(FreeMoves.Count)];
+            //    Genes[seq.Count + i] = rndGene;
+            //    var rndMove = TMove.Decode(rndGene);
+            //    rndMove.Angle = 2 - rndMove.Angle;
+            //    Genes[2 * (seq.Count + setupMoves) - 1 - i] = rndMove.Encode();
+            //}
+            //for (int i = seq.Count - 1; i >= 0; i--)
+            //{
+            //    var move = TMove.Decode(seq[i]);
+            //    move.Angle = 2 - move.Angle;
+            //    Genes[setupMoves + 2 * seq.Count - 1 - i] = move.Encode();
+            //}
+
         }
 
         public override TChromosome Crossover(TChromosome other, int splitIdx)
         {
             var child = new TRubikGenome();
+            //Array.Copy(Genes, child.Genes, splitIdx);
+            //Array.Copy(other.Genes, splitIdx, child.Genes, splitIdx, Genes.Length - splitIdx);
+
+            splitIdx /= 2;
             Array.Copy(Genes, child.Genes, splitIdx);
-            Array.Copy(other.Genes, splitIdx, child.Genes, splitIdx, Genes.Length - splitIdx);
-            //child.Correct();
+            Array.Copy(other.Genes, splitIdx, child.Genes, splitIdx, Genes.Length / 2 - splitIdx);
+            //var revMoves = new List<TMove>();
+            //for (int i = splitIdx - 1; i >= 0; i--)
+            //{
+            //    var move = TMove.Decode((int)child.Genes[i]);
+            //    move.Angle = 2 - move.Angle;
+            //    revMoves.Add(move);
+            //}
+            //for (int i = Genes.Length / 2 - 1; i >= splitIdx; i--)
+            //{
+            //    var move = TMove.Decode((int)child.Genes[i]);
+            //    move.Angle = 2 - move.Angle;
+            //    revMoves.Add(move);
+            //}
+            //for (int i = 0; i < revMoves.Count; i++)
+            //    child.Genes[Genes.Length / 2 + i] = revMoves[i].Encode();
+
+            var pos = Genes.Length / 2;
+            for (int i = splitIdx - 1; i >= 0; i--)
+                child.Genes[pos++] = child.Genes[i] + 2 * (1 - child.Genes[i] % 3);
+            for (int i = Genes.Length / 2 - 1; i >= splitIdx; i--)
+                child.Genes[pos++] = child.Genes[i] + 2 * (1 - child.Genes[i] % 3);
+
+            //child.Correct(); 
             //var seq = RubikCube.ReverseSeq;
             //for (int i = 0; i < seq.Count; i++)
             //    Genes[i] = seq[i];
@@ -192,10 +243,10 @@ namespace RubikCube
             //specimen.Mutate(RubikCube.ActCubie);
             Fitness = double.MaxValue;
             //string startCode = cube.Code;
-            for (int j = 0; j < 1; j++)
+            //for (int j = 0; j < 1; j++)
             {
                 var cube = new TRubikCube(RubikCube);
-                for (int i = j; i < Genes.Length; i++)
+                for (int i = 0; i < Genes.Length; i++)
                 {
                     //if (!TRubikGenome.FreeMoves.Contains((int)specimen.Genes[i]))
                     //    ;
@@ -215,7 +266,7 @@ namespace RubikCube
                     if (fitness < Fitness)// && cube.Code != startCode)
                     {
                         Fitness = fitness;
-                        StartIndex = j;
+                        //StartIndex = j;
                         MoveCount = i + 1;
                         //if (fitness == 0) break;
                     }

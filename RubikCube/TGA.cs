@@ -29,6 +29,7 @@ namespace GA
             for (var i = 0; i < PopulationCount; i++)
             {
                 var chromosome = new T();
+                chromosome.Init();
                 Population.Add(chromosome);
             }
             Best = Population[0];
@@ -69,9 +70,9 @@ namespace GA
                     var splitIdx = TChromosome.Rnd.Next(TChromosome.GenesLength);
                     var momIdx = TChromosome.Rnd.Next(winnerCount);
                     var mom = winners[momIdx];
-                    //winners.RemoveAt(momIdx);
+                    winners.RemoveAt(momIdx);
                     var dad = winners[TChromosome.Rnd.Next(winners.Count)];
-                    //winners.Add(mom);
+                    winners.Add(mom);
                     var child = (T)mom.Crossover(dad, splitIdx);
                     Population.Add(child);
                     child = (T)dad.Crossover(mom, splitIdx);

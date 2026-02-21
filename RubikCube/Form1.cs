@@ -214,6 +214,10 @@ namespace RubikCube
             GACount = StartGACount + Ga.IterCount;
             label6.Text = GACount.ToString();
             label6.Refresh();
+            chart2.Series[0].Points.Clear();
+            for (int i = 0; i < Ga.Population.Count; i++)
+                chart2.Series[0].Points.AddY(Ga.Population[i].Fitness);
+            chart2.Refresh();
 
             //label2.Refresh();
             //label4.Refresh();
@@ -245,17 +249,62 @@ namespace RubikCube
                 TRubikGenome.RubikCube = RubikCube;
                 TRubikGenome.FreeMoves = RubikCube.GetFreeMoves();
                 Ga = new TGA<TRubikGenome>();
-                Ga.GenerationsCount = 50;
+                Ga.GenerationsCount = 100;
                 //Iteration++;
                 //var level = 1 + (int)(10 - HighScore / 10) + RubikCube.SolvedCubies.Count;
                 Ga.PopulationCount = 1000;//TRubikGenome.FreeMoves.Count * 100;
-                Ga.WinnerRatio = 0.01;
-                Ga.MutationRatio = 10;// 0.05;
+                Ga.WinnerRatio = 0.1;
+                Ga.MutationRatio = 1;// 0.05;
                 Ga.SelectionType = TGA<TRubikGenome>.TSelectionType.Unique;
                 //Ga.Evaluate = OnEvaluate;
                 Ga.Progress = OnProgress;
                 Ga.HighScore = HighScore;
-                Ga.Execute();
+                //Ga.Execute();
+
+                //for (int i = 0; i < TRubikGenome.FreeMoves.Count; i++)
+                //{
+                //    for (int k = 0; k < 2; k++)
+                //    {
+                //        var seq = k == 0 ? RubikCube.Seq : RubikCube.RevSeq;
+                //        var cube = new TRubikCube(RubikCube);
+                //        var moves = new List<TMove>();
+                //        for (int j = 0; j < seq.Count; j++)
+                //        {
+                //            var move = TMove.Decode(seq[j]);
+                //            cube.Turn(move);
+                //            moves.Add(move);
+                //        }
+                //        var score = cube.Evaluate();
+                //        if (score >= Ga.HighScore)
+                //        {
+                //            var setupMove = TMove.Decode(TRubikGenome.FreeMoves[i]);
+                //            cube.Turn(setupMove);
+                //            moves.Add(setupMove);
+                //            for (int j = seq.Count - 1; j >= 0; j--)
+                //            {
+                //                var move = TMove.Decode(seq[j]);
+                //                move.Angle = 2 - move.Angle;
+                //                cube.Turn(move);
+                //                moves.Add(move);
+                //            }
+                //            setupMove.Angle = 2 - setupMove.Angle;
+                //            cube.Turn(setupMove);
+                //            moves.Add(TMove.Decode(setupMove.Encode()));
+                //            score = cube.Evaluate();
+                //        }
+                //        if (score < Ga.HighScore)
+                //        {
+                //            Ga.Best = new TRubikGenome();
+                //            for (int m = 0; m < moves.Count; m++)
+                //                Ga.Best.Genes[m] = moves[m].Encode();
+                //            Ga.Best.MoveCount = moves.Count;
+                //            Ga.HighScore = score;
+                //        }
+                //    }
+                //}
+                if (Ga.Best == null)
+                    Ga.Execute();
+
                 if (Ga.HighScore == 0 && RubikCube.ActiveCluster.Count > 1)
                 {
                     //SaveSolution(Ga.Best);
@@ -356,10 +405,12 @@ namespace RubikCube
                 var allMoves = RubikCube.GetAllMoves();
                 var code = allMoves[rnd.Next(allMoves.Count)];
                 var move = TMove.Decode(code);
-                Moves.Add(move);
+                //Moves.Add(move);
+                RubikCube.Turn(move);
                 RubikCube.ActiveCubie.State = RubikCube.ActiveCubie.State;
             }
-            MoveTimer.Start();
+            //MoveTimer.Start();
+            tglView1.Invalidate();
         }
 
         string SolutionPath = "solutions.bin";

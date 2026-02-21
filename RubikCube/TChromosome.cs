@@ -15,7 +15,13 @@ namespace GA
         public double Fitness = double.MaxValue;
         public static Random Rnd = new Random();
 
-        public TChromosome()
+        //public TChromosome()
+        //{
+        //    for (var i = 0; i < GenesLength; i++)
+        //        MutateGene(i);
+        //}
+
+        public void Init()
         {
             for (var i = 0; i < GenesLength; i++)
                 MutateGene(i);
