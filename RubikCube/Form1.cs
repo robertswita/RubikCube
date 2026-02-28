@@ -47,7 +47,7 @@ namespace RubikCube
 
         private void TglView1_MouseWheel(object sender, MouseEventArgs e)
         {
-            for (int i = 2; i < TAffine.Planes.Length; i++)
+            for (int i = 0; i < TAffine.Planes.Length; i++)
                 Root.Rotate(i, (float)e.Delta / 60);
             //Root.Rotate(Math.Min(TAffine.Planes.Length - 1, 2), (float)e.Delta / 60);
             //Root.Rotate(Math.Min(TAffine.Planes.Length - 1, 3), (float)e.Delta / 60);
@@ -59,7 +59,7 @@ namespace RubikCube
             tglView1.Context.Root = Root;
             RubikCube = new TRubikCube();
             RubikCube.Parent = Root;
-            //LoadSolutions();
+            LoadSolutions();
         }
 
         Point StartPos;
@@ -307,7 +307,7 @@ namespace RubikCube
 
                 if (Ga.HighScore == 0 && RubikCube.ActiveCluster.Count > 1)
                 {
-                    //SaveSolution(Ga.Best);
+                    SaveSolution(Ga.Best);
                 }
                 if (Ga.HighScore < HighScore)
                 {
@@ -341,7 +341,7 @@ namespace RubikCube
                     foreach (var solution in Solutions)
                     {
                         var tryMoves = DecodeSolution(solution.Value);
-                        for (int j = -1; j < TRubikGenome.FreeMoves.Count; j++)
+                        for (int j = -1; j < 0*TRubikGenome.FreeMoves.Count; j++)
                         {
                             var moves = new List<TMove>();
                             if (j < 0)
@@ -399,7 +399,7 @@ namespace RubikCube
             IsPaused = true;
             var size = TRubikCube.Size;
             var rnd = TChromosome.Rnd;
-            for (int i = 0; i < 3 * RubikCube.Cubies.Length; i++)
+            for (int i = 0; i < 10 * RubikCube.Cubies.Length; i++)
             {
                 RubikCube.ActiveCubie = RubikCube.Cubies[rnd.Next(RubikCube.Cubies.Length)];
                 var allMoves = RubikCube.GetAllMoves();
@@ -407,7 +407,7 @@ namespace RubikCube
                 var move = TMove.Decode(code);
                 //Moves.Add(move);
                 RubikCube.Turn(move);
-                RubikCube.ActiveCubie.State = RubikCube.ActiveCubie.State;
+                //RubikCube.ActiveCubie.State = RubikCube.ActiveCubie.State;
             }
             //MoveTimer.Start();
             tglView1.Invalidate();

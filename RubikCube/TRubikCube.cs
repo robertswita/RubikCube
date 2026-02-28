@@ -41,7 +41,7 @@ namespace RubikCube
             var scale = new TVector(TAffine.N);
             TCubie.Scaling = new TVector(TAffine.N);
             var dimSizes = new int[TAffine.N];
-            var s = 0.9f / (TAffine.N - 1);
+            var s = 0.9f / (TAffine.N - 1) / (TAffine.N - 2);
             for (int dim = 0; dim < TAffine.N; dim++)
             {
                 size *= Size;
@@ -145,7 +145,7 @@ namespace RubikCube
                 var cubie = selection[i];
                 cubie.Rotate(move.Plane, angle);
                 cubie.ValidState = false;
-                cubie.Transparency = cubie.State == 0 ? 0.1f : 1;
+                cubie.Transparency = cubie.State != 0 ? 0.1f : 1;
                 cubie.Parent = this;
             }
             stateGrid = null;
@@ -161,17 +161,17 @@ namespace RubikCube
         public double Evaluate()
         {
             double score = 0;
-            //var scrambled = 0;
+            var scrambled = 0;
             //var rotCount = 0;
             //var maxClusterState = (double)(1 << 2 * TAffine.Planes.Length);// * ActiveCluster.Count;// * TAffine.N;
             //foreach (var cubie in ActiveCluster)
             //    if (cubie.State != 0)
             //    {
-            //        score += 0.33 * maxClusterState + cubie.State + (cubie.RotationCount << TAffine.Planes.Length);
+            //        score += 0.5 * maxClusterState + cubie.State + (cubie.RotationCount << TAffine.Planes.Length);
             //        //scrambled++;
             //        //rotCount += cubie.RotationCount;
             //    }
-            ////score *= 1 + ((ActiveCluster.Count - scrambled) & 1);
+            //////score *= 1 + ((ActiveCluster.Count - scrambled) & 1);
             //score /= TAffine.N * maxClusterState * ActiveCluster.Count;
             //score *= rotCount / (scrambled + 1);
             //var scrambled = new List<TCubie>();
@@ -182,9 +182,10 @@ namespace RubikCube
                 {
                     score += (maxClusterState + cubie.State + (cubie.RotationCount << TAffine.Planes.Length));
                     //scrambled.Add(cubie);
+                    scrambled++;
                 }
-            //if (ActiveCluster.Count - scrambled == 1)
-            //    score *= 2;
+            if (scrambled == 1)
+                score *= 2;
             //score *= 1 + ((ActiveCluster.Count - scrambled) & 1);
             score /= maxClusterState * (ActiveCluster.Count + 1);
 
@@ -392,7 +393,7 @@ namespace RubikCube
                 if (cubie.State == 0) continue;
                 var pos = new int[TAffine.N];
                 for (int dim = 0; dim < pos.Length; dim++)
-                    pos[dim] = (int)Math.Round(Math.Abs(cubie.Transform.Origin[dim]) + TRubikCube.C);
+                    pos[dim] = (int)Math.Round(Math.Abs(cubie.Transform.Origin[dim]) + C);
                 Array.Sort(pos);
                 Array.Reverse(pos);
                 var dist = TCubie.SizeMatrix.Coords2Index(pos);
@@ -481,7 +482,7 @@ namespace RubikCube
                     while (move.Axis == planes[0] || move.Axis == planes[1])
                         move.Axis++;
                     //move.Slice = (int)Math.Round(cubie.Transform.Origin[move.Axis] + TRubikCube.C);
-                    move.Slice = (int)Math.Round(p[move.Axis] + TRubikCube.C);
+                    move.Slice = (int)Math.Round(p[move.Axis] + C);
                     move.Angle = 3 - angle;
                     RevSeq.Add(move.Encode());
                     cube.Turn(move);

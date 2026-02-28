@@ -46,6 +46,8 @@ namespace RubikCube
             return SizeMatrix.Coords2Index(new int[] { Axis, Slice, Plane, Angle });
         }
 
+        public static int GetRevCode(int code) { return code + 2 * (1 - code % 3); }
+
         public bool IsValid
         {
             get

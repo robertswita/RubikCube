@@ -28,10 +28,10 @@ namespace RubikCube
 
         public int GetAngle(double cosA, double sinA)
         {
-            if (cosA > 0.1) return 0;
-            if (sinA > 0.1) return 1;
-            if (cosA < -0.1) return 2;
-            if (sinA < -0.1) return 3;
+            if (cosA > 0.5) return 0;
+            if (sinA > 0.5) return 1;
+            if (cosA < -0.5) return 2;
+            if (sinA < -0.5) return 3;
             return 0;
         }
 
@@ -91,8 +91,8 @@ namespace RubikCube
                     ;
                 state = value;
                 ValidState = true;
-                if (state != 0)
-                    Transparency = 0.5f;
+                //if (state != 0)
+                //    Transparency = 0.5f;
             }
         }
 
