@@ -64,7 +64,7 @@ namespace RubikCube
 
             //var startPos = Rnd.Next((Genes.Length - TAffine.N + 1) / 2);
             var startPos = Rnd.Next(Genes.Length / 2);
-            var stopPos = startPos + 1;// TAffine.N - 1;
+            var stopPos = startPos + 1;// TChromosome.Rnd.Next(Genes.Length / 2 - startPos);// 1;// TAffine.N - 1;
             var pos = stopPos;
             for (int i = startPos - 1; i >= 0; i--)
                 Genes[pos++] = TMove.GetRevCode((int)Genes[i]);
@@ -93,7 +93,7 @@ namespace RubikCube
 
         public override void Mutate()
         {
-            //var geneIdx = Rnd.Next(Genes.Length);
+            //var geneIdx = Rnd.Next(Genes.Length / 2);
             //MutateGene(geneIdx);
 
             //Conjugate();
@@ -114,6 +114,9 @@ namespace RubikCube
                 //if (!FreeMoves.Contains((int)Genes[i]))
                 //    ;
             }
+            //var move = TMove.Decode((int)Genes[seq.Count]);
+            //move.Slice = (int)Math.Round(RubikCube.ActivePos[move.Axis] + TRubikCube.C);
+            //Genes[seq.Count] = move.Encode();
             Conjugate();
             for (int i = StartIndex; i < seq.Count; i++)
                 Genes[i] = seq[i];
@@ -156,8 +159,9 @@ namespace RubikCube
             //splitIdx++;
 
             var startPos = splitIdx;
-            var stopPos = startPos + TAffine.N / 2;// + TChromosome.Rnd.Next(Genes.Length / 2 - startPos);
-            if (stopPos > Genes.Length / 2) stopPos = Genes.Length / 2;
+            var stopPos = startPos + TChromosome.Rnd.Next(Genes.Length / 2 - startPos);
+            //var stopPos2 = stopPos + TChromosome.Rnd.Next(Genes.Length / 2 - stopPos);
+            //if (stopPos > Genes.Length / 2) stopPos = Genes.Length / 2;
             child.StartPos = startPos;
             child.StopPos = stopPos;
             Array.Copy(Genes, child.Genes, Genes.Length);
@@ -167,6 +171,9 @@ namespace RubikCube
                 child.Genes[pos++] = TMove.GetRevCode((int)child.Genes[i]);
             for (int i = stopPos - 1; i >= startPos; i--)
                 child.Genes[pos++] = TMove.GetRevCode((int)child.Genes[i]);
+            //for (int i = stopPos2 - 1; i >= stopPos; i--)
+            //    child.Genes[pos++] = TMove.GetRevCode((int)child.Genes[i]);
+            //child.Conjugate();
 
             //Array.Copy(Genes, child.Genes, Genes.Length);
             //Array.Copy(other.Genes, splitIdx, child.Genes, splitIdx, Genes.Length / 2 - splitIdx);
@@ -307,6 +314,25 @@ namespace RubikCube
             return Fitness;
         }
 
+        public static List<TRubikGenome> Select(List<TRubikGenome> population, int count)
+        {
+            //var seq = RubikCube.ActSeq;
+            var sel = new List<TRubikGenome>();
+            sel.Add(population[0]);
+            for (int i = 1; i < population.Count; i++)
+            {
+                var specimen = population[i];
+                if (specimen.Fitness != sel[sel.Count - 1].Fitness || population.Count - 1 - i < count - sel.Count)
+                {
+                    //for (int j = 0; j < seq.Count; j++)
+                    //    specimen.Genes[j] = seq[j];
+                    specimen.Correct();
+                    sel.Add(specimen);
+                }
+                if (sel.Count >= count) break;
+            }
+            return sel;
+        }
 
     }
 

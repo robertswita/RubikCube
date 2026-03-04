@@ -59,7 +59,7 @@ namespace RubikCube
             tglView1.Context.Root = Root;
             RubikCube = new TRubikCube();
             RubikCube.Parent = Root;
-            LoadSolutions();
+            //LoadSolutions();
         }
 
         Point StartPos;
@@ -249,13 +249,14 @@ namespace RubikCube
                 TRubikGenome.RubikCube = RubikCube;
                 TRubikGenome.FreeMoves = RubikCube.GetFreeMoves();
                 Ga = new TGA<TRubikGenome>();
-                Ga.GenerationsCount = 100;
+                Ga.GenerationsCount = 50;
                 //Iteration++;
                 //var level = 1 + (int)(10 - HighScore / 10) + RubikCube.SolvedCubies.Count;
                 Ga.PopulationCount = 1000;//TRubikGenome.FreeMoves.Count * 100;
                 Ga.WinnerRatio = 0.1;
-                Ga.MutationRatio = 1;// 0.05;
-                Ga.SelectionType = TGA<TRubikGenome>.TSelectionType.Unique;
+                Ga.MutationRatio = 1.5;// 0.05;
+                Ga.Select = TRubikGenome.Select;
+                //Ga.SelectionType = TGA<TRubikGenome>.TSelectionType.Unique;
                 //Ga.Evaluate = OnEvaluate;
                 Ga.Progress = OnProgress;
                 Ga.HighScore = HighScore;
@@ -302,12 +303,20 @@ namespace RubikCube
                 //        }
                 //    }
                 //}
-                if (Ga.Best == null)
-                    Ga.Execute();
+                //if (Ga.Best == null)
+                Ga.Init();
+                //for (int i = 0; i < Ga.Population.Count / 2; i += 2)
+                //{
+                //    for (int j = 0; j < RubikCube.Seq.Count; j++)
+                //        Ga.Population[i].Genes[j] = RubikCube.Seq[j];
+                //    for (int j = 0; j < RubikCube.RevSeq.Count; j++)
+                //        Ga.Population[i + 1].Genes[j] = RubikCube.RevSeq[j];
+                //}
+                Ga.Execute();
 
                 if (Ga.HighScore == 0 && RubikCube.ActiveCluster.Count > 1)
                 {
-                    SaveSolution(Ga.Best);
+                    //SaveSolution(Ga.Best);
                 }
                 if (Ga.HighScore < HighScore)
                 {

@@ -16,16 +16,18 @@ namespace GA
         public List<T> Population = new List<T>();
         public delegate void ProgressHandler(T best);
         public delegate double EvaluateHandler(T specimen);
+        public delegate List<T> SelectionHandler(List<T> population, int winnerCount);
         public EvaluateHandler Evaluate;
         public ProgressHandler Progress;
+        public SelectionHandler Select;
 
         public enum TSelectionType { Rank, Tournament, Roulette, RouletteRank, Unique };
         public TSelectionType SelectionType;
         public T Best;
 
-        public void Execute()
+
+        public void Init()
         {
-            //TChromosome.Rnd = new Random();
             for (var i = 0; i < PopulationCount; i++)
             {
                 var chromosome = new T();
@@ -33,7 +35,14 @@ namespace GA
                 Population.Add(chromosome);
             }
             Best = Population[0];
+        }
+
+        public void Execute()
+        {
+            //TChromosome.Rnd = new Random();
             //Best = (T)Population[0].Clone();
+            var winnerCount = (int)(WinnerRatio * PopulationCount);
+            var mutationsCount = (int)(MutationRatio * PopulationCount);
             while (Best.Fitness >= HighScore && IterCount < GenerationsCount)
             {
                 foreach (var specimen in Population)
@@ -46,24 +55,23 @@ namespace GA
                     Best = Population[0];
                     //Best = (T)Population[0].Clone();
                 }
-                var winnerCount = (int)(WinnerRatio * PopulationCount);
-                List<T> winners = null;
-                switch (SelectionType)
-                {
-                    case TSelectionType.Rank:
-                        winners = SelectionRank(winnerCount);
-                        break;
-                    case TSelectionType.Unique:
-                        winners = SelectionUnique(winnerCount);
-                        break;
-                    case TSelectionType.Tournament:
-                        winners = SelectionTournament(winnerCount);
-                        break;
-                    case TSelectionType.Roulette:
-                    case TSelectionType.RouletteRank:
-                        winners = SelectionRoulette(winnerCount);
-                        break;
-                }
+                var winners = Select(Population, winnerCount);
+                //switch (SelectionType)
+                //{
+                //    case TSelectionType.Rank:
+                //        winners = SelectionRank(winnerCount);
+                //        break;
+                //    case TSelectionType.Unique:
+                //        winners = SelectionUnique(winnerCount);
+                //        break;
+                //    case TSelectionType.Tournament:
+                //        winners = SelectionTournament(winnerCount);
+                //        break;
+                //    case TSelectionType.Roulette:
+                //    case TSelectionType.RouletteRank:
+                //        winners = SelectionRoulette(winnerCount);
+                //        break;
+                //}
                 Population = new List<T>();
                 for (int i = 0; i < PopulationCount / 2; i++)
                 {
@@ -78,7 +86,6 @@ namespace GA
                     child = (T)dad.Crossover(mom, splitIdx);
                     Population.Add(child);
                 }
-                var mutationsCount = (int)(MutationRatio * PopulationCount);
                 for (int i = 0; i < mutationsCount; i++)
                 {
                     var mutant = Population[TChromosome.Rnd.Next(Population.Count)];

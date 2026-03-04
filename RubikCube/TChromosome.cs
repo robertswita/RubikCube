@@ -21,7 +21,7 @@ namespace GA
         //        MutateGene(i);
         //}
 
-        public void Init()
+        public virtual void Init()
         {
             for (var i = 0; i < GenesLength; i++)
                 MutateGene(i);
@@ -63,5 +63,6 @@ namespace GA
         }
 
         public virtual double Evaluate() { return Fitness; }
+
     }
 }

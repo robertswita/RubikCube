@@ -125,7 +125,7 @@ namespace TGL
             return left.M * right + left.Origin;
         }
 
-        public List<TVector> GetEulerAngles()
+        public List<TVector> GetEulerAngles2()
         {
             var angles = new List<TVector>();
             var A = (TMatrix)M.Clone();
@@ -155,6 +155,44 @@ namespace TGL
             //    ;
             return angles;
         }
+
+        public List<TVector> GetEulerAngles(int order = -1)
+        {
+            var angles = new List<TVector>();
+            var A = (TMatrix)M.Clone();
+            var idx = 0;
+            for (int axis2 = 1; axis2 < n; axis2++)
+                for (int axis1 = 0; axis1 < axis2; axis1++)
+                //for (int axis1 = 0; axis1 < n - 1; axis1++)
+                //    for (int axis2 = axis1 + 1; axis2 < n; axis2++)
+                {
+                    if (idx == order)
+                        A = A.Transpose();
+                    var a = A[axis1, axis1];
+                    var b = A[axis2, axis1];
+                    var r = (float)Math.Sqrt(a * a + b * b);
+                    if (r < 0.1)
+                        angles.Add(new TVector(1, 0));
+                    else
+                    {
+                        var cosA = a / r;
+                        var sinA = b / r;
+                        A.Rotate(axis1, axis2, cosA, -sinA);
+                        if (order >= 0 && idx >= order)
+                            sinA = -sinA;
+                        angles.Add(new TVector(cosA, sinA));
+                    }
+                    idx++;
+                }
+            //var scale = new TVector(N);
+            //for (int i = 0; i < N; i++)
+            //    scale[i] = (float)A.Cols[0].Norm;
+            //var error = (A - TAffine.CreateScale(scale).M).Norm;
+            //if (error > 1E-3)
+            //    ;
+            return angles;
+        }
+
 
         public List<TVector> GetReversedEulerAngles()
         {
