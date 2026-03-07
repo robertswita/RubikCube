@@ -156,7 +156,7 @@ namespace RubikCube
             //Array.Copy(other.Genes, splitIdx, child.Genes, splitIdx, Genes.Length - splitIdx);
 
             splitIdx /= 2;
-            //splitIdx++;
+            splitIdx++;
 
             var startPos = splitIdx;
             var stopPos = startPos + TChromosome.Rnd.Next(Genes.Length / 2 - startPos);

@@ -20,12 +20,12 @@ namespace TGL
                 n = value;
                 Planes = new int[n * (n - 1) / 2][];
                 var idx = 0;
-                for (int col = 1; col < n; col++)
-                    for (int row = 0; row < col; row++)
+                for (int row = 1; row < n; row++)
+                    for (int col = 0; col < row; col++)
                     //for (int row = 0; row < n - 1; row++)
                     //    for (int col = row + 1; col < n; col++)
                     {
-                        Planes[idx] = new int[] { row, col };
+                        Planes[idx] = new int[] { col, row };
                         idx++;
                     }
             }
@@ -125,65 +125,37 @@ namespace TGL
             return left.M * right + left.Origin;
         }
 
-        public List<TVector> GetEulerAngles2()
+        public List<TVector> GetEulerAngles(List<int> order = null, bool reversed = false)
         {
             var angles = new List<TVector>();
-            var A = (TMatrix)M.Clone();
-            for (int axis2 = 1; axis2 < n; axis2++)
-                for (int axis1 = 0; axis1 < axis2; axis1++)
-                //for (int axis1 = 0; axis1 < n - 1; axis1++)
-                //    for (int axis2 = axis1 + 1; axis2 < n; axis2++)
+            var A = reversed ? M.Transpose() : (TMatrix)M.Clone();
+            for (int i = 0; i < Planes.Length; i++)
+            {
+                var plane = order == null ? Planes[i] : Planes[order[i]];
+                var axis1 = plane[0];
+                var axis2 = plane[1];
+                var a = A[axis1, axis1];
+                var b = A[axis2, axis1];
+                var r = (float)Math.Sqrt(a * a + b * b);
+                TVector rot = null;
+                if (r < 0.1)
+                    rot = new TVector(1, 0);
+                else
                 {
-                    var a = A[axis1, axis1];
-                    var b = A[axis2, axis1];
-                    var r = (float)Math.Sqrt(a * a + b * b);
-                    if (r < 0.1)
-                        angles.Add(new TVector(1, 0));
-                    else
-                    {
-                        var cosA = a / r;
-                        var sinA = b / r;
-                        angles.Add(new TVector(cosA, sinA));
-                        A.Rotate(axis1, axis2, cosA, -sinA);
-                    }
+                    var cosA = a / r;
+                    var sinA = b / r;
+                    A.Rotate(axis1, axis2, cosA, -sinA);
+                    rot = new TVector(cosA, sinA, axis1, axis2);
                 }
-            //var scale = new TVector(N);
-            //for (int i = 0; i < N; i++)
-            //    scale[i] = (float)A.Cols[0].Norm;
-            //var error = (A - TAffine.CreateScale(scale).M).Norm;
-            //if (error > 1E-3)
-            //    ;
-            return angles;
-        }
-
-        public List<TVector> GetEulerAngles(int order = -1)
-        {
-            var angles = new List<TVector>();
-            var A = (TMatrix)M.Clone();
-            var idx = 0;
-            for (int axis2 = 1; axis2 < n; axis2++)
-                for (int axis1 = 0; axis1 < axis2; axis1++)
-                //for (int axis1 = 0; axis1 < n - 1; axis1++)
-                //    for (int axis2 = axis1 + 1; axis2 < n; axis2++)
+                if (reversed)
                 {
-                    if (idx == order)
-                        A = A.Transpose();
-                    var a = A[axis1, axis1];
-                    var b = A[axis2, axis1];
-                    var r = (float)Math.Sqrt(a * a + b * b);
-                    if (r < 0.1)
-                        angles.Add(new TVector(1, 0));
-                    else
-                    {
-                        var cosA = a / r;
-                        var sinA = b / r;
-                        A.Rotate(axis1, axis2, cosA, -sinA);
-                        if (order >= 0 && idx >= order)
-                            sinA = -sinA;
-                        angles.Add(new TVector(cosA, sinA));
-                    }
-                    idx++;
+                    rot[1] = -rot[1];
+                    angles.Insert(0, rot);
                 }
+                else
+                    angles.Add(rot);
+            }
+
             //var scale = new TVector(N);
             //for (int i = 0; i < N; i++)
             //    scale[i] = (float)A.Cols[0].Norm;
@@ -194,43 +166,16 @@ namespace TGL
         }
 
 
-        public List<TVector> GetReversedEulerAngles()
-        {
-            //var angles = new List<TVector>();
-            //var A = (TMatrix)M.Clone();
-            //for (int axis2 = n - 1; axis2 >= 1; axis2--)
-            //    for (int axis1 = axis2 - 1; axis1 >= 0; axis1--)
-            //    //for (int axis1 = 0; axis1 < n - 1; axis1++)
-            //    //    for (int axis2 = axis1 + 1; axis2 < n; axis2++)
-            //    {
-            //        var a = A[axis1, axis1];
-            //        var b = A[axis2, axis1];
-            //        var r = (float)Math.Sqrt(a * a + b * b);
-            //        if (r < 0.1)
-            //            angles.Add(new TVector(1, 0));
-            //        else
-            //        {
-            //            var cosA = a / r;
-            //            var sinA = b / r;
-            //            angles.Add(new TVector(cosA, sinA));
-            //            A.Rotate(axis1, axis2, cosA, -sinA);
-            //        }
-            //    }
-            //var scale = new TVector(N);
-            //for (int i = 0; i < N; i++)
-            //    scale[i] = (float)A.Cols[0].Norm;
-            //var error = (A - TAffine.CreateScale(scale).M).Norm;
-            //if (error > 1E-3)
-            //    ;
-
-            var A = (TMatrix)M.Clone();
-            M = M.Transpose();
-            var angles = GetEulerAngles();
-            M = A;
-            for (int i = 0; i < angles.Count; i++)
-                angles[i][1] *= -1;
-            return angles;
-        }
+        //public List<TVector> GetReversedEulerAngles()
+        //{
+        //    var A = (TMatrix)M.Clone();
+        //    M = M.Transpose();
+        //    var angles = GetEulerAngles();
+        //    M = A;
+        //    for (int i = 0; i < angles.Count; i++)
+        //        angles[i][1] *= -1;
+        //    return angles;
+        //}
 
     };
 }

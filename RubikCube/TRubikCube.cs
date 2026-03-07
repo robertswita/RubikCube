@@ -16,9 +16,10 @@ namespace RubikCube
         public TCubie[] Cubies;
         public TCubie ActiveCubie;
         public List<TCubie> SolvedCubies = new List<TCubie>();
-        public List<int> Seq, RevSeq, ActSeq;
-        public TVector ActivePos;
+        //public List<int> Seq, RevSeq, ActSeq;
+        //public TVector ActivePos;
         int[,] stateGrid;
+        public static List<int> EulerOrder;
         public int[,] StateGrid
         {
             get
@@ -420,88 +421,151 @@ namespace RubikCube
             return scrambled;
         }
 
-        public List<int> GetReversedSeq2()
-        {
-            Seq = new List<int>();
-            RevSeq = new List<int>();
-            ActSeq = ActiveCubie.IsReversedSeq ? RevSeq : Seq;
-            var cube = new TRubikCube(this);
-            //foreach (var cubie in cube.ActiveCluster)
-            //for (int n = 0; n < 1; n++)
-            //{
-            //var cubie = cube.ActiveCluster[n];
-            var p = ActiveCubie.Transform.Origin.Clone();
-            //if (!ActiveCubie.IsReversedSeq)
-            {
-                for (int i = 0; i < TAffine.Planes.Length; i++)
-                {
-                    var angle = ActiveCubie.GetAngle(ActiveCubie.EulerAngles[i][0], ActiveCubie.EulerAngles[i][1]);// cubie.State >> shift & 3;
-                                                                                                                   //shift -= 2;
-                    if (angle > 0)
-                    {
-                        var move = new TMove();
-                        move.Plane = i;
-                        var planes = move.GetPlaneAxes();
-                        while (move.Axis == planes[0] || move.Axis == planes[1])
-                            move.Axis++;
-                        //move.Slice = (int)Math.Round(cubie.Transform.Origin[move.Axis] + TRubikCube.C);
-                        move.Slice = (int)Math.Round(p[move.Axis] + TRubikCube.C);
-                        move.Angle = 3 - angle;
-                        Seq.Add(move.Encode());
-                        cube.Turn(move);
-                        p = TAffine.CreateRotation(i, (move.Angle + 1) * 90) * p;
-                    }
-                }
-                //ActSeq = Seq;
-            }
-            //else
-            {
-                cube = new TRubikCube(this);
-                var revEulerAngles = ActiveCubie.Transform.GetReversedEulerAngles();
-                p = ActiveCubie.Transform.Origin.Clone();
-                for (int i = TAffine.Planes.Length - 1; i >= 0; i--)
-                {
-                    var angle = ActiveCubie.GetAngle(revEulerAngles[i][0], revEulerAngles[i][1]);
-                    if (angle > 0)
-                    {
-                        var move = new TMove();
-                        move.Plane = i;
-                        var planes = move.GetPlaneAxes();
-                        while (move.Axis == planes[0] || move.Axis == planes[1])
-                            move.Axis++;
-                        //move.Slice = (int)Math.Round(cubie.Transform.Origin[move.Axis] + TRubikCube.C);
-                        move.Slice = (int)Math.Round(p[move.Axis] + C);
-                        move.Angle = 3 - angle;
-                        RevSeq.Add(move.Encode());
-                        cube.Turn(move);
-                        p = TAffine.CreateRotation(i, (move.Angle + 1) * 90) * p;
-                    }
-                }
-                //ActSeq = RevSeq;
-            }
-            ActivePos = p;
-            //var revSeqSolved = 0;
-            //foreach (var cubie in cube.ActiveCluster)
-            //    if (cubie.State == 0) revSeqSolved++;
-            //ActSeq = seqSolved >= revSeqSolved ? Seq : RevSeq;
+        //public List<int> GetReversedSeq2()
+        //{
+        //    Seq = new List<int>();
+        //    RevSeq = new List<int>();
+        //    ActSeq = ActiveCubie.IsReversedSeq ? RevSeq : Seq;
+        //    var cube = new TRubikCube(this);
+        //    //foreach (var cubie in cube.ActiveCluster)
+        //    //for (int n = 0; n < 1; n++)
+        //    //{
+        //    //var cubie = cube.ActiveCluster[n];
+        //    var p = ActiveCubie.Transform.Origin.Clone();
+        //    //if (!ActiveCubie.IsReversedSeq)
+        //    {
+        //        for (int i = 0; i < TAffine.Planes.Length; i++)
+        //        {
+        //            var angle = ActiveCubie.GetAngle(ActiveCubie.EulerAngles[i][0], ActiveCubie.EulerAngles[i][1]);// cubie.State >> shift & 3;
+        //                                                                                                           //shift -= 2;
+        //            if (angle > 0)
+        //            {
+        //                var move = new TMove();
+        //                move.Plane = i;
+        //                var planes = move.GetPlaneAxes();
+        //                while (move.Axis == planes[0] || move.Axis == planes[1])
+        //                    move.Axis++;
+        //                //move.Slice = (int)Math.Round(cubie.Transform.Origin[move.Axis] + TRubikCube.C);
+        //                move.Slice = (int)Math.Round(p[move.Axis] + TRubikCube.C);
+        //                move.Angle = 3 - angle;
+        //                Seq.Add(move.Encode());
+        //                cube.Turn(move);
+        //                p = TAffine.CreateRotation(i, (move.Angle + 1) * 90) * p;
+        //            }
+        //        }
+        //        //ActSeq = Seq;
+        //    }
+        //    //else
+        //    {
+        //        cube = new TRubikCube(this);
+        //        var revEulerAngles = ActiveCubie.Transform.GetReversedEulerAngles();
+        //        p = ActiveCubie.Transform.Origin.Clone();
+        //        for (int i = TAffine.Planes.Length - 1; i >= 0; i--)
+        //        {
+        //            var angle = ActiveCubie.GetAngle(revEulerAngles[i][0], revEulerAngles[i][1]);
+        //            if (angle > 0)
+        //            {
+        //                var move = new TMove();
+        //                move.Plane = i;
+        //                var planes = move.GetPlaneAxes();
+        //                while (move.Axis == planes[0] || move.Axis == planes[1])
+        //                    move.Axis++;
+        //                //move.Slice = (int)Math.Round(cubie.Transform.Origin[move.Axis] + TRubikCube.C);
+        //                move.Slice = (int)Math.Round(p[move.Axis] + C);
+        //                move.Angle = 3 - angle;
+        //                RevSeq.Add(move.Encode());
+        //                cube.Turn(move);
+        //                p = TAffine.CreateRotation(i, (move.Angle + 1) * 90) * p;
+        //            }
+        //        }
+        //        //ActSeq = RevSeq;
+        //    }
+        //    ActivePos = p;
+        //    //var revSeqSolved = 0;
+        //    //foreach (var cubie in cube.ActiveCluster)
+        //    //    if (cubie.State == 0) revSeqSolved++;
+        //    //ActSeq = seqSolved >= revSeqSolved ? Seq : RevSeq;
 
-            ActiveCubie.IsReversedSeq = !ActiveCubie.IsReversedSeq;
-            return ActSeq;
+        //    ActiveCubie.IsReversedSeq = !ActiveCubie.IsReversedSeq;
+        //    return ActSeq;
+        //}
+
+        static void Swap(ref int a, ref int b)
+        {
+            var temp = a;
+            a = b;
+            b = temp;
         }
 
+        static List<int[]> DoPermute(int[] nums, int start, int end)
+        {
+            var result = new List<int[]>();
+            if (start == end)
+            {
+                var perm = new int[nums.Length];
+                Array.Copy(nums, perm, nums.Length);
+                result.Add(perm);
+            }
+            else
+                for (var i = start; i <= end; i++)
+                {
+                    Swap(ref nums[start], ref nums[i]);
+                    result.AddRange(DoPermute(nums, start + 1, end));
+                    Swap(ref nums[start], ref nums[i]);
+                }
+            return result;
+        }
+
+        List<int> GetOrder()
+        {
+            var mask = new bool[TAffine.N, TAffine.N];
+            var planes = new List<int>();
+            for (int i = 0; i < TAffine.Planes.Length; i++)
+                planes.Add(i);
+            var order = new List<int>();
+            while (planes.Count > 0)
+            {
+                var pool = new List<int>();
+                for (int i = 0; i < planes.Count; i++)
+                {
+                    var planeIdx = TAffine.Planes[planes[i]];
+                    var n = planeIdx[0];
+                    var m = planeIdx[1];
+                    if (n == 0 || mask[m, n - 1] && mask[n, n - 1])
+                        pool.Add(planes[i]);
+                }
+                var plane = pool[TChromosome.Rnd.Next(pool.Count)];
+                planes.Remove(plane);
+                var maskIdx = TAffine.Planes[plane];
+                mask[maskIdx[1], maskIdx[0]] = true;
+                order.Add(plane);
+            }
+            return order;
+        }
+
+        public List<int> ActSeq;
         public List<int> GetReversedSeq()
         {
             ActSeq = new List<int>();
-            var order = TChromosome.Rnd.Next(TAffine.Planes.Length);
-            var eulerAngles = ActiveCubie.Transform.GetEulerAngles(order);
+            //var perm = new int[TAffine.N - 1];
+            //for (int i = 0; i < perm.Length; i++)
+            //    perm[i] = i + 1;
+            //var comb = DoPermute(perm, 0, perm.Length - 1);
+            //var combIdx = TChromosome.Rnd.Next(comb.Count + 1) - 1;
+            //var order = combIdx > 0 ? comb[combIdx] : null;
+            EulerOrder = GetOrder();
+            var eulerAngles = ActiveCubie.Transform.GetEulerAngles(EulerOrder, ActiveCubie.IsReversedSeq);
             var cube = new TRubikCube(this);
             var p = ActiveCubie.Transform.Origin.Clone();
-            for (int i = 0; i < TAffine.Planes.Length; i++)
+            for (int idx = 0; idx < eulerAngles.Count; idx++)
             {
-                var planeIdx = i < order ? i : TAffine.Planes.Length - 1 - (i - order);
-                var angle = ActiveCubie.GetAngle(eulerAngles[planeIdx][0], eulerAngles[planeIdx][1]);
+                var rot = eulerAngles[idx];
+                var angle = ActiveCubie.GetAngle(rot[0], rot[1]);
                 if (angle > 0)
                 {
+                    var axis1 = (int)rot[2];
+                    var axis2 = (int)rot[3];
+                    var planeIdx = axis2 * (axis2 - 1) / 2 + axis1;
                     var move = new TMove();
                     move.Plane = planeIdx;
                     var planes = move.GetPlaneAxes();
@@ -517,6 +581,7 @@ namespace RubikCube
             }
             if (cube.ActiveCubie.State != 0)
                 ;
+            ActiveCubie.IsReversedSeq = !ActiveCubie.IsReversedSeq;
             return ActSeq;
         }
 

@@ -44,7 +44,7 @@ namespace RubikCube
                 if (!ValidState)
                 {
                     state = 0;
-                    EulerAngles = Transform.GetEulerAngles();
+                    EulerAngles = Transform.GetEulerAngles(TRubikCube.EulerOrder, IsReversedSeq);
                     RotationCount = 0;
                     var shift = (EulerAngles.Count - 1) << 1;
                     for (int i = 0; i < EulerAngles.Count; i++)

@@ -254,7 +254,7 @@ namespace RubikCube
                 //var level = 1 + (int)(10 - HighScore / 10) + RubikCube.SolvedCubies.Count;
                 Ga.PopulationCount = 1000;//TRubikGenome.FreeMoves.Count * 100;
                 Ga.WinnerRatio = 0.1;
-                Ga.MutationRatio = 1.5;// 0.05;
+                Ga.MutationRatio = 1;// 0.05;
                 Ga.Select = TRubikGenome.Select;
                 //Ga.SelectionType = TGA<TRubikGenome>.TSelectionType.Unique;
                 //Ga.Evaluate = OnEvaluate;
