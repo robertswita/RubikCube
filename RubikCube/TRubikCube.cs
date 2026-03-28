@@ -18,20 +18,39 @@ namespace RubikCube
         public List<TCubie> SolvedCubies = new List<TCubie>();
         //public List<int> Seq, RevSeq, ActSeq;
         //public TVector ActivePos;
-        int[,] stateGrid;
+        TMatrix[,] stateGrid;
         public static List<int> EulerOrder;
-        public int[,] StateGrid
+        public static bool IsEulerOrderReversed;
+        //public int[,] StateGrid2
+        //{
+        //    get
+        //    {
+        //        if (stateGrid == null)
+        //        {
+        //            var gridSize = Cubies.Length;
+        //            stateGrid = new int[gridSize, gridSize];
+        //            for (int pos = 0; pos < Cubies.Length; pos++)
+        //            {
+        //                var cubie = Cubies[pos];
+        //                stateGrid[cubie.Index, pos] = cubie.State | 1 << 31;
+        //            }
+        //        }
+        //        return stateGrid;
+        //    }
+        //}
+
+        public TMatrix[,] StateGrid
         {
             get
             {
                 if (stateGrid == null)
                 {
                     var gridSize = Cubies.Length;
-                    stateGrid = new int[gridSize, gridSize];
+                    stateGrid = new TMatrix[gridSize, gridSize];
                     for (int pos = 0; pos < Cubies.Length; pos++)
                     {
                         var cubie = Cubies[pos];
-                        stateGrid[cubie.Index, pos] = cubie.State | 1 << 31;
+                        stateGrid[cubie.Index, pos] = cubie.Transform.M;
                     }
                 }
                 return stateGrid;
@@ -60,14 +79,14 @@ namespace RubikCube
             TMove.UpdateSizeMatrix();
             C = (Size - 1) / 2f;
             Scale(scale);
-            for (int pos = 0; pos < Cubies.Length; pos++)
+            for (int i = 0; i < Cubies.Length; i++)
             {
                 var cubie = new TCubie();
                 cubie.Transform = TAffine.CreateScale(TCubie.Scaling);
-                cubie.Index = pos;
-                cubie.StartIndex = pos;
+                cubie.Index = i;
+                cubie.StartIndex = i;
                 cubie.Parent = this;
-                Cubies[pos] = cubie;
+                Cubies[i] = cubie;
             }
         }
 
@@ -164,7 +183,7 @@ namespace RubikCube
         public double Evaluate()
         {
             double score = 0;
-            var scrambled = 0;
+            var scrambled = new List<TCubie>();
             //var rotCount = 0;
             //var maxClusterState = (double)(1 << 2 * TAffine.Planes.Length);// * ActiveCluster.Count;// * TAffine.N;
             //foreach (var cubie in ActiveCluster)
@@ -178,19 +197,55 @@ namespace RubikCube
             //score /= TAffine.N * maxClusterState * ActiveCluster.Count;
             //score *= rotCount / (scrambled + 1);
             //var scrambled = new List<TCubie>();
-
+            //var rotCount = 0;
             var maxClusterState = (double)(1 << 2 * TAffine.Planes.Length) * ActiveCluster.Count * TAffine.N;
+            //var maxClusterState = (double)(1 << 2 * TAffine.Planes.Length) * ActiveCluster.Count;
+            //var hists = new int[TRubikCube.Size, TAffine.N];
             foreach (var cubie in ActiveCluster)
                 if (cubie.State != 0)
                 {
-                    score += (maxClusterState + cubie.State + (cubie.RotationCount << TAffine.Planes.Length));
-                    //scrambled.Add(cubie);
-                    scrambled++;
+                    score += maxClusterState + cubie.State + (cubie.RotationCount << TAffine.Planes.Length);
+                    scrambled.Add(cubie);
+                    //scrambled++;
+                    //var pos = cubie.Position;
+                    //for (int dim = 0; dim < TAffine.N; dim++)
+                    //    hists[pos[dim], dim]++;
+                    //rotCount += cubie.RotationCount;
                 }
-            if (scrambled == 1)
-                score *= 2;
+            //var maxHist = 0;
+            //for (int j = 0; j < TAffine.N; j++)
+            //{
+            //    var max = 0;
+            //    for (int i = 0; i < TRubikCube.Size; i++)
+            //        if (hists[i, j] > max)
+            //            max = hists[i, j];
+            //    if (max > maxHist)
+            //        maxHist = max;
+            //}
+
+            //score *= states.Count;
+            //score += rotCount << TAffine.Planes.Length;
             //score *= 1 + ((ActiveCluster.Count - scrambled) & 1);
             score /= maxClusterState * (ActiveCluster.Count + 1);
+            //if (scrambled.Count < 4 && scrambled.Count > 0)
+            //{
+            //    var states = new List<int>();
+            //    foreach (var cubie in scrambled)
+            //        if (!states.Contains(cubie.State))
+            //            states.Add(cubie.State);
+            //    score *= 5 - scrambled.Count;
+            //    //score *= 4.0 / scrambled.Count;
+            //    score *= (double)(states.Count + 1) / (scrambled.Count + 1);
+            //    //score++;
+            //}
+            if (scrambled.Count == 1)
+            {
+                score *= 2;
+                //score *= (double)(states.Count + 1) / (scrambled + 1);
+                //score++;
+            }
+            //if (scrambled == 4 && states.Count == 1 && maxHist == 4)
+            //    score /= 4;
 
 
             //for (int i = 0; i < scrambled.Count; i++)
@@ -373,15 +428,18 @@ namespace RubikCube
                 if (activeCluster == null)
                 {
                     activeCluster = new List<TCubie>();
-                    for (int state = 0; state < 1 << 2 * TAffine.Planes.Length; state++)
-                    {
-                        var cubie = ActiveCubie.Copy();
-                        for (int i = TAffine.Planes.Length - 1; i >= 0; i--)
-                            cubie.Rotate(i, 90 * (state >> 2 * i & 3));
-                        var clusterCubie = Cubies[cubie.Index];
-                        if (!activeCluster.Contains(clusterCubie))
-                            activeCluster.Add(clusterCubie);
-                    }
+                    //for (int state = 0; state < 1 << 2 * TAffine.Planes.Length; state++)
+                    //{
+                    //    var cubie = ActiveCubie.Copy();
+                    //    for (int i = TAffine.Planes.Length - 1; i >= 0; i--)
+                    //        cubie.Rotate(i, 90 * (state >> 2 * i & 3));
+                    //    var clusterCubie = Cubies[cubie.Index];
+                    //    if (!activeCluster.Contains(clusterCubie))
+                    //        activeCluster.Add(clusterCubie);
+                    //}
+                    foreach (var cubie in Cubies)
+                        if (cubie.ClusterIndex == ActiveCubie.ClusterIndex)
+                            activeCluster.Add(cubie);
                 }
                 return activeCluster;
             }
@@ -392,19 +450,13 @@ namespace RubikCube
             if (ActiveCubie != null)
                 SolvedCubies.AddRange(ActiveCluster);
             ActiveCubie = null;
-            var minDist = float.MaxValue;
+            var minDist = int.MaxValue;
             foreach (var cubie in Cubies)
             {
                 if (cubie.State == 0) continue;
-                var pos = new int[TAffine.N];
-                for (int dim = 0; dim < pos.Length; dim++)
-                    pos[dim] = (int)Math.Round(Math.Abs(cubie.Transform.Origin[dim]) + C);
-                Array.Sort(pos);
-                Array.Reverse(pos);
-                var dist = TCubie.SizeMatrix.Coords2Index(pos);
-                if (dist < minDist)
+                if (cubie.ClusterIndex < minDist)
                 {
-                    minDist = dist;
+                    minDist = cubie.ClusterIndex;
                     ActiveCubie = cubie;
                 }
             }
@@ -490,33 +542,33 @@ namespace RubikCube
         //    return ActSeq;
         //}
 
-        static void Swap(ref int a, ref int b)
-        {
-            var temp = a;
-            a = b;
-            b = temp;
-        }
+        //static void Swap(ref int a, ref int b)
+        //{
+        //    var temp = a;
+        //    a = b;
+        //    b = temp;
+        //}
 
-        static List<int[]> DoPermute(int[] nums, int start, int end)
-        {
-            var result = new List<int[]>();
-            if (start == end)
-            {
-                var perm = new int[nums.Length];
-                Array.Copy(nums, perm, nums.Length);
-                result.Add(perm);
-            }
-            else
-                for (var i = start; i <= end; i++)
-                {
-                    Swap(ref nums[start], ref nums[i]);
-                    result.AddRange(DoPermute(nums, start + 1, end));
-                    Swap(ref nums[start], ref nums[i]);
-                }
-            return result;
-        }
+        //static List<int[]> DoPermute(int[] nums, int start, int end)
+        //{
+        //    var result = new List<int[]>();
+        //    if (start == end)
+        //    {
+        //        var perm = new int[nums.Length];
+        //        Array.Copy(nums, perm, nums.Length);
+        //        result.Add(perm);
+        //    }
+        //    else
+        //        for (var i = start; i <= end; i++)
+        //        {
+        //            Swap(ref nums[start], ref nums[i]);
+        //            result.AddRange(DoPermute(nums, start + 1, end));
+        //            Swap(ref nums[start], ref nums[i]);
+        //        }
+        //    return result;
+        //}
 
-        List<int> GetOrder()
+        public List<int> GetOrder()
         {
             var mask = new bool[TAffine.N, TAffine.N];
             var planes = new List<int>();
@@ -547,14 +599,8 @@ namespace RubikCube
         public List<int> GetReversedSeq()
         {
             ActSeq = new List<int>();
-            //var perm = new int[TAffine.N - 1];
-            //for (int i = 0; i < perm.Length; i++)
-            //    perm[i] = i + 1;
-            //var comb = DoPermute(perm, 0, perm.Length - 1);
-            //var combIdx = TChromosome.Rnd.Next(comb.Count + 1) - 1;
-            //var order = combIdx > 0 ? comb[combIdx] : null;
-            EulerOrder = GetOrder();
-            var eulerAngles = ActiveCubie.Transform.GetEulerAngles(EulerOrder, ActiveCubie.IsReversedSeq);
+            //var eulerAngles = ActiveCubie.Transform.GetEulerAngles(EulerOrder, IsEulerOrderReversed);
+            var eulerAngles = ActiveCubie.Transform.GetEulerAngles(null);
             var cube = new TRubikCube(this);
             var p = ActiveCubie.Transform.Origin.Clone();
             for (int idx = 0; idx < eulerAngles.Count; idx++)
@@ -581,7 +627,6 @@ namespace RubikCube
             }
             if (cube.ActiveCubie.State != 0)
                 ;
-            ActiveCubie.IsReversedSeq = !ActiveCubie.IsReversedSeq;
             return ActSeq;
         }
 

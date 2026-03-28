@@ -1,5 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace TGL
 {
@@ -234,6 +238,36 @@ namespace TGL
             //Cols[i] = iCol;
             //Cols[j] = jCol;
         }
+
+#if !MAUI
+        public static Color[] Palette = TShape.CreatePalette();
+        public Bitmap Image
+        {
+            get
+            {
+                var width = ColsCount;
+                var height = RowsCount;
+                var bmp = new Bitmap(width, height, PixelFormat.Format8bppIndexed);
+                var min = Data.Min();
+                var max = Data.Max();
+                var rc = new Rectangle(0, 0, width, height);
+                var bmpData = bmp.LockBits(rc, ImageLockMode.WriteOnly, PixelFormat.Format8bppIndexed);
+                var pixels = new byte[bmpData.Stride * height];
+
+                for (int x = 0; x < width; x++)
+                    for (int y = 0; y < height; y++)
+                        pixels[y * bmpData.Stride + x] = (byte)((this[y, x] - min) / (max - min) * (Palette.Length - 1));
+
+                Marshal.Copy(pixels, 0, bmpData.Scan0, pixels.Length);
+                var pal = bmp.Palette;
+                Array.Copy(Palette, pal.Entries, pal.Entries.Length);
+                bmp.Palette = pal;
+                bmp.UnlockBits(bmpData);
+                return bmp;
+            }
+        }
+#endif
+
     };
 
 }

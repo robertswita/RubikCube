@@ -33,10 +33,47 @@ namespace TGL
                     Win32.SetPixelFormat(HDC, idx, pfd);
                     HRC = Win32.wglCreateContext(HDC);
                     Win32.wglMakeCurrent(HDC, HRC);
+
+                    var gpuProgram = OpenGL.CreateProgram();
+                    OpenGL.AttachShader(gpuProgram, CreateShader(OpenGL.GL_COMPUTE_SHADER));
+                    //OpenGL.AttachShader(gpuProgram, CreateShader(OpenGL.GL_VERTEX_SHADER));
+                    //OpenGL.AttachShader(gpuProgram, CreateShader(OpenGL.GL_FRAGMENT_SHADER));
+                    OpenGL.LinkProgram(gpuProgram);
+                    OpenGL.UseProgram(gpuProgram);
+                    //OpenGL.GenBuffers(1, UboCamera);
+                    //OpenGL.BindBufferBase(OpenGL.GL_UNIFORM_BUFFER, 0, UboCamera[0]);
+                    //OpenGL.GenBuffers(1, UboBones);
+                    ////OpenGL.BindBufferBase(OpenGL.GL_SHADER_STORAGE_BUFFER, 1, SsboBones[0]);
+                    //OpenGL.BindBufferBase(OpenGL.GL_UNIFORM_BUFFER, 1, UboBones[0]);
+                    //OpenGL.GenBuffers(1, UboLights);
+                    //OpenGL.BindBufferBase(OpenGL.GL_UNIFORM_BUFFER, 2, UboLights[0]);
                 }
                 return HRC;
             }
         }
+
+        int CreateShader(int shaderType)
+        {
+            var shader = OpenGL.CreateShader(shaderType);
+            if (shaderType == OpenGL.GL_VERTEX_SHADER)
+                OpenGL.ShaderSource(shader, RubikCube.Properties.Resources.Vertex_glsl);
+            else if(shaderType == OpenGL.GL_FRAGMENT_SHADER)
+                OpenGL.ShaderSource(shader, RubikCube.Properties.Resources.Fragment_glsl);
+            else
+                OpenGL.ShaderSource(shader, RubikCube.Properties.Resources.Evaluate_glsl);
+            OpenGL.CompileShader(shader);
+            var status = new int[1];
+            OpenGL.GetShader(shader, OpenGL.GL_COMPILE_STATUS, status);
+            if (status[0] == 0)
+            {
+                var maxLength = new int[1];
+                OpenGL.GetShader(shader, OpenGL.GL_INFO_LOG_LENGTH, maxLength);
+                var log = new StringBuilder(maxLength[0]);
+                OpenGL.GetShaderInfoLog(shader, maxLength[0], IntPtr.Zero, log);
+            }
+            return shader;
+        }
+
 
         internal void DrawView()
         {

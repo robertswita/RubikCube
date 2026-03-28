@@ -78,6 +78,8 @@ namespace TGL
         public delegate void glGenFramebuffers(int n, int[] framebuffers);
         public delegate void glBindFramebuffer(int target, int framebuffer);
         public delegate void glBlitFramebuffer(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
+        public delegate void glDispatchCompute(int num_groups_x, int num_groups_y, int num_groups_z);
+        public delegate void glMemoryBarrier(MemoryBarrierFlags barriers);
         //public delegate void glFramebufferTexture2D(uint target, uint attachment, uint textarget, uint texture, int level);
 
         //  Methods
@@ -139,6 +141,8 @@ namespace TGL
         public static glGenFramebuffers GenFramebuffers { get { return GetProc<glGenFramebuffers>(); } }
         public static glBindFramebuffer BindFramebuffer { get { return GetProc<glBindFramebuffer>(); } }
         public static glBlitFramebuffer BlitFramebuffer { get { return GetProc<glBlitFramebuffer>(); } }
+        public static glDispatchCompute DispatchCompute { get { return GetProc<glDispatchCompute>(); } }
+        public static glMemoryBarrier MemoryBarrier {  get { return GetProc<glMemoryBarrier>(); } }
 
         //  Constants
         public const int GL_TRIANGLES = 0x0004;
@@ -160,6 +164,7 @@ namespace TGL
         public const int GL_DYNAMIC_DRAW = 0x88E8;
         public const int GL_FRAGMENT_SHADER = 0x8B30;
         public const int GL_VERTEX_SHADER = 0x8B31;
+        public const int GL_COMPUTE_SHADER = 0x91B9;
         public const int GL_COMPILE_STATUS = 0x8B81;
         public const int GL_INFO_LOG_LENGTH = 0x8B84;
         public const int GL_ARRAY_BUFFER = 0x8892;
@@ -227,5 +232,74 @@ namespace TGL
         public const int WGL_TYPE_RGBA = 0x202B;
         public const int WGL_SAMPLE_BUFFERS = 0x2041;
         public const int WGL_SAMPLES = 0x2042;
+
+        public enum MemoryBarrierFlags : int
+        {
+            /// <summary>
+            /// Original was GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT = 0x00000001
+            /// </summary>
+            VertexAttribArrayBarrierBit = ((int)0x00000001),
+            /// <summary>
+            /// Original was GL_ELEMENT_ARRAY_BARRIER_BIT = 0x00000002
+            /// </summary>
+            ElementArrayBarrierBit = ((int)0x00000002),
+            /// <summary>
+            /// Original was GL_UNIFORM_BARRIER_BIT = 0x00000004
+            /// </summary>
+            UniformBarrierBit = ((int)0x00000004),
+            /// <summary>
+            /// Original was GL_TEXTURE_FETCH_BARRIER_BIT = 0x00000008
+            /// </summary>
+            TextureFetchBarrierBit = ((int)0x00000008),
+            /// <summary>
+            /// Original was GL_SHADER_IMAGE_ACCESS_BARRIER_BIT = 0x00000020
+            /// </summary>
+            ShaderImageAccessBarrierBit = ((int)0x00000020),
+            /// <summary>
+            /// Original was GL_COMMAND_BARRIER_BIT = 0x00000040
+            /// </summary>
+            CommandBarrierBit = ((int)0x00000040),
+            /// <summary>
+            /// Original was GL_PIXEL_BUFFER_BARRIER_BIT = 0x00000080
+            /// </summary>
+            PixelBufferBarrierBit = ((int)0x00000080),
+            /// <summary>
+            /// Original was GL_TEXTURE_UPDATE_BARRIER_BIT = 0x00000100
+            /// </summary>
+            TextureUpdateBarrierBit = ((int)0x00000100),
+            /// <summary>
+            /// Original was GL_BUFFER_UPDATE_BARRIER_BIT = 0x00000200
+            /// </summary>
+            BufferUpdateBarrierBit = ((int)0x00000200),
+            /// <summary>
+            /// Original was GL_FRAMEBUFFER_BARRIER_BIT = 0x00000400
+            /// </summary>
+            FramebufferBarrierBit = ((int)0x00000400),
+            /// <summary>
+            /// Original was GL_TRANSFORM_FEEDBACK_BARRIER_BIT = 0x00000800
+            /// </summary>
+            TransformFeedbackBarrierBit = ((int)0x00000800),
+            /// <summary>
+            /// Original was GL_ATOMIC_COUNTER_BARRIER_BIT = 0x00001000
+            /// </summary>
+            AtomicCounterBarrierBit = ((int)0x00001000),
+            /// <summary>
+            /// Original was GL_SHADER_STORAGE_BARRIER_BIT = 0x00002000
+            /// </summary>
+            ShaderStorageBarrierBit = ((int)0x00002000),
+            /// <summary>
+            /// Original was GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT = 0x00004000
+            /// </summary>
+            ClientMappedBufferBarrierBit = ((int)0x00004000),
+            /// <summary>
+            /// Original was GL_QUERY_BUFFER_BARRIER_BIT = 0x00008000
+            /// </summary>
+            QueryBufferBarrierBit = ((int)0x00008000),
+            /// <summary>
+            /// Original was GL_ALL_BARRIER_BITS = 0xFFFFFFFF
+            /// </summary>
+            AllBarrierBits = unchecked((int)0xFFFFFFFF),
+        }
+
     }
 }

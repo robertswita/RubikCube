@@ -62,6 +62,32 @@ namespace RubikCube.Properties {
         
         /// <summary>
         ///   Looks up a localized string similar to #version 430 core
+        ///
+        ///const int N = 4;
+        ///const int SIZE = 2;
+        ///const int GENES_COUNT = 30;
+        ///const int POPULATION_COUNT = 1000;
+        ///const int CUBIES_COUNT = pow(SIZE, N);
+        ///const int PLANES_COUNT = N * (N - 1) / 2;
+        ///const int MAX_ACTIVECUBIES_COUNT = PLANES_COUNT * (1 &lt;&lt; N - 2);
+        ///
+        ///layout(std430, binding = 0) uniform Cubies
+        ///{
+        ///    float cubies[N * N * CUBIES_COUNT];
+        ///    int solvedCubies[N * N * CUBIES_COUNT];
+        ///    int solvedCubiesCount;
+        ///    int activeCubies[MAX_ACTIVECUBIES_COUNT];
+        ///    int activeCubiesCount;
+        ///} [rest of string was truncated]&quot;;.
+        /// </summary>
+        internal static string Evaluate_glsl {
+            get {
+                return ResourceManager.GetString("Evaluate_glsl", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to #version 430 core
         ///in vec2 fragTexCoord;
         ///in vec3 fragPos;
         ///in vec3 fragNormal;

@@ -29,12 +29,13 @@
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea2 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Series series2 = new System.Windows.Forms.DataVisualization.Charting.Series();
             System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
             System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea2 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            System.Windows.Forms.DataVisualization.Charting.Series series2 = new System.Windows.Forms.DataVisualization.Charting.Series();
             this.MoveTimer = new System.Windows.Forms.Timer(this.components);
             this.panel1 = new System.Windows.Forms.Panel();
+            this.chart2 = new System.Windows.Forms.DataVisualization.Charting.Chart();
             this.SeqCountLbl = new System.Windows.Forms.Label();
             this.label13 = new System.Windows.Forms.Label();
             this.DimsBox = new System.Windows.Forms.NumericUpDown();
@@ -75,8 +76,8 @@
             this.tRubikCubeBindingSource = new System.Windows.Forms.BindingSource(this.components);
             this.saveFileDialog1 = new System.Windows.Forms.SaveFileDialog();
             this.tglView1 = new TGL.TGLView();
-            this.chart2 = new System.Windows.Forms.DataVisualization.Charting.Chart();
             this.panel1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.chart2)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.DimsBox)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.StateBox)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.SlicesBox)).BeginInit();
@@ -85,7 +86,6 @@
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.stateGridBindingSource)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.tRubikCubeBindingSource)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.chart2)).BeginInit();
             this.SuspendLayout();
             // 
             // MoveTimer
@@ -127,6 +127,22 @@
             this.panel1.Size = new System.Drawing.Size(498, 790);
             this.panel1.TabIndex = 8;
             // 
+            // chart2
+            // 
+            chartArea1.AxisX.Title = "iteration";
+            chartArea1.AxisY.Title = "error";
+            chartArea1.Name = "ChartArea1";
+            this.chart2.ChartAreas.Add(chartArea1);
+            this.chart2.Location = new System.Drawing.Point(250, 132);
+            this.chart2.Name = "chart2";
+            series1.ChartArea = "ChartArea1";
+            series1.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
+            series1.Name = "Series1";
+            this.chart2.Series.Add(series1);
+            this.chart2.Size = new System.Drawing.Size(244, 269);
+            this.chart2.TabIndex = 37;
+            this.chart2.Text = "chart2";
+            // 
             // SeqCountLbl
             // 
             this.SeqCountLbl.AutoSize = true;
@@ -148,6 +164,11 @@
             // DimsBox
             // 
             this.DimsBox.Location = new System.Drawing.Point(88, 7);
+            this.DimsBox.Minimum = new decimal(new int[] {
+            1,
+            0,
+            0,
+            0});
             this.DimsBox.Name = "DimsBox";
             this.DimsBox.Size = new System.Drawing.Size(64, 22);
             this.DimsBox.TabIndex = 34;
@@ -256,6 +277,11 @@
             // SlicesBox
             // 
             this.SlicesBox.Location = new System.Drawing.Point(224, 7);
+            this.SlicesBox.Minimum = new decimal(new int[] {
+            1,
+            0,
+            0,
+            0});
             this.SlicesBox.Name = "SlicesBox";
             this.SlicesBox.Size = new System.Drawing.Size(64, 22);
             this.SlicesBox.TabIndex = 21;
@@ -471,22 +497,6 @@
             this.tglView1.MouseDown += new System.Windows.Forms.MouseEventHandler(this.tglView1_MouseDown);
             this.tglView1.MouseMove += new System.Windows.Forms.MouseEventHandler(this.tglView1_MouseMove);
             // 
-            // chart2
-            // 
-            chartArea1.AxisX.Title = "iteration";
-            chartArea1.AxisY.Title = "error";
-            chartArea1.Name = "ChartArea1";
-            this.chart2.ChartAreas.Add(chartArea1);
-            this.chart2.Location = new System.Drawing.Point(250, 132);
-            this.chart2.Name = "chart2";
-            series1.ChartArea = "ChartArea1";
-            series1.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
-            series1.Name = "Series1";
-            this.chart2.Series.Add(series1);
-            this.chart2.Size = new System.Drawing.Size(244, 269);
-            this.chart2.TabIndex = 37;
-            this.chart2.Text = "chart2";
-            // 
             // TRubikForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -502,6 +512,7 @@
             this.Load += new System.EventHandler(this.TRubikForm_Load);
             this.panel1.ResumeLayout(false);
             this.panel1.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.chart2)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.DimsBox)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.StateBox)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.SlicesBox)).EndInit();
@@ -511,7 +522,6 @@
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.stateGridBindingSource)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.tRubikCubeBindingSource)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.chart2)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 

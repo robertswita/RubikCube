@@ -18,6 +18,7 @@ namespace RubikCube
         public int RotationCount;
         public static TVector Scaling;
         public bool IsReversedSeq;
+        public int ClusterIndex;
 
         public TCubie()
         {
@@ -44,7 +45,8 @@ namespace RubikCube
                 if (!ValidState)
                 {
                     state = 0;
-                    EulerAngles = Transform.GetEulerAngles(TRubikCube.EulerOrder, IsReversedSeq);
+                    //EulerAngles = Transform.GetEulerAngles(TRubikCube.EulerOrder, TRubikCube.IsEulerOrderReversed);
+                    EulerAngles = Transform.GetEulerAngles(null);
                     RotationCount = 0;
                     var shift = (EulerAngles.Count - 1) << 1;
                     for (int i = 0; i < EulerAngles.Count; i++)
@@ -115,25 +117,31 @@ namespace RubikCube
             dest.Transform = Transform.Clone();
             dest.Vertices = Vertices;
             dest.Faces = Faces;
-            dest.state = state;
-            dest.ValidState = ValidState;
+            //dest.state = state;
+            //dest.ValidState = ValidState;
             dest.StartIndex = StartIndex;
             dest.RotationCount = RotationCount;
             return dest;
         }
 
-        public int Index
-        {
-            get
-            {
-                return SizeMatrix.Coords2Index(Position);
-            }
-            set 
-            {
-                var pos = SizeMatrix.Index2Coords(value);
-                Transform.Origin = pos - TRubikCube.C;
-            }
-        }
+public int Index
+{
+    get
+    {
+        return SizeMatrix.Coords2Index(Position);
+    }
+    set 
+    {
+        var pos = SizeMatrix.Index2Coords(value);
+        Transform.Origin = pos - TRubikCube.C;
+        var position = new int[pos.Size];
+        for (int dim = 0; dim < position.Length; dim++)
+            position[dim] = (int)Math.Round(Math.Abs(Transform.Origin[dim]) + TRubikCube.C);
+        Array.Sort(position);
+        Array.Reverse(position);
+        ClusterIndex = SizeMatrix.Coords2Index(position);
+    }
+}
 
         public int[] Position
         {

@@ -48,6 +48,10 @@ namespace GA
             MutateGene(Rnd.Next(GenesLength));
         }
 
+        public virtual void MutateAux()
+        {
+        }
+
         public virtual TChromosome Crossover(TChromosome other, int splitIdx)
         {
             var child = (TChromosome)Activator.CreateInstance(GetType());// new TChromosome();

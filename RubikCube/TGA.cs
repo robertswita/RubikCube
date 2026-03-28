@@ -11,15 +11,18 @@ namespace GA
         public int PopulationCount = 100;
         public double WinnerRatio = 0.3;
         public double MutationRatio = 0.01;
+        public double MutationAuxRatio = 0;
         public int GenerationsCount = 2000;
         public int IterCount;
         public List<T> Population = new List<T>();
         public delegate void ProgressHandler(T best);
         public delegate double EvaluateHandler(T specimen);
         public delegate List<T> SelectionHandler(List<T> population, int winnerCount);
+        public delegate void NextGenHandler();
         public EvaluateHandler Evaluate;
         public ProgressHandler Progress;
         public SelectionHandler Select;
+        public NextGenHandler NextGeneration;
 
         public enum TSelectionType { Rank, Tournament, Roulette, RouletteRank, Unique };
         public TSelectionType SelectionType;
@@ -43,7 +46,9 @@ namespace GA
             //Best = (T)Population[0].Clone();
             var winnerCount = (int)(WinnerRatio * PopulationCount);
             var mutationsCount = (int)(MutationRatio * PopulationCount);
+            var mutationsAuxCount = (int)(MutationAuxRatio * PopulationCount);
             while (Best.Fitness >= HighScore && IterCount < GenerationsCount)
+            //while (Best.Fitness >= HighScore)
             {
                 foreach (var specimen in Population)
                     specimen.Evaluate();
@@ -91,7 +96,13 @@ namespace GA
                     var mutant = Population[TChromosome.Rnd.Next(Population.Count)];
                     mutant.Mutate();
                 }
+                for (int i = 0; i < mutationsAuxCount; i++)
+                {
+                    var mutant = Population[TChromosome.Rnd.Next(Population.Count)];
+                    mutant.MutateAux();
+                }
                 IterCount++;
+                NextGeneration();
             }
             HighScore = Best.Fitness;
         }

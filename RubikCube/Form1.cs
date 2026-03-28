@@ -131,7 +131,7 @@ namespace RubikCube
             {
                 MoveNo = 0;
                 Moves.Clear();
-                label2.Text = HighScore.ToString();
+                //label2.Text = HighScore.ToString();
                 //var scrambled = RubikCube.Code.Count(x => x != '\0');
                 label4.Text = RubikCube.ScrambledCount().ToString();
                 //Scrambled = scrambled;
@@ -161,18 +161,26 @@ namespace RubikCube
                 var freeCubies = new List<TCubie>();
                 foreach (var cubie in RubikCube.ActiveCluster)
                     if (cubie.State != 0)
-                    {
-                        //RubikCube.ActiveCubie = cubie;
-                        //break;
                         freeCubies.Add(cubie);
-                    }
-                //if (RubikCube.ActiveCubie != null)
-                //    RubikCube.ActiveCubie.GetReversedSeq();
                 if (freeCubies.Count > 0)
-                {
                     RubikCube.ActiveCubie = freeCubies[TChromosome.Rnd.Next(freeCubies.Count)];
-                    RubikCube.GetReversedSeq();
+                if (Ga.HighScore < HighScore)
+                {
+                    HighScore = Ga.HighScore;
                 }
+                else
+                {
+                    if (!TRubikCube.IsEulerOrderReversed)
+                        TRubikCube.EulerOrder = RubikCube.GetOrder();
+                    TRubikCube.IsEulerOrderReversed = !TRubikCube.IsEulerOrderReversed;// RubikCube.ActiveCubie.IsReversedSeq;
+                                                                                       //RubikCube.ActiveCubie.IsReversedSeq = !RubikCube.ActiveCubie.IsReversedSeq;
+                    foreach (var cubie in RubikCube.ActiveCluster)
+                        cubie.ValidState = false;
+                    HighScore = RubikCube.Evaluate();
+                }
+                RubikCube.GetReversedSeq();
+                label2.Text = HighScore.ToString();
+                label2.Refresh();
                 if (Ga != null)
                     Solve();
             }
@@ -183,19 +191,42 @@ namespace RubikCube
         void DisplayState(Graphics gc)
         {
             var grid = RubikCube.StateGrid;
-            var bmp = new Bitmap(grid.GetLength(0), grid.GetLength(1));
-            using (Graphics g = Graphics.FromImage(bmp)) { g.Clear(Color.White); }
-            for (int y = 0; y < bmp.Height; y++)
-                for (int x = 0; x < bmp.Width; x++)
-                {
-                    if (grid[y, x] != 0)
+            var gridSize = grid.GetLength(0);
+            var pal = new Color[256];
+            for (int i = 0; i < pal.Length; i++)
+                pal[i] = Color.FromArgb(255 - i, 255 - i, 255 - i);
+            TMatrix.Palette = pal;
+            var bmp = new Bitmap(gridSize * TAffine.N, gridSize * TAffine.N);
+            using (var g = Graphics.FromImage(bmp))
+            {
+                g.Clear(Color.White);
+                for (int y = 0; y < gridSize; y++)
+                    for (int x = 0; x < gridSize; x++)
                     {
-                        var r = 255 / 16.0 * (1 + grid[y, x] & 0xF);
-                        var g = 255 / 16.0 * (1 + (grid[y, x] >> 4) & 0xF);
-                        var b = 255 / 16.0 * (1 + (grid[y, x] >> 8) & 0xF);
-                        bmp.SetPixel(x, y, Color.FromArgb((int)r, (int)g, (int)b));
+                        var M = grid[y, x];
+                        if (M != null)
+                        {
+                            //for (int m = 0; m < M.RowsCount; m++)
+                            //    for (int n = 0; n < M.ColsCount; n++)
+                            //    {
+                            //        var x_ = x * TAffine.N + m;
+                            //        var y_ = y * TAffine.N + n;
+                            //        if (M[m, n] > 0.1)
+                            //            bmp.SetPixel(x_, y_, Color.Black);
+                            //        else if (M[m, n] < -0.1)
+                            //            bmp.SetPixel(x_, y_, Color.Gray);
+                            //    }
+                            g.DrawImage(M.Image, x * TAffine.N, y * TAffine.N);
+                        }
+                        //if (grid[y, x] != 0)
+                        //{
+                        //    var r = 255 / 16.0 * (1 + grid[y, x] & 0xF);
+                        //    var g = 255 / 16.0 * (1 + (grid[y, x] >> 4) & 0xF);
+                        //    var b = 255 / 16.0 * (1 + (grid[y, x] >> 8) & 0xF);
+                        //    bmp.SetPixel(x, y, Color.FromArgb((int)r, (int)g, (int)b));
+                        //}
                     }
-                }
+            }
             gc.DrawImage(bmp, StateBox.ClientRectangle);
         }
 
@@ -234,8 +265,8 @@ namespace RubikCube
                 if (RubikCube.ActiveCubie != null)
                 {
                     TRubikGenome.FreeMoves = RubikCube.GetFreeMoves();
-                    HighScore = RubikCube.Evaluate();
                     RubikCube.GetReversedSeq();
+                    HighScore = RubikCube.Evaluate();
                 }
             }
             if (RubikCube.ActiveCubie != null)
@@ -252,10 +283,11 @@ namespace RubikCube
                 Ga.GenerationsCount = 50;
                 //Iteration++;
                 //var level = 1 + (int)(10 - HighScore / 10) + RubikCube.SolvedCubies.Count;
-                Ga.PopulationCount = 1000;//TRubikGenome.FreeMoves.Count * 100;
+                Ga.PopulationCount = 500;//TRubikGenome.FreeMoves.Count * 100;
                 Ga.WinnerRatio = 0.1;
-                Ga.MutationRatio = 1;// 0.05;
-                Ga.Select = TRubikGenome.Select;
+                Ga.MutationRatio = 0.33;// 0.05;
+                Ga.Select = TRubikGenome.SelectUnique;
+                Ga.NextGeneration = TRubikGenome.NextGeneration;
                 //Ga.SelectionType = TGA<TRubikGenome>.TSelectionType.Unique;
                 //Ga.Evaluate = OnEvaluate;
                 Ga.Progress = OnProgress;
@@ -338,7 +370,7 @@ namespace RubikCube
                         //Ga.Best.Correct();
                         //Ga.Best.Evaluate();
                         Iteration = 0;
-                        HighScore = Ga.HighScore;
+                        //HighScore = Ga.HighScore;
                         Ga.Best.Correct();
                         for (int i = Ga.Best.StartIndex; i < Ga.Best.MoveCount; i++)
                             Moves.Add(TMove.Decode((int)Ga.Best.Genes[i]));
@@ -350,7 +382,7 @@ namespace RubikCube
                     foreach (var solution in Solutions)
                     {
                         var tryMoves = DecodeSolution(solution.Value);
-                        for (int j = -1; j < 0*TRubikGenome.FreeMoves.Count; j++)
+                        for (int j = -1; j < 0 * TRubikGenome.FreeMoves.Count; j++)
                         {
                             var moves = new List<TMove>();
                             if (j < 0)
@@ -712,6 +744,7 @@ namespace RubikCube
         private void numericUpDown2_ValueChanged(object sender, EventArgs e)
         {
             TAffine.N = (int)DimsBox.Value;
+            TRubikCube.EulerOrder = null;
             UpdateView();
         }
 
