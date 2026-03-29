@@ -16,7 +16,8 @@ namespace GA
         public int IterCount;
         public List<T> Population = new List<T>();
         public delegate void ProgressHandler(T best);
-        public delegate double EvaluateHandler(T specimen);
+        //public delegate double EvaluateHandler(T specimen);
+        public delegate void EvaluateHandler(List<T> population);
         public delegate List<T> SelectionHandler(List<T> population, int winnerCount);
         public delegate void NextGenHandler();
         public EvaluateHandler Evaluate;
@@ -50,8 +51,9 @@ namespace GA
             while (Best.Fitness >= HighScore && IterCount < GenerationsCount)
             //while (Best.Fitness >= HighScore)
             {
-                foreach (var specimen in Population)
-                    specimen.Evaluate();
+                //foreach (var specimen in Population)
+                //    specimen.Evaluate();
+                Evaluate(Population);
                 Population.Sort();
                 if (Progress != null)
                     Progress(Population[0]);

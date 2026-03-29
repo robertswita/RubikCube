@@ -9,10 +9,10 @@ namespace GA
     public class TChromosome : IComparable<TChromosome>
     {
         public static int GenesLength;
-        public double[] Genes = new double[GenesLength];
-        public static double[] MinGenes;
-        public static double[] MaxGenes;
-        public double Fitness = double.MaxValue;
+        public float[] Genes = new float[GenesLength];
+        public static float[] MinGenes;
+        public static float[] MaxGenes;
+        public float Fitness = float.MaxValue;
         public static Random Rnd = new Random();
 
         //public TChromosome()
@@ -39,7 +39,7 @@ namespace GA
 
         public virtual void MutateGene(int idx)
         {
-            double ratio = Rnd.NextDouble();
+            float ratio = (float)Rnd.NextDouble();
             Genes[idx] = MinGenes[idx] + (MaxGenes[idx] - MinGenes[idx]) * ratio;
         }
 

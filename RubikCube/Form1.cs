@@ -276,22 +276,45 @@ namespace RubikCube
                 StartGACount = GACount;
                 chart1.Series[0].Points.Clear();
 
-                TChromosome.GenesLength = 30;
+                TChromosome.GenesLength = 32;
                 TRubikGenome.RubikCube = RubikCube;
                 TRubikGenome.FreeMoves = RubikCube.GetFreeMoves();
                 Ga = new TGA<TRubikGenome>();
                 Ga.GenerationsCount = 50;
                 //Iteration++;
                 //var level = 1 + (int)(10 - HighScore / 10) + RubikCube.SolvedCubies.Count;
-                Ga.PopulationCount = 500;//TRubikGenome.FreeMoves.Count * 100;
+                Ga.PopulationCount = 1024;//TRubikGenome.FreeMoves.Count * 100;
                 Ga.WinnerRatio = 0.1;
                 Ga.MutationRatio = 0.33;// 0.05;
                 Ga.Select = TRubikGenome.SelectUnique;
                 Ga.NextGeneration = TRubikGenome.NextGeneration;
                 //Ga.SelectionType = TGA<TRubikGenome>.TSelectionType.Unique;
-                //Ga.Evaluate = OnEvaluate;
+                Ga.Evaluate = TRubikGenome.Evaluate;
                 Ga.Progress = OnProgress;
                 Ga.HighScore = HighScore;
+                OpenGL.BindBuffer(OpenGL.GL_SHADER_STORAGE_BUFFER, tglView1.Context.SsboCubies[0]);
+                var matSize = TAffine.N * TAffine.N;
+                var pos = 0;
+                var buffer = new float[(matSize + TAffine.N) * RubikCube.Cubies.Length];
+                for (int i = 0; i < RubikCube.Cubies.Length; i++)
+                {
+                    Array.Copy(RubikCube.Cubies[i].Transform.M.Data, 0, buffer, pos, matSize);
+                    pos += matSize;
+                    Array.Copy(RubikCube.Cubies[i].Transform.Origin.Data, 0, buffer, pos, TAffine.N);
+                    pos += TAffine.N;
+                }
+                OpenGL.BufferDatafv(OpenGL.GL_SHADER_STORAGE_BUFFER, buffer​, OpenGL.GL_STATIC_DRAW);
+                OpenGL.BindBuffer(OpenGL.GL_SHADER_STORAGE_BUFFER, tglView1.Context.SsboActiveCubies[0]);
+                var idxBuffer = new int[RubikCube.ActiveCluster.Count];
+                for (int i = 0; i < idxBuffer.Length; i++)
+                    idxBuffer[i] = RubikCube.ActiveCluster[i].StartIndex;
+                OpenGL.BufferDataiv(OpenGL.GL_SHADER_STORAGE_BUFFER, idxBuffer​, OpenGL.GL_STATIC_DRAW);
+                OpenGL.BindBuffer(OpenGL.GL_SHADER_STORAGE_BUFFER, tglView1.Context.SsboSolvedCubies[0]);
+                idxBuffer = new int[RubikCube.SolvedCubies.Count];
+                for (int i = 0; i < idxBuffer.Length; i++)
+                    idxBuffer[i] = RubikCube.SolvedCubies[i].StartIndex;
+                OpenGL.BufferDataiv(OpenGL.GL_SHADER_STORAGE_BUFFER, idxBuffer​, OpenGL.GL_STATIC_DRAW);
+
                 //Ga.Execute();
 
                 //for (int i = 0; i < TRubikGenome.FreeMoves.Count; i++)
@@ -642,6 +665,14 @@ namespace RubikCube
                 tglView1.Invalidate();
                 StateBox.Invalidate();
                 Moves.Clear();
+                OpenGL.BindBuffer(OpenGL.GL_SHADER_STORAGE_BUFFER, tglView1.Context.SsboPlanes[0]);
+                var buffer = new float[TAffine.Planes.Length * 2];
+                for (int i = 0; i < TAffine.Planes.Length; i++)
+                {
+                    buffer[2 * i] = TAffine.Planes[i][0];
+                    buffer[2 * i + 1] = TAffine.Planes[i][1];
+                }
+                OpenGL.BufferDatafv(OpenGL.GL_SHADER_STORAGE_BUFFER, buffer, OpenGL.GL_STATIC_DRAW);
             }
         }
 

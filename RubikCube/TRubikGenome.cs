@@ -1,6 +1,7 @@
 ﻿using GA;
 using System;
 using System.Collections.Generic;
+using System.Xml.Linq;
 using TGL;
 
 namespace RubikCube
@@ -318,7 +319,7 @@ namespace RubikCube
             //    ;
             //specimen.Conjugate();
             //specimen.Mutate(RubikCube.ActCubie);
-            Fitness = double.MaxValue;
+            Fitness = float.MaxValue;
             //string startCode = cube.Code;
             //for (int j = 0; j < 1; j++)
             {
@@ -339,7 +340,7 @@ namespace RubikCube
                     //var cubeCopy = new TRubikCube(cube);
                     //for (int j = i - 1; j >= 0; j--)
                     //    cube.ReTurn(TMove.Decode((int)specimen.Genes[j]));
-                    double fitness = cube.Evaluate();
+                    var fitness = cube.Evaluate();
                     if (fitness < Fitness)// && cube.Code != startCode)
                     {
                         Fitness = fitness;
@@ -378,6 +379,34 @@ namespace RubikCube
             }
             return sel;
         }
+
+#if !MAUI
+        public static void Evaluate(List<TRubikGenome> population)
+        {
+            int[] SsboPopulation = new int[1];
+            OpenGL.GenBuffers(1, SsboPopulation);
+            OpenGL.BindBufferBase(OpenGL.GL_SHADER_STORAGE_BUFFER, 5, SsboPopulation[0]);
+            OpenGL.BindBuffer(OpenGL.GL_SHADER_STORAGE_BUFFER, SsboPopulation[0]);
+            var buffer = new float[(GenesLength + 2) * population.Count];
+            var pos = 0;
+            for (int i = 0; i < population.Count; i++)
+            {
+                Array.Copy(population[i].Genes, 0, buffer, pos, GenesLength);
+                pos += GenesLength + 2;
+            }
+            OpenGL.BufferDatafv(OpenGL.GL_SHADER_STORAGE_BUFFER, buffer​, OpenGL.GL_DYNAMIC_DRAW);
+            OpenGL.DispatchCompute(population.Count, 1, 1);
+            OpenGL.MemoryBarrier(OpenGL.MemoryBarrierFlags.ShaderStorageBarrierBit);
+            OpenGL.GetBufferSubDatafv(OpenGL.GL_SHADER_STORAGE_BUFFER, 0, buffer);
+            pos = GenesLength;
+            for (int i = 0; i < population.Count; i++)
+            {
+                population[i].MoveCount = (int)buffer[pos++];
+                population[i].Fitness = buffer[pos++];
+                pos += GenesLength;
+            }
+        }
+#endif
 
     }
 

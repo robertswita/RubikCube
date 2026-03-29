@@ -54,6 +54,7 @@ namespace TGL
         public delegate void glBindBuffer(int target, int buffer);
         public delegate void glBindBufferBase(int target, int index, int buffer);
         public delegate void glBufferData(int target, int size, IntPtr data, int usage);
+        public delegate void glGetBufferSubData(int target, int offset, int size, IntPtr data);
         public delegate void glGenVertexArrays(int n, int[] arrays);
         public delegate void glBindVertexArray(int array);
         public delegate void glVertexAttribPointer(int index, int size, int type, bool normalized, int stride, IntPtr pointer);
@@ -110,6 +111,21 @@ namespace TGL
             IntPtr dataPtr = Marshal.AllocHGlobal(data.Length * sizeof(float));
             Marshal.Copy(data, 0, dataPtr, data.Length);
             GetProc<glBufferData>()(target, data.Length * sizeof(float), dataPtr, usage);
+            Marshal.FreeHGlobal(dataPtr);
+        }
+        public static glGetBufferSubData GetBufferSubData { get { return GetProc<glGetBufferSubData>(); } }
+        public static void GetBufferSubDatafv(int target, int offset, float[] data)
+        {
+            IntPtr dataPtr = Marshal.AllocHGlobal(data.Length * sizeof(float));
+            GetProc<glGetBufferSubData>()(target, offset, data.Length * sizeof(float), dataPtr);
+            Marshal.Copy(dataPtr, data, 0, data.Length);
+            Marshal.FreeHGlobal(dataPtr);
+        }
+        public static void BufferDataiv(int target, int[] data, int usage)
+        {
+            IntPtr dataPtr = Marshal.AllocHGlobal(data.Length * sizeof(int));
+            Marshal.Copy(data, 0, dataPtr, data.Length);
+            GetProc<glBufferData>()(target, data.Length * sizeof(int), dataPtr, usage);
             Marshal.FreeHGlobal(dataPtr);
         }
         public static glAttachShader AttachShader { get { return GetProc<glAttachShader>(); } }

@@ -180,9 +180,9 @@ namespace RubikCube
             move.Angle = 2 - move.Angle;
         }
 
-        public double Evaluate()
+        public float Evaluate()
         {
-            double score = 0;
+            float score = 0;
             var scrambled = new List<TCubie>();
             //var rotCount = 0;
             //var maxClusterState = (double)(1 << 2 * TAffine.Planes.Length);// * ActiveCluster.Count;// * TAffine.N;
@@ -198,7 +198,7 @@ namespace RubikCube
             //score *= rotCount / (scrambled + 1);
             //var scrambled = new List<TCubie>();
             //var rotCount = 0;
-            var maxClusterState = (double)(1 << 2 * TAffine.Planes.Length) * ActiveCluster.Count * TAffine.N;
+            var maxClusterState = (float)(1 << 2 * TAffine.Planes.Length) * ActiveCluster.Count * TAffine.N;
             //var maxClusterState = (double)(1 << 2 * TAffine.Planes.Length) * ActiveCluster.Count;
             //var hists = new int[TRubikCube.Size, TAffine.N];
             foreach (var cubie in ActiveCluster)

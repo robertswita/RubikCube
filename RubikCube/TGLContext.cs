@@ -21,6 +21,12 @@ namespace TGL
         public Rectangle Viewport;
         public TShape Root = new TShape();
         public TAffine Transform = new TAffine();
+        public int[] SsboCubies = new int[1];
+        public int[] SsboActiveCubies = new int[1];
+        public int[] SsboSolvedCubies = new int[1];
+        public int[] SsboWorkCubies = new int[1];
+        public int[] SsboPlanes = new int[1];
+        public int[] SsboPopulation = new int[1];
         public IntPtr Handle
         {
             get
@@ -40,13 +46,18 @@ namespace TGL
                     //OpenGL.AttachShader(gpuProgram, CreateShader(OpenGL.GL_FRAGMENT_SHADER));
                     OpenGL.LinkProgram(gpuProgram);
                     OpenGL.UseProgram(gpuProgram);
-                    //OpenGL.GenBuffers(1, UboCamera);
-                    //OpenGL.BindBufferBase(OpenGL.GL_UNIFORM_BUFFER, 0, UboCamera[0]);
-                    //OpenGL.GenBuffers(1, UboBones);
-                    ////OpenGL.BindBufferBase(OpenGL.GL_SHADER_STORAGE_BUFFER, 1, SsboBones[0]);
-                    //OpenGL.BindBufferBase(OpenGL.GL_UNIFORM_BUFFER, 1, UboBones[0]);
-                    //OpenGL.GenBuffers(1, UboLights);
-                    //OpenGL.BindBufferBase(OpenGL.GL_UNIFORM_BUFFER, 2, UboLights[0]);
+                    OpenGL.GenBuffers(1, SsboCubies);
+                    OpenGL.BindBufferBase(OpenGL.GL_SHADER_STORAGE_BUFFER, 0, SsboCubies[0]);
+                    OpenGL.GenBuffers(1, SsboActiveCubies);
+                    OpenGL.BindBufferBase(OpenGL.GL_SHADER_STORAGE_BUFFER, 1, SsboActiveCubies[0]);
+                    OpenGL.GenBuffers(1, SsboSolvedCubies);
+                    OpenGL.BindBufferBase(OpenGL.GL_SHADER_STORAGE_BUFFER, 2, SsboSolvedCubies[0]);
+                    //OpenGL.GenBuffers(1, SsboWorkCubies);
+                    //OpenGL.BindBufferBase(OpenGL.GL_SHADER_STORAGE_BUFFER, 3, SsboWorkCubies[0]);
+                    OpenGL.GenBuffers(1, SsboPlanes);
+                    OpenGL.BindBufferBase(OpenGL.GL_SHADER_STORAGE_BUFFER, 4, SsboPlanes[0]);
+                    OpenGL.GenBuffers(1, SsboPopulation);
+                    OpenGL.BindBufferBase(OpenGL.GL_SHADER_STORAGE_BUFFER, 5, SsboPopulation[0]);
                 }
                 return HRC;
             }
