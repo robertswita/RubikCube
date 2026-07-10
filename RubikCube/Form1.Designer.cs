@@ -28,502 +28,493 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.components = new System.ComponentModel.Container();
+            components = new System.ComponentModel.Container();
             System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
             System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
             System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea2 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
             System.Windows.Forms.DataVisualization.Charting.Series series2 = new System.Windows.Forms.DataVisualization.Charting.Series();
-            this.MoveTimer = new System.Windows.Forms.Timer(this.components);
-            this.panel1 = new System.Windows.Forms.Panel();
-            this.chart2 = new System.Windows.Forms.DataVisualization.Charting.Chart();
-            this.SeqCountLbl = new System.Windows.Forms.Label();
-            this.label13 = new System.Windows.Forms.Label();
-            this.DimsBox = new System.Windows.Forms.NumericUpDown();
-            this.label12 = new System.Windows.Forms.Label();
-            this.MovesLbl = new System.Windows.Forms.Label();
-            this.label11 = new System.Windows.Forms.Label();
-            this.StateBox = new System.Windows.Forms.PictureBox();
-            this.TransparencyBox = new System.Windows.Forms.CheckBox();
-            this.SolutionLbl = new System.Windows.Forms.Label();
-            this.label10 = new System.Windows.Forms.Label();
-            this.IterTimeBox = new System.Windows.Forms.Label();
-            this.PauseBtn = new System.Windows.Forms.Button();
-            this.label9 = new System.Windows.Forms.Label();
-            this.SlicesBox = new System.Windows.Forms.NumericUpDown();
-            this.label8 = new System.Windows.Forms.Label();
-            this.label7 = new System.Windows.Forms.Label();
-            this.label6 = new System.Windows.Forms.Label();
-            this.label5 = new System.Windows.Forms.Label();
-            this.chart1 = new System.Windows.Forms.DataVisualization.Charting.Chart();
-            this.label4 = new System.Windows.Forms.Label();
-            this.label3 = new System.Windows.Forms.Label();
-            this.label2 = new System.Windows.Forms.Label();
-            this.button2 = new System.Windows.Forms.Button();
-            this.label1 = new System.Windows.Forms.Label();
-            this.button1 = new System.Windows.Forms.Button();
-            this.solveWorker = new System.ComponentModel.BackgroundWorker();
-            this.menuStrip1 = new System.Windows.Forms.MenuStrip();
-            this.fileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.openToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.saveToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.saveClustersToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.showClusterToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.makeMovesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.undoMovesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.pictureBox1 = new System.Windows.Forms.PictureBox();
-            this.openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
-            this.stateGridBindingSource = new System.Windows.Forms.BindingSource(this.components);
-            this.tRubikCubeBindingSource = new System.Windows.Forms.BindingSource(this.components);
-            this.saveFileDialog1 = new System.Windows.Forms.SaveFileDialog();
-            this.tglView1 = new TGL.TGLView();
-            this.panel1.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.chart2)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.DimsBox)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.StateBox)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.SlicesBox)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
-            this.menuStrip1.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.stateGridBindingSource)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.tRubikCubeBindingSource)).BeginInit();
-            this.SuspendLayout();
+            MoveTimer = new System.Windows.Forms.Timer(components);
+            panel1 = new System.Windows.Forms.Panel();
+            chart2 = new System.Windows.Forms.DataVisualization.Charting.Chart();
+            SeqCountLbl = new System.Windows.Forms.Label();
+            label13 = new System.Windows.Forms.Label();
+            DimsBox = new System.Windows.Forms.NumericUpDown();
+            label12 = new System.Windows.Forms.Label();
+            MovesLbl = new System.Windows.Forms.Label();
+            label11 = new System.Windows.Forms.Label();
+            StateBox = new System.Windows.Forms.PictureBox();
+            TransparencyBox = new System.Windows.Forms.CheckBox();
+            SolutionLbl = new System.Windows.Forms.Label();
+            label10 = new System.Windows.Forms.Label();
+            IterTimeBox = new System.Windows.Forms.Label();
+            PauseBtn = new System.Windows.Forms.Button();
+            label9 = new System.Windows.Forms.Label();
+            SlicesBox = new System.Windows.Forms.NumericUpDown();
+            label8 = new System.Windows.Forms.Label();
+            label7 = new System.Windows.Forms.Label();
+            label6 = new System.Windows.Forms.Label();
+            label5 = new System.Windows.Forms.Label();
+            chart1 = new System.Windows.Forms.DataVisualization.Charting.Chart();
+            label4 = new System.Windows.Forms.Label();
+            label3 = new System.Windows.Forms.Label();
+            label2 = new System.Windows.Forms.Label();
+            button2 = new System.Windows.Forms.Button();
+            label1 = new System.Windows.Forms.Label();
+            button1 = new System.Windows.Forms.Button();
+            solveWorker = new System.ComponentModel.BackgroundWorker();
+            menuStrip1 = new System.Windows.Forms.MenuStrip();
+            fileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            openToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            saveToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            saveClustersToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            showClusterToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            makeMovesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            undoMovesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            pictureBox1 = new System.Windows.Forms.PictureBox();
+            openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
+            stateGridBindingSource = new System.Windows.Forms.BindingSource(components);
+            tRubikCubeBindingSource = new System.Windows.Forms.BindingSource(components);
+            saveFileDialog1 = new System.Windows.Forms.SaveFileDialog();
+            tglView1 = new TGL.TGLView();
+            panel1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)chart2).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)DimsBox).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)StateBox).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)SlicesBox).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)chart1).BeginInit();
+            menuStrip1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)pictureBox1).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)stateGridBindingSource).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)tRubikCubeBindingSource).BeginInit();
+            SuspendLayout();
             // 
             // MoveTimer
             // 
-            this.MoveTimer.Interval = 4;
-            this.MoveTimer.Tick += new System.EventHandler(this.timer1_Tick);
+            MoveTimer.Interval = 4;
+            MoveTimer.Tick += timer1_Tick;
             // 
             // panel1
             // 
-            this.panel1.Controls.Add(this.chart2);
-            this.panel1.Controls.Add(this.SeqCountLbl);
-            this.panel1.Controls.Add(this.label13);
-            this.panel1.Controls.Add(this.DimsBox);
-            this.panel1.Controls.Add(this.label12);
-            this.panel1.Controls.Add(this.MovesLbl);
-            this.panel1.Controls.Add(this.label11);
-            this.panel1.Controls.Add(this.StateBox);
-            this.panel1.Controls.Add(this.TransparencyBox);
-            this.panel1.Controls.Add(this.SolutionLbl);
-            this.panel1.Controls.Add(this.label10);
-            this.panel1.Controls.Add(this.IterTimeBox);
-            this.panel1.Controls.Add(this.PauseBtn);
-            this.panel1.Controls.Add(this.label9);
-            this.panel1.Controls.Add(this.SlicesBox);
-            this.panel1.Controls.Add(this.label8);
-            this.panel1.Controls.Add(this.label7);
-            this.panel1.Controls.Add(this.label6);
-            this.panel1.Controls.Add(this.label5);
-            this.panel1.Controls.Add(this.chart1);
-            this.panel1.Controls.Add(this.label4);
-            this.panel1.Controls.Add(this.label3);
-            this.panel1.Controls.Add(this.label2);
-            this.panel1.Controls.Add(this.button2);
-            this.panel1.Controls.Add(this.label1);
-            this.panel1.Controls.Add(this.button1);
-            this.panel1.Dock = System.Windows.Forms.DockStyle.Left;
-            this.panel1.Location = new System.Drawing.Point(0, 28);
-            this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(498, 790);
-            this.panel1.TabIndex = 8;
+            panel1.Controls.Add(chart2);
+            panel1.Controls.Add(SeqCountLbl);
+            panel1.Controls.Add(label13);
+            panel1.Controls.Add(DimsBox);
+            panel1.Controls.Add(label12);
+            panel1.Controls.Add(MovesLbl);
+            panel1.Controls.Add(label11);
+            panel1.Controls.Add(StateBox);
+            panel1.Controls.Add(TransparencyBox);
+            panel1.Controls.Add(SolutionLbl);
+            panel1.Controls.Add(label10);
+            panel1.Controls.Add(IterTimeBox);
+            panel1.Controls.Add(PauseBtn);
+            panel1.Controls.Add(label9);
+            panel1.Controls.Add(SlicesBox);
+            panel1.Controls.Add(label8);
+            panel1.Controls.Add(label7);
+            panel1.Controls.Add(label6);
+            panel1.Controls.Add(label5);
+            panel1.Controls.Add(chart1);
+            panel1.Controls.Add(label4);
+            panel1.Controls.Add(label3);
+            panel1.Controls.Add(label2);
+            panel1.Controls.Add(button2);
+            panel1.Controls.Add(label1);
+            panel1.Controls.Add(button1);
+            panel1.Dock = System.Windows.Forms.DockStyle.Left;
+            panel1.Location = new System.Drawing.Point(0, 28);
+            panel1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            panel1.Name = "panel1";
+            panel1.Size = new System.Drawing.Size(498, 994);
+            panel1.TabIndex = 8;
             // 
             // chart2
             // 
             chartArea1.AxisX.Title = "iteration";
             chartArea1.AxisY.Title = "error";
             chartArea1.Name = "ChartArea1";
-            this.chart2.ChartAreas.Add(chartArea1);
-            this.chart2.Location = new System.Drawing.Point(250, 132);
-            this.chart2.Name = "chart2";
+            chart2.ChartAreas.Add(chartArea1);
+            chart2.Location = new System.Drawing.Point(250, 165);
+            chart2.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            chart2.Name = "chart2";
             series1.ChartArea = "ChartArea1";
             series1.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
             series1.Name = "Series1";
-            this.chart2.Series.Add(series1);
-            this.chart2.Size = new System.Drawing.Size(244, 269);
-            this.chart2.TabIndex = 37;
-            this.chart2.Text = "chart2";
+            chart2.Series.Add(series1);
+            chart2.Size = new System.Drawing.Size(244, 336);
+            chart2.TabIndex = 37;
+            chart2.Text = "chart2";
             // 
             // SeqCountLbl
             // 
-            this.SeqCountLbl.AutoSize = true;
-            this.SeqCountLbl.Location = new System.Drawing.Point(337, 404);
-            this.SeqCountLbl.Name = "SeqCountLbl";
-            this.SeqCountLbl.Size = new System.Drawing.Size(69, 16);
-            this.SeqCountLbl.TabIndex = 36;
-            this.SeqCountLbl.Text = "SeqCount:";
+            SeqCountLbl.AutoSize = true;
+            SeqCountLbl.Location = new System.Drawing.Point(337, 505);
+            SeqCountLbl.Name = "SeqCountLbl";
+            SeqCountLbl.Size = new System.Drawing.Size(76, 20);
+            SeqCountLbl.TabIndex = 36;
+            SeqCountLbl.Text = "SeqCount:";
             // 
             // label13
             // 
-            this.label13.AutoSize = true;
-            this.label13.Location = new System.Drawing.Point(299, 9);
-            this.label13.Name = "label13";
-            this.label13.Size = new System.Drawing.Size(94, 16);
-            this.label13.TabIndex = 35;
-            this.label13.Text = "Transparency:";
+            label13.AutoSize = true;
+            label13.Location = new System.Drawing.Point(299, 11);
+            label13.Name = "label13";
+            label13.Size = new System.Drawing.Size(98, 20);
+            label13.TabIndex = 35;
+            label13.Text = "Transparency:";
             // 
             // DimsBox
             // 
-            this.DimsBox.Location = new System.Drawing.Point(88, 7);
-            this.DimsBox.Minimum = new decimal(new int[] {
-            1,
-            0,
-            0,
-            0});
-            this.DimsBox.Name = "DimsBox";
-            this.DimsBox.Size = new System.Drawing.Size(64, 22);
-            this.DimsBox.TabIndex = 34;
-            this.DimsBox.Value = new decimal(new int[] {
-            3,
-            0,
-            0,
-            0});
-            this.DimsBox.ValueChanged += new System.EventHandler(this.numericUpDown2_ValueChanged);
+            DimsBox.Location = new System.Drawing.Point(88, 9);
+            DimsBox.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            DimsBox.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            DimsBox.Name = "DimsBox";
+            DimsBox.Size = new System.Drawing.Size(64, 27);
+            DimsBox.TabIndex = 34;
+            DimsBox.Value = new decimal(new int[] { 3, 0, 0, 0 });
+            DimsBox.ValueChanged += numericUpDown2_ValueChanged;
             // 
             // label12
             // 
-            this.label12.AutoSize = true;
-            this.label12.Location = new System.Drawing.Point(12, 9);
-            this.label12.Name = "label12";
-            this.label12.Size = new System.Drawing.Size(74, 16);
-            this.label12.TabIndex = 33;
-            this.label12.Text = "Dimension:";
-            this.label12.Click += new System.EventHandler(this.label12_Click);
+            label12.AutoSize = true;
+            label12.Location = new System.Drawing.Point(12, 11);
+            label12.Name = "label12";
+            label12.Size = new System.Drawing.Size(83, 20);
+            label12.TabIndex = 33;
+            label12.Text = "Dimension:";
+            label12.Click += label12_Click;
             // 
             // MovesLbl
             // 
-            this.MovesLbl.AutoSize = true;
-            this.MovesLbl.Location = new System.Drawing.Point(362, 89);
-            this.MovesLbl.Name = "MovesLbl";
-            this.MovesLbl.Size = new System.Drawing.Size(14, 16);
-            this.MovesLbl.TabIndex = 32;
-            this.MovesLbl.Text = "0";
+            MovesLbl.AutoSize = true;
+            MovesLbl.Location = new System.Drawing.Point(362, 111);
+            MovesLbl.Name = "MovesLbl";
+            MovesLbl.Size = new System.Drawing.Size(17, 20);
+            MovesLbl.TabIndex = 32;
+            MovesLbl.Text = "0";
             // 
             // label11
             // 
-            this.label11.AutoSize = true;
-            this.label11.Location = new System.Drawing.Point(256, 89);
-            this.label11.Name = "label11";
-            this.label11.Size = new System.Drawing.Size(85, 16);
-            this.label11.TabIndex = 31;
-            this.label11.Text = "Moves Count";
+            label11.AutoSize = true;
+            label11.Location = new System.Drawing.Point(256, 111);
+            label11.Name = "label11";
+            label11.Size = new System.Drawing.Size(95, 20);
+            label11.TabIndex = 31;
+            label11.Text = "Moves Count";
             // 
             // StateBox
             // 
-            this.StateBox.BackColor = System.Drawing.Color.Black;
-            this.StateBox.Location = new System.Drawing.Point(43, 428);
-            this.StateBox.Name = "StateBox";
-            this.StateBox.Size = new System.Drawing.Size(350, 350);
-            this.StateBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;
-            this.StateBox.TabIndex = 30;
-            this.StateBox.TabStop = false;
-            this.StateBox.Paint += new System.Windows.Forms.PaintEventHandler(this.StateBox_Paint);
+            StateBox.BackColor = System.Drawing.Color.Black;
+            StateBox.Location = new System.Drawing.Point(43, 535);
+            StateBox.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            StateBox.Name = "StateBox";
+            StateBox.Size = new System.Drawing.Size(350, 438);
+            StateBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;
+            StateBox.TabIndex = 30;
+            StateBox.TabStop = false;
+            StateBox.Paint += StateBox_Paint;
             // 
             // TransparencyBox
             // 
-            this.TransparencyBox.AutoSize = true;
-            this.TransparencyBox.Location = new System.Drawing.Point(399, 10);
-            this.TransparencyBox.Name = "TransparencyBox";
-            this.TransparencyBox.Size = new System.Drawing.Size(18, 17);
-            this.TransparencyBox.TabIndex = 29;
-            this.TransparencyBox.UseVisualStyleBackColor = true;
-            this.TransparencyBox.CheckedChanged += new System.EventHandler(this.TransparencyBox_CheckedChanged);
+            TransparencyBox.AutoSize = true;
+            TransparencyBox.Location = new System.Drawing.Point(399, 12);
+            TransparencyBox.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            TransparencyBox.Name = "TransparencyBox";
+            TransparencyBox.Size = new System.Drawing.Size(18, 17);
+            TransparencyBox.TabIndex = 29;
+            TransparencyBox.UseVisualStyleBackColor = true;
+            TransparencyBox.CheckedChanged += TransparencyBox_CheckedChanged;
             // 
             // SolutionLbl
             // 
-            this.SolutionLbl.AutoSize = true;
-            this.SolutionLbl.Location = new System.Drawing.Point(362, 113);
-            this.SolutionLbl.Name = "SolutionLbl";
-            this.SolutionLbl.Size = new System.Drawing.Size(14, 16);
-            this.SolutionLbl.TabIndex = 28;
-            this.SolutionLbl.Text = "0";
+            SolutionLbl.AutoSize = true;
+            SolutionLbl.Location = new System.Drawing.Point(362, 141);
+            SolutionLbl.Name = "SolutionLbl";
+            SolutionLbl.Size = new System.Drawing.Size(17, 20);
+            SolutionLbl.TabIndex = 28;
+            SolutionLbl.Text = "0";
             // 
             // label10
             // 
-            this.label10.AutoSize = true;
-            this.label10.Location = new System.Drawing.Point(256, 113);
-            this.label10.Name = "label10";
-            this.label10.Size = new System.Drawing.Size(92, 16);
-            this.label10.TabIndex = 27;
-            this.label10.Text = "Solution Count";
+            label10.AutoSize = true;
+            label10.Location = new System.Drawing.Point(256, 141);
+            label10.Name = "label10";
+            label10.Size = new System.Drawing.Size(107, 20);
+            label10.TabIndex = 27;
+            label10.Text = "Solution Count";
             // 
             // IterTimeBox
             // 
-            this.IterTimeBox.AutoSize = true;
-            this.IterTimeBox.Location = new System.Drawing.Point(243, 404);
-            this.IterTimeBox.Name = "IterTimeBox";
-            this.IterTimeBox.Size = new System.Drawing.Size(56, 16);
-            this.IterTimeBox.TabIndex = 26;
-            this.IterTimeBox.Text = "Iter time:";
+            IterTimeBox.AutoSize = true;
+            IterTimeBox.Location = new System.Drawing.Point(243, 505);
+            IterTimeBox.Name = "IterTimeBox";
+            IterTimeBox.Size = new System.Drawing.Size(68, 20);
+            IterTimeBox.TabIndex = 26;
+            IterTimeBox.Text = "Iter time:";
             // 
             // PauseBtn
             // 
-            this.PauseBtn.Location = new System.Drawing.Point(239, 37);
-            this.PauseBtn.Name = "PauseBtn";
-            this.PauseBtn.Size = new System.Drawing.Size(90, 39);
-            this.PauseBtn.TabIndex = 23;
-            this.PauseBtn.Text = "Pause";
-            this.PauseBtn.UseVisualStyleBackColor = true;
-            this.PauseBtn.Click += new System.EventHandler(this.button3_Click_1);
+            PauseBtn.Location = new System.Drawing.Point(239, 46);
+            PauseBtn.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            PauseBtn.Name = "PauseBtn";
+            PauseBtn.Size = new System.Drawing.Size(90, 49);
+            PauseBtn.TabIndex = 23;
+            PauseBtn.Text = "Pause";
+            PauseBtn.UseVisualStyleBackColor = true;
+            PauseBtn.Click += button3_Click_1;
             // 
             // label9
             // 
-            this.label9.AutoSize = true;
-            this.label9.Location = new System.Drawing.Point(171, 9);
-            this.label9.Name = "label9";
-            this.label9.Size = new System.Drawing.Size(47, 16);
-            this.label9.TabIndex = 22;
-            this.label9.Text = "Slices:";
+            label9.AutoSize = true;
+            label9.Location = new System.Drawing.Point(171, 11);
+            label9.Name = "label9";
+            label9.Size = new System.Drawing.Size(49, 20);
+            label9.TabIndex = 22;
+            label9.Text = "Slices:";
             // 
             // SlicesBox
             // 
-            this.SlicesBox.Location = new System.Drawing.Point(224, 7);
-            this.SlicesBox.Minimum = new decimal(new int[] {
-            1,
-            0,
-            0,
-            0});
-            this.SlicesBox.Name = "SlicesBox";
-            this.SlicesBox.Size = new System.Drawing.Size(64, 22);
-            this.SlicesBox.TabIndex = 21;
-            this.SlicesBox.Value = new decimal(new int[] {
-            3,
-            0,
-            0,
-            0});
-            this.SlicesBox.ValueChanged += new System.EventHandler(this.numericUpDown1_ValueChanged);
+            SlicesBox.Location = new System.Drawing.Point(224, 9);
+            SlicesBox.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            SlicesBox.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            SlicesBox.Name = "SlicesBox";
+            SlicesBox.Size = new System.Drawing.Size(64, 27);
+            SlicesBox.TabIndex = 21;
+            SlicesBox.Value = new decimal(new int[] { 3, 0, 0, 0 });
+            SlicesBox.ValueChanged += numericUpDown1_ValueChanged;
             // 
             // label8
             // 
-            this.label8.AutoSize = true;
-            this.label8.Location = new System.Drawing.Point(33, 113);
-            this.label8.Name = "label8";
-            this.label8.Size = new System.Drawing.Size(35, 16);
-            this.label8.TabIndex = 20;
-            this.label8.Text = "time:";
+            label8.AutoSize = true;
+            label8.Location = new System.Drawing.Point(33, 141);
+            label8.Name = "label8";
+            label8.Size = new System.Drawing.Size(42, 20);
+            label8.TabIndex = 20;
+            label8.Text = "time:";
             // 
             // label7
             // 
-            this.label7.AutoSize = true;
-            this.label7.Location = new System.Drawing.Point(28, 89);
-            this.label7.Name = "label7";
-            this.label7.Size = new System.Drawing.Size(38, 16);
-            this.label7.TabIndex = 19;
-            this.label7.Text = "error:";
+            label7.AutoSize = true;
+            label7.Location = new System.Drawing.Point(28, 111);
+            label7.Name = "label7";
+            label7.Size = new System.Drawing.Size(44, 20);
+            label7.TabIndex = 19;
+            label7.Text = "error:";
             // 
             // label6
             // 
-            this.label6.AutoSize = true;
-            this.label6.Location = new System.Drawing.Point(171, 404);
-            this.label6.Name = "label6";
-            this.label6.Size = new System.Drawing.Size(44, 16);
-            this.label6.TabIndex = 18;
-            this.label6.Text = "label6";
+            label6.AutoSize = true;
+            label6.Location = new System.Drawing.Point(171, 505);
+            label6.Name = "label6";
+            label6.Size = new System.Drawing.Size(50, 20);
+            label6.TabIndex = 18;
+            label6.Text = "label6";
             // 
             // label5
             // 
-            this.label5.AutoSize = true;
-            this.label5.Location = new System.Drawing.Point(136, 404);
-            this.label5.Name = "label5";
-            this.label5.Size = new System.Drawing.Size(35, 16);
-            this.label5.TabIndex = 17;
-            this.label5.Text = "iters:";
+            label5.AutoSize = true;
+            label5.Location = new System.Drawing.Point(136, 505);
+            label5.Name = "label5";
+            label5.Size = new System.Drawing.Size(40, 20);
+            label5.TabIndex = 17;
+            label5.Text = "iters:";
             // 
             // chart1
             // 
             chartArea2.AxisX.Title = "iteration";
             chartArea2.AxisY.Title = "error";
             chartArea2.Name = "ChartArea1";
-            this.chart1.ChartAreas.Add(chartArea2);
-            this.chart1.Location = new System.Drawing.Point(0, 132);
-            this.chart1.Name = "chart1";
+            chart1.ChartAreas.Add(chartArea2);
+            chart1.Location = new System.Drawing.Point(0, 165);
+            chart1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            chart1.Name = "chart1";
             series2.ChartArea = "ChartArea1";
             series2.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
             series2.Name = "Series1";
-            this.chart1.Series.Add(series2);
-            this.chart1.Size = new System.Drawing.Size(244, 269);
-            this.chart1.TabIndex = 14;
-            this.chart1.Text = "chart1";
+            chart1.Series.Add(series2);
+            chart1.Size = new System.Drawing.Size(244, 336);
+            chart1.TabIndex = 14;
+            chart1.Text = "chart1";
             // 
             // label4
             // 
-            this.label4.AutoSize = true;
-            this.label4.Location = new System.Drawing.Point(59, 404);
-            this.label4.Name = "label4";
-            this.label4.Size = new System.Drawing.Size(44, 16);
-            this.label4.TabIndex = 13;
-            this.label4.Text = "label4";
+            label4.AutoSize = true;
+            label4.Location = new System.Drawing.Point(59, 505);
+            label4.Name = "label4";
+            label4.Size = new System.Drawing.Size(50, 20);
+            label4.TabIndex = 13;
+            label4.Text = "label4";
             // 
             // label3
             // 
-            this.label3.AutoSize = true;
-            this.label3.Location = new System.Drawing.Point(3, 404);
-            this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(46, 16);
-            this.label3.TabIndex = 12;
-            this.label3.Text = "states:";
+            label3.AutoSize = true;
+            label3.Location = new System.Drawing.Point(3, 505);
+            label3.Name = "label3";
+            label3.Size = new System.Drawing.Size(50, 20);
+            label3.TabIndex = 12;
+            label3.Text = "states:";
             // 
             // label2
             // 
-            this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(77, 89);
-            this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(44, 16);
-            this.label2.TabIndex = 11;
-            this.label2.Text = "label2";
+            label2.AutoSize = true;
+            label2.Location = new System.Drawing.Point(77, 111);
+            label2.Name = "label2";
+            label2.Size = new System.Drawing.Size(50, 20);
+            label2.TabIndex = 11;
+            label2.Text = "label2";
             // 
             // button2
             // 
-            this.button2.Location = new System.Drawing.Point(16, 37);
-            this.button2.Name = "button2";
-            this.button2.Size = new System.Drawing.Size(89, 39);
-            this.button2.TabIndex = 10;
-            this.button2.Text = "Shuffle";
-            this.button2.UseVisualStyleBackColor = true;
-            this.button2.Click += new System.EventHandler(this.button2_Click);
+            button2.Location = new System.Drawing.Point(16, 46);
+            button2.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            button2.Name = "button2";
+            button2.Size = new System.Drawing.Size(89, 49);
+            button2.TabIndex = 10;
+            button2.Text = "Shuffle";
+            button2.UseVisualStyleBackColor = true;
+            button2.Click += button2_Click;
             // 
             // label1
             // 
-            this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(77, 113);
-            this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(44, 16);
-            this.label1.TabIndex = 9;
-            this.label1.Text = "label1";
+            label1.AutoSize = true;
+            label1.Location = new System.Drawing.Point(77, 141);
+            label1.Name = "label1";
+            label1.Size = new System.Drawing.Size(50, 20);
+            label1.TabIndex = 9;
+            label1.Text = "label1";
             // 
             // button1
             // 
-            this.button1.Location = new System.Drawing.Point(125, 37);
-            this.button1.Name = "button1";
-            this.button1.Size = new System.Drawing.Size(90, 39);
-            this.button1.TabIndex = 8;
-            this.button1.Text = "Solve!";
-            this.button1.UseVisualStyleBackColor = true;
-            this.button1.Click += new System.EventHandler(this.button1_Click);
+            button1.Location = new System.Drawing.Point(125, 46);
+            button1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            button1.Name = "button1";
+            button1.Size = new System.Drawing.Size(90, 49);
+            button1.TabIndex = 8;
+            button1.Text = "Solve!";
+            button1.UseVisualStyleBackColor = true;
+            button1.Click += button1_Click;
             // 
             // menuStrip1
             // 
-            this.menuStrip1.ImageScalingSize = new System.Drawing.Size(20, 20);
-            this.menuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.fileToolStripMenuItem});
-            this.menuStrip1.Location = new System.Drawing.Point(0, 0);
-            this.menuStrip1.Name = "menuStrip1";
-            this.menuStrip1.Size = new System.Drawing.Size(1202, 28);
-            this.menuStrip1.TabIndex = 9;
-            this.menuStrip1.Text = "menuStrip1";
+            menuStrip1.ImageScalingSize = new System.Drawing.Size(20, 20);
+            menuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { fileToolStripMenuItem });
+            menuStrip1.Location = new System.Drawing.Point(0, 0);
+            menuStrip1.Name = "menuStrip1";
+            menuStrip1.Size = new System.Drawing.Size(1202, 28);
+            menuStrip1.TabIndex = 9;
+            menuStrip1.Text = "menuStrip1";
             // 
             // fileToolStripMenuItem
             // 
-            this.fileToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.openToolStripMenuItem,
-            this.saveToolStripMenuItem,
-            this.saveClustersToolStripMenuItem,
-            this.showClusterToolStripMenuItem,
-            this.makeMovesToolStripMenuItem,
-            this.undoMovesToolStripMenuItem});
-            this.fileToolStripMenuItem.Name = "fileToolStripMenuItem";
-            this.fileToolStripMenuItem.Size = new System.Drawing.Size(46, 24);
-            this.fileToolStripMenuItem.Text = "File";
+            fileToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { openToolStripMenuItem, saveToolStripMenuItem, saveClustersToolStripMenuItem, showClusterToolStripMenuItem, makeMovesToolStripMenuItem, undoMovesToolStripMenuItem });
+            fileToolStripMenuItem.Name = "fileToolStripMenuItem";
+            fileToolStripMenuItem.Size = new System.Drawing.Size(46, 24);
+            fileToolStripMenuItem.Text = "File";
             // 
             // openToolStripMenuItem
             // 
-            this.openToolStripMenuItem.Name = "openToolStripMenuItem";
-            this.openToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
-            this.openToolStripMenuItem.Text = "Open";
-            this.openToolStripMenuItem.Click += new System.EventHandler(this.openToolStripMenuItem_Click);
+            openToolStripMenuItem.Name = "openToolStripMenuItem";
+            openToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
+            openToolStripMenuItem.Text = "Open";
+            openToolStripMenuItem.Click += openToolStripMenuItem_Click;
             // 
             // saveToolStripMenuItem
             // 
-            this.saveToolStripMenuItem.Name = "saveToolStripMenuItem";
-            this.saveToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
-            this.saveToolStripMenuItem.Text = "Save";
-            this.saveToolStripMenuItem.Click += new System.EventHandler(this.saveToolStripMenuItem_Click);
+            saveToolStripMenuItem.Name = "saveToolStripMenuItem";
+            saveToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
+            saveToolStripMenuItem.Text = "Save";
+            saveToolStripMenuItem.Click += saveToolStripMenuItem_Click;
             // 
             // saveClustersToolStripMenuItem
             // 
-            this.saveClustersToolStripMenuItem.Name = "saveClustersToolStripMenuItem";
-            this.saveClustersToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
-            this.saveClustersToolStripMenuItem.Text = "Save Clusters";
-            this.saveClustersToolStripMenuItem.Click += new System.EventHandler(this.saveClustersToolStripMenuItem_Click);
+            saveClustersToolStripMenuItem.Name = "saveClustersToolStripMenuItem";
+            saveClustersToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
+            saveClustersToolStripMenuItem.Text = "Save Clusters";
+            saveClustersToolStripMenuItem.Click += saveClustersToolStripMenuItem_Click;
             // 
             // showClusterToolStripMenuItem
             // 
-            this.showClusterToolStripMenuItem.Name = "showClusterToolStripMenuItem";
-            this.showClusterToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
-            this.showClusterToolStripMenuItem.Text = "Show Cluster";
-            this.showClusterToolStripMenuItem.Click += new System.EventHandler(this.showClusterToolStripMenuItem_Click);
+            showClusterToolStripMenuItem.Name = "showClusterToolStripMenuItem";
+            showClusterToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
+            showClusterToolStripMenuItem.Text = "Show Cluster";
+            showClusterToolStripMenuItem.Click += showClusterToolStripMenuItem_Click;
             // 
             // makeMovesToolStripMenuItem
             // 
-            this.makeMovesToolStripMenuItem.Name = "makeMovesToolStripMenuItem";
-            this.makeMovesToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
+            makeMovesToolStripMenuItem.Name = "makeMovesToolStripMenuItem";
+            makeMovesToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
             // 
             // undoMovesToolStripMenuItem
             // 
-            this.undoMovesToolStripMenuItem.Name = "undoMovesToolStripMenuItem";
-            this.undoMovesToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
-            this.undoMovesToolStripMenuItem.Text = "Undo Moves";
-            this.undoMovesToolStripMenuItem.Click += new System.EventHandler(this.undoMovesToolStripMenuItem_Click);
+            undoMovesToolStripMenuItem.Name = "undoMovesToolStripMenuItem";
+            undoMovesToolStripMenuItem.Size = new System.Drawing.Size(178, 26);
+            undoMovesToolStripMenuItem.Text = "Undo Moves";
+            undoMovesToolStripMenuItem.Click += undoMovesToolStripMenuItem_Click;
             // 
             // pictureBox1
             // 
-            this.pictureBox1.Location = new System.Drawing.Point(1004, 28);
-            this.pictureBox1.Name = "pictureBox1";
-            this.pictureBox1.Size = new System.Drawing.Size(157, 151);
-            this.pictureBox1.TabIndex = 10;
-            this.pictureBox1.TabStop = false;
-            this.pictureBox1.Visible = false;
+            pictureBox1.Location = new System.Drawing.Point(1004, 35);
+            pictureBox1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            pictureBox1.Name = "pictureBox1";
+            pictureBox1.Size = new System.Drawing.Size(157, 189);
+            pictureBox1.TabIndex = 10;
+            pictureBox1.TabStop = false;
+            pictureBox1.Visible = false;
             // 
             // openFileDialog1
             // 
-            this.openFileDialog1.FileName = "openFileDialog1";
+            openFileDialog1.FileName = "openFileDialog1";
             // 
             // stateGridBindingSource
             // 
-            this.stateGridBindingSource.DataMember = "StateGrid";
-            this.stateGridBindingSource.DataSource = this.tRubikCubeBindingSource;
+            stateGridBindingSource.DataMember = "StateGrid";
+            stateGridBindingSource.DataSource = tRubikCubeBindingSource;
             // 
             // tRubikCubeBindingSource
             // 
-            this.tRubikCubeBindingSource.DataSource = typeof(RubikCube.TRubikCube);
+            tRubikCubeBindingSource.DataSource = typeof(TRubikCube);
             // 
             // tglView1
             // 
-            this.tglView1.BackColor = System.Drawing.Color.White;
-            this.tglView1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.tglView1.Location = new System.Drawing.Point(498, 28);
-            this.tglView1.Name = "tglView1";
-            this.tglView1.Size = new System.Drawing.Size(704, 790);
-            this.tglView1.TabIndex = 0;
-            this.tglView1.MouseDown += new System.Windows.Forms.MouseEventHandler(this.tglView1_MouseDown);
-            this.tglView1.MouseMove += new System.Windows.Forms.MouseEventHandler(this.tglView1_MouseMove);
+            tglView1.BackColor = System.Drawing.Color.White;
+            tglView1.Dock = System.Windows.Forms.DockStyle.Fill;
+            tglView1.Location = new System.Drawing.Point(498, 28);
+            tglView1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            tglView1.Name = "tglView1";
+            tglView1.Size = new System.Drawing.Size(704, 994);
+            tglView1.TabIndex = 0;
+            tglView1.MouseDown += tglView1_MouseDown;
+            tglView1.MouseMove += tglView1_MouseMove;
             // 
             // TRubikForm
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1202, 818);
-            this.Controls.Add(this.pictureBox1);
-            this.Controls.Add(this.tglView1);
-            this.Controls.Add(this.panel1);
-            this.Controls.Add(this.menuStrip1);
-            this.MainMenuStrip = this.menuStrip1;
-            this.Name = "TRubikForm";
-            this.Text = "Rubik\'s Cube";
-            this.Load += new System.EventHandler(this.TRubikForm_Load);
-            this.panel1.ResumeLayout(false);
-            this.panel1.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.chart2)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.DimsBox)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.StateBox)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.SlicesBox)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.chart1)).EndInit();
-            this.menuStrip1.ResumeLayout(false);
-            this.menuStrip1.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.stateGridBindingSource)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.tRubikCubeBindingSource)).EndInit();
-            this.ResumeLayout(false);
-            this.PerformLayout();
+            AutoScaleDimensions = new System.Drawing.SizeF(8F, 20F);
+            AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            ClientSize = new System.Drawing.Size(1202, 1022);
+            Controls.Add(pictureBox1);
+            Controls.Add(tglView1);
+            Controls.Add(panel1);
+            Controls.Add(menuStrip1);
+            MainMenuStrip = menuStrip1;
+            Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            Name = "TRubikForm";
+            Text = "Rubik's Cube";
+            FormClosed += TRubikForm_FormClosed;
+            Load += TRubikForm_Load;
+            panel1.ResumeLayout(false);
+            panel1.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)chart2).EndInit();
+            ((System.ComponentModel.ISupportInitialize)DimsBox).EndInit();
+            ((System.ComponentModel.ISupportInitialize)StateBox).EndInit();
+            ((System.ComponentModel.ISupportInitialize)SlicesBox).EndInit();
+            ((System.ComponentModel.ISupportInitialize)chart1).EndInit();
+            menuStrip1.ResumeLayout(false);
+            menuStrip1.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)pictureBox1).EndInit();
+            ((System.ComponentModel.ISupportInitialize)stateGridBindingSource).EndInit();
+            ((System.ComponentModel.ISupportInitialize)tRubikCubeBindingSource).EndInit();
+            ResumeLayout(false);
+            PerformLayout();
 
         }
 

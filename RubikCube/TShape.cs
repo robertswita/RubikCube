@@ -17,7 +17,7 @@ namespace TGL
     public class TShape
     {
         public bool Selected;
-        public float Transparency = 1;
+        public virtual float Transparency { get; set; } = 1.0f;
         public List<TVector> Vertices = new List<TVector>();
         public List<int> Faces = new List<int>();
         public List<TShape> Children = new List<TShape>();
@@ -36,17 +36,17 @@ namespace TGL
                 _Parent?.Children.Add(this);
             }
         }
-        //public TAffine Transform = new TAffine();
-        TAffine transform = new TAffine();
-        public TAffine Transform
-        {
-            get { return transform; }
-            set
-            {
-                transform = value;
-                //EulerAngles = transform.GetEulerAngles();
-            }
-        }
+        public TAffine Transform = new TAffine();
+        //TAffine transform = new TAffine();
+        //public TAffine Transform
+        //{
+        //    get { return transform; }
+        //    set
+        //    {
+        //        transform = value;
+        //        //EulerAngles = transform.GetEulerAngles();
+        //    }
+        //}
         public TAffine WorldTransform = new TAffine();
         //public TVector Origin
         //{

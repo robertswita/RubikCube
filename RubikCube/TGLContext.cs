@@ -1,32 +1,31 @@
-﻿﻿/**********************************************************
+/**********************************************************
 Autor: Robert Świta
 Politechnika Koszalińska
 Katedra Systemów Multimedialnych i Sztucznej inteligencji
 ***********************************************************/
+using GA;
+using RubikCube;
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Drawing;
-using System.Windows.Forms;
 using System.Drawing.Imaging;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using System.Windows.Forms;
 
 namespace TGL
 {
-    public class TGLContext
+    public unsafe class TGLContext
     {
         public TGLView View;
         IntPtr HDC;
         IntPtr HRC;
-        Win32.PIXELFORMATDESCRIPTOR pfd;
         public Rectangle Viewport;
         public TShape Root = new TShape();
         public TAffine Transform = new TAffine();
-        public int[] SsboCubies = new int[1];
-        public int[] SsboActiveCubies = new int[1];
-        public int[] SsboSolvedCubies = new int[1];
-        public int[] SsboWorkCubies = new int[1];
-        public int[] SsboPlanes = new int[1];
-        public int[] SsboPopulation = new int[1];
+
         public IntPtr Handle
         {
             get
@@ -34,57 +33,16 @@ namespace TGL
                 if (HRC == IntPtr.Zero)
                 {
                     HDC = View.CreateGraphics().GetHdc();
-                    pfd = new Win32.PIXELFORMATDESCRIPTOR();
-                    var idx = Win32.ChoosePixelFormat(HDC, pfd);
-                    Win32.SetPixelFormat(HDC, idx, pfd);
+                    var pfd = Win32.PIXELFORMATDESCRIPTOR.CreateDefault();
+                    var idx = Win32.ChoosePixelFormat(HDC, &pfd);
+                    Win32.SetPixelFormat(HDC, idx, &pfd);
                     HRC = Win32.wglCreateContext(HDC);
                     Win32.wglMakeCurrent(HDC, HRC);
-
-                    var gpuProgram = OpenGL.CreateProgram();
-                    OpenGL.AttachShader(gpuProgram, CreateShader(OpenGL.GL_COMPUTE_SHADER));
-                    //OpenGL.AttachShader(gpuProgram, CreateShader(OpenGL.GL_VERTEX_SHADER));
-                    //OpenGL.AttachShader(gpuProgram, CreateShader(OpenGL.GL_FRAGMENT_SHADER));
-                    OpenGL.LinkProgram(gpuProgram);
-                    OpenGL.UseProgram(gpuProgram);
-                    OpenGL.GenBuffers(1, SsboCubies);
-                    OpenGL.BindBufferBase(OpenGL.GL_SHADER_STORAGE_BUFFER, 0, SsboCubies[0]);
-                    OpenGL.GenBuffers(1, SsboActiveCubies);
-                    OpenGL.BindBufferBase(OpenGL.GL_SHADER_STORAGE_BUFFER, 1, SsboActiveCubies[0]);
-                    OpenGL.GenBuffers(1, SsboSolvedCubies);
-                    OpenGL.BindBufferBase(OpenGL.GL_SHADER_STORAGE_BUFFER, 2, SsboSolvedCubies[0]);
-                    //OpenGL.GenBuffers(1, SsboWorkCubies);
-                    //OpenGL.BindBufferBase(OpenGL.GL_SHADER_STORAGE_BUFFER, 3, SsboWorkCubies[0]);
-                    OpenGL.GenBuffers(1, SsboPlanes);
-                    OpenGL.BindBufferBase(OpenGL.GL_SHADER_STORAGE_BUFFER, 4, SsboPlanes[0]);
-                    OpenGL.GenBuffers(1, SsboPopulation);
-                    OpenGL.BindBufferBase(OpenGL.GL_SHADER_STORAGE_BUFFER, 5, SsboPopulation[0]);
+                    Gpu.Init();   // build the shared GPU-GA pipeline while this context is current
                 }
                 return HRC;
             }
         }
-
-        int CreateShader(int shaderType)
-        {
-            var shader = OpenGL.CreateShader(shaderType);
-            if (shaderType == OpenGL.GL_VERTEX_SHADER)
-                OpenGL.ShaderSource(shader, RubikCube.Properties.Resources.Vertex_glsl);
-            else if(shaderType == OpenGL.GL_FRAGMENT_SHADER)
-                OpenGL.ShaderSource(shader, RubikCube.Properties.Resources.Fragment_glsl);
-            else
-                OpenGL.ShaderSource(shader, RubikCube.Properties.Resources.Evaluate_glsl);
-            OpenGL.CompileShader(shader);
-            var status = new int[1];
-            OpenGL.GetShader(shader, OpenGL.GL_COMPILE_STATUS, status);
-            if (status[0] == 0)
-            {
-                var maxLength = new int[1];
-                OpenGL.GetShader(shader, OpenGL.GL_INFO_LOG_LENGTH, maxLength);
-                var log = new StringBuilder(maxLength[0]);
-                OpenGL.GetShaderInfoLog(shader, maxLength[0], IntPtr.Zero, log);
-            }
-            return shader;
-        }
-
 
         internal void DrawView()
         {
@@ -93,9 +51,9 @@ namespace TGL
                 Viewport = View.ClientRectangle;
                 var backColor = View.BackColor;
                 Win32.wglMakeCurrent(HDC, HRC);
-                OpenGL.glClearColor(backColor.R / 255f, backColor.G / 255f, backColor.B / 255f, 1);
-                OpenGL.glClear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
-                OpenGL.glViewport(Viewport.Left, Viewport.Top, Viewport.Width, Viewport.Height);
+                OpenGL.ClearColor(backColor.R / 255f, backColor.G / 255f, backColor.B / 255f, 1);
+                OpenGL.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
+                OpenGL.Viewport(Viewport.Left, Viewport.Top, Viewport.Width, Viewport.Height);
                 Init();
                 //SetupCamera();
                 DrawScene();
@@ -142,22 +100,22 @@ namespace TGL
                 childrenList.Sort(ZOrderComparer);
             for (int i = 0; i < obj.Children.Count; i++)
                 DrawObject(childrenList[i]);
-            OpenGL.glBegin(OpenGL.GL_QUADS);
+            OpenGL.Begin(OpenGL.GL_QUADS);
             for (int i = 0; i < obj.Faces.Count; i++)
             {
                 var v = obj.Vertices[obj.Faces[i]];
                 if (i % 4 == 0)
                 {
                     var color = obj.Colors[i / 4];
-                    OpenGL.glColor4ub(color.R, color.G, color.B, (byte)(255 * obj.Transparency));
+                    OpenGL.Color4ub(color.R, color.G, color.B, (byte)(255 * obj.Transparency));
                 }
                 v = Transform * v;
                 if (v.Size == 2)
-                    OpenGL.glVertex2f(v.X, v.Y);
+                    OpenGL.Vertex2f(v.X, v.Y);
                 else
-                    OpenGL.glVertex3f(v.X, v.Y, v.Z);
+                    OpenGL.Vertex3f(v.X, v.Y, v.Z);
             }
-            OpenGL.glEnd();
+            OpenGL.End();
             Transform = transform;
         }
 
@@ -186,7 +144,7 @@ namespace TGL
         {
             if (!IsInited)
             {
-                OpenGL.glEnable(OpenGL.GL_DEPTH_TEST);
+                OpenGL.Enable(OpenGL.GL_DEPTH_TEST);
                 //OpenGL.glDisable(OpenGL.GL_CULL_FACE);  // Disable face culling to show all faces
                 //OpenGL.glPolygonMode(OpenGL.GL_FRONT_AND_BACK, OpenGL.GL_LINE);
                 //OpenGL.glEnable(OpenGL.GL_TEXTURE_2D);
@@ -195,11 +153,11 @@ namespace TGL
                 //OpenGL.glEnable(OpenGL.GL_NORMALIZE);
                 if (IsTransparencyOn)
                 {
-                    OpenGL.glEnable(OpenGL.GL_BLEND);
-                    OpenGL.glBlendFunc(OpenGL.GL_SRC_ALPHA, OpenGL.GL_ONE_MINUS_SRC_ALPHA);
+                    OpenGL.Enable(OpenGL.GL_BLEND);
+                    OpenGL.BlendFunc(OpenGL.GL_SRC_ALPHA, OpenGL.GL_ONE_MINUS_SRC_ALPHA);
                 }
                 else
-                    OpenGL.glDisable(OpenGL.GL_BLEND);
+                    OpenGL.Disable(OpenGL.GL_BLEND);
                 IsInited = true;
             }
         }

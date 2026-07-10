@@ -66,7 +66,7 @@ namespace GA
             return Fitness.CompareTo(other.Fitness);
         }
 
-        public virtual double Evaluate() { return Fitness; }
+        public virtual float Evaluate() { return Fitness; }
 
     }
 }

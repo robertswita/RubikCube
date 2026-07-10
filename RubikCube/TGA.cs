@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 
@@ -8,11 +9,11 @@ namespace GA
     public class TGA<T> where T : TChromosome, new()
     {
         public double HighScore = double.MaxValue;
-        public int PopulationCount = 100;
+        public static int PopulationCount = 100;
         public double WinnerRatio = 0.3;
         public double MutationRatio = 0.01;
         public double MutationAuxRatio = 0;
-        public int GenerationsCount = 2000;
+        public static int GenerationsCount = 2000;
         public int IterCount;
         public List<T> Population = new List<T>();
         public delegate void ProgressHandler(T best);
@@ -20,10 +21,12 @@ namespace GA
         public delegate void EvaluateHandler(List<T> population);
         public delegate List<T> SelectionHandler(List<T> population, int winnerCount);
         public delegate void NextGenHandler();
+        public delegate void GenesisHandler(List<T> population, int count);
         public EvaluateHandler Evaluate;
         public ProgressHandler Progress;
         public SelectionHandler Select;
         public NextGenHandler NextGeneration;
+        public GenesisHandler Genesis;
 
         public enum TSelectionType { Rank, Tournament, Roulette, RouletteRank, Unique };
         public TSelectionType SelectionType;
@@ -38,7 +41,7 @@ namespace GA
                 chromosome.Init();
                 Population.Add(chromosome);
             }
-            Best = Population[0];
+
         }
 
         public void Execute()
@@ -48,6 +51,8 @@ namespace GA
             var winnerCount = (int)(WinnerRatio * PopulationCount);
             var mutationsCount = (int)(MutationRatio * PopulationCount);
             var mutationsAuxCount = (int)(MutationAuxRatio * PopulationCount);
+            Genesis(Population, PopulationCount);
+            Best = Population[0];
             while (Best.Fitness >= HighScore && IterCount < GenerationsCount)
             //while (Best.Fitness >= HighScore)
             {
@@ -104,7 +109,7 @@ namespace GA
                     mutant.MutateAux();
                 }
                 IterCount++;
-                NextGeneration();
+                //NextGeneration();
             }
             HighScore = Best.Fitness;
         }

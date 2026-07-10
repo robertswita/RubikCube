@@ -1,16 +1,38 @@
-#version 430 core
+﻿#version 430 core
+// Definicja pojedynczego osobnika w populacji
+struct Specimen {
+    uint fitness;      // Wynik oceny dopasowania kostki
+    uint movesCount;    // Liczba ruchów w tym chromosomie
+    uint moves[100];    // Tablica genów (sekwencja ruchów)
+};
 
-const int N = 4;
-const int SIZE = 2;
+// Globalny bufor stanu populacji kostek Rubika
+layout(std430, binding = 0) buffer PopulationBuffer {
+    Specimen specimens[]; // Tablica o rozmiarze zależnym od liczby osobników
+};
+
+// Globalny bufor przechowujący aktualny stan kubików dla całej populacji
+layout(std430, binding = 1) buffer CubiesBuffer {
+    // Rozmiar tego bufora to: POPULATION_COUNT * CUBIES_COUNT
+    // Aplikacja na CPU alokuje dokładnie tyle pamięci, ile wymaga dana kostka (SIZE^N)
+    uint globalCubies[];
+};
+
+
+
+
+layout(location = 0) uniform int N;    // dynamiczny wymiar, np. 3, 4, 5...
+layout(location = 1) uniform int SIZE; // dynamiczny rozmiar, np. 2, 3, 4...
+
 const int CUBIES_COUNT = SIZE * SIZE * SIZE * SIZE;
-const int XFORM_SIZE = N * N;
+//const int XFORM_SIZE = N * N;
 const int GENES_COUNT = 32;
 const int POPULATION_COUNT = 1024;
 const int PLANES_COUNT = N * (N - 1) / 2;
 const float C = (SIZE - 1) / 2;
 //const int CUBIES_SIZE = (XFORM_SIZE + N) * CUBIES_COUNT;
 
-layout(local_size_x = 1) in;
+layout(local_size_x = 64) in;
 
 struct XForm
 {
@@ -180,7 +202,7 @@ float evaluateCubies(XForm[CUBIES_COUNT] workCubies)
         int state = getState(workCubies[activeCubies[i]]);
         if (state != 0)
         {
-            score += maxClusterState + state +(getRotationCount(state) << PLANES_COUNT);
+            score += maxClusterState + state + (getRotationCount(state) << PLANES_COUNT);
             scrambled++;
         }
     }
@@ -206,32 +228,114 @@ void Rotate(inout XForm cubie, int plane, int angle)
 }
 
 
-void Turn(inout XForm[CUBIES_COUNT] workCubies, Move move)
+//void Turn(inout XForm[CUBIES_COUNT] workCubies, Move move)
+//{
+//    for (int i = 0; i < workCubies.length(); i++)
+//    {
+//        float v = round(workCubies[i].Origin[move.Axis] + C);
+//        if (int(v) == move.Slice)
+//            Rotate(workCubies[i], move.Plane, move.Angle + 1);
+//    }       
+//}
+
+
+int getStartCoordinate(int cubieID, int col)
 {
-    for (int i = 0; i < workCubies.length(); i++)
-    {
-        float v = round(workCubies[i].Origin[move.Axis] + C);
-        if (int(v) == move.Slice)
-            Rotate(workCubies[i], move.Plane, move.Angle + 1);
-    }       
+    //Wyznaczenie indeksu warstwy (0 do SIZE-1) dla wybranego wymiaru (col)
+    if (SIZE == 2) return (cubieID >> col) & 1; // Szybka operacja bitowa dla SIZE = 2
+    // Uniwersalne rozwiązanie dla dowolnego SIZE (np. 3, 4, 5...)
+    int divisor = 1;
+    for (int i = 0; i < col; i++)
+        divisor *= SIZE;
+    return (cubieID / divisor) % SIZE;
 }
- 
+
+
+void TurnCubie(inout uint cubieMatrix, int cubieID, Move move)
+{
+    int col, sign;
+    // Pobieramy informacje tylko dla JEDNEGO wiersza (interesującej nas osi)
+    getRow(cubieMatrix, move.Axis, col, sign);
+
+    // Pobieramy pojedynczą współrzędną z wektora początkowego kubika
+    int startLayerIndex = getStartCoordinate(cubieID, col);
+    int currentLayer = (sign == 1) ? startLayerIndex : (SIZE - 1) - startLayerIndex;
+    if (currentLayer == move.Slice) {
+        int axis1 = int(Planes[move.Plane].x);
+        int axis2 = int(Planes[move.Plane].y);
+        RotateMatInt(cubieMatrix, axis1, axis2, move.Angle);
+    }
+}
+
+
+// Funkcja pomocnicza: pobiera wartość (1 lub -1) oraz indeks kolumny dla danego wiersza
+void getRow(uint M, int row, out int outCol, out int outSign)
+{
+    uint rowData = (M >> (row * 3)) & 7u; // 7u = binary 111
+    outCol = int(rowData & 3u);          // 3u = binary 11 (indeks kolumny 0-3)
+    outSign = ((rowData >> 2) & 1u) == 1u ? -1 : 1; // 3. bit to znak
+}
+
+// Funkcja pomocnicza: ustawia dane dla konkretnego wiersza w spakowanej macierzy
+uint setRow(uint M, int row, int col, int sign)
+{
+    uint signBit = (sign == -1) ? 1u : 0u;
+    uint rowData = (signBit << 2) | (uint(col) & 3u);
+
+    uint mask = ~(7u << (row * 3));
+    return (M & mask) | (rowData << (row * 3));
+}
+
+// Nowa, niezwykle szybka funkcja obrotu macierzy bez użycia float i trygonometrii!
+// Kąt w kostce Rubika to zawsze wielokrotność 90 stopni (krok = 0, 1, 2)
+void RotateMatInt(inout uint M, int axis1, int axis2, int angleStep)
+{
+    // Wyciągamy tylko dwa interesujące nas wiersze, które tworzą płaszczyznę obrotu
+    int col1, sign1;
+    int col2, sign2;
+    getRow(M, axis1, col1, sign1);
+    getRow(M, axis2, col2, sign2);
+
+    if (angleStep == 0)      // 90 stopni w lewo
+    {
+        M = setRow(M, axis1, col2, -sign2);
+        M = setRow(M, axis2, col1, sign1);
+    }
+    else if (angleStep == 1) // 180 stopni
+    {
+        M = setRow(M, axis1, col1, -sign1);
+        M = setRow(M, axis2, col2, -sign2);
+    }
+    else if (angleStep == 2) // 270 stopni (90 stopni w prawo)
+    {
+        M = setRow(M, axis1, col2, sign2);
+        M = setRow(M, axis2, col1, -sign1);
+    }
+}
+
+
+
 void main()
 {
     int specimenID = int(gl_GlobalInvocationID.x);
+    if (specimenID >= POPULATION_COUNT) return;
     Chromosome specimen = population[specimenID];
     float bestFitness = 100 * cubies.length();
-		XForm[CUBIES_COUNT] workCubies = cubies;
-		for (int i = 0; i < GENES_COUNT; i++)
-		{
-				Turn(workCubies, getMove(int(specimen.Genes[i])));
+    //XForm[CUBIES_COUNT] workCubies = cubies;
+    // Zamiast tablicy struktur, przechowujesz tylko tablicę macierzy!
+    uint workCubies[CUBIES_COUNT]; // 16 * 4 bajty = 64 bajty na całą kostkę 4D!
+    for (int m = 0; m < GENES_COUNT; m++)
+    {
+        Move move = getMove(int(specimen.Genes[m])
+            for (int cubieID = 0; cubieID < CUBIES_COUNT; cubieID++)
+                TurnCubie(workCubies[cubieID], cubieID, move);
         float fitness = evaluateCubies(workCubies);
-				if (fitness < bestFitness)
-				{
-						bestFitness = fitness;
-						specimen.MoveCount = i + 1;
-				}
-		}
+        if (fitness < bestFitness)
+        {
+            bestFitness = fitness;
+            specimen.MoveCount = cubieID + 1;
+        }
+    }
     specimen.Fitness = bestFitness;
     population[specimenID] = specimen;
 }
