@@ -36,12 +36,6 @@ void main() {
     for (uint i = startPos; i < stopPos; i++)
         child[i] = Population[dadIdx].Moves[i];
 
-    // 3. mutation with probability MUTATION_RATIO percent: replace one gene in the first part.
-    if (hash(seed + 5u) % 100u < uint(MUTATION_RATIO)) {
-        uint mpos = hash(seed + 6u) % stopPos;
-        child[mpos] = FreeMoves[hash(seed + 7u) % uint(FreeMoves.length())];
-    }
-
     // 4. second half = reverse-complement of the first part: the mom block [0,startPos)
     //    and the dad block [startPos,stopPos), each reversed with negated angles.
     uint pos = stopPos;
@@ -54,11 +48,11 @@ void main() {
     for (uint i = 2u * stopPos; i < GENES_COUNT; i++)
         child[i] = Population[momIdx].Moves[i];
 
-    // 5b. Macro-mutation (mirror CPU Mutate + Conjugate): with SEED_MUT_RATIO% probability overwrite the
+    // 5b. Macro-mutation (mirror CPU Mutate + Conjugate): with MUTATION_RATIO% probability overwrite the
     //     leading genes with a fresh seed sequence (solves one active-cluster cubie) and conjugate a
     //     block. Re-injects cubie-solvers every generation - the CPU's main search driver - which
-    //     crossover then recombines into commutators.
-    if (numSeeds > 0u && hash(seed + 8u) % 100u < uint(SEED_MUT_RATIO)) {
+    //     crossover then recombines into commutators. This is now the only mutation operator.
+    if (numSeeds > 0u && hash(seed + 8u) % 100u < uint(MUTATION_RATIO)) {
         uint sbase = (hash(seed + 9u) % numSeeds) * SEED_STRIDE;
         for (uint g = 0u; g < SEED_STRIDE; g++) {
             uint code = SeedMoves[sbase + g];

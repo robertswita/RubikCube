@@ -528,7 +528,7 @@ namespace RubikCube
                 if (!TRubikCube.IsEulerOrderReversed)
                     TRubikCube.EulerOrder = RubikCube.GetOrder();
                 TRubikCube.IsEulerOrderReversed = !TRubikCube.IsEulerOrderReversed;
-                var seq = RubikCube.GetReversedSeq();
+                var seq = RubikCube.GetSolveSeq();
                 var found = false;
                 foreach (var revSeq in RevSeqs)
                     if (revSeq.Count == seq.Count)

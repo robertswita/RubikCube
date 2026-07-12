@@ -35,6 +35,7 @@
             System.Windows.Forms.DataVisualization.Charting.Series series2 = new System.Windows.Forms.DataVisualization.Charting.Series();
             MoveTimer = new System.Windows.Forms.Timer(components);
             panel1 = new System.Windows.Forms.Panel();
+            TimeBox = new System.Windows.Forms.TextBox();
             chart2 = new System.Windows.Forms.DataVisualization.Charting.Chart();
             SeqCountLbl = new System.Windows.Forms.Label();
             label13 = new System.Windows.Forms.Label();
@@ -52,14 +53,12 @@
             SlicesBox = new System.Windows.Forms.NumericUpDown();
             label8 = new System.Windows.Forms.Label();
             label7 = new System.Windows.Forms.Label();
-            label6 = new System.Windows.Forms.Label();
             label5 = new System.Windows.Forms.Label();
             chart1 = new System.Windows.Forms.DataVisualization.Charting.Chart();
             label4 = new System.Windows.Forms.Label();
             label3 = new System.Windows.Forms.Label();
             label2 = new System.Windows.Forms.Label();
             button2 = new System.Windows.Forms.Button();
-            label1 = new System.Windows.Forms.Label();
             button1 = new System.Windows.Forms.Button();
             solveWorker = new System.ComponentModel.BackgroundWorker();
             menuStrip1 = new System.Windows.Forms.MenuStrip();
@@ -76,6 +75,7 @@
             tRubikCubeBindingSource = new System.Windows.Forms.BindingSource(components);
             saveFileDialog1 = new System.Windows.Forms.SaveFileDialog();
             tglView1 = new TGL.TGLView();
+            ItersBox = new System.Windows.Forms.TextBox();
             panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)chart2).BeginInit();
             ((System.ComponentModel.ISupportInitialize)DimsBox).BeginInit();
@@ -95,6 +95,8 @@
             // 
             // panel1
             // 
+            panel1.Controls.Add(ItersBox);
+            panel1.Controls.Add(TimeBox);
             panel1.Controls.Add(chart2);
             panel1.Controls.Add(SeqCountLbl);
             panel1.Controls.Add(label13);
@@ -112,14 +114,12 @@
             panel1.Controls.Add(SlicesBox);
             panel1.Controls.Add(label8);
             panel1.Controls.Add(label7);
-            panel1.Controls.Add(label6);
             panel1.Controls.Add(label5);
             panel1.Controls.Add(chart1);
             panel1.Controls.Add(label4);
             panel1.Controls.Add(label3);
             panel1.Controls.Add(label2);
             panel1.Controls.Add(button2);
-            panel1.Controls.Add(label1);
             panel1.Controls.Add(button1);
             panel1.Dock = System.Windows.Forms.DockStyle.Left;
             panel1.Location = new System.Drawing.Point(0, 28);
@@ -127,6 +127,13 @@
             panel1.Name = "panel1";
             panel1.Size = new System.Drawing.Size(498, 994);
             panel1.TabIndex = 8;
+            // 
+            // TimeBox
+            // 
+            TimeBox.Location = new System.Drawing.Point(77, 138);
+            TimeBox.Name = "TimeBox";
+            TimeBox.Size = new System.Drawing.Size(103, 27);
+            TimeBox.TabIndex = 38;
             // 
             // chart2
             // 
@@ -301,15 +308,6 @@
             label7.TabIndex = 19;
             label7.Text = "error:";
             // 
-            // label6
-            // 
-            label6.AutoSize = true;
-            label6.Location = new System.Drawing.Point(171, 505);
-            label6.Name = "label6";
-            label6.Size = new System.Drawing.Size(50, 20);
-            label6.TabIndex = 18;
-            label6.Text = "label6";
-            // 
             // label5
             // 
             label5.AutoSize = true;
@@ -373,15 +371,6 @@
             button2.Text = "Shuffle";
             button2.UseVisualStyleBackColor = true;
             button2.Click += button2_Click;
-            // 
-            // label1
-            // 
-            label1.AutoSize = true;
-            label1.Location = new System.Drawing.Point(77, 141);
-            label1.Name = "label1";
-            label1.Size = new System.Drawing.Size(50, 20);
-            label1.TabIndex = 9;
-            label1.Text = "label1";
             // 
             // button1
             // 
@@ -486,6 +475,13 @@
             tglView1.MouseDown += tglView1_MouseDown;
             tglView1.MouseMove += tglView1_MouseMove;
             // 
+            // ItersBox
+            // 
+            ItersBox.Location = new System.Drawing.Point(171, 505);
+            ItersBox.Name = "ItersBox";
+            ItersBox.Size = new System.Drawing.Size(73, 27);
+            ItersBox.TabIndex = 39;
+            // 
             // TRubikForm
             // 
             AutoScaleDimensions = new System.Drawing.SizeF(8F, 20F);
@@ -563,6 +559,9 @@
         private System.Windows.Forms.SaveFileDialog saveFileDialog1;
         private System.Windows.Forms.Label SeqCountLbl;
         private System.Windows.Forms.DataVisualization.Charting.Chart chart2;
+        private System.Windows.Forms.TextBox textBox1;
+        private System.Windows.Forms.TextBox ItersBox;
+        private System.Windows.Forms.TextBox TimeBox;
     }
 }
 

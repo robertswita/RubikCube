@@ -17,11 +17,12 @@ void main() {
         uint a = direction ? i : j;
         uint b = direction ? j : i;
         // SelectUnique folded into the sort: equal fitness means a duplicate, so demote one (b) by a
-        // whole-population penalty. Distinct-fitness specimens rise, duplicates sink out of the winner
-        // pool, keeping the parent gene-pool diverse (mirrors the CPU's unique selection). The penalty
-        // only grows fitness, so the global minimum is never penalised and index 0 stays a true best.
+        // penalty the size of the maximum fitness (CUBIES_COUNT). Distinct-fitness specimens rise,
+        // duplicates sink out of the winner pool, keeping the parent gene-pool diverse (mirrors the
+        // CPU's unique selection). The penalty only grows fitness, so the global minimum is never
+        // penalised and index 0 stays a true best.
         if (Population[a].Fitness == Population[b].Fitness) {
-            Population[b].Fitness = floatBitsToUint(uintBitsToFloat(Population[b].Fitness) + float(POPULATION_COUNT));
+            Population[b].Fitness = floatBitsToUint(uintBitsToFloat(Population[b].Fitness) + float(CUBIES_COUNT));
         } else if (Population[a].Fitness > Population[b].Fitness) {
             Specimen swapped = Population[a];
             Population[a] = Population[b];

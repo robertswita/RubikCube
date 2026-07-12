@@ -57,7 +57,7 @@ namespace RubikCube
             } 
         }
 
-        public bool ValidState;
+        private bool ValidState;
         int state;
         public int State
         {
@@ -123,6 +123,12 @@ namespace RubikCube
                 //if (state != 0)
                 //    Transparency = 0.5f;
             }
+        }
+
+        public void Rotate(int[] plane, TVector rot)
+        {
+            Transform.Rotate(plane[0], plane[1], rot.X, rot.Y);
+            ValidState = false;
         }
 
         // Number of axes the cubie's orientation does not leave fixed: axis k is fixed <=> M[k,k] is

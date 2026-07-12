@@ -179,10 +179,7 @@ namespace RubikCube
             var rot = TCubie.SetAngle(move.Angle + 1);
             foreach (var cubie in Cubies)
                 if (cubie.GetPos(move.Axis) == move.Slice)
-                {
-                    cubie.Transform.Rotate(plane[0], plane[1], rot.X, rot.Y);
-                    cubie.ValidState = false;
-                }
+                    cubie.Rotate(plane, rot);
         }
 
         // Packs every cubie's orientation (from its Transform) into the shader's uint format: per row
@@ -213,60 +210,9 @@ namespace RubikCube
             return packed;
         }
 
-        static int CubieL1(uint m, int bitsPerRow)
-        {
-            int dist = 0;
-            for (int r = 0; r < TAffine.N; r++)
-            {
-                uint field = (m >> (r * bitsPerRow)) & ((1u << bitsPerRow) - 1u);
-                dist += (int)(field > (uint)r ? field - (uint)r : (uint)r - field);
-            }
-            return dist;
-        }
-
-        static int ActiveAxes(uint m, int bitsPerRow)
-        {
-            int count = 0;
-            for (int r = 0; r < TAffine.N; r++)
-            {
-                uint field = (m >> (r * bitsPerRow)) & ((1u << bitsPerRow) - 1u);
-                if (field != (uint)r) count++;
-            }
-            return count;
-        }
-
-        // Mirrors Setup.glsl.c cubieState: moves-to-solve (active axes) dominant, L1 orientation tiebreak.
-        static int CubieState(uint m, int bitsPerRow, int maxCubieL1)
-        {
-            return ActiveAxes(m, bitsPerRow) * (maxCubieL1 + 1) + CubieL1(m, bitsPerRow);
-        }
-
-        // Fitness of the current cube in the exact GPU metric (a specimen doing zero moves): the
-        // normalized active-cluster error (moves-to-solve + L1, see cubieState) plus the count of
-        // already-solved cubies that are no longer solved. Use this - not Evaluate() - as the
-        // baseline/Score when driving the GPU GA, so it is comparable with best.Fitness. Mirrors Setup.glsl.c.
-        public float EvaluateGpu()
-        {
-            int bitsForCol = TAffine.N <= 4 ? 2 : 3;
-            int bitsPerRow = bitsForCol + 1;
-            int maxCubieL1 = TAffine.N * ((1 << bitsForCol) + TAffine.N - 1);
-            int maxCubieState = TAffine.N * (maxCubieL1 + 1) + maxCubieL1;
-            var packed = PackCubies();
-            int countActive = ActiveCluster.Count;
-            float maxClusterState = (float)maxCubieState * countActive;
-            float maxFA = maxClusterState * (countActive + 1);
-            float fA = 0;
-            foreach (var cubie in ActiveCluster)
-            {
-                int d = CubieState(packed[cubie.StartIndex], bitsPerRow, maxCubieL1);
-                if (d != 0) fA += (maxClusterState + d) / maxFA;
-            }
-            int solvedErrors = 0;
-            foreach (var cubie in SolvedCubies)
-                if (CubieL1(packed[cubie.StartIndex], bitsPerRow) != 0)
-                    solvedErrors++;
-            return solvedErrors + fA;
-        }
+        // Cube scoring lives on the GPU now (Gpu.ScoreCube -> scoreState in Setup.glsl.c), a single
+        // source of truth for the metric. The old host mirror (EvaluateGpu + CubieL1/ActiveAxes/
+        // CubieState) was removed so the two can no longer drift.
 
         //bool IsEvaluating;
         public float Evaluate2()
@@ -849,149 +795,82 @@ namespace RubikCube
             return false;
         }
 
-        // Random active cubie + random axis-permutation, decomposed (EulerOrder / route) into the
-        // (plane, moveAngle) solve steps, recording the cubie's coord vector before each step. The
-        // axis is deferred - the cubie trajectory is axis-independent - so the caller realizes the
-        // moves with any axis: random (GetReversedSeq) or enumerated (BuildSeedMoves). m = active axes.
-        List<int[]> GetSolveSteps(out int[][] coordAtStep, out int m)
+        // Greedy shortest-solve of the host-designated active cubie, on a lightweight copy of just that
+        // cubie (deep Transform, shared geometry) - no full-cube clone, since only its orientation is
+        // needed. At each step pick a random cube move (plane + 90/180/270) that lowers the moves-to-solve
+        // (RotationCount) by one, realize it with a random valid axis, record its code and rotate the
+        // copy - until the orientation is the identity. Reject-free (a progress move exists on every
+        // shortest path); random choices cover every decomposition tree.
+        public List<int> GetSolveSeq()
         {
-            var nums = new int[TAffine.N];
-            for (int i = 0; i < nums.Length; i++)
-                nums[i] = i;
-            var permuts = DoPermute(nums, 0, nums.Length - 1);
-            var perm = permuts[TChromosome.Rnd.Next(permuts.Count)];
-            var cube = new TRubikCube(this);
-
-            var freeCubies = new List<TCubie>();
-            foreach (var cubie in cube.ActiveCluster)
-                if (cubie.State != 0)
-                    freeCubies.Add(cubie);
-            if (freeCubies.Count > 0)
-                cube.ActiveCubie = freeCubies[TChromosome.Rnd.Next(freeCubies.Count)];
-
-            m = cube.ActiveCubie.ActiveAxisCount();
-
-            var M = cube.ActiveCubie.Transform.M;
-            var A = (TMatrix)M.Clone();
-            for (int y = 0; y < M.RowsCount; y++)
-                for (int x = 0; x < M.ColsCount; x++)
-                    A[y, x] = M[perm[y], perm[x]];
-            cube.ActiveCubie.Transform.M = A;
-            var eulerAngles = cube.ActiveCubie.Transform.GetEulerAngles(EulerOrder, IsEulerOrderReversed);
-            cube.ActiveCubie.Transform.M = M;
-
-            var steps = new List<int[]>();          // each: { plane, moveAngle }
-            var coords = new List<int[]>();
-            for (int idx = 0; idx < eulerAngles.Count; idx++)
+            var c = ActiveCubie.Copy();        // just the cubie - no full-cube clone
+            var seq = new List<int>();
+            while (c.State != 0)          // State getter refreshes c.RotationCount
             {
-                var rot = eulerAngles[idx];
-                var angle = TCubie.GetAngle(rot[0], rot[1]);
-                if (angle == 0) continue;
-                int axis1 = perm[(int)rot[2]], axis2 = perm[(int)rot[3]];
-                if (axis1 > axis2) { (axis1, axis2) = (axis2, axis1); angle = 4 - angle; }
-                int plane = axis2 * (axis2 - 1) / 2 + axis1;
-                int moveAngle = 3 - angle;
-
-                var coord = new int[TAffine.N];
-                for (int a = 0; a < TAffine.N; a++)
-                    coord[a] = cube.ActiveCubie.GetPos(a);
-                coords.Add(coord);
-                steps.Add(new[] { plane, moveAngle });
-
-                int canon = 0;                       // any axis not in the plane, only to advance the sim
-                while (canon == axis1 || canon == axis2) canon++;
-                cube.Turn(new TMove { Plane = plane, Angle = moveAngle, Axis = canon, Slice = coord[canon] });
-            }
-            coordAtStep = coords.ToArray();
-            return steps;
-        }
-
-        public List<int> ActSeq;
-        public List<int> GetReversedSeq()
-        {
-            var steps = GetSolveSteps(out var coord, out _);
-            ActSeq = new List<int>(steps.Count);
-            for (int k = 0; k < steps.Count; k++)
-            {
-                int plane = steps[k][0], angle = steps[k][1];
-                var pa = TAffine.Planes[plane];
-                int axis = TChromosome.Rnd.Next(TAffine.N);
+                int[] pa;
+                TVector rot;
+                var cand = new List<int[]>();
+                for (int plane = 0; plane < TAffine.Planes.Length; plane++)
+                    for (int angle = 0; angle < 3; angle++)
+                    {
+                        var rotCubie = c.Copy();
+                        pa = TAffine.Planes[plane];
+                        rot = TCubie.SetAngle(angle + 1);
+                        rotCubie.Rotate(pa, rot);
+                        _ = rotCubie.State;
+                        if (rotCubie.RotationCount == c.RotationCount - 1)
+                            cand.Add(new[] { plane, angle });
+                    }
+                //if (cand.Count == 0) break;                          // only if the rotation convention is off
+                var pick = cand[TChromosome.Rnd.Next(cand.Count)];
+                pa = TAffine.Planes[pick[0]];
+                rot = TCubie.SetAngle(pick[1] + 1);
+                c.Rotate(pa, rot);
+                int axis = TChromosome.Rnd.Next(TAffine.N);          // any axis not in the plane (collateral only)
                 while (axis == pa[0] || axis == pa[1])
                     axis = (axis + 1) % TAffine.N;
-                ActSeq.Add(new TMove { Plane = plane, Angle = angle, Axis = axis, Slice = coord[k][axis] }.Encode());
+                seq.Add(new TMove { Plane = pick[0], Angle = pick[1], Axis = axis, Slice = c.GetPos(axis) }.Encode());
             }
-            return ActSeq;
+            return seq;
         }
 
-        // Every axis realization (Axis not in plane, per step) of a step list. Full Cartesian product
-        // when it stays under CAP, otherwise CAP random samples (the caller dedups). The axis choice
-        // only changes which layer / collateral cubies move, not the target cubie's solve.
-        static IEnumerable<int[]> AxisCombos(List<int[]> steps)
-        {
-            const int CAP = 64;
-            var choices = new List<int>[steps.Count];
-            long total = 1;
-            for (int k = 0; k < steps.Count; k++)
-            {
-                var pa = TAffine.Planes[steps[k][0]];
-                var list = new List<int>();
-                for (int a = 0; a < TAffine.N; a++)
-                    if (a != pa[0] && a != pa[1]) list.Add(a);
-                choices[k] = list;
-                total *= list.Count;
-            }
-            if (total <= CAP)
-            {
-                var idx = new int[steps.Count];
-                while (true)
-                {
-                    var axis = new int[steps.Count];
-                    for (int k = 0; k < steps.Count; k++) axis[k] = choices[k][idx[k]];
-                    yield return axis;
-                    int i = 0;
-                    for (; i < idx.Length; i++) { if (++idx[i] < choices[i].Count) break; idx[i] = 0; }
-                    if (i == idx.Length) yield break;
-                }
-            }
-            for (int n = 0; n < CAP; n++)
-            {
-                var axis = new int[steps.Count];
-                for (int k = 0; k < steps.Count; k++) axis[k] = choices[k][TChromosome.Rnd.Next(choices[k].Count)];
-                yield return axis;
-            }
-        }
+        // Moves-to-solve of the cubie's orientation after applying the cube move (plane, angle) - the copy
+        // is rotated exactly as Turn rotates a cubie, so the greedy's prediction matches the real move.
+        // Reuses TCubie's own RotationCount (computed by the State getter).
+        //static int RotationCountAfter(TCubie c, int plane, int angle)
+        //{
+        //    var t = c.Copy();
+        //    var pa = TAffine.Planes[plane];
+        //    var rot = TCubie.SetAngle(angle + 1);
+        //    t.Transform.Rotate(pa[0], pa[1], rot.X, rot.Y);
+        //    t.ValidState = false;
+        //    _ = t.State;                       // refresh RotationCount
+        //    return t.RotationCount;
+        //}
 
         // Packs up to numSeeds per-specimen seed sequences into a flat buffer (stride genes each, unused
-        // slots = -1 sentinel) for the GPU Init shader. Reuses the CPU generator (GetSolveSteps) but
-        // enumerates all axis realizations per draw. numSeeds = populationCount * seedRatioPercent / 100.
+        // slots = -1 sentinel) for the GPU Init shader. Each draw is a fresh greedy decomposition
+        // (GetSolveSeq) realized with a random axis per move (the axis only picks the collateral layer,
+        // not the target's solve, so it adds no decomposition trees). Targets populationCount *
+        // seedRatioPercent / 100 slots; numSeeds is however many distinct sequences it finds.
         public int[] BuildSeedMoves(int populationCount, int stride, int seedRatioPercent, out uint numSeeds)
         {
             int target = populationCount * seedRatioPercent / 100;
-            var savedOrder = EulerOrder;
-            var savedReversed = IsEulerOrderReversed;
             var slots = new List<int[]>();
             var seen = new HashSet<string>();
-            int guard = 0, GUARD = 8 * target + 64;
-            while (slots.Count < target && guard++ < GUARD)
+            // The distinct-decomposition pool for one cubie is small (e.g. <= 3 trees for N=3), far below
+            // target. Stop once draws stop producing anything new (pool saturated) instead of spinning a
+            // fixed guard; the stall budget scales with what we found so far so bigger pools get patience.
+            int stall = 0;
+            while (slots.Count < target)
             {
-                if (!IsEulerOrderReversed) EulerOrder = GetOrder();   // both routes per drawn order
-                IsEulerOrderReversed = !IsEulerOrderReversed;
-                var steps = GetSolveSteps(out var coord, out _);
-                if (steps.Count == 0) continue;                       // cubie already solved
-                foreach (var combo in AxisCombos(steps))
-                {
-                    var moves = new int[steps.Count];
-                    for (int k = 0; k < steps.Count; k++)
-                        moves[k] = new TMove { Plane = steps[k][0], Angle = steps[k][1], Axis = combo[k], Slice = coord[k][combo[k]] }.Encode();
-                    if (seen.Add(string.Join(",", moves)))
-                    {
-                        slots.Add(moves);
-                        if (slots.Count >= target) break;
-                    }
-                }
+                var moves = GetSolveSeq().ToArray();               // greedy: random shortest-solve decomposition
+                if (moves.Length == 0) break;                         // cubie already solved -> no seeds
+                if (seen.Add(string.Join(",", moves)))
+                    { slots.Add(moves); stall = 0; }
+                else if (++stall > 32 + 8 * slots.Count)              // long run with no new tree: pool exhausted
+                    break;
             }
-            EulerOrder = savedOrder;
-            IsEulerOrderReversed = savedReversed;
 
             numSeeds = (uint)slots.Count;
             if (slots.Count == 0) return new int[1];                  // never a zero-size SSBO

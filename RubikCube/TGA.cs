@@ -14,6 +14,7 @@ namespace GA
         public double MutationRatio = 0.01;
         public double MutationAuxRatio = 0;
         public static int GenerationsCount = 2000;
+        public static int StallLimit;
         public int IterCount;
         public List<T> Population = new List<T>();
         public delegate void ProgressHandler(T best);

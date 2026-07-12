@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using TGL;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.TextBox;
 
 namespace RubikCube
 {
@@ -14,12 +15,14 @@ namespace RubikCube
     // Init() must be called once while a GL context is current (TGLContext.Handle does that).
     public static unsafe class Gpu
     {
-        public static uint InitProgram, EvaluateMicroProgram, EvaluateMacroProgram, SortProgram, SelCrossoverProgram;
+        public static uint InitProgram, EvaluateMicroProgram, EvaluateMacroProgram, SortProgram, SelCrossoverProgram, ScoreCubeProgram;
         public static Ssbo[] PopulationBuffer = new Ssbo[2];
-        public static Ssbo CubiesBuffer, FreeMovesBuffer, SolvedBuffer, ActiveBuffer, PlanesBuffer, SeedMovesBuffer;
+        public static Ssbo CubiesBuffer, FreeMovesBuffer, SolvedBuffer, ActiveBuffer, PlanesBuffer, SeedMovesBuffer, ScoreBuffer;
         static string Setup;
         static int CompiledN, CompiledSize;
         static uint NumSeeds;   // specimens pre-seeded by Init (host-built SeedMoves)
+        public static int GenerationsCount;
+
 
         // One-time GPU setup: reserve the buffers, create the program + shader objects (attached but
         // not yet compiled), then compile them for the current cube. Call once with a current GL context.
@@ -39,6 +42,7 @@ namespace RubikCube
             ActiveBuffer    = new Ssbo();                           // 5
             PlanesBuffer    = new Ssbo(OpenGL.GL_UNIFORM_BUFFER);   // 6  std140 UBO
             SeedMovesBuffer = new Ssbo();                           // 7  Init seed sequences
+            ScoreBuffer     = new Ssbo();                           // 8  ScoreCube result (cube.Score baseline)
 
             // Create the program + shader objects once and attach them. BuildShaders only (re)sources,
             // compiles and links these same objects, so nothing is ever created or deleted again.
@@ -47,6 +51,7 @@ namespace RubikCube
             EvaluateMacroProgram = CreateProgram();
             SortProgram = CreateProgram();
             SelCrossoverProgram = CreateProgram();
+            ScoreCubeProgram = CreateProgram();
 
             BuildShaders();
         }
@@ -88,6 +93,7 @@ namespace RubikCube
             TChromosome.GenesLength = GetDefineValue("GENES_COUNT");
             TGA<TRubikGenome>.PopulationCount = GetDefineValue("POPULATION_COUNT");
             TGA<TRubikGenome>.GenerationsCount = GetDefineValue("GENERATIONS_COUNT");
+            TGA<TRubikGenome>.StallLimit = GetDefineValue("STALL_LIMIT");
             CompiledN = TAffine.N;
             CompiledSize = TRubikCube.Size;
 
@@ -96,6 +102,7 @@ namespace RubikCube
             CompileProgram(EvaluateMacroProgram, "Resources.EvaluateMacro.glsl.c");
             CompileProgram(SortProgram, "Resources.Sort.glsl.c");
             CompileProgram(SelCrossoverProgram, "Resources.SelCrossover.glsl.c");
+            CompileProgram(ScoreCubeProgram, "Resources.ScoreCube.glsl.c");
         }
 
         static string ReadManifestText(string dotPath)
@@ -177,6 +184,39 @@ namespace RubikCube
             fixed (int* p = seedMoves) SeedMovesBuffer.Update(seedMoves.Length * sizeof(int), p);
         }
 
+        // Scores a cube state on the GPU with scoreState - the SAME metric the evaluators use - so the
+        // host's cube.Score baseline no longer mirrors the shader (single source of truth). Uploads the
+        // cube's packed cubies and the active/solved cluster indices, runs the one-thread ScoreCube
+        // kernel and reads back the single float.
+        public static float ScoreCube(TRubikCube cube)
+        {
+            if (CompiledN != TAffine.N || CompiledSize != TRubikCube.Size)
+                BuildShaders();
+
+            var cubies = cube.PackCubies();
+            var solved = cube.SolvedCubies.Select(c => c.StartIndex).ToArray();
+            if (solved.Length == 0) solved = new int[1];
+            var active = cube.ActiveCluster.Select(c => c.StartIndex).ToArray();
+            if (active.Length == 0) active = new int[1];
+
+            fixed (uint* p = cubies) CubiesBuffer.Update(cubies.Length * sizeof(uint), p);
+            fixed (int* p = solved) SolvedBuffer.Update(solved.Length * sizeof(int), p);
+            fixed (int* p = active) ActiveBuffer.Update(active.Length * sizeof(int), p);
+            ScoreBuffer.Update(sizeof(float), null);
+
+            OpenGL.UseProgram(ScoreCubeProgram);
+            OpenGL.Uniform1ui(4, (uint)cube.SolvedCubies.Count);   // countSolved
+            OpenGL.Uniform1ui(5, (uint)cube.ActiveCluster.Count);  // countActive
+            OpenGL.DispatchCompute(1, 1, 1);
+            OpenGL.MemoryBarrier(OpenGL.MemoryBarrierFlags.ShaderStorage);
+
+            var result = new int[1];
+            OpenGL.BindBuffer(ScoreBuffer.Type, ScoreBuffer.Id);
+            fixed (int* rp = result)
+                OpenGL.GetBufferSubData(ScoreBuffer.Type, 0, sizeof(float), rp);
+            return BitConverter.Int32BitsToSingle(result[0]);
+        }
+
         // Runs the genetic algorithm on the GPU for the current cube (TRubikGenome.RubikCube /
         // TRubikGenome.FreeMoves) and returns the best specimen found.
         public static TRubikGenome ExecuteGA()
@@ -198,8 +238,8 @@ namespace RubikCube
 
             int parentSlot = 0;
             var best = new TRubikGenome();
-            var specimenInts = TChromosome.GenesLength + 2;
-            var bestBuffer = new int[specimenInts];
+            var specimenSize = (TChromosome.GenesLength + 2) * sizeof(int);
+            var bestBuffer = new int[specimenSize / sizeof(int)];
             fixed (int* bestBufPtr = bestBuffer)
             {
                 // Init: fill Population[0] (binding 0) with random valid move sequences.
@@ -211,7 +251,7 @@ namespace RubikCube
                 OpenGL.DispatchCompute(genGroups, 1, 1);
                 OpenGL.MemoryBarrier(OpenGL.MemoryBarrierFlags.ShaderStorage);
 
-                for (int generation = 0; generation < TGA<TRubikGenome>.GenerationsCount; generation++)
+                for (GenerationsCount = 0; GenerationsCount < TGA<TRubikGenome>.GenerationsCount; GenerationsCount++)
                 {
                     var parent = PopulationBuffer[parentSlot];
                     var child = PopulationBuffer[parentSlot ^ 1];
@@ -239,13 +279,13 @@ namespace RubikCube
 
                     // 3. Read the best specimen (Population[parentSlot][0] after the sort).
                     OpenGL.BindBuffer(parent.Type, parent.Id);
-                    OpenGL.GetBufferSubData(parent.Type, 0, specimenInts * sizeof(int), bestBufPtr);
+                    OpenGL.GetBufferSubData(parent.Type, 0, specimenSize, bestBufPtr);
                     var fitness = BitConverter.UInt32BitsToSingle((uint)bestBuffer[0]);
                     if (fitness < best.Fitness)
                     {
                         best.ReadBuffer(bestBuffer);
                         if (best.Fitness < cube.Score)
-                            break;
+                            return best;
                     }
 
                     // 4. Selection + crossover: parents at binding 0, children written to binding 1.
@@ -260,6 +300,11 @@ namespace RubikCube
                     // 5. Ping-pong: this generation's children are next generation's parents.
                     parentSlot ^= 1;
                 }
+                //// 6. Read the second best specimen
+                //var popBuffer = PopulationBuffer[parentSlot ^ 1];
+                //OpenGL.BindBuffer(popBuffer.Type, popBuffer.Id);
+                //OpenGL.GetBufferSubData(popBuffer.Type, specimenSize, specimenSize, bestBufPtr);
+                //best.ReadBuffer(bestBuffer);
             }
             return best;
         }

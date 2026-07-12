@@ -22,12 +22,14 @@
   <ItemGroup>
     <None Remove="Resources\Evaluate.glsl.old.c" />
     <None Remove="Resources\Init.glsl.c" />
+    <None Remove="Resources\ScoreCube.glsl.c" />
     <None Remove="Resources\Setup.glsl.c" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\EvaluateMacro.glsl.c" />
     <EmbeddedResource Include="Resources\EvaluateMicro.glsl.c" />
     <EmbeddedResource Include="Resources\Init.glsl.c" />
+    <EmbeddedResource Include="Resources\ScoreCube.glsl.c" />
     <EmbeddedResource Include="Resources\SelCrossover.glsl.c" />
     <EmbeddedResource Include="Resources\Setup.glsl.c" />
     <EmbeddedResource Include="Resources\Sort.glsl.c" />

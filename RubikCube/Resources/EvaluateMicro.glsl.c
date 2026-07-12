@@ -33,13 +33,26 @@ void main()
 
         // 2b. SEQUENTIAL EVALUATION: the thread sums its own errors for the current step 'm'
         float local_fA_sum = 0.0;
+        uint scrambled = 0u;
         uint local_solved_errors = 0;
-        for (uint i = 0; i < countActive; i++)
-            local_fA_sum += GetActiveCubieError(local_cubies[ActiveCubies[i]], maxClusterState, max_fA);
+        bool changed = false;
+        for (uint i = 0; i < countActive; i++) {
+            uint cur = local_cubies[ActiveCubies[i]];
+            if (cur != Cubies[ActiveCubies[i]]) changed = true;   // did this prefix move the active cluster?
+            float e = GetActiveCubieError(cur, maxClusterState, max_fA);
+            local_fA_sum += e;
+            if (e != 0.0) scrambled++;
+        }
+        // Endgame: once <= N active cubies remain unsolved, stop rewarding fewer of them (fewer is
+        // not easier - a lone twisted cubie / mono-twist is very hard to escape). Amplify by
+        // N/scrambled so the search then optimises the orientation magnitude, not the count.
+        if (scrambled > 0u && scrambled <= uint(N))
+            local_fA_sum *= float(N) / float(scrambled);
         for (uint i = 0; i < countSolved; i++)
             if (cubieL1(local_cubies[SolvedCubies[i]]) != 0u)
                 local_solved_errors += 1;
         float current_step_fitness = float(local_solved_errors) + local_fA_sum;
+        if (!changed) current_step_fitness += 1e6;   // a no-op on the active cluster is not a solution
         if (current_step_fitness < specimen_best_fitness) {
             specimen_best_fitness = current_step_fitness;
             specimen_best_moves_count = uint(m + 1);
