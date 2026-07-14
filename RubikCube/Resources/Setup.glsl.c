@@ -1,42 +1,4 @@
-#define uint unsigned int
-#define N 3
-#define SIZE 3
-// Cubies Count = Size^N
-#define CUBIES_COUNT 27
-#define PLANES_COUNT (N*(N-1)/2)
-#define GENERATIONS_COUNT 50
-#define GENES_COUNT 32
-#define POPULATION_COUNT 1024
-#define WINNERS_RATIO 10
-// Percentage of children rebuilt by macro-mutation (fresh seed + conjugate) in SelCrossover.
-// The only mutation operator - single-gene random mutation was removed.
-#define MUTATION_RATIO 10
-// Target (as a percentage of the population) for the number of DISTINCT seed sequences the host
-// builds. Init pre-seeds that many specimens (specimenID < numSeeds) with a cubie-undoing sequence;
-// the rest get fully random genes. The actual numSeeds is capped by how many distinct decompositions
-// the active cubie has - often far fewer than the target (e.g. <= 3 for N=3, where the collateral
-// axis is forced), so most of the population starts random and the real seeding pressure comes from
-// macro-mutation, not Init.
-#define SEED_RATIO 100
-
-// Row packing of the orientation matrix (N in range [3, 8]): bits for the column index + 1 sign bit.
-// Equivalent to findMSB(N-1)+1, but as a compile-time constant (findMSB is not a constant expression).
-#define BITS_FOR_COL (N <= 4 ? 2 : 3)
-#define BITS_PER_ROW (BITS_FOR_COL + 1)
-
-// Rigorous upper bound on the per-cubie L1 distance.
-// This exceeds the achievable maximum, so each active-cluster
-// magnitude term stays strictly below 1.
-#define MAX_CUBIE_L1 (N * ((1 << BITS_FOR_COL) + N - 1))
-
-// Per-cubie penalty = moves-to-solve (active axes, dominant) * (MAX_CUBIE_L1 + 1) + L1 (tiebreak).
-// Rigorous upper bound: m <= N active axes, L1 <= MAX_CUBIE_L1; still exceeds the achievable maximum,
-// so each active-cluster magnitude term stays strictly below 1.
-#define MAX_CUBIE_STATE (N * (MAX_CUBIE_L1 + 1) + MAX_CUBIE_L1)
-
-// Slot width (in genes) reserved for one Init seed sequence: solving a cubie takes at most N-1 moves.
-#define SEED_STRIDE (uint(N) - 1u)
-#define STALL_LIMIT 8
+#include "Variables.glsl.c"
 
 struct Specimen {
     uint Fitness;      // floatBitsToUint(fitness_float)
@@ -78,7 +40,6 @@ layout(std430, binding = 4) buffer SolvedBuffer { uint SolvedCubies[]; };
 layout(std430, binding = 5) buffer ActiveBuffer { uint ActiveCubies[]; };
 layout(std140, binding = 6) uniform PlanesBuffer { ivec2 Planes[PLANES_COUNT]; };
 layout(std430, binding = 7) buffer SeedBuffer { uint SeedMoves[]; };   // Init: per-specimen seed sequences
-layout(std430, binding = 8) buffer ScoreBuffer { float CubeScore[]; };  // ScoreCube: host cube.Score baseline
 
 // 3. Uniform location registry
 //layout(location = 0) uniform uint N;
@@ -120,17 +81,18 @@ void RotateMatInt(inout uint M, uint axis1, uint axis2, uint angleStep)
     getRow(M, axis1, col1, sign1);
     getRow(M, axis2, col2, sign2);
 
-    if (angleStep == 0)      // 90 degrees left
+    // angleStep is the number of quarter-turns: 0 = identity (no rotation), 1/2/3 = 90/180/270.
+    if (angleStep == 1)      // 90 degrees left
     {
         M = setRow(M, axis1, col2, -sign2);
         M = setRow(M, axis2, col1, sign1);
     }
-    else if (angleStep == 1) // 180 degrees
+    else if (angleStep == 2) // 180 degrees
     {
         M = setRow(M, axis1, col1, -sign1);
         M = setRow(M, axis2, col2, -sign2);
     }
-    else if (angleStep == 2) // 270 degrees (90 degrees right)
+    else if (angleStep == 3) // 270 degrees (90 degrees right)
     {
         M = setRow(M, axis1, col2, sign2);
         M = setRow(M, axis2, col1, -sign1);
@@ -205,24 +167,4 @@ float GetActiveCubieError(uint cubieMatrix, float maxClusterState, float max_fA)
     if (d != 0u)
         return (maxClusterState + float(d)) / max_fA;
     return 0.0;
-}
-
-// Single source of truth for scoring a cube state against the current active/solved cluster.
-// The ScoreCube kernel runs this on the starting cube to produce the host's cube.Score baseline,
-// so the CPU no longer mirrors the metric. The evaluators compute the same value per gene-prefix,
-// kept inline (micro is serial, macro is a parallel reduction). A disturbed solved cubie counts as
-// +1 (integer, dominant); active cubies contribute fractional magnitude with the <=N endgame
-// amplification. Keep this in sync with the two evaluators' inline scoring.
-float scoreState(uint cubies[CUBIES_COUNT]) {
-    float maxClusterState = float(MAX_CUBIE_STATE) * float(countActive);
-    float max_fA = maxClusterState * (float(countActive) + 1.0);
-    float fA = 0.0; uint scrambled = 0u; uint solved_err = 0u;
-    for (uint i = 0u; i < countActive; i++) {
-        float e = GetActiveCubieError(cubies[ActiveCubies[i]], maxClusterState, max_fA);
-        fA += e; if (e != 0.0) scrambled++;
-    }
-    if (scrambled > 0u && scrambled <= uint(N)) fA *= float(N) / float(scrambled);
-    for (uint i = 0u; i < countSolved; i++)
-        if (cubieL1(cubies[SolvedCubies[i]]) != 0u) solved_err++;
-    return float(solved_err) + fA;
 }

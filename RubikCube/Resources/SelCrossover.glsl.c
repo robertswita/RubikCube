@@ -6,9 +6,10 @@
 // by the bitonic sort. Children are written to NewPopulation (binding 6).
 layout(local_size_x = 64) in;
 
-// Inverse move: keep axis/plane/slice, negate the angle (0<->2, 1 stays). Matches TMove.GetRevCode.
+// Inverse move: keep axis/plane/slice, negate the angle in quarter-turns (1<->3, 2 and 0 stay).
+// Matches TMove.GetRevCode.
 uint getRevCode(uint code) {
-    return (code & ~3u) | (2u - (code & 3u));
+    return (code & ~3u) | ((4u - (code & 3u)) & 3u);
 }
 
 void main() {

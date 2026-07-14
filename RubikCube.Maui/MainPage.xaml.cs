@@ -334,7 +334,7 @@ public partial class MainPage : ContentPage
 
             if (_frameNo <= FrameCount)
             {
-                double angle = 90 * (_currentMove.Angle + 1);
+                double angle = 90 * _currentMove.Angle;
                 if (angle > 180) angle -= 360;
                 angle *= (double)_frameNo / FrameCount;
                 _actSlice!.Transform = new TAffine();

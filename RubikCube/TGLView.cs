@@ -18,15 +18,34 @@ namespace TGL
         }
         // Kontrolka rysuje swoje wnętrze w odpowiedzi na komunikat okna WM_PAINT. 
         // Nadpiszemy handler tego komunikatu - OnPaint i wywołamy w nim metodę DrawScene kontekstu:
-        protected override void OnPaint(PaintEventArgs e)
+        // Kontekst GL tworzymy dokładnie wtedy, gdy powstaje uchwyt okna - symetrycznie do OnHandleDestroyed,
+        // zamiast leniwie w OnPaint. W trybie projektanta pomijamy: designer tworzy uchwyt kontrolki, a
+        // kontekst GL + Gpu.Init w jego procesie wywaliłyby ładowanie formatki.
+        protected override void OnHandleCreated(EventArgs e)
         {
-            if (Context.Handle != IntPtr.Zero)
-                Context.DrawView();
+            base.OnHandleCreated(e);
+            //if (!DesignMode)
+                Context.Create();
         }
 
-        public void Recreate()
+        protected override void OnPaint(PaintEventArgs e)
         {
-            RecreateHandle();
+            //if (DesignMode)
+            //{
+            //    e.Graphics.Clear(BackColor);
+            //    return;
+            //}
+            Context.DrawView();   // kontekst istnieje od OnHandleCreated; DrawView i tak strzeże HRC
+        }
+
+        // Kontekst GL jest przywiązany do prywatnego DC tej kontrolki (CS_OWNDC), więc zwalniamy go
+        // dokładnie wtedy, gdy ginie uchwyt okna - przy zamknięciu formy i przy RecreateHandle.
+        // Release() zeruje HRC, więc następny paint leniwie odbuduje świeży kontekst na nowym DC.
+        // Dzięki temu całe GL zostaje w TGLContext, a formatka nie dotyka funkcji GL/Win32.
+        protected override void OnHandleDestroyed(EventArgs e)
+        {
+            Context.Release();
+            base.OnHandleDestroyed(e);
         }
 
         // Kontekst DC kontrolki będzie kontekstem prywatnym, tworzonym razem z oknem kontrolki

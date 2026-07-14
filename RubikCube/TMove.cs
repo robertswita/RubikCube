@@ -68,10 +68,11 @@ namespace RubikCube
 
 
         //public static int GetRevCode(int code) { return code + 2 * (1 - code % 3); }
+        // Inverse move: keep axis/plane/slice, negate the angle in quarter-turns (1<->3, 2 and 0 stay).
         public static int GetRevCode(int code)
         {
             int oldAngle = code & 3;
-            int newAngle = 2 - oldAngle;
+            int newAngle = (4 - oldAngle) & 3;
             return (code & ~3) | newAngle;
         }
 

@@ -13,7 +13,7 @@ namespace RubikCube
         public int StartPos;
         public int StopPos;
         public int BestMovesCount;
-        public static List<int> FreeMoves;
+        //public static List<int> FreeMoves;
         public static TRubikCube RubikCube;
         public static List<List<int>> RevSeqs;
         public static int HighScore;
@@ -42,7 +42,7 @@ namespace RubikCube
         }
         public override void MutateGene(int idx)
         {
-            Genes[idx] = FreeMoves[Rnd.Next(FreeMoves.Count)];
+            Genes[idx] = RubikCube.FreeMoves[Rnd.Next(RubikCube.FreeMoves.Count)];
             //if (idx == GenesLength - 1)
             //{
             //    //Check();
@@ -326,8 +326,8 @@ namespace RubikCube
                     if (prevMove.Plane != move.Plane) break;
                     if (prevMove.Slice == move.Slice)
                     {
-                        var angle = ((move.Angle + prevMove.Angle + 2) & 3) - 1;
-                        if (angle >= 0)
+                        var angle = (move.Angle + prevMove.Angle) & 3;   // compose quarter-turns mod 4
+                        if (angle > 0)
                         {
                             prevMove.Angle = angle;
                             Genes[prevIdx] = prevMove.Encode();

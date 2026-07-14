@@ -52,7 +52,7 @@ void main()
             if (cubieL1(local_cubies[SolvedCubies[i]]) != 0u)
                 local_solved_errors += 1;
         float current_step_fitness = float(local_solved_errors) + local_fA_sum;
-        if (!changed) current_step_fitness += 1e6;   // a no-op on the active cluster is not a solution
+        if (!changed) current_step_fitness += float(2 * CUBIES_COUNT);   // no-op on the active cluster: rank below every real move (max real fitness <= CUBIES_COUNT, since solved+active = CUBIES_COUNT and the active term <= 1)
         if (current_step_fitness < specimen_best_fitness) {
             specimen_best_fitness = current_step_fitness;
             specimen_best_moves_count = uint(m + 1);

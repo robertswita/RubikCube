@@ -495,7 +495,6 @@
             Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             Name = "TRubikForm";
             Text = "Rubik's Cube";
-            FormClosed += TRubikForm_FormClosed;
             Load += TRubikForm_Load;
             panel1.ResumeLayout(false);
             panel1.PerformLayout();

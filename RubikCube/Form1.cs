@@ -5,11 +5,9 @@ using System.Data;
 using System.Drawing;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using TGL;
 using System.Diagnostics;
-using System.Threading;
 using System.IO;
 using GA;
 
@@ -32,16 +30,16 @@ namespace RubikCube
         //public TCamera Camera;
         //TGA<TRubikGenome> Ga;
         TRubikGenome Best;
-        TShape Root = new TShape();
+        TScene Scene = new TScene();
+        TLight Light = new TLight();
         //int Scrambled;
         public TRubikForm()
         {
             InitializeComponent();
-            //Camera = tglView1.Context.Camera;
+            tglView1.Context.Scene = Scene;
             //Camera.Parent = Scene.Root;
-            //var light = new TLight();
-            //light.Parent = Camera;
-            //light.Origin = new TVector(0, 0, 1);
+            Light.Parent = Scene.Root;
+            //Light.Transform.Origin = new TVector(0, 0, 1);
             //TransparencyBox.Checked = true;
             tglView1.MouseWheel += TglView1_MouseWheel;
         }
@@ -49,7 +47,7 @@ namespace RubikCube
         private void TglView1_MouseWheel(object sender, MouseEventArgs e)
         {
             for (int i = 0; i < TAffine.Planes.Length; i++)
-                Root.Rotate(i, (float)e.Delta / 60);
+                RubikCube.Rotate(i, (float)e.Delta / 60);
             //Root.Rotate(Math.Min(TAffine.Planes.Length - 1, 2), (float)e.Delta / 60);
             //Root.Rotate(Math.Min(TAffine.Planes.Length - 1, 3), (float)e.Delta / 60);
             tglView1.Invalidate();
@@ -57,9 +55,9 @@ namespace RubikCube
 
         private void TRubikForm_Load(object sender, EventArgs e)
         {
-            tglView1.Context.Root = Root;
+            //tglView1.Context.Root = Scene.Root;
             RubikCube = new TRubikCube();
-            RubikCube.Parent = Root;
+            RubikCube.Parent = Scene.Root;
             //LoadSolutions();
         }
 
@@ -77,8 +75,8 @@ namespace RubikCube
                 var rot = new TVector();
                 rot.Y = 180 * (e.X - StartPos.X) / tglView1.Width;
                 rot.X = 180 * (e.Y - StartPos.Y) / tglView1.Height;
-                Root.Rotate(1, rot.Y);
-                Root.Rotate(0, rot.X);
+                RubikCube.Rotate(1, rot.Y);
+                RubikCube.Rotate(0, rot.X);
                 tglView1.Invalidate();
                 StartPos = e.Location;
             }
@@ -112,7 +110,7 @@ namespace RubikCube
                 FrameNo++;
                 if (FrameNo <= FrameCount)
                 {
-                    double angle = 90 * (move.Angle + 1);
+                    double angle = 90 * move.Angle;
                     if (angle > 180) angle -= 360;
                     angle *= (double)FrameNo / FrameCount;
                     ActSlice.Transform = TAffine.CreateRotation(move.Plane, angle);
@@ -266,60 +264,18 @@ namespace RubikCube
             {
                 chart1.Series[0].Points.Clear();
                 RubikCube.NextCluster();
-                if (RubikCube.ActiveCubie != null)
-                {
-                    TRubikGenome.FreeMoves = RubikCube.GetFreeMoves();
-                    RubikCube.GetSolveSeq();
-                    RubikCube.Score = Gpu.ScoreCube(RubikCube);
-                }
+                //if (RubikCube.ActiveCubie != null)
+                //{
+                //    TRubikGenome.FreeMoves = RubikCube.GetFreeMoves();
+                //    RubikCube.GetSolveSeq();
+                //    RubikCube.Score = Gpu.ScoreCube(RubikCube);
+                //}
             }
             if (RubikCube.ActiveCubie != null)
             {
                 IterElapsed = TimeSpan.Zero;
                 StartGACount = GACount;
-
-                //TChromosome.GenesLength = 32;
                 TRubikGenome.RubikCube = RubikCube;
-                TRubikGenome.FreeMoves = RubikCube.GetFreeMoves();
-                //TRubikGenome.Genesis(new List<TRubikGenome>(), 1);
-                //////Ga.GenerationsCount = 50;
-                //////var level = 1 + (int)(10 - HighScore / 10) + RubikCube.SolvedCubies.Count;
-                ////TGA<TRubikGenome>.PopulationCount = 512;//TRubikGenome.FreeMoves.Count * 100;
-                ////Ga.WinnerRatio = 0.1;
-                ////Ga.MutationRatio = 0.01;// .3;// .5;// 1.5;// 0.05;
-                ////Ga.MutationAuxRatio = 0.01;// 0.1;// .1;// .05;// .05;// 1.5;// 0.05;
-                ////Ga.Select = TRubikGenome.SelectUnique;
-                ////Ga.NextGeneration = TRubikGenome.NextGeneration;
-                //////Ga.SelectionType = TGA<TRubikGenome>.TSelectionType.Unique;
-                ////Ga.Evaluate = TRubikGenome.Evaluate;
-                ////Ga.Progress = OnProgress;
-                ////Ga.HighScore = HighScore;
-                ////Ga.Genesis = TRubikGenome.Genesis;
-                //OpenGL.BindBuffer(OpenGL.GL_SHADER_STORAGE_BUFFER, tglView1.Context.SsboCubies[0]);
-                //var matSize = TAffine.N * TAffine.N;
-                //var pos = 0;
-                //var buffer = new float[(matSize + TAffine.N) * RubikCube.Cubies.Length];
-                //for (int i = 0; i < RubikCube.Cubies.Length; i++)
-                //{
-                //    Array.Copy(RubikCube.Cubies[i].Transform.M.Data, 0, buffer, pos, matSize);
-                //    pos += matSize;
-                //    Array.Copy(RubikCube.Cubies[i].Transform.Origin.Data, 0, buffer, pos, TAffine.N);
-                //    pos += TAffine.N;
-                //}
-                //OpenGL.BufferDatafv(OpenGL.GL_SHADER_STORAGE_BUFFER, buffer​, OpenGL.GL_STATIC_DRAW);
-                //OpenGL.BindBuffer(OpenGL.GL_SHADER_STORAGE_BUFFER, tglView1.Context.SsboActiveCubies[0]);
-                //var idxBuffer = new int[RubikCube.ActiveCluster.Count];
-                //for (int i = 0; i < idxBuffer.Length; i++)
-                //    idxBuffer[i] = RubikCube.ActiveCluster[i].StartIndex;
-                //OpenGL.BufferDataiv(OpenGL.GL_SHADER_STORAGE_BUFFER, idxBuffer​, OpenGL.GL_STATIC_DRAW);
-                //OpenGL.BindBuffer(OpenGL.GL_SHADER_STORAGE_BUFFER, tglView1.Context.SsboSolvedCubies[0]);
-                //idxBuffer = new int[RubikCube.SolvedCubies.Count];
-                //for (int i = 0; i < idxBuffer.Length; i++)
-                //    idxBuffer[i] = RubikCube.SolvedCubies[i].StartIndex;
-                //OpenGL.BufferDataiv(OpenGL.GL_SHADER_STORAGE_BUFFER, idxBuffer​, OpenGL.GL_STATIC_DRAW);
-                //TRubikGenome best = null;
-                //if (Moves.Count == 0)
-                    //Ga.Execute();
                 Best = Gpu.ExecuteGA();
                 Iteration += Gpu.GenerationsCount;
                 Stall++;
@@ -333,16 +289,6 @@ namespace RubikCube
                 {
                     Stall = 0;
                     OnProgress(Best);
-                    //Ga.Best.Correct();
-                    //Ga.Best.Evaluate();
-                    //Iteration = 0;
-                    //HighScore = Ga.HighScore;
-                    //Ga.Best.Correct();
-                    //for (int i = Ga.Best.StartIndex; i < Ga.Best.BestMovesCount; i++)
-                    //    Moves.Add(TMove.Decode((int)Ga.Best.Genes[i]));
-                    //if (Ga.Best.FromPredict)
-                    //    for (int i = 0; i < Ga.Best.PredictSeq.Count; i++)
-                    //        Moves.Add(Ga.Best.PredictSeq[i]);
                     Best.Correct();
                     for (int i = 0; i < Best.BestMovesCount; i++)
                         Moves.Add(TMove.Decode((int)Best.Genes[i]));
@@ -354,17 +300,17 @@ namespace RubikCube
                     foreach (var solution in Solutions)
                     {
                         var tryMoves = DecodeSolution(solution.Value);
-                        for (int j = -1; j < 0 * TRubikGenome.FreeMoves.Count; j++)
+                        for (int j = -1; j < 0 * RubikCube.FreeMoves.Count; j++)
                         {
                             var moves = new List<TMove>();
                             if (j < 0)
                                 moves.AddRange(tryMoves);
                             else
                             {
-                                var move = TMove.Decode(TRubikGenome.FreeMoves[j]);
+                                var move = TMove.Decode(RubikCube.FreeMoves[j]);
                                 moves.Add(move);
                                 moves.AddRange(tryMoves);
-                                move = TMove.Decode(TRubikGenome.FreeMoves[j]);
+                                move = TMove.Decode(RubikCube.FreeMoves[j]);
                                 move.Angle = 2 - move.Angle;
                                 moves.Add(move);
                             }
@@ -522,19 +468,6 @@ namespace RubikCube
 
         private void saveToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            //var S = new StreamWriter(Application.StartupPath + "\\Moves.txt");
-            //using (S)
-            //{
-            //    for (int i = 0; i < AllMoves.Count; i++)
-            //    {
-            //        var move = AllMoves[i];
-            //        S.Write(move.Axis);
-            //        S.Write(";");
-            //        S.Write(move.Slice);
-            //        S.Write(";");
-            //        S.WriteLine(move.Angle);
-            //    }
-            //}
             saveFileDialog1.InitialDirectory = Application.StartupPath;
             if (saveFileDialog1.ShowDialog() == DialogResult.OK)
                 SaveConfig(saveFileDialog1.FileName);
@@ -542,27 +475,9 @@ namespace RubikCube
 
         private void openToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            //Moves.Clear();
-            //var S = new StreamReader(Application.StartupPath + "\\Moves.txt");
-            //using (S)
-            //{
-            //    while (!S.EndOfStream)
-            //    {
-            //        var line = S.ReadLine().Split(';');
-            //        var move = new TMove();
-            //        move.Axis = int.Parse(line[0]);
-            //        move.Slice = int.Parse(line[1]);
-            //        move.Angle = int.Parse(line[2]);
-            //        Moves.Add(move);
-            //    }
-            //}
-            //MoveNo = 0;
-            //timer1.Start();
             openFileDialog1.InitialDirectory = Application.StartupPath;
             if (openFileDialog1.ShowDialog() == DialogResult.OK)
-            {
                 LoadConfig(openFileDialog1.FileName);
-            }
         }
 
         string ConfigPath = "Config.bin";
@@ -584,10 +499,9 @@ namespace RubikCube
             var S = new StreamReader(fileName);
             using (S)
             {
-                Root = null;
+                Scene.Root = null;
                 DimsBox.Value = int.Parse(S.ReadLine());
                 SlicesBox.Value = int.Parse(S.ReadLine());
-                Root = new TShape();
                 UpdateView();
                 RubikCube.Code = S.ReadToEnd();
             }
@@ -596,37 +510,33 @@ namespace RubikCube
         private void stateSpaceToolStripMenuItem_Click(object sender, EventArgs e)
         {
             var spaceForm = new TSpaceForm();
-            //spaceForm.Solutions = Solutions;
             spaceForm.ShowDialog();
         }
 
         private void numericUpDown1_ValueChanged(object sender, EventArgs e)
         {
             TRubikCube.Size = (int)SlicesBox.Value;
-            //tglView1.Context.SetDefineValue("SIZE", (int)SlicesBox.Value);
-            //tglView1.Context.RebuildShaders();
             UpdateView();
         }
 
         void UpdateView()
         {
-            if (Root != null)
+            if (Scene.Root != null)
             {
-                Root = new TShape();
+                Scene.Root = new TShape();   // TScene.Root setter re-establishes the scene back-link
                 RubikCube = new TRubikCube();
-                RubikCube.Parent = Root;
-                tglView1.Context.Root = Root;
+                RubikCube.Parent = Scene.Root;
+
+                // The light persists across dimension changes, but its affine transform is sized to
+                // TAffine.N at construction time - stale after N changed, and GatherInstances does
+                // parent(N-D) * light.Transform. Rebuild it for the current N (identity + origin on Z)
+                // before re-attaching the light to the freshly created Root.
+                Light.Transform = new TAffine();
+                Light.Parent = Scene.Root;
+
                 tglView1.Invalidate();
                 StateBox.Invalidate();
                 Moves.Clear();
-                //OpenGL.BindBuffer(OpenGL.GL_SHADER_STORAGE_BUFFER, tglView1.Context.SsboPlanes[0]);
-                //var buffer = new float[TAffine.Planes.Length * 2];
-                //for (int i = 0; i < TAffine.Planes.Length; i++)
-                //{
-                //    buffer[2 * i] = TAffine.Planes[i][0];
-                //    buffer[2 * i + 1] = TAffine.Planes[i][1];
-                //}
-                //OpenGL.BufferDatafv(OpenGL.GL_SHADER_STORAGE_BUFFER, buffer, OpenGL.GL_STATIC_DRAW);
             }
         }
 
@@ -648,7 +558,7 @@ namespace RubikCube
             TRubikCube.Size = 7;
             RubikCube.Parent = null;
             RubikCube = new TRubikCube();
-            RubikCube.Parent = Root;
+            RubikCube.Parent = Scene.Root;
 
             var cubies = new List<TCubie>();
             cubies.Add(RubikCube.Cubies[0]);
@@ -736,12 +646,6 @@ namespace RubikCube
         private void label12_Click(object sender, EventArgs e)
         {
 
-        }
-
-        private unsafe void TRubikForm_FormClosed(object sender, FormClosedEventArgs e)
-        {
-            Win32.wglMakeCurrent(IntPtr.Zero, IntPtr.Zero);
-            Win32.wglDeleteContext(tglView1.Context.Handle);
         }
     }
 }

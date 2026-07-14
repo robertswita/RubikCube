@@ -254,6 +254,23 @@ namespace TGL
       return angles;
         }
 
+        public uint OrthoPack()
+        {
+            int bitsForCol = TAffine.N <= 4 ? 2 : 3;
+            int bitsPerRow = bitsForCol + 1;
+            uint m = 0;
+            for (int row = 0; row < TAffine.N; row++)
+            {
+                int nzCol = 0;
+                float nz = 0;
+                for (int col = 0; col < TAffine.N; col++)
+                    if (Math.Abs(M[row, col]) > Math.Abs(nz)) { nz = M[row, col]; nzCol = col; }
+                uint sign = nz < 0 ? 1u : 0u;
+                m |= ((sign << bitsForCol) | (uint)nzCol) << (row * bitsPerRow);
+            }
+            return m;
+        }
+
 
         //public List<TVector> GetReversedEulerAngles()
         //{
@@ -360,102 +377,6 @@ namespace TGL
 
 
     };
-
-public static class SimpleHypercubeOrientationCoder
-    {
-        // Statyczna tablica silni dla szybkiego dostępu (obsługuje wymiary do N=12)
-        private static int[] Factorials = { 1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916800, 479001600 };
-
-        /// <summary>
-        /// Koduje macierz obrotu do indeksu, zapisując WSZYSTKIE N bitów znaków.
-        /// </summary>
-        public static int MatrixToIndex(int[,] matrix)
-        {
-            int n = matrix.GetLength(0);
-
-            Span<int> permutation = stackalloc int[n];
-            int signIndex = 0;
-
-            // 1. Jednoczesne wyciąganie permutacji i pakowanie WSZYSTKIECH N znaków jako bity
-            for (int i = 0; i < n; i++)
-            {
-                for (int j = 0; j < n; j++)
-                {
-                    if (matrix[i, j] != 0)
-                    {
-                        permutation[i] = j;
-                        if (matrix[i, j] > 0)
-                        {
-                            signIndex |= (1 << i); // Ustaw bit na 1 dla znaku dodatniego (+)
-                        }
-                        break;
-                    }
-                }
-            }
-
-            // 2. Indeksowanie permutacji (Kod Lehmera)
-            int permIndex = 0;
-            Span<bool> used = stackalloc bool[n];
-
-            for (int i = 0; i < n; i++)
-            {
-                int currentVal = permutation[i];
-                int smallerCount = 0;
-
-                for (int j = 0; j < currentVal; j++)
-                {
-                    if (!used[j]) smallerCount++;
-                }
-
-                permIndex += smallerCount * Factorials[n - 1 - i];
-                used[currentVal] = true;
-            }
-
-            // 3. Łączenie: Przesuwamy permutację o N bitów (zamiast N-1) i doklejamy znaki
-            return (permIndex << n) | signIndex;
-        }
-
-        /// <summary>
-        /// Dekoduje indeks w sposób uproszczony – bez liczenia wyznacznika/parzystości.
-        /// </summary>
-        public static int[,] IndexToMatrix(int index, int n)
-        {
-            int[,] matrix = new int[n, n];
-
-            // Rozdzielenie bitowe na podstawie pełnego wymiaru N
-            int signMask = (1 << n) - 1;
-            int signIndex = index & signMask;
-            int permIndex = (int)((uint)index >> n);
-
-            // 1. Odtworzenie permutacji z kodu Lehmera (liniowy krok)
-            Span<int> permutation = stackalloc int[n];
-            Span<int> availableCols = stackalloc int[n];
-            for (int i = 0; i < n; i++) availableCols[i] = i;
-
-            int tempPerm = permIndex;
-            for (int i = 0; i < n; i++)
-            {
-                int factVal = Factorials[n - 1 - i];
-                int choiceIndex = tempPerm / factVal;
-                tempPerm %= factVal;
-
-                permutation[i] = availableCols[choiceIndex];
-                for (int j = choiceIndex; j < n - 1 - i; j++)
-                {
-                    availableCols[j] = availableCols[j + 1];
-                }
-            }
-
-            // 2. Bezpośrednie wpisanie wartości do macierzy na podstawie bitów znaków
-            for (int i = 0; i < n; i++)
-            {
-                int sign = ((signIndex & (1 << i)) != 0) ? 1 : -1;
-                matrix[i, permutation[i]] = sign;
-            }
-
-            return matrix;
-        }
-    }
 
 }
 

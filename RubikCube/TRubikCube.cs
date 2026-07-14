@@ -19,7 +19,6 @@ namespace RubikCube
         public List<TCubie> SolvedCubies = new List<TCubie>();
         public static List<int> EulerOrder;
         public static bool IsEulerOrderReversed;
-        public static List<int>[,] SliceCubiesIndices;
         public float Score;
 
         //sbyte[] Transforms;
@@ -78,7 +77,7 @@ namespace RubikCube
             TCubie.SizeMatrix = new TMatrix(size, 1);
             TCubie.SizeMatrix.DimSizes = dimSizes;
             TCubie.MaxScore = 1 << 2 * TAffine.Planes.Length;
-            TCubie.Cube = CreateHyperCube();
+            //TCubie.Cube = CreateHyperCube();
             //TMove.UpdateSizeMatrix();
             C = (Size - 1) / 2f;
             Scale(scale);
@@ -92,20 +91,6 @@ namespace RubikCube
                 cubie.Parent = this;
                 Cubies[i] = cubie;
             }
-
-
-            //SliceCubiesIndices = new List<int>[TAffine.N, Size];
-            //for (int axis = 0; axis < TAffine.N; axis++)
-            //    for (int slice = 0; slice < Size; slice++)
-            //    {
-            //        var indices = new List<int>();
-            //        foreach (var cubie in Cubies)
-            //        {
-            //            var v = cubie.GetPos(axis);
-            //            if (v == slice) indices.Add(cubie.Index);
-            //        }
-            //        SliceCubiesIndices[axis, slice] = indices;
-            //    }
         }
 
         public TRubikCube(TRubikCube src)
@@ -166,8 +151,6 @@ namespace RubikCube
                 if (v == move.Slice)
                     selection.Add(cubie);
             }
-            //if (selection.Count != Cubies.Length / Size)
-            //    ;
             return selection;
         }
 
@@ -176,7 +159,7 @@ namespace RubikCube
         public void Turn(TMove move)
         {
             var plane = TAffine.Planes[move.Plane];
-            var rot = TCubie.SetAngle(move.Angle + 1);
+            var rot = TCubie.SetAngle(move.Angle);
             foreach (var cubie in Cubies)
                 if (cubie.GetPos(move.Axis) == move.Slice)
                     cubie.Rotate(plane, rot);
@@ -189,30 +172,15 @@ namespace RubikCube
         // getStartCoordinate after the axis-order fix.
         public uint[] PackCubies()
         {
-            int bitsForCol = TAffine.N <= 4 ? 2 : 3;
-            int bitsPerRow = bitsForCol + 1;
             var packed = new uint[Cubies.Length];
             for (int id = 0; id < Cubies.Length; id++)
-            {
-                var t = Cubies[id].Transform.M;
-                uint m = 0;
-                for (int row = 0; row < TAffine.N; row++)
-                {
-                    int bestCol = 0;
-                    float best = 0;
-                    for (int col = 0; col < TAffine.N; col++)
-                        if (Math.Abs(t[row, col]) > Math.Abs(best)) { best = t[row, col]; bestCol = col; }
-                    uint sign = best < 0 ? 1u : 0u;
-                    m |= ((sign << bitsForCol) | (uint)bestCol) << (row * bitsPerRow);
-                }
-                packed[id] = m;
-            }
+                packed[id] = Cubies[id].Transform.OrthoPack();
             return packed;
         }
 
-        // Cube scoring lives on the GPU now (Gpu.ScoreCube -> scoreState in Setup.glsl.c), a single
-        // source of truth for the metric. The old host mirror (EvaluateGpu + CubieL1/ActiveAxes/
-        // CubieState) was removed so the two can no longer drift.
+        // Cube scoring lives on the GPU now (Gpu.ScoreCube evaluates a zero specimen with the same
+        // evaluator the GA uses - one scorer, no separate kernel). The old host mirror (EvaluateGpu +
+        // CubieL1/ActiveAxes/CubieState) was removed so the two can no longer drift.
 
         //bool IsEvaluating;
         public float Evaluate2()
@@ -452,16 +420,19 @@ namespace RubikCube
                             var gene = move.Encode();
                             if (freeGenes.IndexOf(gene) < 0)
                             {
-                                freeGenes.Add(gene + 0);
-                                freeGenes.Add(gene + 1);
-                                freeGenes.Add(gene + 2);
+                                freeGenes.Add(gene + 1);   // 90
+                                freeGenes.Add(gene + 2);   // 180
+                                freeGenes.Add(gene + 3);   // 270  (angle 0 = identity, excluded)
                             }
                         }
             return freeGenes;
         }
 
+        List<int> freeMoves;
+        public List<int> FreeMoves => freeMoves ??= GetFreeMoves();
+        void RebuildFreeMoves() => freeMoves = null;
 
-        public List<int> GetFreeMoves()
+        List<int> GetFreeMoves()
         {
             var freeGenes = new List<int>();
             var pos = ActiveCubie.Position;
@@ -486,9 +457,9 @@ namespace RubikCube
                             var gene = move.Encode();
                             if (freeGenes.IndexOf(gene) < 0)
                             {
-                                freeGenes.Add(gene + 0);
-                                freeGenes.Add(gene + 1);
-                                freeGenes.Add(gene + 2);
+                                freeGenes.Add(gene + 1);   // 90
+                                freeGenes.Add(gene + 2);   // 180
+                                freeGenes.Add(gene + 3);   // 270  (angle 0 = identity, excluded)
                             }
                         }
             return freeGenes;
@@ -532,9 +503,9 @@ namespace RubikCube
                                 //    move.Angle = 2 - move.Angle;
                                 //    freeGenes.Add(move.Encode());
                                 //}
-                                freeGenes.Add(gene + 0);
-                                freeGenes.Add(gene + 1);
-                                freeGenes.Add(gene + 2);
+                                freeGenes.Add(gene + 1);   // 90
+                                freeGenes.Add(gene + 2);   // 180
+                                freeGenes.Add(gene + 3);   // 270  (angle 0 = identity, excluded)
                             }
                         }
                 }
@@ -579,9 +550,10 @@ namespace RubikCube
                 if (activeCluster == null)
                 {
                     activeCluster = new List<TCubie>();
-                    foreach (var cubie in Cubies)
-                        if (cubie.ClusterIndex == ActiveCubie.ClusterIndex)
-                            activeCluster.Add(cubie);
+                    if (ActiveCubie != null)
+                        foreach (var cubie in Cubies)
+                            if (cubie.ClusterIndex == ActiveCubie.ClusterIndex)
+                                activeCluster.Add(cubie);
                 }
                 return activeCluster;
             }
@@ -605,6 +577,12 @@ namespace RubikCube
             activeCluster = null;
             if (ActiveCubie == null)
                 SolvedCubies.Clear();
+            else
+            {
+                RebuildFreeMoves();
+                GetSolveSeq();
+                Score = Gpu.ScoreCube(this);
+            }
         }
 
         public int ScrambledCount()
@@ -811,11 +789,11 @@ namespace RubikCube
                 TVector rot;
                 var cand = new List<int[]>();
                 for (int plane = 0; plane < TAffine.Planes.Length; plane++)
-                    for (int angle = 0; angle < 3; angle++)
+                    for (int angle = 1; angle <= 3; angle++)   // quarter-turns: 1/2/3 = 90/180/270
                     {
                         var rotCubie = c.Copy();
                         pa = TAffine.Planes[plane];
-                        rot = TCubie.SetAngle(angle + 1);
+                        rot = TCubie.SetAngle(angle);
                         rotCubie.Rotate(pa, rot);
                         _ = rotCubie.State;
                         if (rotCubie.RotationCount == c.RotationCount - 1)
@@ -824,7 +802,7 @@ namespace RubikCube
                 //if (cand.Count == 0) break;                          // only if the rotation convention is off
                 var pick = cand[TChromosome.Rnd.Next(cand.Count)];
                 pa = TAffine.Planes[pick[0]];
-                rot = TCubie.SetAngle(pick[1] + 1);
+                rot = TCubie.SetAngle(pick[1]);
                 c.Rotate(pa, rot);
                 int axis = TChromosome.Rnd.Next(TAffine.N);          // any axis not in the plane (collateral only)
                 while (axis == pa[0] || axis == pa[1])

@@ -23,40 +23,43 @@ namespace TGL
         IntPtr HDC;
         IntPtr HRC;
         public Rectangle Viewport;
-        public TShape Root = new TShape();
+        public TScene Scene;
         public TAffine Transform = new TAffine();
 
-        public IntPtr Handle
+        public IntPtr Handle => HRC;
+
+        public void Create()
         {
-            get
-            {
-                if (HRC == IntPtr.Zero)
-                {
-                    HDC = View.CreateGraphics().GetHdc();
-                    var pfd = Win32.PIXELFORMATDESCRIPTOR.CreateDefault();
-                    var idx = Win32.ChoosePixelFormat(HDC, &pfd);
-                    Win32.SetPixelFormat(HDC, idx, &pfd);
-                    HRC = Win32.wglCreateContext(HDC);
-                    Win32.wglMakeCurrent(HDC, HRC);
-                    Gpu.Init();   // build the shared GPU-GA pipeline while this context is current
-                }
-                return HRC;
-            }
+            HDC = View.CreateGraphics().GetHdc();
+            var pfd = Win32.PIXELFORMATDESCRIPTOR.CreateDefault();
+            var idx = Win32.ChoosePixelFormat(HDC, &pfd);
+            Win32.SetPixelFormat(HDC, idx, &pfd);
+            HRC = Win32.wglCreateContext(HDC);
+            Win32.wglMakeCurrent(HDC, HRC);
+            Gpu.Init();   // buduj wspólny pipeline GPU-GA, póki kontekst jest bieżący
+        }
+
+        public void Release()
+        {
+            Win32.wglMakeCurrent(IntPtr.Zero, IntPtr.Zero);
+            Win32.wglDeleteContext(HRC);
         }
 
         internal void DrawView()
         {
-            if (Handle != IntPtr.Zero)
+            //if (Handle != IntPtr.Zero)
             {
                 Viewport = View.ClientRectangle;
-                var backColor = View.BackColor;
                 Win32.wglMakeCurrent(HDC, HRC);
-                OpenGL.ClearColor(backColor.R / 255f, backColor.G / 255f, backColor.B / 255f, 1);
-                OpenGL.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
-                OpenGL.Viewport(Viewport.Left, Viewport.Top, Viewport.Width, Viewport.Height);
                 Init();
                 //SetupCamera();
-                DrawScene();
+                // Gather the scene: per-instance world transform + alpha (unsolved cubies are translucent).
+                // Gpu.RenderScene owns the WBOIT passes (opaque -> transparent -> composite) and the clears.
+                var instances = new List<TAffine>();
+                var alphas = new List<float>();
+                GatherInstances(Scene.Root, new TAffine(), instances, alphas);
+                Gpu.UpdateLights(Scene.Lights);   // upload the scene lights (UBO) before drawing
+                Gpu.RenderScene(instances, alphas, View.BackColor, Viewport.Width, Viewport.Height);
                 Win32.SwapBuffers(HDC);
             }
         }
@@ -82,41 +85,14 @@ namespace TGL
         //    OpenGL.glMatrixMode(OpenGL.GL_MODELVIEW);
         //}
 
-        void DrawScene()
+        // Gathers the accumulated ND world transform of every face-bearing node (all cubies share one
+        // base mesh). TGLContext owns the scene graph; Gpu owns the render pipeline (Gpu.DrawCube).
+        void GatherInstances(TShape obj, TAffine parent, List<TAffine> list, List<float> alphas)
         {
-            Transform = new TAffine();
-            DrawObject(Root);
-        }
-
-        TObject3DComparer ZOrderComparer = new TObject3DComparer();
-        protected void DrawObject(TShape obj)
-        {
-            var transform = Transform.Clone();
-            Transform = Transform * obj.Transform;
-            obj.WorldTransform = Transform.Clone();
-
-            var childrenList = new List<TShape>(obj.Children);
-            if (obj.WorldTransform.Origin.Size > 2)
-                childrenList.Sort(ZOrderComparer);
-            for (int i = 0; i < obj.Children.Count; i++)
-                DrawObject(childrenList[i]);
-            OpenGL.Begin(OpenGL.GL_QUADS);
-            for (int i = 0; i < obj.Faces.Count; i++)
-            {
-                var v = obj.Vertices[obj.Faces[i]];
-                if (i % 4 == 0)
-                {
-                    var color = obj.Colors[i / 4];
-                    OpenGL.Color4ub(color.R, color.G, color.B, (byte)(255 * obj.Transparency));
-                }
-                v = Transform * v;
-                if (v.Size == 2)
-                    OpenGL.Vertex2f(v.X, v.Y);
-                else
-                    OpenGL.Vertex3f(v.X, v.Y, v.Z);
-            }
-            OpenGL.End();
-            Transform = transform;
+            var world = parent * obj.Transform;
+            if (obj.Faces.Count > 0) { list.Add(world); alphas.Add(obj.Transparency); }
+            foreach (var child in obj.Children)
+                GatherInstances(child, world, list, alphas);
         }
 
         //void gluPickMatrix(double x, double y, double w, double h)

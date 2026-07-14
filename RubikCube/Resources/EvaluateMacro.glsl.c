@@ -91,7 +91,7 @@ void main()
             if (scrambled > 0u && scrambled <= uint(N))
                 fA *= float(N) / float(scrambled);
             float current_step_fitness = float(shared_solved_errors[0]) + fA;
-            if (shared_changed[0] == 0u) current_step_fitness += 1e6;   // no-op on the active cluster is not a solution
+            if (shared_changed[0] == 0u) current_step_fitness += float(2 * CUBIES_COUNT);   // no-op on the active cluster: rank below every real move (max real fitness <= CUBIES_COUNT, since solved+active = CUBIES_COUNT and the active term <= 1)
             if (current_step_fitness < specimen_best_fitness) {
                 specimen_best_fitness = current_step_fitness;
                 specimen_best_moves_count = uint(m + 1);

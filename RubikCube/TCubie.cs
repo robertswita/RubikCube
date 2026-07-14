@@ -25,7 +25,7 @@ namespace RubikCube
         {
             Vertices = Cube.Vertices;
             Faces = Cube.Faces;
-            Colors = Cube.Colors;
+            Materials = Cube.Materials;
         }
 
         public static int GetAngle(double cosA, double sinA)
@@ -65,9 +65,8 @@ namespace RubikCube
             {
                 if (!ValidState)
                 {
-                    state = 0;
-                    //EulerAngles = Transform.GetEulerAngles(TRubikCube.EulerOrder, TRubikCube.IsEulerOrderReversed);
                     EulerAngles = Transform.GetEulerAngles(null);
+                    state = 0;
                     RotationCount = 0;
                     var shift = (EulerAngles.Count - 1) << 1;
                     for (int i = 0; i < EulerAngles.Count; i++)
@@ -76,9 +75,7 @@ namespace RubikCube
                         state |= angle << shift;
                         shift -= 2;
                         if (angle > 0)
-                        {
                             RotationCount++;
-                        }
                     }
                     //var RotationCount2 = TAffine.N;
                     //for (int i = 0; i < TAffine.N; i++)
@@ -96,12 +93,6 @@ namespace RubikCube
                     //    ;                    
 
                     ValidState = true;
-                    //for (int i = 0; i < TAffine.N; i++)
-                    //    if (Math.Abs(Transform.M[i, i] - Scaling[i]) > 1E-3)
-                    //    {
-                    //        state = 1;
-                    //        break;
-                    //    }
                 }
                 return state;
             }
@@ -114,14 +105,8 @@ namespace RubikCube
                     var shift = (TAffine.Planes.Length - 1 - i) << 1;
                     Transform.Rotate(i, 90 * (value >> shift & 3));
                 }
-                ValidState = false;
-                var state_ = State;
-                if (state_ != value)
-                    ;
                 state = value;
                 ValidState = true;
-                //if (state != 0)
-                //    Transparency = 0.5f;
             }
         }
 

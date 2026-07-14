@@ -41,7 +41,7 @@ namespace RubikCube
                 for (int j = 0; j < solution.Count; j++)
                 {
                     var move = solution[j];
-                    var scale = 20 * (move.Angle + 1);
+                    var scale = 20 * move.Angle;
                     Size v = new Size((move.Slice - 1) * scale, (move.Plane - 1) * scale);
                     actPos += v;
                     pts.Add(actPos);

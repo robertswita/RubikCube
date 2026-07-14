@@ -21,7 +21,9 @@ namespace TGL
         public List<TVector> Vertices = new List<TVector>();
         public List<int> Faces = new List<int>();
         public List<TShape> Children = new List<TShape>();
-        public List<Color> Colors = new List<Color>();
+        //public List<Color> Colors = new List<Color>();
+        public List<TMaterial> Materials = new List<TMaterial>();
+        public List<TVector> UV = new List<TVector>();
         public List<TVector> EulerAngles;
 
         TShape _Parent;
@@ -36,6 +38,24 @@ namespace TGL
                 _Parent?.Children.Add(this);
             }
         }
+        public TShape Root
+        {
+            get
+            {
+                var root = this;
+                while (root.Parent != null)
+                    root = root.Parent;
+                return root;
+            }
+        }
+
+        TScene scene;
+        public TScene Scene
+        {
+            get { return Root?.scene; }
+            set { scene = value; }
+        }
+
         public TAffine Transform = new TAffine();
         //TAffine transform = new TAffine();
         //public TAffine Transform
@@ -145,7 +165,15 @@ namespace TGL
                     cube.Faces.Add(firstIdx | axis1);
                     cube.Faces.Add(firstIdx | axis1 | axis2);
                     cube.Faces.Add(firstIdx | axis2);
-                    cube.Colors.Add(pal[255 * colorIdx / colorCount]);
+                    cube.UV.Add(new TVector(0, 0));
+                    cube.UV.Add(new TVector(1, 0));
+                    cube.UV.Add(new TVector(1, 1));
+                    cube.UV.Add(new TVector(0, 1));
+                    // A fresh material per face: TMaterial is a reference type, so one shared instance
+                    // would give every face of the plane the last colour written (colours "duplicate").
+                    var mat = new TMaterial();
+                    mat.Diffuse.Color = pal[255 * colorIdx / colorCount];
+                    cube.Materials.Add(mat);
                     colorIdx++;
                 }
             }
