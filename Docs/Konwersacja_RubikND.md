@@ -18155,3 +18155,107 @@ Więc — **odpuśćmy drugi człon ku koherencji.** Nie jest wart ani kosztu, a
 I dobra wiadomość: **nie potrzebujemy go.** Strona wyceny jest teraz naprawdę dobra — drabina `1/logs` bogata, bez kolizji, wszystko koherentne pod floorem, celuje w bramę. To, czego brakuje, to **dojście** do tych struktur = zebranie = **problem search**, nie wyceny. A właściwy lewar na to już pociągnąłeś: **DFS-seedy**. Metryka ma nagradzać *wynik* zebrania (i nagradza), a *znajdowaniem* ruchu ma się zająć seed + STALL.
 
 Zostaw floor jaki jest (neutralny `avg(d)` jako rozjemca — niech nie walczy o koherencję), puść z DFS-seedami i zobaczmy, czy z eight-pairs (1.75) potrafi teraz scalić ku bramie. Jeśli po DFS *dalej* wisi — to znak, że brakuje nie gradientu, tylko **głębokości/eskejpu** (dłuższe seedy, niższy STALL_LIMIT), a nie że metryka jest zła.
+
+## 🧑 Robert
+
+Poczekam jeszcze chwilę, ale z DFS-em obliczenia są powolne, a postęp niewidoczny do momentu jakiegoś trafienia/przełomu. Myślę, że masz rację, że doprowadziliśmy tą gałąź do porządku - jest poprawna merytorycznie i nie widać możliwości większego skoku w przód lub gruntownej poprawy. 2^5 to bardzo trudny problem dla niej. Spróbujemy za chwilę z innej strony i to raczej właśnie kandydat E (a nie np. D4) wydaje mi się odpowiedni
+
+
+## 🤖 Claude
+
+Zapisałem stan tej gałęzi do pamięci, żeby nie odtwarzać jej od zera.
+
+Zgadzam się z Twoją oceną — i to jest zdrowa decyzja, nie kapitulacja. Doprowadziliśmy drabinę do stanu, który jest **merytorycznie poprawny i domknięty**: `1/logs` daje rozłączne pasma bez kolizji, wszystko pod floorem, brama = 1, floor = N spójny z kotwicą, subkoherentne połówki na miejscu. Metryka **widocznie się wspina** (scattered-4 err 15 → koherentna-16 err ~7.6) — czyli robi dokładnie to, co ma robić. To, że 2^5 się nie domyka, to nie wada wyceny, tylko twardy **problem przeszukiwania** — a on jest po prostu bardzo trudny dla czystego, uniformowego GA. Zgodnie z tym, po co ta kostka w ogóle jest: to ćwiczenie z geometrii i wyobraźni, nie szybki solver. Rozpoznać „poprawne, ale ograniczone" i nie młócić dalej tej samej gałęzi — to dobra robota.
+
+Co do DFS: tak, wolno i bez widocznego postępu aż do trafienia — to jest ten ogon Las Vegas. Metryka dała gradient, reszta to długoogonowy zakład search.
+
+I trafnie: **E, nie D4**. Nasza cała ostatnia praca to w gruncie rzeczy wyrafinowany E — **dekompozycja per-stan po grupach** (`log2(g)`), tylko okiełznana bramką symetrii i wygładzona `1/logs`. E miał słuszny rdzeń (per-state g), a wywalał go współczynnik i asymetria — to naprawiliśmy. D4 (gładka baza) to znany przegrany, bo klif jest nośny dla peela. Więc lineaż E jest właściwy.
+
+Tylko powiedz mi, co masz na myśli przez „z innej strony" — bo E-jako-metrykę już w dużej mierze wyczerpaliśmy tą drabiną. Czy chodzi Ci o E zaaplikowane do **innego lewara** (seedowanie? mechanizm GA? eskejp?), czy o świeże podejście do samej metryki w duchu E, ale inaczej pociętej? Jak naszkicujesz ten „inny kąt", to podepnę się od razu.
+
+## 🧑 Robert
+
+Ale jeszcze jedno: nasz algorytm to 2 strategie - gradient i coherence. O ile w przypadku gradientu chodzi nam o szybkie zejście do floor i trafienie w koherencję - tutaj wydaje mi się, że klasyczny kop STALL'em może bardzo pomóc - natomiast po znalezieniu jakiegoś koherencyjnego układu natychmiast trzena byłoby przełączyć się na aktualny tryb STALL. Co o tym sądzisz?
+
+
+## 🤖 Claude
+
+Podoba mi się — i to jest naturalne rozszerzenie „dwóch strategii". Regime-adaptacyjny STALL, i co ważne: **łatwo wykrywalny**. Mamy już sygnał reżimu za darmo — `koszt < floor` = jesteśmy na drabinie koherencji, `koszt == floor` = jeszcze na floorze. Więc przełącznik jest czysty, bez nowej maszynerii.
+
+**Faza koherencji → łagodny obecny STALL: zgoda w stu procentach.** Twardy kop tam **zrzuciłby Besta z drabiny**, na którą się z trudem wspiął, z powrotem na floor. Łagodny sideways pozwala schodzić po gradiencie ku bramie. Tu nie ma o czym dyskutować.
+
+**Faza floor → kop: tu jest ciekawa historia, i muszę Ci ją uczciwie podać.** W pamięci mamy twarde: *kop na płaskim plateau 2^5 (pre-koherencja) był martwym lewarem*. Ale — mierzone **przed** drabiną, i prawdopodobny **powód**, że był martwy, jest teraz naprawiony. Dawniej nawet szczęśliwe trafienie w koherencję **nie trzymało się** — stara metryka słabo je nagradzała, więc kop-strzelba strzelał w próżnię. Teraz bogata drabina sprawia, że trafienie **się przykleja** (nagrodzone, pod floorem, GA na nim zostaje). Czyli kop na floorze, martwy wcześniej, **ma realną szansę ożyć teraz** — bo dopiero teraz trafienia zostają. To jest konkretny powód, dla którego Twój pomysł może zadziałać, choć historycznie nie działał.
+
+Jeden kontrapunkt, żebyś miał pełny obraz: ta sama pamięć mówi, że kop jest **realnym lewarem w reżimie koherencji** — do wyjścia z **zaklinowanej pod-struktury** (jak nasze eight-pairs), gdzie po kopie drabina prowadzi z powrotem w dół. Więc możliwe, że prawdziwy podział to nie „floor vs koherencja", tylko **„zaklinowany vs schodzący"**: kop, gdy Best nie drgnął przez X generacji (gdziekolwiek jest), łagodny sideways, gdy schodzi. Eight-pairs to koherencja, a jednak wołałby o kopa.
+
+Więc: **wpinaj przełącznik dwutrybowy** — jest czysty i połowa „koherencja → łagodny" na pewno słuszna. Kop-na-floorze potraktuj jako hipotezę i **zmierz trafialność** (czy podnosi wpadanie w koherencję, czy tylko miesza). A jeśli zobaczysz, że utyka też *na* drabinie (eight-pairs), to znak, że kryterium przełączania to nie floor, tylko „stoi w miejscu". Co Ty na to — startujemy od Twojego floor/koherencja, czy od razu celujemy w „stuck/schodzi"?
+
+## 🧑 Robert
+
+Moment znalezienia rozwiązania koherentntego muszę określić po stronie CPU, wspomniałeś, że można to określić po błędzie (chyba w przybliżeniu). Jak wyglądałby taki warunek?
+
+
+## 🤖 Claude
+
+Tak, działa — i to całkiem dokładnie, bo licznik się skraca. Wyprowadzenie w skrócie:
+
+```
+fitness = local_fA_sum · cost/scrambled ≈ (scrambled·M) · cost/scrambled = M · cost
+M = maxClusterState/max_fA = 1/(countActive+1)
+⟹  cost ≈ fitness · (countActive+1)
+```
+
+Czyli z samego `Score` (= Best.Fitness) odzyskujesz koszt. Sprawdźmy na naszych liczbach (countActive=32, +1=33):
+- err 15.32 → Score 0.1532 → `0.1532·33 = 5.06` ≈ **floor 5** ✓
+- err 7.66 → Score 0.0766 → `0.0766·33 = 2.53` ≈ **eight-pairs 2.5** ✓
+
+Trafia. Więc warunek „jesteśmy w koherencji" (koszt pod floorem):
+
+```csharp
+// countActive = rozmiar aktywnego klastra (to, co w shaderze dzieli: ActiveCubies.Length)
+// N = TAffine.N
+bool inCoherence = RubikCube.Score * (countActive + 1) < N - 0.5;
+```
+
+Lewa strona to **oszacowany koszt**, prawa to **floor N minus pół szczebla**.
+
+Dlaczego `N − 0.5` jest bezpieczne: floor = N, a najbliższa koherentna to coherent-2 = **N−1** (jej pasmo to `[N−1, N)`, i nie ma nic między nimi — s=3 to niepotęga → floor). Więc szczelina floor↔koherencja to pełna **1**. A drugi człon (`avg(d)`) zawyża oszacowanie tylko o `< (N−1)/countActive` — dla 2^5 to `4/32 = 0.125`, dużo mniej niż margines 0.5. Więc:
+- stan floorowy: `cost_est ≥ 5` > 4.5 → `inCoherence = false`
+- coherent-2 (najgorszy przypadek): `cost_est ≤ 4.125` < 4.5 → `true`
+
+Czyste rozdzielenie dla każdego N w Micro (dla N=6: `5/64 = 0.078`, jeszcze luźniej).
+
+I to jest dokładnie Twoja flaga reżimu: `inCoherence == true` → łagodny obecny STALL (schodź po drabinie), `false` → kop (szukaj trafienia w koherencję na floorze). Jedna linijka po stronie CPU, bez żadnej dodatkowej komunikacji z GPU — `Score` już masz.
+
+## 🧑 Robert
+
+Gdybyśmy liczyli cost = float(int(T) - ls) + float(ls - lf) / float(ls); dla T =8, w kostce 2^5, to jak wyglądałaby drabika ocen układów koherentnych?
+
+
+## 🤖 Claude
+
+Policzę wprost. `cost = (T − ls) + (ls − lf)/ls`, T=8, 2^5 (gateway = scrambled 16):
+
+| struktura | scrambled (ls) | g (lf) | koszt |
+|---|---|---|---|
+| coherent-16 | 16 (4) | 1 (4) | (8−4)+0 = **4** |
+| subcoherent-16 | 16 (4) | 2 (3) | 4 + 1/4 = **4.25** |
+| subsubcoherent-16 | 16 (4) | 4 (2) | 4 + 2/4 = **4.5** |
+| eight-pairs | 16 (4) | 8 (1) | 4 + 3/4 = **4.75** |
+| coherent-8 | 8 (3) | 1 (3) | (8−3)+0 = **5** |
+| subcoherent-8 | 8 (3) | 2 (2) | 5 + 1/3 = **5.33** |
+| subsubcoherent-8 | 8 (3) | 4 (1) | 5 + 2/3 = **5.67** |
+| coherent-4 | 4 (2) | 1 (2) | (8−2)+0 = **6** |
+| subcoherent-4 | 4 (2) | 2 (1) | 6 + 1/2 = **6.5** |
+| coherent-2 | 2 (1) | 1 (1) | (8−1)+0 = **7** |
+
+To jest **dokładnie nasza drabina N=5, przesunięta w górę o `T−N = 3`.** Struktura identyczna: rozłączne pasma `[T−ls, T−ls+1)`, ta sama gradacja `1/logs` wewnątrz, zero kolizji. Zmienia się tylko **kotwica**.
+
+I to ma jedną istotną konsekwencję: **gateway (coherent-16) = 4, a nie 1.** Czyli metryka mówi „przekrój warstwy = 4 ruchy od ułożenia", podczas gdy to **1 ruch**. Tracimy odczyt „koszt = ruchy do ułożenia", który przy N-kotwicy trzymał gateway na 1. I floor musiałby wskoczyć na `T = 8` (coherent-2 = 7 < 8), więc cała szczelina gateway↔solved rozciąga się na 4 zamiast 1.
+
+Więc pytanie: **co chcesz tym T=8 osiągnąć?** Bo jako czyste przesunięcie o +3 nie dodaje ani jednego poziomu gradacji (te same struktury, te same odstępy), a psuje gateway=1. Jeśli celujesz w:
+- **szerszą drabinę / więcej „powietrza" nad solved** — to owszem, dostajesz [4,7] zamiast [1,4], ale kosztem sensu „ruchy do ułożenia";
+- **wspólny anchor = floor** (T i tak jest floorem) — to działa (wszystko pod 8), ale znów gateway=4;
+- **coś jeszcze** — powiedz, bo może jest lepszy sposób.
+
+Mówiąc krótko: T=8 to ta sama drabina wyżej. Jaki jest cel przesunięcia?

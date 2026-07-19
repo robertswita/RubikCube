@@ -295,8 +295,10 @@ namespace RubikCube
                 // Fitness == Score is always a REAL move to a different equal-fitness state. Walks the plateau
                 // instead of STALL jumping off it; un-hangs the plain < case. Cost: solution length inflates,
                 // and a strict local min (every move worse) would still hang -> STALL returns as last resort.
+                bool inCoherence = RubikCube.Score * (RubikCube.ActiveCluster.Count + 1) < TAffine.N - 0.5;
                 if (Best.Fitness < RubikCube.Score
                     || (Best.Fitness == RubikCube.Score && Stall >= TGA<TRubikGenome>.StallLimit))
+                    //|| Stall >= TGA<TRubikGenome>.StallLimit && !inCoherence)
                 {
                     Stall = 0;
                     OnProgress(Best);

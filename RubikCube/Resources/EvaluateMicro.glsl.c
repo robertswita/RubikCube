@@ -66,7 +66,7 @@ void main()
         //   somewhere to go. Non-gameable: coherence needs a real shared LAYER (agreeAxes), not just a shared
         //   orientation (the 3/32 cheat raises no agreeAxes). Fires for scrambled <= G, power-of-2 only.
         //   O(k^2 * N), Micro only (k <= 82).
-        uint T = N;                                          // floor size for SMALL residuals: 4 = the four quarter-turn
+        uint T = 8;                                          // floor size for SMALL residuals: 4 = the four quarter-turn
                                                               // orientations (also 2^(N-2) on 2^4, 2^(N-3) on 2^5)
         uint G = 1u << (uint(N) - 1u);                        // coherence ceiling = gateway 2^(N-1) (one slice = the 1-move layer)
         if (scrambled > 0u && scrambled <= G) {
@@ -128,7 +128,7 @@ void main()
                 if (symmetric && firstSize > 1u)
                 {
                     int ls = findMSB(scrambled), lf = findMSB(firstSize);
-                    cost = float(int(N) - ls) + float(ls - lf) / float(ls);
+                    cost = float(int(T) - ls) + float(ls - lf) / float(ls);
                 }
             }
             local_fA_sum *= cost / float(scrambled);
