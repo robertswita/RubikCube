@@ -28,6 +28,12 @@ namespace TGL
                 Context.Create();
         }
 
+        //protected override void CreateHandle()
+        //{
+        //    base.CreateHandle();
+        //    Context.Create();
+        //}
+
         protected override void OnPaint(PaintEventArgs e)
         {
             //if (DesignMode)

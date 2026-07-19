@@ -135,6 +135,7 @@ namespace RubikCube
                 label4.Text = RubikCube.ScrambledCount().ToString();
                 //Scrambled = scrambled;
                 MovesLbl.Text = MovesCount.ToString();
+                UpdateClusterInfo();
                 RubikCube.StateGrid = null;
                 StateBox.Invalidate();
                 //if (RubikCube.ActiveCubie != null)
@@ -179,8 +180,8 @@ namespace RubikCube
                 //    //HighScore = RubikCube.Evaluate();
                 //}
                 //RubikCube.GetSolveSeq();
-                label2.Text = (100 * RubikCube.Score).ToString();
-                label2.Refresh();
+                ErrorBox.Text = (100 * RubikCube.Score).ToString();
+                ErrorBox.Refresh();
                 if (Best != null)
                     Solve();
             }
@@ -242,9 +243,9 @@ namespace RubikCube
             IterTimeBox.Refresh();
             //IterElapsed += iterTime;
             IterElapsed = Watch.Elapsed;
-            GACount = Iteration;// StartGACount + Ga.IterCount;
-            ItersBox.Text = GACount.ToString();
-            ItersBox.Refresh();
+            //GACount = Iteration;// StartGACount + Ga.IterCount;
+            //ItersBox.Text = GACount.ToString();
+            //ItersBox.Refresh();
             //chart2.Series[0].Points.Clear();
             //for (int i = 0; i < Ga.Population.Count; i++)
             //    chart2.Series[0].Points.AddY(Ga.Population[i].Fitness);
@@ -264,6 +265,7 @@ namespace RubikCube
             {
                 chart1.Series[0].Points.Clear();
                 RubikCube.NextCluster();
+                UpdateClusterInfo();
                 //if (RubikCube.ActiveCubie != null)
                 //{
                 //    TRubikGenome.FreeMoves = RubikCube.GetFreeMoves();
@@ -278,6 +280,9 @@ namespace RubikCube
                 TRubikGenome.RubikCube = RubikCube;
                 Best = Gpu.ExecuteGA();
                 Iteration += Gpu.GenerationsCount;
+                GACount = Iteration;                 // tick the live counter every run, not only on accept (OnProgress)
+                ItersBox.Text = GACount.ToString();
+                ItersBox.Refresh();
                 Stall++;
 
                 //if (Ga.HighScore == 0 && RubikCube.ActiveCluster.Count > 1)
@@ -285,7 +290,13 @@ namespace RubikCube
                 //    //SaveSolution(Ga.Best);
                 //}
                 //if (Ga.HighScore < HighScore)
-                if (Best.Fitness < RubikCube.Score || Stall >= TGA<TRubikGenome>.StallLimit)
+                // Accept EQUAL fitness too (<=), not only strictly-better: a sideways move on the plateau.
+                // Safe because the no-op penalty (2*CUBIES_COUNT) makes standing still score ABOVE Score, so
+                // Fitness == Score is always a REAL move to a different equal-fitness state. Walks the plateau
+                // instead of STALL jumping off it; un-hangs the plain < case. Cost: solution length inflates,
+                // and a strict local min (every move worse) would still hang -> STALL returns as last resort.
+                if (Best.Fitness < RubikCube.Score
+                    || (Best.Fitness == RubikCube.Score && Stall >= TGA<TRubikGenome>.StallLimit))
                 {
                     Stall = 0;
                     OnProgress(Best);
@@ -612,6 +623,78 @@ namespace RubikCube
             ////tglView1.Context.Root.RotateY(90);
             //Camera.Pitch(225);
             //tglView1.Invalidate();
+        }
+
+        private void greedyTestToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var report = TGreedyDiversity.Run();
+            System.Diagnostics.Debug.WriteLine(report);
+            ShowTextDialog("Greedy decomposition diversity", report);
+        }
+
+        private void orientClusterToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var report = TGreedyDiversity.FindOrientationCluster();
+            System.Diagnostics.Debug.WriteLine(report);
+            ShowTextDialog("Orientation cluster", report);
+        }
+
+        private void verifyManoeuvresToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var report = TGreedyDiversity.Verify();
+            System.Diagnostics.Debug.WriteLine(report);
+            ShowTextDialog("Manoeuvre verification", report);
+        }
+
+        private void seedStatsToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var report = Gpu.SeedStats(RubikCube);
+            System.Diagnostics.Debug.WriteLine(report);
+            ShowTextDialog("Seed pool stats", report);
+        }
+
+        // Status labels: which cluster is being solved (by ClusterIndex, 1-based) out of the total, and how
+        // many of the active cluster's cubies are already solved. ActiveCubie == null means the cube is solved.
+        private void UpdateClusterInfo()
+        {
+            if (RubikCube == null || RubikCube.Cubies == null) return;
+            if (RubikCube.ActiveCubie == null)
+            {
+                ClusterLbl.Text = $"Cluster - / {RubikCube.ClustersCount}";
+                SolvedLbl.Text = "Solved - / -";
+                return;
+            }
+            int solved = 0;
+            foreach (var c in RubikCube.ActiveCluster)
+                if (c.State == 0) solved++;
+            ClusterLbl.Text = $"Cluster {RubikCube.ActiveCubie.ClusterIndex} / {RubikCube.ClustersCount}";
+            SolvedLbl.Text = $"Solved {solved} / {RubikCube.ActiveCluster.Count}";
+        }
+
+        // Read-only monospace text box in a small dialog: the report stays selectable/copyable (Ctrl+A,
+        // Ctrl+C) and the histogram columns line up (unlike a proportional-font MessageBox).
+        static void ShowTextDialog(string title, string text)
+        {
+            using var form = new Form
+            {
+                Text = title,
+                Width = 560,
+                Height = 480,
+                StartPosition = FormStartPosition.CenterParent
+            };
+            var box = new TextBox
+            {
+                Multiline = true,
+                ReadOnly = true,
+                Dock = DockStyle.Fill,
+                ScrollBars = ScrollBars.Both,
+                WordWrap = false,
+                Font = new Font("Consolas", 10f),
+                Text = text
+            };
+            box.Select(0, 0);
+            form.Controls.Add(box);
+            form.ShowDialog();
         }
 
         private void undoMovesToolStripMenuItem_Click(object sender, EventArgs e)

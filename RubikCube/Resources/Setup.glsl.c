@@ -116,6 +116,18 @@ uint getStartCoordinate(uint cubieID, uint col)
     }
 }
 
+// Current coordinate of a cubie along a given axis - the layer index a move on that axis addresses.
+// Mirrors the currentLayer computation in TurnSingleCubie: the axis row picks a column, its home
+// coordinate along that column, flipped when the axis is reflected. Two cubies sharing this value on
+// SOME axis lie in a common layer, so one turn of that layer moves them together.
+uint curCoord(uint M, uint cubieID, uint axis) {
+    uint col;
+    int sign;
+    getRow(M, axis, col, sign);
+    uint start = getStartCoordinate(cubieID, col);
+    return (sign == 1) ? start : (SIZE - 1u) - start;
+}
+
 uint TurnSingleCubie(uint cubieMatrix, uint cubieID, Move move) {
     uint col;
     int sign;
@@ -164,7 +176,11 @@ uint cubieState(uint M) {
 
 float GetActiveCubieError(uint cubieMatrix, float maxClusterState, float max_fA) {
     uint d = cubieState(cubieMatrix);
-    if (d != 0u)
-        return (maxClusterState + float(d)) / max_fA;
-    return 0.0;
+    // D4: smooth (cliff-free) base. The cliff form (maxClusterState + d)/max_fA adds a big fixed premium per
+    // scrambled cubie, so fA is essentially a COUNT and the floor plateau below T is flat -> STALL blind-walks
+    // out of it (the D3 tail). This form charges only the magnitude d/maxClusterState, giving the floor a
+    // sub-gradient toward less twist = toward solved. Trade-off: it is a GLOBAL change (mid-game homing loses
+    // the cliff, may slow) and the floor's count-block softens. A/B against the cliff form above.
+    //return float(d) / maxClusterState;
+    return d == 0u ? 0.0 : (maxClusterState + float(d)) / max_fA;
 }

@@ -184,6 +184,7 @@ namespace TGL
         public const uint GL_ACCUM_BUFFER_BIT = 0x00000200;
         public const uint GL_STENCIL_BUFFER_BIT = 0x00000400;
         public const uint GL_COLOR_BUFFER_BIT = 0x00004000;
+        public const uint GL_CULL_FACE = 0x0B44;
         public const uint GL_DEPTH_TEST = 0x0B71;
         public const uint GL_MODELVIEW_MATRIX = 0x0BA6;
         public const uint GL_TEXTURE_1D = 0x0DE0;

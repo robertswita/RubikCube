@@ -54,6 +54,9 @@ void main()
         uint local_scrambled = 0u;
         uint local_solved_error = 0;
         uint local_changed = 0u;
+        // NOTE: COHERENCE (see Variables.glsl.c) is prototyped in EvaluateMicro only (<= 64 cubies).
+        // Macro (> 64) stays baseline until the Micro metric is validated, then the maxHist discount
+        // gets ported here (block-shared local_cubies + parallel reduction over the pairwise scan).
         for (uint i = tid; i < countActive; i += gl_WorkGroupSize.x) {
             uint cur = local_cubies[ActiveCubies[i]];
             if (cur != Cubies[ActiveCubies[i]]) local_changed = 1u;   // did this prefix move the active cluster?
@@ -87,9 +90,9 @@ void main()
             // Endgame amplification (mirrors EvaluateMicro / CPU Evaluate): once <= N active cubies
             // remain unsolved, drop the count reward and scale the magnitude by N/scrambled.
             float fA = shared_fA_sum[0];
-            uint scrambled = shared_scrambled[0];
-            if (scrambled > 0u && scrambled <= uint(N))
-                fA *= float(N) / float(scrambled);
+            //uint scrambled = shared_scrambled[0];
+            //if (scrambled > 0u && scrambled <= uint(N))
+            //    fA *= float(N) / float(scrambled);
             float current_step_fitness = float(shared_solved_errors[0]) + fA;
             if (shared_changed[0] == 0u) current_step_fitness += float(2 * CUBIES_COUNT);   // no-op on the active cluster: rank below every real move (max real fitness <= CUBIES_COUNT, since solved+active = CUBIES_COUNT and the active term <= 1)
             if (current_step_fitness < specimen_best_fitness) {

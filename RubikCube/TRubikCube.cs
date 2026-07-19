@@ -86,15 +86,37 @@ namespace RubikCube
                 var cubie = new TCubie();
                 cubie.Transform = TAffine.CreateScale(TCubie.Scaling);
                 cubie.GivensOrder = TVector.Uniform(TAffine.N);
-                cubie.Index = i;
+                cubie.Index = i;                 // setter stamps the sparse orbit-based ClusterIndex
                 cubie.StartIndex = i;
                 cubie.Parent = this;
                 Cubies[i] = cubie;
             }
+            RenumberClusters();
+        }
+
+        // The Index setter stamps each cubie with a sparse ORBIT index (linear index of its sorted |coords|
+        // from the centre - a distance class), so values are non-contiguous and run into the thousands. Remap
+        // them to a dense, sequential cluster rank 1,2,3,... in ascending orbit order: now ClusterIndex reads
+        // as a real "k-th cluster" and ClustersCount is the number of clusters. NextCluster (min ClusterIndex)
+        // and ActiveCluster (equality) depend only on order and equality - both preserved by this monotonic
+        // remap - so the solve order is unchanged.
+        private void RenumberClusters()
+        {
+            var byOrbit = new List<TCubie>(Cubies);
+            byOrbit.Sort((a, b) => a.ClusterIndex.CompareTo(b.ClusterIndex));
+            int rank = 0, prevOrbit = int.MinValue;
+            foreach (var cubie in byOrbit)
+            {
+                int orbit = cubie.ClusterIndex;                  // still the orbit index (not yet remapped)
+                if (orbit != prevOrbit) { rank++; prevOrbit = orbit; }   // 1, 2, 3, ...
+                cubie.ClusterIndex = rank;
+            }
+            ClustersCount = rank;
         }
 
         public TRubikCube(TRubikCube src)
         {
+            ClustersCount = src.ClustersCount;
             Cubies = new TCubie[src.Cubies.Length];
             for (int pos = 0; pos < Cubies.Length; pos++)
             {
@@ -542,6 +564,10 @@ namespace RubikCube
         }
 
 
+        // Number of distinct clusters. After RenumberClusters, cubie ClusterIndex runs 1..ClustersCount in
+        // solve order. Set once during cube construction; used for the UI "Cluster k / K" label.
+        public int ClustersCount;
+
         private List<TCubie> activeCluster;
         public List<TCubie> ActiveCluster
         {
@@ -773,12 +799,154 @@ namespace RubikCube
             return false;
         }
 
-        // Greedy shortest-solve of the host-designated active cubie, on a lightweight copy of just that
-        // cubie (deep Transform, shared geometry) - no full-cube clone, since only its orientation is
-        // needed. At each step pick a random cube move (plane + 90/180/270) that lowers the moves-to-solve
-        // (RotationCount) by one, realize it with a random valid axis, record its code and rotate the
-        // copy - until the orientation is the identity. Reject-free (a progress move exists on every
-        // shortest path); random choices cover every decomposition tree.
+        // Moves-to-solve of an orientation under (plane ORDER, mixed-Givens mode): reduce plane by plane in the
+        // given order[] with a per-plane strategy packed 2 bits per plane in modeMask (base-4): 0=pod-L, 1=nad-L,
+        // 2=pod-R, 3=nad-R. pod/nad zero the SUB- vs SUPER-diagonal; L/R = row op (left, Rotate, -sin) vs column
+        // op (right, RotatePost, +sin) - a right op still yields a real cube move (L*M*R = I => M^-1 = R*L).
+        // Natural order [0..P-1] + modeMask 0 = standard QR baseline. Non-destructive (works on a clone). The
+        // full P! order space subsumes axis-permutation, so order (not perm) is the diversity axis (diagnostic).
+        static int RotCountMode(TMatrix M, int[] order, int modeMask)
+        {
+            var A = (TMatrix)M.Clone();                        // working copy (non-destructive)
+            int c = 0;
+            for (int i = 0; i < order.Length; i++)
+            {
+                int p = order[i];
+                int a1 = TAffine.Planes[p][0], a2 = TAffine.Planes[p][1];
+                int strat = (modeMask >> (2 * p)) & 3;         // 0=pod-L 1=nad-L 2=pod-R 3=nad-R
+                float a, b;
+                switch (strat)
+                {
+                    case 0:  a = A[a1, a1]; b =  A[a2, a1]; break;   // pod-L: zero sub-diag [a2,a1] (row op)
+                    case 1:  a = A[a2, a2]; b = -A[a1, a2]; break;   // nad-L: zero super-diag [a1,a2] (row op)
+                    case 2:  a = A[a2, a2]; b = -A[a2, a1]; break;   // pod-R: zero sub-diag [a2,a1] (col op)
+                    default: a = A[a1, a1]; b =  A[a1, a2]; break;   // nad-R: zero super-diag [a1,a2] (col op)
+                }
+                float r = (float)Math.Sqrt(a * a + b * b);
+                if (r < 0.1f) continue;                                            // pivot ~ 0 -> identity rotation
+                float cos = a / r, sin = b / r;
+                if (strat < 2) A.Rotate(a1, a2, cos, -sin);        // left: row op, -sin
+                else           A.RotatePost(a1, a2, cos, sin);     // right: col op, +sin
+                if (TCubie.GetAngle(cos, sin) != 0) c++;
+            }
+            return c;
+        }
+
+        // mode moves-to-solve of orientation M after applying cube move (plane, angle). Clones the small n x n
+        // matrix (not the whole cubie) and left-rotates it exactly as Turn rotates a cubie, so the greedy's
+        // prediction matches the real move; the clone leaves M intact for the sibling candidates.
+        static int RotCountModeAfter(TMatrix M, int plane, int angle, int[] order, int modeMask)
+        {
+            var A = (TMatrix)M.Clone();
+            var pa = TAffine.Planes[plane];
+            var rot = TCubie.SetAngle(angle);
+            A.Rotate(pa[0], pa[1], rot.X, rot.Y);
+            return RotCountMode(A, order, modeMask);
+        }
+
+        static int[] IdentityOrder()
+        {
+            var o = new int[TAffine.Planes.Length];
+            for (int i = 0; i < o.Length; i++) o[i] = i;
+            return o;
+        }
+
+        // A random plane-reduction order (any permutation of the P planes). Drawn per seed so the pool samples
+        // the strategy x order space - the full generating axis (order subsumes perm, per the diagnostic). An
+        // order that is invalid for a given (cubie, strategy) just makes the greedy stuck -> null -> redraw.
+        static int[] RandomOrder()
+        {
+            var o = IdentityOrder();
+            for (int i = o.Length - 1; i > 0; i--)
+            {
+                int j = TChromosome.Rnd.Next(i + 1);
+                (o[i], o[j]) = (o[j], o[i]);
+            }
+            return o;
+        }
+
+        // Greedy solve of the host-designated active cubie under a mixed-Givens mode, via RANDOMIZED
+        // BACKTRACKING on a lightweight copy of just that cubie (deep Transform, shared geometry). Every
+        // descent takes a random cube move (plane + 90/180/270) that lowers the mode moves-to-solve by one;
+        // on a dead end (the metric hits 0 with M != I, or no progress move exists) it backtracks and tries
+        // another branch instead of giving up. This is the crucial fix over a one-shot descent: a mixed
+        // mode's solving paths are NARROW, so a single random descent almost always dead-ends and the greedy
+        // harvested ZERO macro-moves (every non-stuck draw was a minimal-length path). Backtracking finds a
+        // full length-rc0 path iff one exists, so macro modes (rc0 > minimal) actually yield their longer
+        // sequences. modeMask == 0 is the standard shortest-solve. Returns null only when the whole monotone
+        // tree dead-ends (mode genuinely stuck for this cubie) - the caller redraws a fresh mode.
+        public List<int> GetSolveSeq(int[] order, int modeMask)
+        {
+            var c = ActiveCubie.Copy();        // just the cubie - no full-cube clone
+            var seq = new List<int>();
+            int rc0 = RotCountMode(c.Transform.M, order, modeMask);
+            return SolveModeDfs(c, order, modeMask, rc0, seq) ? seq : null;
+        }
+
+        // Depth-first search over the monotone tree (each step drops the mode moves-to-solve by exactly 1),
+        // random branch order, first solution wins. seq accumulates the realized moves; on backtrack the last
+        // move is popped. rc == current mode moves-to-solve == depth remaining down to the identity.
+        bool SolveModeDfs(TCubie c, int[] order, int modeMask, int rc, List<int> seq)
+        {
+            if (c.State == 0) return true;                           // reached identity - seq solves the cubie
+            var cand = new List<int[]>();
+            for (int plane = 0; plane < TAffine.Planes.Length; plane++)
+                for (int angle = 1; angle <= 3; angle++)            // quarter-turns: 1/2/3 = 90/180/270
+                    if (RotCountModeAfter(c.Transform.M, plane, angle, order, modeMask) == rc - 1)
+                        cand.Add(new[] { plane, angle });
+            for (int i = cand.Count - 1; i > 0; i--)                // Fisher-Yates: progress moves in random order
+            {
+                int j = TChromosome.Rnd.Next(i + 1);
+                (cand[i], cand[j]) = (cand[j], cand[i]);
+            }
+            foreach (var pick in cand)
+            {
+                var pa = TAffine.Planes[pick[0]];
+                var child = c.Copy();
+                child.Rotate(pa, TCubie.SetAngle(pick[1]));
+                int axis = TChromosome.Rnd.Next(TAffine.N);          // any axis not in the plane (collateral only)
+                while (axis == pa[0] || axis == pa[1])
+                    axis = (axis + 1) % TAffine.N;
+                seq.Add(new TMove { Plane = pick[0], Angle = pick[1], Axis = axis, Slice = child.GetPos(axis) }.Encode());
+                if (SolveModeDfs(child, order, modeMask, rc - 1, seq)) return true;
+                seq.RemoveAt(seq.Count - 1);                         // dead end - undo and try the next branch
+            }
+            return false;
+        }
+
+        // Single-descent (NO backtracking) mode solve: at each step take ONE random move that drops the mode
+        // moves-to-solve by 1; on a dead end (no such move) FAIL (no undo). O(rc) per attempt vs the DFS's
+        // branching - so cheap even when it fails, and the caller just redraws ("draw until valid"). Narrow
+        // (macro) modes dead-end often, so the pool ends up mostly minimal - deliberate: the fast SEED path
+        // trades macro-move material for speed. Mutates its own cubie copy in place (no backtrack -> no copies).
+        public List<int> GetSolveSeqGreedy(int[] order, int modeMask)
+        {
+            var c = ActiveCubie.Copy();
+            var seq = new List<int>();
+            int rc = RotCountMode(c.Transform.M, order, modeMask);
+            while (c.State != 0)
+            {
+                int bestPlane = -1, bestAngle = 0, hits = 0;
+                for (int plane = 0; plane < TAffine.Planes.Length; plane++)
+                    for (int angle = 1; angle <= 3; angle++)
+                        if (RotCountModeAfter(c.Transform.M, plane, angle, order, modeMask) == rc - 1
+                            && TChromosome.Rnd.Next(++hits) == 0)     // reservoir pick: one uniform winner, no list
+                        { bestPlane = plane; bestAngle = angle; }
+                if (hits == 0) return null;                           // dead end, no backtrack
+                var pa = TAffine.Planes[bestPlane];
+                c.Rotate(pa, TCubie.SetAngle(bestAngle));
+                int axis = TChromosome.Rnd.Next(TAffine.N);
+                while (axis == pa[0] || axis == pa[1]) axis = (axis + 1) % TAffine.N;
+                seq.Add(new TMove { Plane = bestPlane, Angle = bestAngle, Axis = axis, Slice = c.GetPos(axis) }.Encode());
+                rc--;
+            }
+            return seq;
+        }
+
+        // Legacy standard-metric greedy: same shortest-solve as GetSolveSeq(0), but the moves-to-solve is
+        // read through the cubie's State getter (which honours the CPU GA's EulerOrder / IsEulerOrderReversed
+        // toggles), not the explicit mixed-Givens metric. Kept for the CPU path (TRubikGenome.Genesis and the
+        // warm-up call in ActivateCubie); the GPU seed path uses the mode overload instead.
         public List<int> GetSolveSeq()
         {
             var c = ActiveCubie.Copy();        // just the cubie - no full-cube clone
@@ -799,7 +967,6 @@ namespace RubikCube
                         if (rotCubie.RotationCount == c.RotationCount - 1)
                             cand.Add(new[] { plane, angle });
                     }
-                //if (cand.Count == 0) break;                          // only if the rotation convention is off
                 var pick = cand[TChromosome.Rnd.Next(cand.Count)];
                 pa = TAffine.Planes[pick[0]];
                 rot = TCubie.SetAngle(pick[1]);
@@ -812,51 +979,153 @@ namespace RubikCube
             return seq;
         }
 
-        // Moves-to-solve of the cubie's orientation after applying the cube move (plane, angle) - the copy
-        // is rotated exactly as Turn rotates a cubie, so the greedy's prediction matches the real move.
-        // Reuses TCubie's own RotationCount (computed by the State getter).
-        //static int RotationCountAfter(TCubie c, int plane, int angle)
-        //{
-        //    var t = c.Copy();
-        //    var pa = TAffine.Planes[plane];
-        //    var rot = TCubie.SetAngle(angle + 1);
-        //    t.Transform.Rotate(pa[0], pa[1], rot.X, rot.Y);
-        //    t.ValidState = false;
-        //    _ = t.State;                       // refresh RotationCount
-        //    return t.RotationCount;
-        //}
-
         // Packs up to numSeeds per-specimen seed sequences into a flat buffer (stride genes each, unused
         // slots = -1 sentinel) for the GPU Init shader. Each draw is a fresh greedy decomposition
-        // (GetSolveSeq) realized with a random axis per move (the axis only picks the collateral layer,
-        // not the target's solve, so it adds no decomposition trees). Targets populationCount *
-        // seedRatioPercent / 100 slots; numSeeds is however many distinct sequences it finds.
-        public int[] BuildSeedMoves(int populationCount, int stride, int seedRatioPercent, out uint numSeeds)
+        // (GetSolveSeq) under a RANDOMLY chosen mixed-Givens mode, realized with a random axis per move (the
+        // axis only picks the collateral layer, not the target's solve, so it adds no decomposition trees).
+        // mode 0 is the standard shortest-solve; mixed modes trace longer macro-move paths - the mode pool
+        // (2^P) is the dominant diversity source. A stuck mode yields null; we just redraw. Targets
+        // populationCount * seedRatioPercent / 100 slots; numSeeds is however many distinct sequences it finds.
+        // Canonicalize a move sequence in place: compose consecutive moves in the SAME (axis, plane, slice) as
+        // quarter-turns mod 4 (Rz90 Rz90 -> Rz180; Rz90 Rz270 -> removed). Same logic as TRubikGenome.Correct /
+        // TGreedyDiversity.CorrectGenes. Run before the seed dedup so two Correct-equal draws fold to one slot
+        // instead of being kept as distinct raw strings.
+        static void CorrectSeq(List<int> g)
+        {
+            for (int idx = 0; idx < g.Count; idx++)
+            {
+                var move = TMove.Decode(g[idx]);
+                for (int prev = idx - 1; prev >= 0; prev--)
+                {
+                    var pm = TMove.Decode(g[prev]);
+                    if (pm.Axis != move.Axis || pm.Plane != move.Plane) break;
+                    if (pm.Slice == move.Slice)
+                    {
+                        int angle = (move.Angle + pm.Angle) & 3;         // compose quarter-turns mod 4
+                        if (angle > 0) { pm.Angle = angle; g[prev] = pm.Encode(); }
+                        else { g.RemoveAt(prev); idx--; }
+                        g.RemoveAt(idx); idx--;
+                        break;
+                    }
+                }
+            }
+        }
+
+        public static bool Diagnostic;       // set by Gpu.SeedStats: enables the census + report in BuildSeedMoves
+        public string LastSeedReport = "";   // filled by BuildSeedMoves (only when Diagnostic); shown by Seed Pool Stats
+
+        public int[] BuildSeedMoves(int populationCount, int stride, int seedRatioPercent, bool mixedModes, bool fast, out uint numSeeds)
         {
             int target = populationCount * seedRatioPercent / 100;
+            int modeSpace = mixedModes ? 1 << (2 * TAffine.Planes.Length) : 1;   // 4^P strategies; SEED_MODE 0 -> mode 0 (baseline)
             var slots = new List<int[]>();
             var seen = new HashSet<string>();
-            // The distinct-decomposition pool for one cubie is small (e.g. <= 3 trees for N=3), far below
-            // target. Stop once draws stop producing anything new (pool saturated) instead of spinning a
-            // fixed guard; the stall budget scales with what we found so far so bigger pools get patience.
+            // The distinct-manoeuvre pool across modes is far richer than the single-tree shortest-solve pool,
+            // but still finite. Stop once draws stop producing anything new (pool saturated) instead of
+            // spinning a fixed guard; the stall budget scales with what we found so far so bigger pools get
+            // patience. Both a stuck mode (null) and a duplicate count as a no-progress draw.
             int stall = 0;
+            int draws = 0, stuck = 0, dupes = 0;                     // telemetry: why the pool ends up the size it is
+            var lenHist = new SortedDictionary<int, int>();          // accepted-seed length distribution
+            var modeContrib = new HashSet<int>();                    // distinct modes that landed >=1 accepted seed
+            var ident = IdentityOrder();
+            // Safe LOWER bound on moves-to-solve: each move is a Givens in one plane (2 axes), so it can fix at
+            // most 2 axes -> solving d non-fixed axes needs >= ceil(d/2) moves. (Standard QR is only an UPPER
+            // bound - e.g. diag(-1,1,-1) is 1 move via plane (0,2) but standard QR at natural order counts 2 -
+            // so using it here would wrongly skip valid short solves. This bound never over-skips.)
+            int min = (ActiveCubie.ActiveAxisCount() + 1) / 2;
+            // A no-progress draw (stuck mode or duplicate). We call the pool saturated once a run of them
+            // outlasts a budget that grows with the pool - a bigger pool earns more patience. One method,
+            // so the three no-progress branches below read identically instead of repeating the expression.
+            bool Saturated() => ++stall > 32 + 8 * slots.Count;
+            if (fast)
+            {
+                // FAST path: one single random descent per draw (GetSolveSeqGreedy, NO backtracking), thrown in
+                // "as they come" with NO dedup. A descent that dead-ends on a narrow mode returns null and is just
+                // redrawn ("draw until valid") - cheap because each attempt is O(rc), not the DFS's branching. Cap
+                // the draws so a cubie whose modes all dead-end on a single descent can't spin forever; whatever we
+                // gathered is topped up to target by repetition below. Duplicates are FINE here (more of the same
+                // easy manoeuvre is legitimate seed material), so no seen-set, no CorrectSeq, no saturation budget.
+                int maxDraws = 32 * target + 64;
+                for (int draw = 0; slots.Count < target && draw < maxDraws; draw++)
+                {
+                    int mode = mixedModes ? TChromosome.Rnd.Next(modeSpace) : 0;
+                    var order = mixedModes ? RandomOrder() : ident;
+                    var seq = GetSolveSeqGreedy(order, mode);        // single descent; null on any dead end
+                    if (seq == null) { draws++; stuck++; continue; }  // narrow mode dead-ended -> redraw
+                    if (seq.Count == 0) break;                        // cubie already solved -> no seeds
+                    slots.Add(seq.ToArray());
+                    lenHist.TryGetValue(seq.Count, out int hc); lenHist[seq.Count] = hc + 1;
+                    modeContrib.Add(mode);
+                }
+            }
+            else
             while (slots.Count < target)
             {
-                var moves = GetSolveSeq().ToArray();               // greedy: random shortest-solve decomposition
-                if (moves.Length == 0) break;                         // cubie already solved -> no seeds
+                int mode = TChromosome.Rnd.Next(modeSpace);
+                var order = mixedModes ? RandomOrder() : ident;      // random plane-reduction order (baseline: natural)
+                draws++;
+                if (RotCountMode(ActiveCubie.Transform.M, order, mode) < min)   // undercounting -> provably stuck, skip the DFS
+                { stuck++; if (Saturated()) break; continue; }
+                var seq = GetSolveSeq(order, mode);                  // greedy under (random order, random mode)
+                if (seq == null) { stuck++; if (Saturated()) break; continue; }  // rc0>=min but still stuck
+                if (seq.Count == 0) break;                            // cubie already solved -> no seeds
+                CorrectSeq(seq);                                      // canonicalize before dedup: fold Correct-equal draws
+                var moves = seq.ToArray();
                 if (seen.Add(string.Join(",", moves)))
-                    { slots.Add(moves); stall = 0; }
-                else if (++stall > 32 + 8 * slots.Count)              // long run with no new tree: pool exhausted
-                    break;
+                {
+                    slots.Add(moves); stall = 0;
+                    lenHist.TryGetValue(moves.Length, out int hc); lenHist[moves.Length] = hc + 1;
+                    modeContrib.Add(mode);
+                }
+                else
+                {
+                    dupes++;
+                    if (Saturated()) break;                           // long run with no new manoeuvre: exhausted
+                }
             }
 
-            numSeeds = (uint)slots.Count;
-            if (slots.Count == 0) return new int[1];                  // never a zero-size SSBO
-            var buf = new int[slots.Count * stride];
-            for (int s = 0; s < slots.Count; s++)
+            // Census + report are DIAGNOSTIC-only (Seed Pool Stats): the census alone is modeSpace (up to 4^P =
+            // 4096) extra RotCountMode calls per cubie - pure waste in production. Skip unless Diagnostic is set.
+            if (Diagnostic)
             {
+                // mode census: rc0 (mode moves-to-solve) of THIS cubie under each mode (at natural order). Path
+                // length == rc0, so this is the cubie's macro-move potential. All rc0 == minimal => degenerate
+                // (shallow) cubie; a spread => deep orientation that mixed modes inflate into macro-moves.
+                var rc0Hist = new SortedDictionary<int, int>();
+                for (int mode = 0; mode < modeSpace; mode++)
+                {
+                    int r = RotCountMode(ActiveCubie.Transform.M, ident, mode);
+                    rc0Hist.TryGetValue(r, out int hc); rc0Hist[r] = hc + 1;
+                }
+
+                var rep = new System.Text.StringBuilder();
+                rep.AppendLine($"[BuildSeedMoves]  N={TAffine.N}  SEED_MODE={(mixedModes ? 1 : 0)}  order={(mixedModes ? "random" : "natural")}  stride={stride}  target={target}  ({seedRatioPercent}% of population)");
+                rep.AppendLine($"distinct seeds = {slots.Count}     draws={draws}  stuck={stuck}  dupes={dupes}");
+                if (slots.Count > 0 && slots.Count < target)
+                    rep.AppendLine($"pool < target -> {target} slots filled by repeating the {slots.Count} distinct seeds");
+                rep.AppendLine($"distinct modes contributing = {modeContrib.Count} / {modeSpace}");
+                rep.Append("mode rc0 census (moves:modes):");
+                foreach (var kv in rc0Hist) rep.Append($"  {kv.Key}:{kv.Value}");
+                rep.AppendLine();
+                rep.Append("accepted length histogram (moves:count):");
+                foreach (var kv in lenHist) rep.Append($"  {kv.Key}:{kv.Value}");
+                LastSeedReport = rep.ToString();
+                System.Diagnostics.Debug.WriteLine(LastSeedReport);
+            }
+
+            // Seed the FULL target, not just as many specimens as the pool has distinct manoeuvres. A shallow
+            // cubie with few decompositions no longer leaves the population under-seeded: every distinct seed is
+            // placed once (slots 0..pool), then the remaining slots are topped up by sampling the pool with
+            // repetition. numSeeds = target so Init pre-seeds exactly that many specimens.
+            if (slots.Count == 0) { numSeeds = 0; return new int[1]; }   // nothing to seed (solved / stuck); never a zero-size SSBO
+            numSeeds = (uint)target;
+            var buf = new int[target * stride];
+            for (int s = 0; s < target; s++)
+            {
+                int[] seed = s < slots.Count ? slots[s] : slots[TChromosome.Rnd.Next(slots.Count)];
                 int k = 0;
-                for (; k < slots[s].Length && k < stride; k++) buf[s * stride + k] = slots[s][k];
+                for (; k < seed.Length && k < stride; k++) buf[s * stride + k] = seed[k];
                 for (; k < stride; k++) buf[s * stride + k] = -1;
             }
             return buf;

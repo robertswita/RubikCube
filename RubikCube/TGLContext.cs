@@ -57,9 +57,12 @@ namespace TGL
                 // Gpu.RenderScene owns the WBOIT passes (opaque -> transparent -> composite) and the clears.
                 var instances = new List<TAffine>();
                 var alphas = new List<float>();
-                GatherInstances(Scene.Root, new TAffine(), instances, alphas);
-                Gpu.UpdateLights(Scene.Lights);   // upload the scene lights (UBO) before drawing
-                Gpu.RenderScene(instances, alphas, View.BackColor, Viewport.Width, Viewport.Height);
+                if (Scene != null)
+                {
+                    GatherInstances(Scene.Root, new TAffine(), instances, alphas);
+                    Gpu.UpdateLights(Scene.Lights);   // upload the scene lights (UBO) before drawing
+                    Gpu.RenderScene(instances, alphas, View.BackColor, Viewport.Width, Viewport.Height);
+                }
                 Win32.SwapBuffers(HDC);
             }
         }
@@ -121,7 +124,7 @@ namespace TGL
             if (!IsInited)
             {
                 OpenGL.Enable(OpenGL.GL_DEPTH_TEST);
-                //OpenGL.glDisable(OpenGL.GL_CULL_FACE);  // Disable face culling to show all faces
+                //OpenGL.Enable(OpenGL.GL_CULL_FACE);  // Disable face culling to show all faces
                 //OpenGL.glPolygonMode(OpenGL.GL_FRONT_AND_BACK, OpenGL.GL_LINE);
                 //OpenGL.glEnable(OpenGL.GL_TEXTURE_2D);
                 //OpenGL.glEnable(OpenGL.GL_LIGHTING);

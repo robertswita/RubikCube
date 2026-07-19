@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using TGL;
+using static System.Windows.Forms.AxHost;
 
 namespace RubikCube
 {
@@ -15,7 +16,16 @@ namespace RubikCube
         public static int MaxScore;
         //public double Error;
         public int StartIndex;
-        public int RotationCount;
+        int rotationCount;
+        public int RotationCount
+        {
+            get
+            {
+                _ = State;
+                return rotationCount;
+            }
+            set => rotationCount = value;
+        }
         public static TVector Scaling;
         public bool IsReversedSeq;
         public int ClusterIndex;
@@ -50,12 +60,20 @@ namespace RubikCube
             return new TVector(cosA, sinA);
         }
 
-        public override float Transparency { 
-            get { 
-                base.Transparency = State != 0 ? 0.1f : 1;
-                return base.Transparency;
-            } 
-        }
+        // Per-face alpha for an unsolved cubie that read well at N=3 (faceCount 6). The shader gets the
+        // final alpha per instance and stays oblivious to the geometry - the layer compensation lives here.
+        public static float BaseUnsolvedAlpha = 0.1f;
+
+
+        // The hypercube mesh has Cube.Materials.Count faces (= P * 2^(N-2): 6 at N=3, 24 at N=4),
+        // all stacking in the WBOIT revealage (product of 1-alpha over the layers). A fixed
+        // per-face alpha makes high-N cubies pile up to near-opaque. Scale alpha so the NET
+        // revealage stays what N=3 had: revealage (1-a)^faceCount constant => a = 1 -
+        // (1-BaseUnsolvedAlpha)^(6 / faceCount). Any true layer count L proportional to faceCount
+        // cancels, so this holds regardless of L.
+        //base.Transparency = 1 - (float)Math.Pow(1 - BaseUnsolvedAlpha, 6.0 / Materials.Count);
+        public override float Transparency =>
+            State == 0 ? 1f : 1f - (float)Math.Pow(1 - BaseUnsolvedAlpha, 6.0 / Cube.Materials.Count);
 
         private bool ValidState;
         int state;
@@ -67,7 +85,7 @@ namespace RubikCube
                 {
                     EulerAngles = Transform.GetEulerAngles(null);
                     state = 0;
-                    RotationCount = 0;
+                    rotationCount = 0;
                     var shift = (EulerAngles.Count - 1) << 1;
                     for (int i = 0; i < EulerAngles.Count; i++)
                     {
@@ -75,7 +93,7 @@ namespace RubikCube
                         state |= angle << shift;
                         shift -= 2;
                         if (angle > 0)
-                            RotationCount++;
+                            rotationCount++;
                     }
                     //var RotationCount2 = TAffine.N;
                     //for (int i = 0; i < TAffine.N; i++)
@@ -148,6 +166,7 @@ namespace RubikCube
             dest.state = state;
             dest.ValidState = ValidState;
             dest.StartIndex = StartIndex;
+            dest.ClusterIndex = ClusterIndex;
             dest.RotationCount = RotationCount;
             dest.EulerAngles = EulerAngles;
             return dest;

@@ -7936,3 +7936,10222 @@ Dołącz dzisiejszą konwersację do pliku w Docs
 ## 🤖 Claude
 
 Dołączam dzisiejszą konwersację do `Docs/Konwersacja_RubikND.md` — mam gotowy skrypt z poprzedniego razu (`append_convo.py`), który wyrównuje do istniejącej treści i dokleja nowe tury. Uruchamiam:
+
+
+---
+
+<!-- Sesja 2 (f2be91dc): grafika WBOIT/FXAA/tekstury + badanie różnorodności greedy -->
+
+## 🧑 Robert
+
+Cześć, Claude. Nie poprawiaj na razie niczego, ale wydaje mi się, że poprawiłeś deklarację konwencji wywołań rozszerzeń OpenGL z oprawionej Stdcall na wcześniejszą Cdecl (a może się nie zapisała przed zwieszką), ale ma być Stdcall, prawda?
+
+
+## 🤖 Claude
+
+Cześć! Nie będę nic poprawiał — tylko sprawdzę stan deklaracji konwencji wywołań. Zobaczmy, jak to teraz wygląda w kodzie.
+
+Sprawdziłem — masz rację co do meritum, i rzeczywiście w aktualnym kodzie **rozszerzenia są zadeklarowane jako `[Cdecl]`**, a nie `[Stdcall]`.
+
+Stan faktyczny w [OpenGL.cs](RubikCube/OpenGL.cs):
+
+- **Funkcje core** (ładowane przez `GetCore`, linie 10–30 i 84–104) → `delegate* unmanaged[Stdcall]`
+- **Funkcje rozszerzeń** (ładowane przez `GetExt` / `wglGetProcAddress`, linie 32–67 i 105–140) → `delegate* unmanaged[Cdecl]`
+
+Czyli albo poprawka na `Stdcall` się nie zapisała przed zwieszką, albo w ogóle nie została zastosowana do bloku rozszerzeń — core zostało przy `Stdcall`, a rozszerzenia mają `Cdecl`.
+
+Co do tego, jak *ma* być — potwierdza to nawet Twoja własna notatka w [Konwersacja_RubikND.md:3279](Docs/Konwersacja_RubikND.md#L3279):
+
+> Rozszerzenia deklarujesz jako `[Cdecl]`, a funkcje GL na Windows to `APIENTRY` = **`__stdcall`**. Na x64 ABI jest wspólne, więc działa; na x86 to byłby crash (rozjazd sprzątania stosu). Warto ujednolicić na `[Stdcall]`.
+
+Więc tak — poprawnie powinno być `[Stdcall]` również dla rozszerzeń. Na x64 (a projekt raczej celuje w x64) `Cdecl` „działa" tylko przypadkiem, bo ABI jest wspólne i nikt nie sprząta stosu wywołującego — ale semantycznie jest to błędne i wysypałoby się przy x86.
+
+Zgodnie z prośbą nic nie zmieniam. Jak dasz znać, ujednolicę cały blok rozszerzeń (linie 32–67 oraz rzutowania w 105–140) na `[Stdcall]`.
+
+
+## 🧑 Robert
+
+Zmieniłem trochę GPU.cs, możesz popatrzeć. Zmienne przeniosłem do pliku Variables includowanym przez Setup i VS, getDefine i setDefine korzystają z niego (dodatkowo łatwiej zamieniać w krótszym łańcuchu). Drobne zmiany z strukturze funkcji Create i Compile programów
+
+
+## 🤖 Claude
+
+Zobaczmy jeszcze nowe pliki `Variables` i jak wygląda `Setup` z includem, plus diff względem poprzedniej wersji.
+
+Zobaczmy jeszcze shader wierzchołków (czy include pasuje) oraz czy `Variables.glsl.c` jest osadzony jako zasób w csproj — inaczej `ReadManifestText` wyłoży się w runtime.
+
+Przejrzałem cały łańcuch. Refaktor jest czysty i spójny — poniżej co potwierdziłem plus kilka drobiazgów.
+
+## Co działa dobrze
+
+**Dwupoziomowy include rozwiązuje się poprawnie.** [Gpu.cs:160-170](RubikCube/Gpu.cs#L160) — `CompileComputeProgram` najpierw wstawia `Variables` w `#include "Variables.glsl.c"` wewnątrz `Setup`, a potem cały `Setup` w `#include "Setup.glsl.c"` w pliku shadera. Ścieżka renderu ([Gpu.cs:343-352](RubikCube/Gpu.cs#L343)) wstawia `Variables` bezpośrednio, bo [CubeVertex.glsl.c:6](RubikCube/Resources/CubeVertex.glsl.c#L6) includuje `Variables`, nie `Setup`. Zgadza się.
+
+**Zasoby są osadzone.** `Variables.glsl.c` jest jako `EmbeddedResource` w [RubikCubeND.csproj:37](RubikCube/RubikCubeND.csproj#L37) (i `<None Remove>` w 26) — `ReadManifestText` nie wyłoży się w runtime.
+
+**Strip `#define uint unsigned int`** robisz raz w [Init:39](RubikCube/Gpu.cs#L39) na `Variables`, a ten stripped string jest reużywany wszędzie (compute + render). Wcześniej pewnie stripowałeś z `Setup` — teraz jedno miejsce, ładniej.
+
+**Mutacja `Variables` w krótszym łańcuchu** — `SetDefineValue` podmienia in-place, kolejne `GetDefineValue` widzą nową wartość, a `CompileComputeProgram` bierze aktualny `Variables` przy każdym wywołaniu. Spójne. Wartości nieustawiane (GENES_COUNT, POPULATION_COUNT…) zostają autorskie. OK.
+
+## Drobiazgi (do decyzji, nic nie ruszam)
+
+**1. `GetDefineValue` matchuje po prefiksie — kruche.** [Gpu.cs:79](RubikCube/Gpu.cs#L79):
+```csharp
+if (line.StartsWith(targetToken, StringComparison.Ordinal))   // targetToken = "#define N"
+```
+`"#define N"` jest prefiksem `"#define NX ..."`. Dziś kolizji **nie ma** (żaden pytany define nie jest prefiksem innego — sprawdziłem `N`, `SIZE`, `GENES_COUNT` vs `GENERATIONS_COUNT` itd.), ale dodanie kiedyś np. `#define N_SOMETHING` po cichu zepsułoby `GetDefineValue("N")`. Bezpieczniej byłoby wymagać granicy tokenu (spacja po nazwie), skoro i tak budujesz `defineLine = targetToken + " "` w `SetDefineValue`.
+
+**2. `SetDefineValue` po cichu nic nie robi, jeśli define nie istnieje.** [Gpu.cs:91-93](RubikCube/Gpu.cs#L91) — gdy `GetDefineValue` zwróci `-1`, `Replace("#define N -1", ...)` nie trafia w nic i nie ma żadnego sygnału. Literówka w nazwie define = cicha porażka zamiast wyjątku. Niski priorytet, ale warto wiedzieć.
+
+**3. Nieaktualny komentarz.** [Gpu.cs:342](RubikCube/Gpu.cs#L342): „N injected into its own #define (not the Setup header)" — teraz wstrzykujesz **cały blok `Variables`**, nie samo N. Kosmetyka.
+
+Nic nie zmieniałem. Jeśli chcesz, mogę utwardzić `GetDefineValue`/`SetDefineValue` (granica tokenu + ewentualnie wyjątek przy braku define) i poprawić komentarz — daj znać.
+
+
+## 🧑 Robert
+
+Utwardź getDefine i setDefine oraz popraw komentarz ale nie dodawał wyjątku
+
+
+## 🤖 Claude
+
+Teraz komentarz przy `CompileRenderProgram`:
+
+Zrobione — trzy zmiany w [Gpu.cs](RubikCube/Gpu.cs):
+
+1. **`GetDefineValue`** ([:71](RubikCube/Gpu.cs#L71)) — token domknięty spacją (`"#define " + defineName + " "`), więc `"N"` nie złapie już `"N_SOMETHING"`.
+2. **`SetDefineValue`** ([:89](RubikCube/Gpu.cs#L89)) — gdy define nie istnieje (`-1`), jawny no-op zamiast ślepego `Replace("#define N -1", …)`. Bez wyjątku, zgodnie z prośbą.
+3. **Komentarz** przy `CompileRenderProgram` ([:342](RubikCube/Gpu.cs#L342)) — teraz opisuje, że VS wciąga cały blok `Variables`, a nie „N w własnym #define".
+
+Szybka weryfikacja spójności: jedyni wołający `SetDefineValue` to `N`, `SIZE`, `CUBIES_COUNT` — wszystkie mają w [Variables.glsl.c](RubikCube/Resources/Variables.glsl.c) czystą wartość int ze spacją po nazwie, więc domknięcie tokenu i guard `-1` niczego nie psują (nadal zwracają dotychczasowe wartości i podmieniają poprawnie).
+
+
+## 🧑 Robert
+
+Zmieniłem w klasie TShape tablicę Colors na tablicę z materiałami typu TMAterial, ale kolory w kostce teraz się dublują
+
+
+## 🤖 Claude
+
+Znalazłem przyczynę. W [TShape.cs:142](RubikCube/TShape.cs#L142) tworzysz `TMaterial` **raz na płaszczyznę** (pętla `plane`), a potem w wewnętrznej pętli po `i` dla każdej ściany ustawiasz `mat.Diffuse.Color` i dodajesz **tę samą referencję** do `cube.Materials`:
+
+```csharp
+var mat = new TMaterial();              // ← jeden obiekt na całą płaszczyznę
+for (int i = 0; i < 1 << TAffine.N - 2; i++)
+{
+    ...
+    mat.Diffuse.Color = pal[...];       // ← nadpisuje kolor tego samego obiektu
+    cube.Materials.Add(mat);            // ← dodaje tę samą referencję
+    colorIdx++;
+}
+```
+
+`TMaterial` to typ referencyjny, więc wszystkie wpisy w `Materials` dla danej płaszczyzny wskazują na **jeden** obiekt, a jego `Diffuse.Color` przyjmuje ostatnią przypisaną wartość. Efekt: wszystkie ściany danej płaszczyzny dostają ten sam kolor (ostatniego `colorIdx`) — stąd dublowanie. Wcześniej `cube.Colors.Add(pal[...])` dodawał świeżą wartość na każdą ścianę.
+
+Sprawdzę jeszcze `TMaterial`, żeby przenieść tworzenie w dobre miejsce i nie zepsuć niczego innego:
+
+Potwierdzone — `TMaterial` to klasa (typ referencyjny). Poprawka: tworzyć nowy materiał **na każdą ścianę**, wewnątrz pętli po `i`:
+
+Sprawdźmy, czy konsument mesha (`BuildCubeMesh` w Gpu.cs) i inne miejsca zostały przełączone z `Colors` na `Materials` — inaczej albo się nie kompiluje, albo bierze zły kolor:
+
+Poprawka gotowa. Główny projekt (`Gpu.cs`, `TCubie.cs`) jest już przełączony na `Materials`, więc render kostki będzie brał świeży kolor na każdą ścianę.
+
+Zwracam jednak uwagę na jedną rzecz **poza zakresem tej poprawki**: projekt `RubikCube.Maui` wciąż odwołuje się do usuniętego `Colors`:
+
+- [CubeView.cs:61](RubikCube.Maui/Controls/CubeView.cs#L61) — `obj.Colors.Count ? obj.Colors[colorIndex]`
+- [VertexBufferBuilder.cs:65](RubikCube.Maui/Rendering/VertexBufferBuilder.cs#L65) — to samo
+
+Sprawdźmy, czy `obj` to ten sam `TShape` (czyli czy to realnie nie skompiluje się po usunięciu `Colors`):
+
+Potwierdzone — `obj` jest typu `TShape` (linia 49: `new List<TShape>(obj.Children)`), a `TShape.cs` ma `#if MAUI`, czyli jest współdzielony/linkowany do projektu MAUI. Po usunięciu `Colors` **te dwa pliki MAUI się nie skompilują**:
+
+- [CubeView.cs:61](RubikCube.Maui/Controls/CubeView.cs#L61)
+- [VertexBufferBuilder.cs:65](RubikCube.Maui/Rendering/VertexBufferBuilder.cs#L65)
+
+Poprawka jest analogiczna do `Gpu.cs`: `obj.Colors.Count` → `obj.Materials.Count`, `obj.Colors[colorIndex]` → `obj.Materials[colorIndex].Diffuse.Color`.
+
+## Podsumowanie
+
+- **Przyczyna dublowania**: w [TShape.cs](RubikCube/TShape.cs#L142) `TMaterial` był tworzony raz na płaszczyznę i ta sama referencja trafiała do `Materials` dla wszystkich ścian płaszczyzny — końcowy kolor nadpisywał wcześniejsze. Naprawione: nowy materiał na każdą ścianę.
+- **Do decyzji przez Ciebie**: dwa pliki w `RubikCube.Maui` wciąż używają starego `Colors`. Nie ruszam ich, bo pytałeś tylko o dublowanie w kostce — daj znać, czy przełączyć je na `Materials`, jeśli budujesz też wariant MAUI.
+
+
+## 🧑 Robert
+
+Nie buduję już w MAUI, projekt został wykluczony z rozwiązania (nie przejmuj się już nim więcej). Dodałem też tablicę wsp. UV do TShape, możesz je wykorzystać w GPU.cs?
+
+
+## 🤖 Claude
+
+Świetnie — `TShape.UV` ma dokładnie 4 wpisy na ścianę w tej samej kolejności co `Faces`, więc mogę zastąpić zaszyty na sztywno `quadUv` odczytem z mesha. Sprawdzę tylko, jak dobrać się do składowych `TVector` dla UV (pozycje używają `.Data[d]`):
+
+`new TVector(0, 0)` trafia w konstruktor `params float[]`, więc UV ma `Data[0]=u`, `Data[1]=v`. Zastępuję zaszyty `quadUv` odczytem z `mesh.UV`:
+
+Zrobione. W [BuildCubeMesh](RubikCube/Gpu.cs#L356) usunąłem zaszytą tablicę `quadUv` i zamiast niej biorę UV z mesha: `mesh.UV[v]`, gdzie `v = 4*f + k`. Indeksowanie jest zgodne, bo w [CreateHyperCube](RubikCube/TShape.cs#L138) `UV` jest wypełniane równolegle z `Faces` i `Materials` — po 4 wpisy na ścianę w tej samej kolejności iteracji.
+
+Zachowanie jest identyczne jak wcześniej (te same wartości `(0,0),(1,0),(1,1),(0,1)`), ale teraz źródłem prawdy jest `TShape`, więc gdybyś kiedyś zmienił mapowanie UV ścian (np. atlas tekstur), wystarczy to zrobić w jednym miejscu — `BuildCubeMesh` pójdzie za tym automatycznie.
+
+Jedno założenie, które warto mieć z tyłu głowy: `mesh.UV` musi mieć tyle samo wpisów co `4 * faceCount`. W obecnym `CreateHyperCube` tak jest. Gdyby w przyszłości któraś ścieżka budowała `Faces`/`Materials` bez dołożenia UV, `mesh.UV[v]` wyjdzie poza zakres — ale to samo dotyczyłoby wcześniej `Materials`, więc niczego nowego nie psuję.
+
+
+## 🧑 Robert
+
+Dodałem klasę TScene i TLight. TGLContext ma teraz uchwyt do sceny TScene, a ta do Root typu TShape. W formatce tworzę światło (które dziedziczy po tShape bo podlega transformacjom afinicznym) i staje się dzieckiem Root. Trochę problem stanowi to, że światło ma domyślnie tylko 3 współrzędne w transformacji. Chyba trzeba przebudowować tą transformacię w UpdateView formatki?
+
+
+## 🤖 Claude
+
+Zobaczmy jeszcze, jak `TGLContext` używa sceny/świateł i jak liczony jest `WorldTransform` (czy transformacja światła jest mnożona przez N-wymiarową transformację rodzica):
+
+Zobaczmy jeszcze, jak działa `TShape.Scene` (czy dziecko dziedziczy scenę po rodzicu), bo od tego zależy, czy `TLight.Parent` w ogóle dopisze światło do `Scene.Lights`:
+
+Mam pełny obraz. Sprawdzę jeszcze operator `*` na `TAffine`, żeby dokładnie opisać, co się stanie przy niezgodności wymiarów światła (3D) i sceny (N-D):
+
+Potwierdzam diagnozę — i owszem, `UpdateView` jest właściwym miejscem. Wyjaśnię dokładnie mechanizm, bo w grę wchodzą trzy sprzężone rzeczy, nie tylko sam wymiar transformacji.
+
+## Dlaczego 3 współrzędne
+
+`TLight Light = new TLight()` to inicjalizator pola formatki — wykonuje się, zanim ustawisz `TAffine.N`. W tym momencie statyczny konstruktor `TAffine` ustawił `N = 3`, więc `Light.Transform` dostaje `M = TMatrix(3,3)` i `Origin = TVector(3)` ([TAffine.cs:34-36](RubikCube/TAffine.cs#L34)). Ten wymiar jest zamrożony na sztywno w obiekcie i nigdy nie jest przebudowywany.
+
+## Dlaczego to wybucha przy N-D
+
+`GatherInstances` liczy `world = parent * obj.Transform` ([TGLContext.cs:92](RubikCube/TGLContext.cs#L92)), a operator `*` robi `left.M * right.M` oraz `left.M * right.Origin` ([TAffine.cs:125-126](RubikCube/TAffine.cs#L125)). Gdy rodzic (Root) jest N-wymiarowy, a światło ma macierz 3×3 i origin 3-D — mnożenie N×N przez 3×3 / N-wektor przez 3-wektor leci w niezgodność wymiarów. **Dlatego** linia [Form1.cs:529](RubikCube/Form1.cs#L529) `//Light.Parent = Scene.Root;` jest zakomentowana — po podpięciu światła do N-D roota to się sypało.
+
+## Trzeci, ukryty problem — zerwany link do sceny
+
+`UpdateView` robi `Scene.Root = new TShape()`, ale nowy root ma prywatne pole `scene == null`. `TShape.Scene` czyta `Root?.scene` ([TShape.cs:55](RubikCube/TShape.cs#L55)), więc po podmianie roota **cały graf traci powiązanie ze sceną**. W efekcie override `TLight.Parent` (`Scene?.Lights.Add(this)`) trafi na `Scene == null` i światło nigdy nie wyląduje w `Scene.Lights`.
+
+## Poprawka
+
+Rozbudowuję `UpdateView`: odbudowa N-D transformacji światła, przywrócenie linku sceny i ponowne podpięcie światła:
+
+Gotowe. Kolejność w `Light.Parent = Scene.Root` jest bezpieczna: override `TLight.Parent` najpierw robi `Scene?.Lights.Remove(this)` (usuwa z poprzedniego roota, który ma ustawiony link), potem `base.Parent`, potem `Scene?.Lights.Add(this)` już względem nowego roota — bez duplikatów.
+
+Sprawdzę, czy `RubikCube` się kompiluje po tych zmianach:
+
+Kompilacja przechodzi (0 błędów). 
+
+## Podsumowanie
+
+W [UpdateView](RubikCube/Form1.cs#L522) dodałem trzy rzeczy, które razem sprawiają, że światło poprawnie żyje w N-wymiarowej scenie:
+
+1. **`Scene.Root.Scene = Scene`** — przywraca link nowego roota do sceny, bez którego `TLight.Parent` nie dopisałby światła do `Scene.Lights`.
+2. **`Light.Transform = new TAffine()`** — odbudowa transformacji na aktualne `TAffine.N` (zamiast zamrożonego 3-D z inicjalizatora pola), plus `Origin[2] = 1` odtwarza dotychczasową pozycję `(0,0,1)`.
+3. **`Light.Parent = Scene.Root`** — odkomentowane; teraz nie wybucha, bo transformacja jest już N-D.
+
+## Jedna sugestia na przyszłość (nie ruszam bez zgody)
+
+Linijka `Scene.Root.Scene = Scene` w formatce to trochę łatanie inwariantu, który należy do `TScene`. Czyściej byłoby zamienić `public TShape Root = new TShape();` na właściwość pilnującą back-linku:
+
+```csharp
+TShape root;
+public TShape Root
+{
+    get => root;
+    set { root = value; if (root != null) root.Scene = this; }
+}
+public TScene() { Root = new TShape(); }
+```
+
+Wtedy każde `Scene.Root = new TShape()` (w `UpdateView`, `LoadConfig`, linia [502](RubikCube/Form1.cs#L502)) samo utrzymuje powiązanie ze sceną i można by usunąć tę linijkę z formatki. Daj znać, czy przenieść to do `TScene`.
+
+
+## 🧑 Robert
+
+Przenieś to do TScene
+
+
+## 🤖 Claude
+
+Teraz usuwam zbędną już linijkę z formatki:
+
+Sprawdzam kompilację:
+
+No response requested.
+
+
+## 🧑 Robert
+
+Ok, możemy już chyba przekazać do shadera dane świateł ze sceny (nie zakładajmy, że akurat jest jedno, jakiś MAX_LIGHTS byłby OK). Pewnie jakiś bufor UBO będzie do tego potrzebny
+
+
+## 🤖 Claude
+
+Zanim dołożę bufor świateł, muszę zobaczyć aktualny fragment shader (czy są normalne/pozycje do oświetlenia), klasę `Ssbo` (jak obsługuje UBO — wzorem `PlanesBuffer`) oraz jak `DrawCube`/`GatherInstances` przekazują dane.
+
+To spora, ale fajna integracja. Zanim zacznę, potwierdzę aktualny stan kilku miejsc, które będę modyfikować (Init buforów, BuildShaders, DrawCube, CompileRenderProgram) oraz `TScene`/`UpdateView` po Twoich ostatnich zmianach:
+
+Mam wszystko. Zaczynam od `MAX_LIGHTS` w Variables:
+
+Teraz fragment shader — dołączam Variables, definiuję blok świateł UBO (std140, binding 10) i liczę oświetlenie:
+
+Teraz `Gpu.cs` — pola dla bufora świateł:
+
+Fragment shader też musi teraz podmieniać include na `Variables`:
+
+Teraz metoda `UpdateLights` pakująca dane świateł ze sceny do UBO (plus helper liczący pozycję światła w świecie), i podpięcie bufora w `DrawCube`:
+
+Na koniec `TGLContext.DrawView` — wywołanie `UpdateLights` przed rysowaniem:
+
+Sprawdzę, czy `Gpu.Init()` (który ustawia `MaxLights` i tworzy `LightsBuffer`) na pewno leci przed pierwszym `DrawView`/`UpdateLights`:
+
+Gotowe — `Gpu.Init()` leci w [TGLContext.cs:39](RubikCube/TGLContext.cs#L39) (ścieżka `Create`, przed `DrawView`), więc `MaxLights` i `LightsBuffer` są gotowe zanim wywoła się `UpdateLights`.
+
+## Co zostało wpięte
+
+**Bufor UBO świateł (binding 10)** — dołożony w `Gpu.Init` zaraz po `XformBuffer`, więc auto-numeracja `Ssbo` daje mu binding 10. `MaxLights` czytane z define w `BuildShaders`.
+
+**Layout std140** (host ↔ shader muszą się zgadzać co do bajta):
+- Nagłówek `vec4` (`.x` = liczba aktywnych świateł), potem `MAX_LIGHTS` rekordów po 5×`vec4`.
+- Każdy `vec3` dopchany do `vec4`, żeby pakowanie po stronie C# było trywialne, a flagi siedzą w `.w`: `Position.w` = `isDirectional`.
+- Rekord = 20 floatów = 80 B (wielokrotność 16 → brak niespodzianek ze stride tablicy struktur).
+
+**`Gpu.UpdateLights(List<TLight>)`** — pakuje tylko włączone światła (do `MAX_LIGHTS`), liczy pozycję światła w świecie helperem `WorldOf` (spina łańcuch `parent.Transform * ...` dokładnie jak `GatherInstances`, bo światła nie mają ścian i nie są tam zbierane), rzutuje na 3D biorąc pierwsze ≤3 współrzędne — tak samo jak mesh.
+
+**`TGLContext.DrawView`** woła `Gpu.UpdateLights(Scene.Lights)` co klatkę przed `DrawCube` (transformacje światła/roota zmieniają się przy obrocie sceny).
+
+**Fragment shader** — dołącza `Variables` (dla `MAX_LIGHTS`; poprawiłem `CompileRenderProgram`, żeby podmieniał include także w FS), liczy normalną z pochodnych ekranowych `cross(dFdx(fPos), dFdy(fPos))` (mesh ND nie niesie normalnych — zgodnie z komentarzem-roadmapą, który tam był), i akumuluje ambient + diffuse + specular z tłumieniem. Gdy `count == 0` → zwraca płaski kolor (zachowanie sprzed integracji).
+
+## Czego C# nie sprawdzi — zweryfikuj w runtime
+
+- **Zgodność std140** host↔shader (kompilator C# tego nie złapie). Jeśli kolory wyjdą dziwne/przesunięte, to pierwszy podejrzany.
+- Przy N > 3 światło i tak działa (pozycja rzutowana identycznie jak mesh), ale oświetlenie liczone jest w rzucie 3D — normalne z pochodnych są przybliżeniem rzutu, nie prawdziwej geometrii ND. To świadomy kompromis pierwszej wersji.
+
+**Nie odpalałem builda** (poprzedni przerwałeś) — zostawiam kompilację/uruchomienie Tobie w VS. Daj znać, jeśli mam jednak zrobić szybki `dotnet build` na sprawdzenie literówek C#.
+
+Jedno pytanie na potem: przy `count == 0` kostka renderuje się płasko (bez cieniowania). Wolisz taki fallback, czy raczej minimalny ambient, żeby zawsze było widać bryłę nawet bez świateł w scenie?
+
+
+## 🧑 Robert
+
+Zadaje się, że shader nie zrozumiał normalize(cross(dFdx(fPos), dFdy(fPos))); a zwłaszcza dFdx/y jak mi się zdaje
+
+
+## 🤖 Claude
+
+Sprawdźmy najpierw, jak wygląda wrapper kompilacji shadera i jak raportowane są błędy — żeby zobaczyć, czy to realny błąd kompilacji i co dokładnie mówi log:
+
+Widzę, że `CompileShader` to teraz wrapper przyjmujący string. Zobaczmy dokładnie, jak przekazuje źródło do `glShaderSource` (kodowanie, długość, null-terminacja):
+
+To bardzo trafne podejrzenie — i faktycznie wygląda na to, że `dFdx`/`dFdy` w tym miejscu są problematyczne. Zanim jednak podmienię, jedna rzecz do jasności: `dFdx`/`dFdy` **są** rdzennymi funkcjami desktopowego GLSL (od 1.10, więc w 430 na pewno), więc jeśli log kompilacji wskazuje wprost na nie, to zwykle znak, że sterownik odrzuca je w danym kontekście albo raportuje błąd z sąsiedniej linii. Niezależnie od przyczyny — pochodne ekranowe to i tak najsłabszy element tego shadera (dają tylko przybliżenie normalnej z rzutu i wykrzaczają się na zdegenerowanych ścianach).
+
+Zastąpię je **prawdziwą normalną ściany liczoną w vertex shaderze** z własnych rogów kwadratu (rzutowanych do 3D) i przekazaną jako `flat` — bez żadnego `dFdx`.
+
+Zobaczmy, czy log kompilacji jest gdzieś przechwytywany do pliku (żeby potwierdzić dokładny komunikat), a potem przepisuję shadery:
+
+Przepisuję vertex shader — projekcja rogu wydzielona do funkcji, normalna ściany liczona z rogów kwadratu i przekazana jako `flat`:
+
+Teraz fragment shader — używa `flat in vec3 fNormal;` zamiast pochodnych:
+
+Sprawdzam, że nie został żaden `dFdx`/`dFdy` i że interfejs VS→FS się zgadza:
+
+Gotowe — `dFdx`/`dFdy` zniknęły całkowicie (poza komentarzem wyjaśniającym). Interfejs się zgadza: VS ma `flat out vec3 fNormal`, FS `flat in vec3 fNormal`.
+
+## Co się zmieniło (tylko shadery, zero zmian w C#)
+
+**Vertex shader** ([CubeVertex.glsl.c](RubikCube/Resources/CubeVertex.glsl.c)) — projekcję rogu ND→3D wydzieliłem do funkcji `project(vid)`, a normalną ściany liczę z jej własnych rogów:
+```glsl
+int c0 = gl_VertexID & ~3;   // pierwszy róg tego kwadratu (= 4 * face)
+vec3 nrm = cross(project(c0 + 1) - project(c0), project(c0 + 3) - project(c0));
+fNormal = length(nrm) > 1e-6 ? normalize(nrm) : vec3(0, 0, 1);
+```
+To **prawdziwa** normalna zrzutowanej ściany, nie przybliżenie z pochodnych — i z zabezpieczeniem na ściany zdegenerowane (te, których płaszczyzna 2D leży w odrzuconych wymiarach ND i rzutuje się do odcinka/punktu; przy `dFdx` dawały NaN).
+
+**Fragment shader** ([CubeFragment.glsl.c](RubikCube/Resources/CubeFragment.glsl.c)) — bierze `fNormal` zamiast liczyć pochodne. Reszta oświetlenia bez zmian.
+
+## Ważna uwaga do diagnozy
+
+Dla pewności: `dFdx`/`dFdy` to poprawny rdzenny GLSL 4.30, więc jeśli log kompilacji **naprawdę** je wskazywał, to teraz problem zniknie. Ale jeśli błąd leżał gdzie indziej (np. blok UBO albo — mniej prawdopodobne — nierozwinięty `#include` w FS), to ta zmiana go nie ruszy.
+
+`OpenGL.CompileShader` rzuca wyjątek z treścią `GetShaderInfoLog` przy błędzie. **Odpal i jeśli nadal leci wyjątek — wklej mi dokładną treść komunikatu** (linia + tekst z logu). Wtedy albo potwierdzimy, że to był `dFdx`, albo namierzę faktyczną przyczynę bez zgadywania.
+
+
+## 🧑 Robert
+
+System.Exception: '0(81) : error C0000: syntax error, unexpected integer constant, expecting ';' or '(' at token "<int-const>"
+0(82) : error C1031: swizzle mask element not present in operand "z"
+0(82) : error C1034: assignment to non-lvalue
+0(100) : error C1115: unable to find compatible overloaded function "dot(int, vec3)"
+0(102) : error C1115: unable to find compatible overloaded function "dot(int, vec3)"
+'
+
+
+## 🤖 Claude
+
+Znalezione — i to **nie** był `dFdx`. Twój log zdradza prawdziwą przyczynę: w Variables jest `#define N 3`, a ja nazwałem lokalną zmienną normalnej `N`. Preprocesor zamienia każde `N` na `3`, więc `vec3 N = fNormal;` staje się `vec3 3 = fNormal;`:
+
+- `0(81)` „unexpected integer constant" → `vec3 3 = ...`
+- `0(82)` swizzle `.z` na `3` + „assignment to non-lvalue" → `3.z`, `3 = -3`
+- `0(100)/0(102)` `dot(int, vec3)` → `dot(3, L)`
+
+Stary shader z `dFdx` miał dokładnie ten sam `vec3 N = normalize(...)`, więc wywalał się z tego samego powodu — `dFdx` był niewinny (choć i tak dobrze, że go zdjęliśmy). Poprawka: zmiana nazwy lokalnej `N` → `nrm`:
+
+Sprawdzam, że w obu shaderach nie ma już żadnego samotnego `N` (ani innego makra) użytego jako zmienna:
+
+To był ostatni gwóźdź — teraz `N` występuje w FS tylko w komentarzach; jako makro wymiaru jest używane wyłącznie w VS (poprawnie: `vid * N`, `min(N,3)`).
+
+Zapiszę to do pamięci projektu, bo ta pułapka będzie wracać przy każdym pisaniu GLSL w tym repo:
+
+Poprawione i zapamiętane. Podsumowanie:
+
+## Przyczyna
+`#define N 3` z `Variables.glsl.c` jest wstrzykiwane do fragment shadera, a moja lokalna `vec3 N` rozwijała się do `vec3 3` → stąd cała kaskada błędów (`3.z`, `dot(3, L)` itd.). `dFdx` był fałszywym tropem — stary shader miał ten sam `vec3 N` i wywaliłby się identycznie.
+
+## Fix
+- `N` → `nrm` w [CubeFragment.glsl.c](RubikCube/Resources/CubeFragment.glsl.c) (deklaracja + `dot(nrm, L)`, `dot(nrm, H)`).
+- Przy okazji zostaje geometryczna normalna z VS (bez `dFdx`) — czystsza i tak.
+
+## Zapamiętane
+Zapisałem do pamięci projektu regułę: w ciałach shaderów nie nazywać zmiennych jak wielkie makra z Variables (`N`, `SIZE`, `MAX_LIGHTS`…), bo to się rozwija w liczbę i daje mylące błędy wskazujące nie tam, gdzie trzeba.
+
+Odpal teraz — powinno się skompilować. Jeśli coś jeszcze wyskoczy z `GetShaderInfoLog`, wklej log; ale te cztery błędy z Twojego wyjątku są już zaadresowane co do jednego.
+
+
+## 🧑 Robert
+
+obiecywałeś coś, że wyznaczymy TBN ze wsp. tekstur, aha musimy przekazać materiał
+
+
+## 🤖 Claude
+
+Zgadałem o tym w komentarzu FS („normal + TBN … normal mapping arrive later"). Zanim wybiorę reprezentację materiału, sprawdzę, czy w projekcie w ogóle są ścieżki/obrazy tekstur (czy normal-mapy są teraz realne, czy materiały mają na razie tylko płaskie kolory):
+
+Jest już `Fragment.glsl.c` (legacy) z pełną strukturą materiału i oświetlenia — zobaczmy go, bo to prawdopodobnie wzorzec, do którego zmierzamy (TBN, `material.Shininess`, `matSpecular`):
+
+To jest właśnie wzorzec-obietnica: [Fragment.glsl.c](RubikCube/Resources/Fragment.glsl.c) ma pełne TBN (`fragTangent`/`fragBitangent`/`fragNormal`), `Material` z mapami i Phonga z `matSpecular`/`Shininess`. Dwie rzeczy z tego są teraz realne od ręki, jedna nie:
+
+- **TBN „ze wsp. tekstur"** — praktycznie za darmo: UV kwadratu są osiowe, więc krawędź `róg0→róg1` to kierunek **+u = tangent**, `róg0→róg3` to **+v = bitangent**, a `N = T×B`. To dokładnie te dwie krawędzie, które już liczę na normalną. Żadnych pochodnych ekranowych.
+- **Materiał (specular + shininess)** — trzeba przekazać; zrobię to per-ściana przez SSBO (jak Pos/Xform).
+- **Mapy `sampler2D` (normal/diffuse/specular)** — na razie nierealne: materiały mają tylko płaskie kolory (`Normal.Color` = (127,127,255), brak ścieżek bitmap), więc normal-mapping byłby wizualnym no-opem. Zostawię jednoliniowy hak na próbkowanie mapy, gdy pojawią się tekstury.
+
+Zaczynam od vertex shadera — TBN + lookup materiału po numerze ściany:
+
+Teraz fragment shader — TBN + rozdzielone ambient/diffuse/specular z materiałem:
+
+Teraz strona C# — pole `MaterialsBuffer`, utworzenie (binding 11), upload w `BuildCubeMesh`, bind w `DrawCube`:
+
+Teraz upload materiałów w `BuildCubeMesh`. Zobaczmy końcówkę tej metody, żeby wstawić w dobrym miejscu (mam `mesh`, `faceCount`):
+
+Na koniec bind `MaterialsBuffer` w `DrawCube`:
+
+Gotowe. Sprawdzam zgodność varyings VS↔FS i brak kolizji nazw z makrami (świeża lekcja):
+
+Wszystko spięte. Podsumowanie tego kroku:
+
+## TBN „ze wsp. tekstur" — jak obiecane, bez pochodnych
+W [CubeVertex.glsl.c](RubikCube/Resources/CubeVertex.glsl.c): UV kwadratu są osiowe, więc te same dwie krawędzie, z których liczyłem normalną, **są** ramką TBN:
+- `T` = `róg0→róg1` (kierunek +u)
+- `B` = `róg0→róg3` (kierunek +v)
+- `N` = `T×B`
+
+Przekazywane jako `flat` do FS. Zdegenerowane ściany (płaszczyzna 2D w odrzuconych wymiarach ND) dostają ramkę zwróconą do widza.
+
+## Materiał przekazany per-ścianę (SSBO, binding 11)
+- [Gpu.cs](RubikCube/Gpu.cs) — nowy `MaterialsBuffer` (jedna `vec4` na ścianę: `rgb` = specular, `w` = shininess), budowany w `BuildCubeMesh` z `mesh.Materials[f].Specular.Color` i `.Shininess`, bindowany w `DrawCube`.
+- VS pobiera rekord po numerze ściany (`gl_VertexID/4`) i podaje `flat` dalej.
+
+## Oświetlenie w FS — teraz jak we wzorcu
+[CubeFragment.glsl.c](RubikCube/Resources/CubeFragment.glsl.c) rozdziela składowe zgodnie z [Fragment.glsl.c](RubikCube/Resources/Fragment.glsl.c):
+```
+ambient  = light.Ambient  * matDiffuse
+diffuse  = light.Diffuse  * matDiffuse * max(dot(Nw,L),0)
+specular = light.Specular * matSpecular * pow(max(dot(Nw,H),0), shininess)
+```
+Specular **nie jest już** barwiony kolorem ściany (poprzednio `fCol * lit` psuło highlighty). Ramka TBN jest zbudowana i użyta — `Nw = TBN * tangentNormal`, gdzie `tangentNormal = (0,0,1)`.
+
+## Czego świadomie NIE ma (następny krok, gdy będą tekstury)
+Mapy `sampler2D` (Diffuse/Specular/**Normal**). Materiały mają teraz tylko płaskie kolory (`Normal.Color` domyślnie płaska (127,127,255)), więc normal-mapping byłby no-opem. W FS jest gotowy hak — jedna linia:
+```glsl
+vec3 tangentNormal = vec3(0.0, 0.0, 1.0);   // -> texture(NormalMap, fUv)*2-1
+```
+Gdy dorzucisz obrazy tekstur, wtedy: załadowanie bitmap materiału do tekstur GL (`TMaterial.TTexture.Map` daje `Bitmap`), samplery, i podmiana tej linii. To już osobny kawałek (upload tekstur + per-materiałowe indeksy warstw).
+
+**Nie budowałem** (poprzedni build przerwałeś) — odpal w VS. Uwaga: nowe `flat` varyings i SSBO 11 to zmiana interfejsu programu renderującego, ale C# ich nie dotyka. Jeśli chcesz, zrobię szybki `dotnet build` na wychwycenie literówek C#.
+
+
+## 🧑 Robert
+
+Wgrałem 5 tekstur do Resources projektu. Mapa height to zapewne displacement map a roughness to chyba specular, a basecolor - diffuse?
+
+
+## 🤖 Claude
+
+Najpierw zobaczmy, co dokładnie wgrałeś — nazwy i typy plików powiedzą, jak je najlepiej zmapować:
+
+To standardowy zestaw PBR **metallic-roughness** (Wall_Stone_018): `basecolor`, `normal`, `roughness`, `height`, `ambientOcclusion`. Twoje mapowanie jest w 2/3 trafne — jedno wymaga korekty.
+
+## Twoje trzy typy
+
+| Tekstura | Twój strzał | Poprawnie |
+|---|---|---|
+| **basecolor** | diffuse | ✅ **tak** — dla dielektryka (kamień, metallic=0) albedo = diffuse |
+| **height** | displacement | ✅ **tak** — mapa wysokości; displacement (wierzchołki) lub parallax (w FS) |
+| **roughness** | specular | ⚠️ **nie do końca** — patrz niżej |
+
+## Dlaczego roughness ≠ specular
+
+To są różne rzeczy:
+- **Specular map** (klasyczny Phong) = *ile* i *jakiego koloru* jest odblysk per teksel.
+- **Roughness** = *jak rozmyty* jest odblysk. 0 = ostry/lustrzany, 1 = matowy.
+
+Roughness najnaturalniej mapuje się na **shininess** (wykładnik Phonga), i to **odwrotnie**: im większe roughness, tym **mniejszy** shininess (szerszy, słabszy highlight). Typowo `shininess ≈ 2/roughness⁴ − 2` albo prościej `(1−roughness)·max`.
+
+Koloru specular ten zestaw **nie ma osobno** — dla niemetalu odbicie zwierciadlane jest ~stałe (białawe, ~4%). Czyli: nie ma mapy „specular", jest roughness sterujące ostrością. (Swoją drogą Twój `roughness.jpg` ma tylko 6 KB — pewnie prawie jednolity.)
+
+## Piąta, o którą nie pytałeś
+
+**ambientOcclusion** → mnożnik członu **ambient** (`ambient *= texture(AO, uv).r`). Brak metallic w zestawie potwierdza, że basecolor to czysty diffuse.
+
+## Jak to ląduje w naszym silniku (Phong, nie PBR)
+
+Wprost, z tego co już mamy:
+- **basecolor → `Diffuse.Map`** — proste, zastępuje `fCol`.
+- **normal → `Normal.Map`** — wpina się **dokładnie w to TBN**, które przed chwilą zbudowaliśmy; to jest ten „jednoliniowy hak" `texture(NormalMap, fUv)*2−1`. Największy wizualny zysk.
+
+Wymaga rozbudowy `TMaterial` + struktury `Material` w shaderze (dziś są 3 sloty: Diffuse/Specular/Normal + skalar Shininess):
+- **roughness** — jako mapa próbkowana w FS i konwertowana na wykładnik (dziś Shininess to skalar, nie mapa).
+- **height** — parallax w FS (nasza ściana to płaski quad, więc realny displacement wierzchołków wymagałby teselacji — parallax occlusion mapping jest praktyczniejszy).
+- **AO** — nowy slot, mnoży ambient.
+
+I dochodzi realny kawałek infrastruktury, którego świadomie dotąd nie ruszaliśmy: **ładowanie bitmap do tekstur GL + samplery** (per-materiał; `TMaterial.TTexture.Map` daje `Bitmap`).
+
+Proponuję zacząć od dwóch, które dają najwięcej i domykają obietnicę TBN: **basecolor → diffuse** i **normal → normal map**. Roughness/AO/height dołożymy po nich. Chcesz, żebym w tej kolejności to poprowadził — zaczynając od uploadu tekstur i rozszerzenia `Material`?
+
+
+## 🧑 Robert
+
+Tak
+
+
+## 🤖 Claude
+
+Świetnie. To spory kawałek — zrobię go porządnie. Najpierw inwentaryzacja: co z funkcji/stałych tekstur GL jest już załadowane w `OpenGL.cs`, jak wygląda `TexImage2D`, i czy obrazy są w ogóle osadzone w csproj (grep wcześniej nic nie zwrócił):
+
+Inwentaryzacja jasna. Brakuje `glTexParameteri` i kilku stałych (GL_RGBA, filtry min/mag, wrap, REPEAT, LINEAR_MIPMAP_LINEAR) — dołożę je. Zobaczmy jeszcze sekcję zasobów w csproj, żeby osadzić obrazy tym samym wzorcem co pliki `.glsl.c`:
+
+Plan jasny. Zaczynam od `OpenGL.cs` — dokładam `glTexParameteri` i brakujące stałe tekstur:
+
+Teraz csproj — osadzam dwa obrazy (basecolor + normal) tym samym wzorcem `None Remove` + `EmbeddedResource Include`:
+
+Teraz `Gpu.cs` — pola tekstur, metoda `LoadTexture`, załadowanie w `Init`, bind w `DrawCube`. Najpierw pola:
+
+Ładowanie tekstur w `Init` (raz — nie zależą od N/SIZE):
+
+Bind tekstur w `DrawCube` (jednostki 0/1, zgodne z `layout(binding=)` w FS):
+
+Na koniec fragment shader — samplery i użycie map (diffuse tintuje kolor ściany, normal przez TBN):
+
+Wszystko wpięte. Podsumowanie tego kroku (upload tekstur + rozszerzenie materiału o mapy, wg ustalonej kolejności — najpierw diffuse i normal):
+
+## Co doszło
+
+**[OpenGL.cs](RubikCube/OpenGL.cs)** — loader `glTexParameteri` + brakujące stałe (`GL_RGBA/RGBA8`, filtry MIN/MAG, WRAP_S/T, `GL_REPEAT`, `GL_LINEAR_MIPMAP_LINEAR`).
+
+**[RubikCubeND.csproj](RubikCube/RubikCubeND.csproj)** — `basecolor` i `normal` osadzone jako `EmbeddedResource` (wzorzec `None Remove` + `Include`, jak pliki `.glsl.c`). Pozostałe trzy (roughness/AO/height) dołożę, gdy je podepniemy.
+
+**[Gpu.cs](RubikCube/Gpu.cs)**:
+- `LoadTexture(dotPath)` — czyta osadzony obraz przez `GetManifestResourceStream` → `Bitmap` → `LockBits(Format32bppArgb)` → `TexImage2D` jako `BGRA`→`RGBA8`, mipmapy, `REPEAT`, trilinear. Bitmapa GDI jest top-down, więc `FlipY` (GL ma origin w lewym-dolnym rogu).
+- Ładowane raz w `Init` (`diffuseTex`, `normalTex` — nie zależą od N/SIZE).
+- W `DrawCube` bind na jednostki 0/1.
+
+**[CubeFragment.glsl.c](RubikCube/Resources/CubeFragment.glsl.c)** — `layout(binding=0/1) uniform sampler2D DiffuseMap/NormalMap` (jednostki z kwalifikatora, bez `glUniform1i`; legalne od GLSL 4.20). Użycie:
+```glsl
+vec3 tangentNormal = texture(NormalMap, fUv).rgb * 2.0 - 1.0;   // przez TBN -> Nw
+vec3 matDiffuse    = fCol.rgb * texture(DiffuseMap, fUv).rgb;   // kolor naklejki * kamień
+```
+Diffuse **tintuje** kolor ściany kamieniem (zachowuje tożsamość kostki). Czysty kamień = usuń `fCol.rgb *`.
+
+## Na co uważać przy odpaleniu
+
+- **Orientacja normal-mapy (zielony kanał)** — to klasyczna niejednoznaczność OpenGL vs DirectX + mój `FlipY`. Jeśli wypukłości będą oświetlone „od zła" (jakby wklęsłe), to znak, że trzeba odwrócić Y: albo `tangentNormal.g = -tangentNormal.g` w FS, albo zdjąć `FlipY` przy tej jednej teksturze. Nie zgaduję na sucho — zobacz i powiedz, którą stronę.
+- Tekstura kładzie się **na każdą naklejkę** (UV (0,0)-(1,1) na ścianę cubie), więc na SIZE×SIZE kaflach kamień się powtarza — na razie OK.
+
+**Nie budowałem** (trzymam się Twojego trybu). Tu ryzyko literówek C# jest większe niż zwykle — nowy interop `System.Drawing` (`LockBits`/`Scan0`), wskaźniki, nowy delegat GL. Chcesz, żebym odpalił `dotnet build` na szybkie sprawdzenie, czy zostawiasz kompilację w VS?
+
+
+## 🧑 Robert
+
+Ładnie, tekstury są rozmiaru 1024x1024, to chyba stanowczo za dużo na nasze kubiki. Jak myślisz, 128x128 wystarczy? Chyba mogę je normalnie wszystkie przeskalować jak zwykły obraz?
+
+
+## 🤖 Claude
+
+Dobre pytania — z jednym haczykiem, który warto znać, bo nie wszystkie mapy są „zwykłym obrazem".
+
+## Czy 128×128 wystarczy
+
+Tak, spokojnie. Co więcej — my już wołamy `GenerateMipmap`, więc GPU i tak sam schodzi w dół przy minifikacji; przy małych ściankach cubie różnica 1024 vs 128 jest praktycznie niewidoczna. Czyli zejście do 128 to głównie oszczędność **pamięci/rozmiaru assemblatu**, nie utrata jakości. Jedyny scenariusz, gdzie 128 może zamydlić, to mocny zoom na pojedynczą ściankę — jeśli chcesz margines, weź **256**. Do normalnego widoku 128 jest OK.
+
+## Czy można je przeskalować „jak zwykły obraz"
+
+To zależy od typu mapy:
+
+- **basecolor (diffuse)** i **ambientOcclusion** — tak, całkiem zwyczajnie. To dane obrazowe/luminancja, skaluj dowolnym edytorem.
+- **normal**, **roughness**, **height** — skalować można i u nas zadziała, ale to **nie** są dane sRGB, tylko liniowe, więc:
+  1. **Nie gamma-koryguj** przy zmianie rozmiaru (edytor nie może traktować ich jako sRGB). Zwykły „resize" bilinearny jest OK, byle bez gamma.
+  2. **Normalną (i te dwie) zapisz jako PNG, nie JPG.** Twój `normal.jpg` już jest stratny (JPEG z podpróbkowaniem chromy psuje wektory normalnych → szum w cieniowaniu). Przeskalowanie i ponowny zapis do JPG **spotęguje** to. Po zmniejszeniu daj PNG — lossless.
+  
+  Dla samej normalnej masz u nas komfort: w shaderze i tak robimy `normalize(TBN * tangentNormal)`, więc drobne błędy długości wektorów po interpolacji/skalowaniu same się kasują. To renormalizacja, o którą normalnie trzeba się martwić — u nas załatwiona.
+
+## Podsumowując
+
+128 (lub 256 dla zapasu). basecolor/AO — resize bez ceregieli. normal/roughness/height — resize liniowo i **zapisz jako PNG**.
+
+Jak przeskalujesz i ewentualnie zmienisz `normal.jpg` → `normal.png`, powiedz — poprawię wtedy nazwę w `Init` (`LoadTexture(...)`) i w csproj. Alternatywnie mogę dodać skalowanie w locie w `LoadTexture` (rysowanie do mniejszej bitmapy), gdybyś wolał trzymać oryginały bez ruszania — ale wtedy nie zmniejszy się rozmiar osadzonych plików. Co wolisz?
+
+
+## 🧑 Robert
+
+OK, przeskalowałem
+
+
+## 🤖 Claude
+
+Sprawdzę, co jest teraz w Resources — czy zmieniły się nazwy/rozszerzenia (zwłaszcza normal → PNG), żeby ewentualnie poprawić `Init` i csproj:
+
+Widzę — `normal` zmieniłeś na PNG (dobrze!), reszta bez zmian nazw. Muszę poprawić odwołanie do `normal` w dwóch miejscach (`.jpg` → `.png`):
+
+Zsynchronizowane. Teraz odwołania zgadzają się z plikami:
+
+- **basecolor.jpg** (3 KB) — bez zmian, JPG dla koloru w porządku.
+- **normal.png** (37 KB) — poprawione `.jpg` → `.png` w [Gpu.cs](RubikCube/Gpu.cs) (`LoadTexture` w `Init`) oraz w [csproj](RubikCube/RubikCubeND.csproj) (`None Remove` + `EmbeddedResource`).
+
+Pozostałe trzy (AO/height/roughness, też już przeskalowane do PNG) czekają na swój krok — podepniemy je, gdy rozszerzymy materiał o kolejne mapy.
+
+Gotowe do odpalenia. Przy pierwszym uruchomieniu zerknij na to, o czym pisałem: czy wypukłości kamienia są oświetlone „w dobrą stronę" — jeśli wyglądają jak wklęsłe, odwrócimy `tangentNormal.g`. Chcesz, żebym teraz zrobił `dotnet build` na sprawdzenie literówek C#, czy budujesz w VS?
+
+
+## 🧑 Robert
+
+Wszystko chyba jest OK, efekt jest dość delikatny, ale to nie szkodzi. Chciałbym jeszcze zmienić, ale chyba wystarczy na diffuse dorysowanie strzałki lub obrysu trójkąta?
+
+
+## 🤖 Claude
+
+Dobre pytanie i dobra intuicja — **tak, na sam diffuse to właściwy wybór**. Płaski nadruk (strzałka/obrys) to dekal w kanale albedo; normal/specular zostawiamy w spokoju, bo inaczej marker wyglądałby jak wytłoczony/wyryty, a nie namalowany.
+
+Jest natomiast realna rozwidlenie **jak** to nanieść — i to zmienia efekt (zwłaszcza że sam teksturowy detal określiłeś jako „dość delikatny"). Zapytam o dwie rzeczy, potem wpinam:
+
+Świetne spostrzeżenie — i masz rację: przy palecie od czerni do bieli marker w stałym kolorze **zniknie** na ściance o tym samym kolorze. Wypalanie w teksturze też by tego nie ratowało (stały nadruk). Więc: **proceduralnie, strzałka, z inwersją koloru (XOR-owo)** — marker = negatyw tego, co pod nim.
+
+Dodaję funkcję maski strzałki i inwersję albedo w [CubeFragment.glsl.c](RubikCube/Resources/CubeFragment.glsl.c):
+
+
+## 🧑 Robert
+
+Czekaj, bo nie podoba mi się grzebanie w shaderze - i tak już jest za bardzo pod kostkę. Myślałem o zrobieniu tylu tekstur co ścian, ale myślałem w 3D, w 4D - to już 24 ściany, itd. NIe..., zróbmy obrazek ze strzałką i składajmy te dwa obrazy proceduralnie, podmieniając kolory w czarno-białym obrazie strzałki - biały - przezroczysty, czarny - dopełnienie koloru ścianki
+
+
+## 🤖 Claude
+
+Jasne — masz rację, że tekstura-na-ścianę nie skaluje się do ND (3D=6, 4D=24, 5D=40...), a geometria strzałki w shaderze to zaszywanie kostki w rendererze. Twój pomysł jest lepszy: **jeden obrazek strzałki (czarno-biały) + generyczny composite** — biały przezroczysty, czarny = dopełnienie koloru ścianki. Shader robi tylko trywialny miks, bez wiedzy o kształcie.
+
+Cofam funkcję `arrowMask` i wstawiam trzeci sampler + composite:
+
+Teraz `Gpu.cs` — pole, ładowanie i bind trzeciej tekstury (jednostka 2):
+
+Csproj — osadzam `Arrow.png`:
+
+Zostaje sam obrazek `Arrow.png`. Wygeneruję prosty placeholder (czarna strzałka na białym tle), żeby od razu działało — podmienisz na swój. Sprawdzę, czym mogę to narysować:
+
+PIL jest (12.3.0). Generuję placeholder `Arrow.png` (256×256, czarna strzałka w górę na białym tle) prosto do `Resources`:
+
+Placeholder wygląda dobrze. Wszystko wpięte — podsumowanie tej zmiany:
+
+## Podejście (bez geometrii kostki w shaderze)
+- **Kształt strzałki żyje w obrazku** [Arrow.png](RubikCube/Resources/Arrow.png) (256×256, czarna strzałka na białym). Cofnąłem proceduralną `arrowMask`.
+- **Shader robi tylko generyczny composite** w [CubeFragment.glsl.c](RubikCube/Resources/CubeFragment.glsl.c):
+  ```glsl
+  float arrow = 1.0 - texture(ArrowMap, fUv).r;   // biały -> 0, czarny -> 1
+  matDiffuse = mix(matDiffuse, vec3(1.0) - fCol.rgb, arrow);   // czarny = dopełnienie koloru ścianki
+  ```
+  Dokładnie jak chciałeś: biały → przezroczysty, czarny → negatyw koloru naklejki. Zero wiedzy o kształcie — podmienisz obrazek i shader się nie zmienia.
+
+## Reszta plumbingu
+- [Gpu.cs](RubikCube/Gpu.cs) — `arrowTex` ładowany z `Resources.Arrow.png`, bind na jednostkę 2.
+- [csproj](RubikCube/RubikCubeND.csproj) — `Arrow.png` osadzony.
+
+## Dwie rzeczy do świadomości
+1. **Mid-gray zostaje ślepą plamką.** Dopełnienie/XOR to fundamentalnie: `1 − 0.5 = 0.5`, więc na ściance ~50% szarości strzałka zniknie mimo wszystko. Jeśli Twoja paleta ma taki środkowy szary i to przeszkadza, jednoliniowo podmienimy na kontrast wg luminancji (`luminancja < 0.5 ? biały : czarny`), który nie znika nigdzie — ale to już nie jest czysty XOR.
+2. **Kierunek strzałki** — `LoadTexture` robi `FlipY` (słuszne dla map kamienia), więc ta strzałka wyrenderuje się **w dół**, nie w górę. Dla markera orientacji kierunek jest kosmetyczny i spójny, więc działa; jeśli chcesz „w górę", narysuj ją w pliku grotem w dół (flip ją odwróci) albo powiesz, to wyłączę flip dla tej jednej tekstury.
+
+Placeholder działa od ręki — podmień na swój obrazek, kiedy chcesz (byle czarne-na-białym). Odpalasz w VS, czy mam zrobić `dotnet build` na sprawdzenie C#?
+
+
+## 🧑 Robert
+
+Ale super to wygląda! Lepiej niż myślałem!
+
+
+## 🤖 Claude
+
+Cieszę się — i to naprawdę zgrabnie wyszło dzięki Twoim decyzjom po drodze: TBN „za darmo" z krawędzi kwadratu, materiał per-ścianę, a na koniec ten composite ze strzałką z inwersją zamiast 24+ tekstur na ściany. Właśnie to ostatnie uratowało sprawę — obrazek trzyma kształt, shader zostaje generyczny.
+
+Co mamy na teraz:
+- Oświetlenie ze sceny (N świateł, UBO), TBN, normal-mapping, diffuse z tinta naklejki i marker orientacji.
+
+Co czeka, gdybyś kiedyś chciał (masz już przeskalowane pliki):
+- **roughness → shininess** (per-teksel, sterowanie ostrością highlightu)
+- **AO → mnożnik ambientu**
+- **height → parallax** w FS
+
+Żadne z nich nie jest pilne — kostka wygląda dobrze i bez nich. Daj znać, kiedy (i czy) chcesz któreś dołożyć, albo jak wpadnie inny pomysł. 🙂
+
+
+## 🧑 Robert
+
+Pierwsze 2 można od razu - to niewiele roboty, ale nie jestem pewien parallaxy - przecież nie zmieniam pozycji kamerkamery, nie mam nawet zooma - nie - jak będziemy robić poważniejszy projekt graficzny
+
+
+## 🤖 Claude
+
+Zgoda co do parallaxu — bez ruchomej kamery/zooma nie ma czego pokazać, więc `height` odkładamy do „poważniejszego projektu graficznego". Robię dwie od ręki: **roughness → shininess** (per-teksel) i **AO → mnożnik ambientu**.
+
+Najpierw csproj — osadzam roughness i AO:
+
+Teraz `Gpu.cs` — pola, ładowanie i bind jednostek 3/4:
+
+Teraz fragment shader — samplery i użycie (roughness → wykładnik, AO → ambient):
+
+Na koniec pętla świateł — AO do ambientu i nowy wykładnik w specular:
+
+Sprawdzam całość fragment shadera po zmianach:
+
+Zaktualizuję jeszcze nieaktualny komentarz nad samplerami (roughness/AO są już wpięte, została tylko height):
+
+Gotowe — obie mapy wpięte:
+
+## roughness → shininess (per-teksel)
+[CubeFragment.glsl.c](RubikCube/Resources/CubeFragment.glsl.c):
+```glsl
+float shininess = exp2((1.0 - texture(RoughnessMap, fUv).r) * 8.0);   // rough 0 -> 256, rough 1 -> 1
+```
+Gładkie, ograniczone [1, 256], perceptualnie sensowne (wykładnik rośnie wykładniczo). Zastępuje per-ścianowy skalar `fShininess` w highlightcie — skalar zostaje podpięty (VS→FS) na przyszłe skalowanie per-materiał.
+
+## AO → ambient
+```glsl
+float ao = texture(AOMap, fUv).r;
+...
+vec3 ambient = lgt.Ambient.xyz * matDiffuse * ao;   // tylko człon ambient (pośredni), zgodnie ze sztuką
+```
+
+## Plumbing
+- [Gpu.cs](RubikCube/Gpu.cs) — `roughTex`/`aoTex` na jednostkach 3/4, bind w `DrawCube`.
+- [csproj](RubikCube/RubikCubeND.csproj) — roughness.png + ambientOcclusion.jpg osadzone.
+- **height** pominięte świadomie (komentarz w shaderze to odnotowuje — wróci przy ruchomej kamerze).
+
+## Uwaga o widoczności efektu
+Twój `roughness.png` po przeskalowaniu ma **425 bajtów** — to praktycznie jednolity obraz, więc per-tekselowa zmienność będzie znikoma; mapa w efekcie ustawi głównie *ogólny* poziom połysku kamienia, a nie lokalne różnice. Podobnie AO, jeśli jest mało kontrastowe. To nie błąd — po prostu przy tak małych/płaskich mapach efekt bywa subtelny (jak sam wcześniej zauważyłeś przy normalu).
+
+Odpalasz w VS? Uzbierało się trochę zmian C# bez kompilacji (nowy delegat GL, ładowanie 5 tekstur, interop `System.Drawing`) — jeśli chcesz, mogę zrobić `dotnet build` na wychwycenie literówek, zanim odpalisz.
+
+
+## 🧑 Robert
+
+Wszystko OK, lecimy dalej z planem?
+
+
+## 🤖 Claude
+
+Zanim ruszymy — upewnię się, co dokładnie jest już zescaffoldowane pod kolejny oflagowany krok (przezroczystość/OIT), żeby trafnie zaproponować „dalej":
+
+To potwierdza plan z [Docs/Konwersacja_RubikND.md](Docs/Konwersacja_RubikND.md): krok 1–2 (statyczny instancjowany render) ✓, krok 2.5 (światło + tekstura orientacji) ✓ — właśnie skończony. **Następny jest krok 3: WBOIT** (weighted-blended order-independent transparency), oflagowany też w komentarzach shadera i częściowo zescaffoldowany (`TransparencyBox` + handler, `IsTransparencyOn` w `TGLContext`, blend już ustawiany).
+
+Sprawdzę tylko źródło alfy per-instancja (nieułożone kubiki mają być prześwitujące) i jak zbierane są instancje, żeby zaproponować konkretny pierwszy krok:
+
+Potwierdzam położenie w planie: **krok 2.5 (światło + orientacja) domknięty**, następny jest **krok 3 — WBOIT**. Źródło alfy per-instancja jest gotowe: `TCubie.Transparency` = `State != 0 ? 0.1 : 1` (nieułożony kubik → prześwit).
+
+Co WBOIT wymaga (żebyś widział skalę):
+- **Alfa per-instancja** — `GatherInstances` zbiera też `Transparency`, ląduje w buforze instancji, VS→FS.
+- **Podział na passy** — opaque (zapis Z) osobno, transparent osobno (test Z, bez zapisu).
+- **MRT FBO** — dwa float-target y: *accum* (RGBA16F) + *revealage* (R), blend przemienny per-attachment (`glBlendFunci`).
+- **Composite pass** — fullscreen quad łączący accum/revealage nad opaque.
+- **Nowe funkcje GL** — `glDrawBuffers`, `glBlendFunci`, `glFramebufferTexture2D`, formaty float; plus zmarszczka **MSAA+OIT** (bufory OIT bez multisamplingu albo per-sample).
+
+To zdecydowanie największy krok do tej pory. Jedno pytanie o sposób dowiezienia (reszta jest jasna z planu w Docs):
+
+Wybrałeś całe WBOIT naraz — robię pełny potok. To duża zmiana (6 plików: nowe funkcje GL, alfa per-instancja, 3 passy, MRT FBO, 2 nowe shadery). Zaczynam od `OpenGL.cs` — funkcje i stałe potrzebne do MRT/blendu per-attachment:
+
+`OpenGL.cs` gotowe. Teraz vertex shader — alfa per-instancja + `uInstanceBase` (offset dla drugiego passu), stride powiększony o 1 float:
+
+Fragment shader — dwa wyjścia (opaque / accum+revealage), przełącznik `uOIT`, wagowe WBOIT:
+
+Nowe shadery composite (fullscreen trójkąt + łączenie accum/revealage nad opaque):
+
+Csproj — osadzam shadery composite:
+
+Teraz `Gpu.cs` — sedno WBOIT. Przeczytam aktualne fragmenty (pola render, tworzenie/kompilacja programu, `DrawCube`), żeby edytować precyzyjnie:
+
+`OpenGL.cs`, shadery i composite gotowe. Teraz `Gpu.cs` — pola (program composite + cele OIT):
+
+Dodaję metody tworzenia/kompilacji programu composite (obok render-owych):
+
+Teraz zastępuję `DrawCube` pełnym potokiem WBOIT (`RenderScene`) + helpery FBO/tekstur:
+
+`Gpu.cs` gotowe. Na koniec `TGLContext` — zbieranie alfy + wywołanie `RenderScene`. Przeczytam aktualny stan:
+
+Cały potok WBOIT wpięty (6 plików). To duża, nietestowana zmiana z mnóstwem nowego C# (wskaźniki, `stackalloc`, nowe delegaty GL), więc mimo wszystko odpalę `dotnet build` na wychwycenie literówek — jeśli nie chcesz, odrzuć prompt:
+
+Build przechodzi — **0 błędów** (5 ostrzeżeń, prawdopodobnie zastane). Krok 3 (WBOIT) kompletny.
+
+## Co zostało zbudowane
+
+**Potok 3-passowy** w [Gpu.RenderScene](RubikCube/Gpu.cs) (zastąpiło `DrawCube`):
+1. **Opaque** (alpha == 1) → kolor + głębia w offscreen FBO (zapis Z, bez blendu).
+2. **Transparent** (alpha < 1) → `accum` (RGBA16F, blend `ONE,ONE`) + `revealage` (R16F, blend `ZERO, ONE_MINUS_SRC_COLOR`), test Z bez zapisu.
+3. **Composite** → fullscreen trójkąt składa `opaque*reveal + avg*(1-reveal)` do domyślnego framebuffera.
+
+**Alfa per-instancja** — `GatherInstances` zbiera `obj.Transparency` (nieułożony kubik = 0.1), pakowana do `XformBuffer` (+1 float/instancja), instancje partycjonowane opaque-first, drugi pass rysowany z offsetem `uInstanceBase`. Jeden `uOIT` przełącza wyjście shadera (opaque vs accum/revealage) — jeden VS+FS na oba passy, bez duplikacji oświetlenia.
+
+**Nowe elementy**: `OpenGL.cs` (`DrawBuffers`, `BlendFunci`, `FramebufferTexture2D`, `ClearBufferfv`, `DepthMask` + stałe float/attachment), 2 shadery composite, MRT FBO z 4 celami.
+
+## Co obejrzeć przy odpaleniu
+
+- **Przezroczystość**: po zamieszaniu kostki nieułożone kubiki mają być prześwitujące i — kluczowe — **niezależne od kolejności** (obróć kostkę, prześwit stabilny, bez migotania sortu).
+- **Czarny ekran** = najpewniej FBO incomplete albo brak którejś funkcji GL. Wtedy daj znać, dołożę `glCheckFramebufferStatus` do diagnostyki.
+- **Poszarpane krawędzie opaque** — świadomy kompromis: opaque renderuje teraz do jednopróbkowej tekstury OIT, więc traci MSAA, które ewentualnie miał domyślny framebuffer. To jest ta oflagowana zmarszczka **MSAA+OIT** — jeśli aliasing przeszkadza, następnym krokiem robimy per-sample OIT albo MSAA FBO z resolve. Na razie WBOIT jest jednopróbkowy (najprostszy poprawny wariant).
+
+Odpal w VS i powiedz, co widać — zwłaszcza czy prześwit działa i czy nie ma czarnego ekranu.
+
+
+## 🧑 Robert
+
+Wygląda super, również przy obrotach. MSAA chyba w tym projekcie nie jest odpalony, ale to byłaby kwestia w OpenGL ponownego utworzenia kontextu z odpowiednią flagą, gdzieś to już robiłem
+
+
+## 🤖 Claude
+
+Super, że działa też przy obrotach — to był główny cel WBOIT (kolejność bez znaczenia).
+
+Co do MSAA jest jednak istotny haczyk, który zmienił się właśnie przez WBOIT — i warto go znać, zanim sięgniesz po sprawdzony sposób z flagą kontekstu:
+
+**Sama flaga multisample przy tworzeniu kontekstu już nic nie da dla kostki.** Teraz cała geometria (opaque i transparent) renderuje się do **jednopróbkowych tekstur offscreen** (cele OIT), a do domyślnego framebuffera trafia tylko **fullscreen trójkąt composite**. Multisampling domyślnego FB wygładza krawędzie geometrii *w* tym FB — a tam jest już tylko jeden trójkąt pokrywający cały ekran, bez wewnętrznych krawędzi. Więc MSAA na kontekście zadziałałby „w próżnię", kostka zostałaby poszarpana tak samo.
+
+Żeby realnie mieć AA pod WBOIT, są dwie drogi:
+
+1. **MSAA w celach OIT** — attachmenty jako `GL_TEXTURE_2D_MULTISAMPLE` (albo multisample renderbuffery), rendering per-sample i resolve. To jest „porządne" MSAA, ale sporo roboty: multisample opaque + multisample accum/revealage + rozwiązywanie próbek. Flaga kontekstu tu nie wystarcza.
+
+2. **Post-process AA w passie composite (FXAA)** — skoro i tak mamy fullscreen composite, dokładamy tam jeden shader FXAA na gotowym obrazie. Zero zmian w kontekście/FBO, świetnie współgra z WBOIT, dużo taniej niż MSAA. Krawędzie nie będą tak ostre jak z prawdziwego MSAA, ale dla kostki wygląda bardzo dobrze.
+
+Dla tego projektu FXAA w composite to moim zdaniem najlepszy stosunek efekt/koszt — pasuje idealnie, bo pass już istnieje. Prawdziwe MSAA ma sens, jak będzie „poważniejszy projekt graficzny", o którym wspominałeś.
+
+Chcesz, żebym dołożył FXAA do composite, czy zostawiamy AA na potem i lecimy dalej z planem (albo coś innego)?
+
+
+## 🧑 Robert
+
+Chciałbym zobaczyć efekt FXAA na kostce
+
+
+## 🤖 Claude
+
+Dołożę FXAA prosto do passu composite — mamy już fullscreen resolve, więc antyaliasing wchodzi tam bez dodatkowego passu/FBO ani zmian w C#. Trik: wydzielam `resolve(uv)` (składanie opaque+accum+reveal) i FXAA próbkuje sąsiadów przez tę funkcję zamiast pojedynczej tekstury.
+
+Gotowe — i to **tylko zmiana w shaderze** [CompositeFragment.glsl.c](RubikCube/Resources/CompositeFragment.glsl.c). Zero C#, zero nowych funkcji GL, plik już osadzony, więc po prostu odpalasz.
+
+## Co robi
+- `resolve(uv)` — wyciągnięte składanie WBOIT (opaque + accum/reveal), teraz wołane dla dowolnego texela.
+- FXAA (kompaktowy wariant Lottesa) próbkuje 4 sąsiadów po przekątnych + centrum przez `resolve()`, wykrywa krawędź z luminancji, liczy kierunek wzdłuż krawędzi i miesza 2–4 próbki. `textureSize` sam daje rozmiar texela, więc nie ma dodatkowych uniformów.
+- Koszt: ~9× `resolve` = ~27 fetchy/piksel w passie composite. Dla kostki bez znaczenia.
+
+## Na co patrzeć
+Krawędzie kubików (zwłaszcza ukośne przy obrocie) powinny być gładsze, bez „schodków". FXAA działa na gotowym obrazie po WBOIT, więc wygładza też krawędzie między opaque a prześwitującymi kubikami.
+
+Dwie rzeczy, gdyby efekt nie leżał:
+- **Za miękko / rozmyte** — to typowy zarzut do FXAA (rozmywa też trochę tekstury/tekst). Można przyciąć `FXAA_SPAN_MAX` (np. 4.0) albo podbić próg `FXAA_REDUCE_MIN`.
+- **Za słabo widać** — przy 1:1 na dużym oknie schodki i tak są drobne; najlepiej ocenić na ukośnej krawędzi kostki obróconej pod ~30°.
+
+Jeśli chcesz **porównać on/off na żywo**, mogę podpiąć przełącznik (jest wolny, wisząc `TransparencyBox` z handlerem po WBOIT można by go przeznaczyć na FXAA) — powiedz, to dołożę uniform i wpięcie. Na razie FXAA jest po prostu włączone.
+
+
+## 🧑 Robert
+
+Wygląda bardzo dobrze. Jeśli chodzi o stronę graficzną to wydaje mi się on zakończona. Może potem obejrzę jeszcze źródła, ale wszystko wyglądało OK. Wróćmy do jednego punktu, który nie wydaje mi się jeszcze dopracowany - algorytmu greedy. Ustaliliśmy, że ma duży potencjał, bo potrafi znajdować koniunkcje i komutatory, w sumie - makroruchy. Co prawda nie to dokładnie zawsze jest jego zadaniem - pamiętajmy, że ruchy są odbijane podczas krzyżowania, tworząc komutator, ale w ten sposób otrzymujemy chyba komutator zagnieżdżony. Sama zmiana order w GetEulerAngles niewiele zmienia - bo kolejność uzyskana z GetOrder wynika z możliwych propagacji zer od lewej strony rozkładanej macierzy. Stąd permutacje osi. Czy dałoby się zrobić test porównujący liczbę możliwych do uzyskania różnych sekwencji układających kubik ze standardowego QR w greed i używającego permutacji osi (order standardowy spermutowanej macierzy)?
+
+
+## 🤖 Claude
+
+Zgoda — strona graficzna wygląda na domkniętą (WBOIT + FXAA + pełny materiał). Wracamy do greedy. To gęsty temat algorytmiczny i zanim zaproponuję sensowny test, muszę odświeżyć sobie dokładnie, jak działa obecny rozkład (QR/Givens, `GetOrder`, `GetEulerAngles`, permutacje osi, seedowanie). Zlokalizuję kluczowe metody:
+
+Widzę greedy (`GetSolveSeq` — losowe najkrótsze rozkłady) i `GetOrder`/`NonStandard` (kolejność płaszczyzn z propagacji zer). Teraz muszę zrozumieć drugą stronę porównania — `GetEulerAngles` (QR/Givens) w `TAffine` i jak z niej powstaje sekwencja ruchów:
+
+Odświeżyłem sobie obie strony. Zsumuję, żeby upewnić się, że mówimy o tym samym, bo od tego zależy sensowność testu.
+
+## Dwie metody rozkładu orientacji kubika
+
+**Greedy — [`GetSolveSeq`](RubikCube/TRubikCube.cs#L782)**: BFS-zachłanny. W każdym kroku enumeruje wszystkie `(plane, angle)` obniżające `RotationCount` o 1, losuje jeden, aplikuje. Komentarz słusznie mówi „random choices cover every decomposition tree" — czyli przy dostatecznej liczbie losowań pokrywa **całe drzewo najkrótszych rozkładów**. Oś (collateral) tylko wybiera warstwę i „adds no decomposition trees". To jest ta strona z dużym potencjałem (koniunkcje/komutatory po odbiciu w krzyżowaniu).
+
+**QR/Givens — [`GetEulerAngles`](RubikCube/TAffine.cs#L199)**: dla zadanej `order` zeruje poddiagonalę plane po plane (Givens), dając `(cos,sin)` na płaszczyznę = ćwierćobroty. Liczba **różnych** sekwencji jest ograniczona liczbą dopuszczalnych `order` — a te wynikają z propagacji zer ([`GetOrder`](RubikCube/TRubikCube.cs#L731)/[`NonStandard`](RubikCube/TRubikCube.cs#L760)). Twój wariant: zamiast permutować `order`, **permutować osie macierzy** (M' = PᵀMP) i puścić **standardowy** order → do N! rozkładów.
+
+Twoja hipoteza, jak ją rozumiem: greedy generuje istotnie **więcej** różnych układających sekwencji niż permutacje osi QR, i chcesz to policzyć.
+
+## Test — szkielet, ale najpierw 3 decyzje metodologiczne
+
+Zanim zakoduję (żeby nie zmierzyć nie tego), potrzebuję ustaleń — proponuję domyślne, powiedz co zmienić:
+
+1. **Zbiór orientacji wejściowych.** Wyczerpująco po **całej grupie orientacji jednego kubika** dla bieżącego N (dla N=3 to garść, rośnie z N — dla wyższych N przełączam na próbkę losową K sztuk). *Domyślnie: exhaustive dla N≤4, próbka dla N≥5.*
+
+2. **Równoważność sekwencji.** Porównujemy jako uporządkowaną listę `(plane, angle)`, **ignorując oś collateral** (bo z definicji nie tworzy nowych drzew). *Zgoda?*
+
+3. **Długość.** Greedy z definicji daje najkrótsze. QR bywa **dłuższy** (pomija plany bliskie identyczności przez `r<0.1`, ale kolejność może wymusić dodatkowe obroty). Liczyć tylko sekwencje **minimalnej długości** (uczciwe porównanie „ile najkrótszych dróg"), czy wszystkie i osobno raportować rozkład długości? *Domyślnie: raportuję jedno i drugie — liczbę distinct oraz histogram długości.*
+
+**Metryka na wyjściu**: per orientacja `|distinct greedy|` vs `|distinct QR-perm|`, plus agregaty (średnia/mediana/max) i ile orientacji greedy pokrywa, a QR-perm nie (i odwrotnie).
+
+**Forma**: diagnostyczna metoda (np. pozycja w menu obok „State Space") wypisująca tabelkę do konsoli/okna — reużywa `GetSolveSeq` i `GetEulerAngles`, nic w produkcyjnej ścieżce.
+
+Potwierdź te trzy punkty (albo skoryguj), to od razu piszę. Jedno pytanie kontrolne z mojej strony: czy `GetEulerAngles` gdziekolwiek już produkuje realne **ruchy** kubika, czy w teście mam sam napisać konwersję `(cos,sin)→(plane,angle)` i odwzorowanie osi po permutacji? Z tego, co widzę, dziś ścieżką seedującą jest wyłącznie greedy, więc zakładam, że konwersję QR→ruchy dopisuję w teście.
+
+
+## 🧑 Robert
+
+Nie, nie rozumiemy się. Skup się, bo dla mnie to też niełatwe zadanie. W greedy wybieramy ruch, który obniża RotationCount, a to czy ruch go obniża, zależy od kolejności założonych obrotów w QR (Czekaj, może zmienię definicję RotationCount w TCubie, aby było to wyraźniejsze - już). Zatem spróbujmy tą kolejność zmienić - i porównać. Może brakuje Ci metod już skasowanych, permutujących osie? Bo trzeba by było podzcas analizy RotateCount (czyli w getterze TCubie.State) zamieniać osie macierzy Transformacji (zgodnie z wcześniej ustaloną permutacją), dokonać standardowego QR i sprawdzić RotationAngle. Po wybraniu kandydata trzeba przy tworzeniu ruchu odwrócić permutację osi
+
+
+## 🤖 Claude
+
+Masz rację, źle to ująłem — teraz rozumiem: to nie dwie osobne metody, tylko **jedna greedy**, w której metryka `RotationCount` (a więc co „obniża") zależy od kolejności/permutacji osi w QR. Eksperyment = puścić greedy z różnymi permutacjami osi w liczeniu `RotationCount` i porównać.
+
+Najpierw przeczytam to, co właśnie zmieniłeś w `TCubie` (State/RotationCount) i te skasowane metody permutujące osie (`GetEulerAngles2` z parametrem `perm`), żeby nie zgadywać:
+
+Teraz kluczowe: `RotationCount` w [State getterze](RubikCube/TCubie.cs#L71) = liczba niezerowych obrotów Givensa z `GetEulerAngles(null)` (standardowy order). Jest też nieużywane pole `GivensOrder` (linia 31) — pewnie hak na permutację. Przeczytam skasowaną `GetEulerAngles2(order, perm)` w TAffine, bo tam prawdopodobnie jest logika permutacji osi, o której mówisz:
+
+
+## 🧑 Robert
+
+// Random active cubie + random axis-permutation, decomposed (EulerOrder / route) into the
+        // (plane, moveAngle) solve steps, recording the cubie's coord vector before each step. The
+        // axis is deferred - the cubie trajectory is axis-independent - so the caller realizes the
+        // moves with any axis: random (GetReversedSeq) or enumerated (BuildSeedMoves). m = active axes.
+        List<int[]> GetSolveSteps(out int[][] coordAtStep, out int m)
+        {
+            var nums = new int[TAffine.N];
+            for (int i = 0; i < nums.Length; i++)
+                nums[i] = i;
+            var permuts = DoPermute(nums, 0, nums.Length - 1);
+            var perm = permuts[TChromosome.Rnd.Next(permuts.Count)];
+            var cube = new TRubikCube(this);
+
+            var freeCubies = new List<TCubie>();
+            foreach (var cubie in cube.ActiveCluster)
+                if (cubie.State != 0)
+                    freeCubies.Add(cubie);
+            if (freeCubies.Count > 0)
+                cube.ActiveCubie = freeCubies[TChromosome.Rnd.Next(freeCubies.Count)];
+
+            m = cube.ActiveCubie.ActiveAxisCount();
+
+            var M = cube.ActiveCubie.Transform.M;
+            var A = (TMatrix)M.Clone();
+            for (int y = 0; y < M.RowsCount; y++)
+                for (int x = 0; x < M.ColsCount; x++)
+                    A[y, x] = M[perm[y], perm[x]];
+            cube.ActiveCubie.Transform.M = A;
+            var eulerAngles = cube.ActiveCubie.Transform.GetEulerAngles(EulerOrder, IsEulerOrderReversed);
+            cube.ActiveCubie.Transform.M = M;
+
+            var steps = new List<int[]>();          // each: { plane, moveAngle }
+            var coords = new List<int[]>();
+            for (int idx = 0; idx < eulerAngles.Count; idx++)
+            {
+                var rot = eulerAngles[idx];
+                var angle = TCubie.GetAngle(rot[0], rot[1]);
+                if (angle == 0) continue;
+                int axis1 = perm[(int)rot[2]], axis2 = perm[(int)rot[3]];
+                if (axis1 > axis2) { (axis1, axis2) = (axis2, axis1); angle = 4 - angle; }
+                int plane = axis2 * (axis2 - 1) / 2 + axis1;
+                int moveAngle = 3 - angle;
+
+                var coord = new int[TAffine.N];
+                for (int a = 0; a < TAffine.N; a++)
+                    coord[a] = cube.ActiveCubie.GetPos(a);
+                coords.Add(coord);
+                steps.Add(new[] { plane, moveAngle });
+
+                int canon = 0;                       // any axis not in the plane, only to advance the sim
+                while (canon == axis1 || canon == axis2) canon++;
+                cube.Turn(new TMove { Plane = plane, Angle = moveAngle, Axis = canon, Slice = coord[canon] });
+            }
+            coordAtStep = coords.ToArray();
+            return steps;
+        }
+
+Tu jest m.in logika permutacji osi
+
+
+## 🤖 Claude
+
+Teraz się zgadza — dzięki za `GetSolveSteps`, to jest brakujący element. Sprawdzę tylko, czy ta metoda jest jeszcze w kodzie, czy skasowana (to zmienia, czy ją adaptuję, czy odtwarzam):
+
+To wyjaśnia wszystko. Z historii w Docs widać, że stara `GetSolveSteps` (permutacja osi `PᵀMP` + transpozycja przed QR) została **zrefaktorowana w czysty greedy** (`GetSolveSeq`), który liczy `RotationCount` **standardowym** QR — i właśnie stąd traci część drzew rozkładu (Docs notują: „prawdziwa różnorodność bierze się z (a) permutacji osi `A[y,x]=M[perm[y],perm[x]]` i (b) transpozycji"). Twój pomysł: wstrzyknąć tę permutację z powrotem, ale do **metryki** greedy (`RotationCount` w `State`), nie jako osobną ścieżkę.
+
+Widzę też, że `cubie.GivensOrder` jest już ustawiane. Zobaczę kontekst, żeby wiedzieć, co ma trzymać permutację:
+
+Teraz mam pełny obraz. Rekapitulacja mechanizmu (powiedz, jeśli dalej coś przekręcam):
+
+- Greedy per krok bierze `(plane,angle)` obniżający `RotationCount`; `RotationCount` = liczba niezerowych Givensów z `GetEulerAngles(null)` — **standardowy** order. Więc „co jest progresem" zależy od tego orderu, a on gubi część drzew (Docs: dla obrotów 180° w szczególności).
+- Twój pomysł: przed QR sprzęgnij macierz permutacją osi `A[y,x]=M[perm[y],perm[x]]` (=PᵀMP), policz `RotationCount` na `A`; greedy działa w permutowanej ramce, a **przy emisji ruchu** odwracasz perm — dokładnie jak stara `GetSolveSteps` (`axis1=perm[rot[2]]`, sort osi, `angle→4-angle` przy zamianie).
+
+Proponuję zrobić to **najpierw jako samodzielny test**, który **nie dotyka produkcyjnego `TCubie.State`** — i to celowo, bo:
+
+> Getter `State` liczy naraz `rotationCount` (miara greedy) **i** `state` (spakowane kąty). `state` konsumuje setter (odtwarza `Transform`, standardowy order) i pakowanie/solved-detekcja. Ślepa permutacja w getterze rozjedzie `state` z tymi konsumentami. Więc do pomiaru replikuję greedy + permutowany `RotationCount` w harnessie (przez `GetEulerAngles` na PᵀMP), zero ryzyka. Dopiero jak test pokaże, że permutacja poszerza zbiór dróg — wpinamy ją do `State` porządnie (permutować tylko `rotationCount`, `state` zostawić standardowe).
+
+**Test**: dla losowego aktywnego kubika puść greedy K× pod (a) perm=identyczność, (b) wszystkie N! permutacje osi, (± transpozycja `reversed` jako druga oś), zbierz **distinct sekwencje** (jako listy `(plane,angle)`, oś ignorowana) per perm i **sumę** po permach. Raport: o ile N!-permutacji poszerza osiągalny zbiór dróg vs sam standard, i które drogi standard gubi. Diagnostyka obok „State Space".
+
+Trzy rzeczy do potwierdzenia, zanim zacznę pisać:
+
+1. **Zapisz `TCubie.cs`** (albo wklej aktualne `State`/`RotationCount`). Mówisz „już zmieniłem RotationCount", ale na dysku wciąż jest `get { _ = State; return rotationCount; }` liczone standardowym QR. Docs pokazują, że Twoje edycje bywały niezapisane i moje Read widziały starą wersję → churn. Nie chcę pisać pod nieaktualny stan.
+2. **`GivensOrder`** (`TVector.Uniform(N)`) — perm biorę jako argsort tego wektora, czy w teście enumeruję wprost wszystkie N! (a `GivensOrder` to osobny, per-kubik hak na produkcję)?
+3. **Transpozycja** — dołączyć `reversed` (Mᵀ) jako drugą oś różnorodności w teście, czy na razie tylko permutacje osi?
+
+Zapis + odpowiedzi, to piszę harness.
+
+
+## 🧑 Robert
+
+@"C:\_Moje Dane\_Dokumenty\Praca\Publikacje\2026\RubikCubeND\2026_07_10\RubikCube\TRubikCube.cs"
+
+
+## 🤖 Claude
+
+Teraz mam **całą** maszynerię permutacji osi — dzięki. Z tego snapshotu (`2026_07_10`) kluczowe jest `GetSolveSteps`: losowy `perm`, `A[y,x]=M[perm[y],perm[x]]` (PᵀMP), `GetEulerAngles(EulerOrder, IsEulerOrderReversed)`, i back-map płaszczyzn przez `perm` (`axis1=perm[rot[2]]`, sort, `angle→4-angle`). Plus `AxisCombos` i `BuildSeedMoves` mnożące różnorodność przez `order × reversed × axis`.
+
+Jedno doprecyzowanie, które z tego wyprowadziłem (potwierdź, bo na nim stoi test):
+
+> **Greedy z permutowaną metryką ≡ enumeracja realnych ruchów + `RotationCount` liczony na PᵀMP.** Back-map jest implicit: ruch nad płaszczyzną `(a,b)` w ramce permutowanej to realny ruch `(perm[a],perm[b])`, a pomiar `RotationCount` na PᵀMP standardowym orderem = pomiar w ramce permutowanej. Więc **jedynym parametrem testu jest `perm`** (± `reversed`).
+
+Dzięki temu test robię **samodzielnie, bez tykania produkcyjnego `TCubie.State`** — i to celowo rozwiązuje problem Twojej niezapisanej zmiany `RotationCount`: test ma własną, jedną definicję metryki, więc porównanie identity-vs-perm jest wewnętrznie spójne niezależnie od tego, co jest na dysku.
+
+**Szkielet:**
+- `RotCountUnderPerm(M, perm)` = liczba niezerowych Givensów z `GetEulerAngles` na PᵀMP.
+- `GreedyUnderPerm(cubie, perm)` → klon; póki `RotCount>0`: enumeruj realne `(plane,angle)`, zostaw obniżające `RotCount` o 1, losuj, zapisz. **Brak kandydata → „stuck"** — bo permutowana metryka *nie zawsze* ma ruch-progres realizowalny ćwierćobrotem, i to jest samo w sobie wynik (identity go nie ma z założenia).
+- Dla wybranego kubika: K przebiegów pod `identity` i K pod każdą z N! permutacji; zbieram **distinct** `(plane,angle)` sekwencje per-perm i **unię**.
+- Raport: `|identity|`, `|unia po perm|`, ile dróg identity gubi, ile perm-ów się zakleszcza, przykłady dróg unikalnych dla permutacji.
+
+Trzy decyzje go/no-go, potem od razu piszę (obiecuję, że tym razem bez kolejnej rundy):
+1. **Cel**: bieżący `ActiveCubie`, czy test sam robi losowy scramble i iteruje po nieułożonych kubikach (uśrednienie)?
+2. **`reversed`**: dołączyć transpozycję jako drugą oś, czy na razie tylko `perm`?
+3. **Wyjście/trigger**: `Debug.WriteLine` + nowy item menu obok „State Space", czy wolisz `MessageBox`?
+
+
+## 🧑 Robert
+
+Nie rozumiem p.2 GreedyUnderPerm - permutujemy tylko osie macierzy - dalej macierz jest rozkładana standardowo - oczywiście, że znajdą się kandydaci tak samo jak dla permutacji tożsamościowej. Po co mówić o aktywnych kubikach - mówimy po prostu o różnych macierzach orientacji, test dla 4D - 192 możliwości
+
+
+## 🤖 Claude
+
+Masz rację w obu punktach — dziękuję:
+
+1. **Brak „stuck"**: permutacja osi to czyste przeetykietowanie, rozkład jest izomorficzny z tożsamościowym, więc ruch-progres realny (obraz progresu w ramce permutowanej) **zawsze** istnieje. Mój błąd, wyrzucam obsługę zakleszczenia.
+2. **Domena to same macierze orientacji**, nie aktywne kubiki/scramble: enumerujemy **całą grupę orientacji** (signed-permutacje z det +1) — dla 3D 24, dla **4D 192**. Bez losowania, bez klastrów.
+
+Finalna, poprawiona specyfikacja:
+- Enumeruj wszystkie macierze orientacji `M` dla bieżącego N (24 / 192).
+- `RotCountUnderPerm(M, perm)` = liczba niezerowych Givensów z `GetEulerAngles` na `PᵀMP`.
+- `AllGreedy(M, perm)` = **pełne drzewo** najkrótszych rozkładów pod tą metryką (DFS rozgałęziający na *wszystkich* kandydatach obniżających `RotCount` o 1, nie losowo) → zbiór sekwencji `(plane, angle)`.
+- Per `M`: `|AllGreedy(identity)|` vs `|⋃_perm AllGreedy(perm)|`. Agregaty po wszystkich `M`: ile permutacje dokładają, ile `M` w ogóle zyskuje, przykłady dróg, których identity nie ma.
+
+Zanim napiszę — sprawdzę API `TMatrix` (konstruktor/indeks/`Clone`/`Rotate`) i jak wpiąć trigger obok „State Space":
+
+Uwaga: w bieżącym Designerze **nie ma już** żywej pozycji „State Space" (handler `stateSpaceToolStripMenuItem_Click` jest osierocony) — menu to tylko `file → open/save/saveClusters/showCluster/makeMoves/undoMoves`. Podepnę więc diagnostykę jako nową pozycję pod „file", wzorując się na `undoMoves`. Sprawdzę wzorzec wpięcia i ciało `TAffine.Rotate` (żeby wiernie aplikować ruch na macierzy):
+
+Mam wszystko, co potrzebne (`TAffine.Rotate`→`M.Rotate`, `Clone`, `OrthoPack` jako klucz orientacji, wzorzec menu). Piszę samodzielny diagnostyk — enumeracja orientacji przez domknięcie ruchami (konwencyjnie bezpieczne), pełne drzewo greedy pod permutowaną metryką, memoizacja `RotCount`:
+
+Teraz wpięcie menu. Przeczytam dokładny blok konfiguracji `undoMoves` w Designerze, żeby go wiernie zmirrorować:
+
+Teraz cztery edycje Designera + handler:
+
+Handler w Form1.cs — dodam obok `undoMovesToolStripMenuItem_Click`:
+
+Wpięte. Buduję, żeby wyłapać błędy C# (nowy plik + wiring menu):
+
+Zbudowane, 0 błędów. Diagnostyk gotowy — **File → „Greedy Diversity"**.
+
+## Co liczy (finalnie, po Twoich korektach)
+
+Dla bieżącego N enumeruje **całą grupę orientacji** kubika (domknięcie tożsamości ruchami → 24 dla 3D, 192 dla 4D). Dla każdej orientacji `M`:
+- `RotCount(M, perm)` = liczba niezerowych Givensów **standardowego** QR na `PᵀMP` — dokładnie Twoja „permutowana metryka".
+- `AllGreedy(M, perm)` = **pełne drzewo** najkrótszych ciągów `(plane,angle)` (rozgałęzia na *wszystkich* kandydatach obniżających `RotCount` o 1 — nie losowo, więc wynik jest dokładny, nie próbką).
+- Porównuje `|AllGreedy(identity)|` z `|⋃ po wszystkich N! permutacjach|`.
+
+Bez „stuck" (permutacja to przeetykietowanie, kandydat zawsze jest), bez aktywnych kubików — czyste macierze.
+
+## Jak czytać wynik
+
+Raport (MessageBox + `Debug.WriteLine`) daje sumy po całej grupie:
+- **identity metric** = to, co osiąga **dzisiejsza produkcyjna greedy** (ta sama definicja `RotCount`, standardowy order).
+- **union over perms** = co osiągnęłaby greedy z permutacją osi w metryce.
+- **extra / +%** = wprost odpowiedź na Twoje pytanie: o ile permutacje poszerzają zbiór dróg.
+- plus: na ilu orientacjach permutacje w ogóle coś dokładają, maksymalny przyrost, i przykład ścieżki nieosiągalnej dla identity.
+
+## Ważne
+
+- **Samodzielny** — jeden nowy plik [TGreedyDiversity.cs](RubikCube/TGreedyDiversity.cs) + pozycja menu. Nie tyka `TCubie.State`, więc Twoja niezapisana zmiana `RotationCount` na to nie wpływa (test ma własną, spójną metrykę). Identity-case i tak odtwarza produkcyjną greedy co do drzewa.
+- Wynik jest **dokładny** (pełna enumeracja, nie sampling), definitywny dla całej grupy.
+
+Dwie łatwe dokładki, gdy zobaczysz liczby:
+1. **Transpozycja** (`reversed`, rozkład `Mᵀ`) jako druga oś różnorodności — dosłownie drugi wariant `RotCount` i drugi union; powiesz, to dołożę.
+2. **Histogram długości** dróg (ile 180°-owych greedy gubi — to był Twój trop z Docs).
+
+Odpal i wklej liczby — wtedy zobaczymy, czy hipoteza („permutacje istotnie poszerzają zbiór makroruchów") się broni, i zdecydujemy, czy wpinać permutację w produkcyjny `RotationCount`.
+
+Świetnie — i wynik jest wymowny. Rozczytajmy go dla N=3:
+
+- **57 → 70 dróg (+22,8%)** po dołożeniu permutacji osi, na **7 z 24** orientacji (max +4 na jednej).
+- Reszta orientacji (17/24) nic nie zyskuje — standardowy order już pokrywa ich drzewa.
+
+## Kluczowe: przykład „1 1" potwierdza Twój trop z Docs o 180°
+
+Token = `plane*4 + angle`, więc **„1 1" = (plane 0, angle 1) dwa razy** = dwa ćwierćobroty tej samej płaszczyzny = **obrót 180° zrealizowany jako 2×90°**.
+
+Dlaczego identity tego nie ma: dla orientacji „180° w płaszczyźnie 0" standardowy QR widzi **jeden** Givens (kąt 180°), więc `RotCount = 1`. Pojedynczy ruch 90° daje orientację „90° w pł. 0" — dalej `RotCount = 1`, **nie spada**, więc 90° nie jest progresem. Identity układa to **jednym** ruchem 180° (token „2"). Dopiero **permutacja** rozbija ten 180° na dwa Givensy (`RotCount = 2`), przez co ścieżka 2×90° staje się greedy-najkrótsza. To dokładnie to, co zanotowałeś w Docs: „takie obroty zdarzają się tylko dla kątów 180°".
+
+Czyli permutacja dokłada **realizacje 180° przez 2×90°** — a to są jakościowo inne sekwencje (inny materiał na koniunkcje/komutatory po odbiciu w krzyżowaniu). Hipoteza się broni, choć dla N=3 skromnie.
+
+## Co dalej
+
+1. **Odpal N=4** (Dimension→4: 192 orientacji, 24 permutacje). Tam efekt powinien być wyraźnie większy — więcej „180°-splitów" i znacznie więcej swobody permutacyjnej. To jest właściwy test Twojej intuicji.
+2. **Histogram długości** — dołożę kolumnę „ile dróg której długości", osobno dla identity i dla extra-z-permutacji. To wprost pokaże, że nadmiar to dłuższe (rozbite) ścieżki, i skwantyfikuje historię 180°. Moim zdaniem najcenniejsza dokładka — chcesz?
+3. **Transpozycja** (`reversed`) jako druga oś — czy N!-permutacje już to subsumują, sprawdzimy jednym dodatkowym unionem.
+
+(Na marginesie: render w tle wygląda świetnie — kamień + strzałki + WBOIT/FXAA złożyły się w całość.)
+
+Który krok — N=4 najpierw, czy od razu dokładam histogram długości, żeby N=4 od razu dał pełny obraz?
+
+
+## 🧑 Robert
+
+Dołóż histogram długości, potem odpalę N=4. Czy z tego MessageBox nie mógłbym kopiować tylko tekstu, czy Ci wszystko jedno?
+
+
+## 🤖 Claude
+
+Dobre pytanie o kopiowanie — standardowy `MessageBox` pozwala tylko `Ctrl+C` całości (z tytułem i przyciskami), a do tego proporcjonalna czcionka rozjeżdża kolumny histogramu. Zrobię lepiej: mały dialog z **read-only, monospace `TextBox`** — zaznaczasz i kopiujesz sam tekst, a kolumny się wyrównują.
+
+Najpierw histogram długości w [TGreedyDiversity.cs](RubikCube/TGreedyDiversity.cs):
+
+Teraz kopiowalny dialog w `Form1.cs` zamiast `MessageBox`:
+
+Buduję:
+
+Kod się skompilował — te dwa błędy to **nie** błędy kodu, tylko blokada pliku: `RubikCube.exe` (proces 9456) wciąż działa pod debuggerem, więc linker nie mógł nadpisać `bin\...\RubikCube.exe` (MSB3027/MSB3021 = „plik używany przez inny proces"). Zatrzymaj uruchomioną instancję (Stop/■ w VS) i zbuduje się czysto — przy następnym „Start" w VS pójdzie samo. Żadnej zmiany w kodzie nie trzeba.
+
+## Co doszło
+
+1. **Histogram długości** w raporcie:
+   ```
+     distinct sequences by length:
+       length   identity   extra(perm)
+            0          1            0
+            1         ..           ..
+            2         ..           ..
+       ...
+   ```
+   `identity` = distinct ścieżki metryki tożsamościowej danej długości (sumą po orientacjach), `extra(perm)` = te, które daje dopiero permutacja. Spodziewam się, że **extra skupi się przy większych długościach** — bo to właśnie rozbicia 180° na 2×90° (i dłuższe warianty). To wprost skwantyfikuje historię z „1 1".
+
+2. **Kopiowalny dialog** zamiast `MessageBox` — read-only `TextBox`, czcionka Consolas (kolumny się wyrównują), zaznaczasz `Ctrl+A` / kopiujesz `Ctrl+C`.
+
+Zatrzymaj instancję, odpal ponownie N=3 (zobaczysz histogram), potem przełącz na N=4 i wklej — wtedy ocenimy, czy dla 4D permutacje dokładają istotnie więcej (i czy nadmiar rzeczywiście siedzi w dłuższych ścieżkach).
+
+
+## 🧑 Robert
+
+Greedy decomposition diversity  (N = 3)
+  cubie orientations (rotation group) : 24
+  axis permutations (N!)             : 6
+
+  distinct sequences, identity metric : 57   (avg 2,38 / orientation)
+  distinct sequences, union over perms: 70   (avg 2,92 / orientation)
+  extra from permuting axes           : 13   (+22,8%)
+
+  orientations where perms add paths  : 7 / 24
+  max extra paths on one orientation  : 4
+  example path only reachable via perm: 1 1
+
+  distinct sequences by length:
+    length   identity   extra(perm)
+         0          1            0
+         1          8            1
+         2         48           12
+Greedy decomposition diversity  (N = 4)
+  cubie orientations (rotation group) : 192
+  axis permutations (N!)             : 24
+
+  distinct sequences, identity metric : 2126   (avg 11,07 / orientation)
+  distinct sequences, union over perms: 3655   (avg 19,04 / orientation)
+  extra from permuting axes           : 1529   (+71,9%)
+
+  orientations where perms add paths  : 87 / 192
+  max extra paths on one orientation  : 55
+  example path only reachable via perm: 1 1
+
+  distinct sequences by length:
+    length   identity   extra(perm)
+         0          1            0
+         1         15            3
+         2        203           79
+         3       1907         1447
+
+
+## 🤖 Claude
+
+Hipoteza **potwierdzona i skaluje się z N** — dokładnie jak przewidywałeś:
+
+| | identity | union | extra | na ilu orient. |
+|---|---|---|---|---|
+| **N=3** | 57 | 70 | **+22,8%** | 7/24 |
+| **N=4** | 2126 | 3655 | **+71,9%** | 87/192 |
+
+Efekt rośnie mocno z wymiarem (22,8% → 71,9%), a **nadmiar siedzi w najdłuższych ścieżkach** (len 2 dla 3D, len 3 dla 4D): dla N=4 przy długości 3 identity ma 1907, permutacje dokładają **1447** (+76% samych trójek). To alternatywne drzewa rozkładu / rozbicia — jakościowo inny materiał na komutatory. Twoja intuicja się broni, i to tym bardziej, im trudniejszy problem.
+
+## Ale najciekawsze jest gdzie indziej — długość 1
+
+`extra(perm)` przy **len 1**: 1 (3D), **3 (4D)**. To nie są alternatywy — to **krótsze rozwiązania**. Ruch jednokrokowy `Y` układa orientację `M`, ale identity-greedy go **nie osiąga**, bo standardowy `RotCount(M)` wynosi tam ≥2 (schodzi 2→0, więc 90° nie jest „progresem o 1"). Czyli **standardowy order QR PRZESZACOWUJE moves-to-solve** dla części orientacji, a permutacja znajduje prawdziwe minimum. To ważniejsze niż sama różnorodność: metryka greedy bywa niedokładna, a permutacja ją naprawia — krótsze seedy = lepszy GA.
+
+## Dwa kroki, wybierz kolejność
+
+1. **Skwantyfikować „krótsze"** (polecam najpierw): licznik orientacji, gdzie `min długość pod jakąkolwiek permutacją < min pod identity`. To jest killer-metryka — mówi wprost, jak często permutacja daje **strictly krótszy** rozkład, nie tylko więcej wariantów. Mała dokładka do raportu.
+2. **Wpiąć permutację w produkcję.** Przypomnijmy: stara `GetSolveSteps` **miała** `perm × order × reversed` — refaktor na czysty greedy to **wyrzucił**, i to jest te −72% (4D) różnorodności seedów. Odzyskanie: w pętli seedującej (`BuildSeedMoves`/greedy) losować `perm` per pobranie (per-cubie hak `GivensOrder` już jest). To dokładnie Twój pomysł „permutuj osie w metryce, odwróć przy emisji".
+
+Robię najpierw licznik krótszych rozkładów (żeby N=4 od razu pokazał, ile to realnie shorter-solves), czy wolisz od razu przejść do wpinania permutacji w seedowanie?
+
+
+## 🧑 Robert
+
+Czekaj, nie spiesz się. To nie do końca tak. Standardowy greedy np. nie znalazł jednego obrotu wokół Y o 180 ale znalazł 2 obroty po 90 stopni - to to samo, sekwencja zmieniająca wszystkie kubiki w ten sam sposób. Trzeba by to jakoś odfiltrować. Szukamy sekwencji, które się różnią w efekcie na innej orientacji niż nasza (bo ta sprowadzana jest do identity). Ale to marny test. Coś proponujesz?
+
+Czekaj, chyba wiem - trzeba by przeprowadzić na tych sekwencjach procedurę Correct() i dopiero wówczas porównywać (zamienić ruchy na geny, sekwencję "odchudzić" i porównać sekwencje genów)
+
+
+## 🤖 Claude
+
+Masz rację — i to jest istotna korekta mojej interpretacji. „1 1" (2×90°) i „2" (1×180°) to **ten sam efekt na całej kostce** (identyczna transformacja wszystkich kubików), więc liczenie ich jako różnych dróg **zawyża** wynik, a moja teza o „krótszym rozwiązaniu" była błędna — to nie krótsze, to ta sama transformacja większą liczbą ruchów. Metryka „distinct po stringu `(plane,angle)`" mierzy nie to.
+
+Sedno, które nazwałeś: dwie sekwencje układające *nasz* kubik do identity są **naprawdę różne** tylko wtedy, gdy różnią się **efektem na pozostałych** kubikach (kolateralnie) — bo to one są budulcem komutatorów. Czyli prawdziwa różnorodność = **liczba różnych transformacji całej kostki**.
+
+Zanim cokolwiek zaproponuję — znajdę `Correct()`, żeby zobaczyć, czym dokładnie „odchudza":
+
+`Correct()` jest w `TRubikGenome` (woła je `Best.Correct()` w [Form1.cs:292]). Z Docs: to **składanie ruchów** — dla każdego ruchu skan wstecz, łączy z ruchem o tym samym `plane+axis+slice` (`(a+b)&3`, kasuje przy 0), O(len²). Przeczytam dokładnie, bo to zmienia strukturę testu (Correct działa na **genach**, czyli z osią/warstwą — a to właśnie ten kolateralny wymiar, który w abstrakcyjnym teście odrzuciłem):
+
+Przeczytałem `Correct()` — potwierdzam: składa **kolejne** ruchy o tym samym `Axis` **i** `Plane` **i** `Slice` (`(a+b)&3`, kasuje przy 0), przerywa na zmianie osi/płaszczyzny. Czyli reduktor **lokalny** (bez reorderowania), na genach = `(plane, angle, axis, slice)`.
+
+I tu jest sedno, które sam nazwałeś: **żeby w ogóle mówić o „efekcie na innych kubikach", potrzebne są geny — czyli oś i warstwa** — a to jest dokładnie ten kolateralny wymiar, który w abstrakcyjnym teście (same macierze orientacji) odrzuciłem. Wraca, i słusznie, bo teraz to on jest przedmiotem pomiaru.
+
+Zwróć uwagę na jedną rzecz zanim wybierzemy `Correct()`: on jest **lokalny**, więc „równe po Correct" to tylko **przybliżenie** „ten sam efekt". Dwie sekwencje o identycznym efekcie netto, ale nieredukowalne lokalnie do tej samej postaci (np. przeplecione innymi płaszczyznami), zostaną policzone jako różne.
+
+Dokładny odpowiednik Twojego kryterium („różnią się efektem na innych kubikach") jest czystszy: **zaaplikuj sekwencję genów na ułożonej kostce i zahaszuj cały stan** (wszystkie kubiki). Wtedy:
+- `2×90°` i `1×180°` na tej samej warstwie → identyczny stan → **auto-filtr**, bez `Correct()`.
+- inna oś (inna warstwa) → inne kubiki obrócone → inny stan → słusznie liczone jako różne.
+- kubik-cel u wszystkich ląduje w `M⁻¹` (ta sama netto-rotacja), więc hash różni się **wyłącznie kolateralnie** — dokładnie to, o co Ci chodzi.
+
+Oba podejścia wymagają tego samego wejścia (geny), więc test trzeba przebudować. Trzy decyzje, na których stoi kształt:
+
+1. **Kryterium równości**: dokładne (symulacja → hash całej kostki) czy `Correct()`-w-przestrzeni-genów (Twoja propozycja)? Ja bym dał **dokładne jako ground-truth**, a `Correct()`-owe **obok** jako druga kolumna — bo to *ono* widzi GA, więc różnica między nimi sama w sobie jest ciekawa (ile GA „nie doredukowuje").
+2. **Realizacje osi**: enumerować wszystkie (`AxisCombos` — pełna różnorodność kolateralna) czy kanoniczna oś na krok? Skoro mierzymy właśnie kolateral — enumerować.
+3. **Pozycja/zakres**: kolateral zależy od **pozycji** celu (które kubiki są w warstwie). Ustawiamy cel w jednej kanonicznej pozycji (np. narożnik) i iterujemy po jego orientacjach (192 dla 4D)? To trzyma test porównywalnym i wykonalnym.
+
+Nie piszę jeszcze nic — powiedz, jak chcesz te trzy, i wtedy przebuduję harness pod właściwą metrykę (identity vs union-po-permutacjach, ale już na **distinct efektach**, nie na stringach `(plane,angle)`).
+
+
+## 🧑 Robert
+
+1.  Dla ciekawości - oba, 2. Ale oś nie ma tu kompletnie nic do rzeczy, musimy wybierać po prostu tą samą oś dla porównywanych sekwencji, więc jeśli będziemy zawsze wybierać pierwszą możliwą - będzie OK. 3. Chyba może być, choć w realnej kostce narożny nie może mieć wszystkich możliwych orientacji, bo jest np. dla 3D w klastrze o liczności 8 (liczba rogów kostki - 2^N)
+
+I tu się wykłada moja 1 metoda - trzeba byłoby szukać kubika z klastra o liczności wszystkich orientacji. Nie bawmy się - Correct() zadziała, a oś ustaw tak jak mówiłem - pierwszą poprawną
+
+
+## 🤖 Claude
+
+Zdecydowane, upraszczam zgodnie z tym:
+- **Tylko `Correct()`** (metoda 1 z symulacją odpada — klaster narożnika nie ma wszystkich orientacji).
+- **Oś = pierwsza poprawna** dla każdego kroku (deterministyczna, ta sama dla porównywanych).
+- Bez pozycji/kostki: `Slice` mogę trzymać stałe (0), bo współrzędna wzdłuż osi kolateralnej **jest niezmiennicza** przy obrotach tej samej płaszczyzny — więc `Correct` i tak połączy kolejne 90° tej samej płaszczyzny (i tylko je), dając `2×90° → 180°`. To załatwia filtr bez śledzenia trajektorii.
+
+Metryka zmienia się z „distinct `(plane,angle)` stringów" na „**distinct sekwencji genów po `Correct()`**". Sprawdzę `TMove.Encode/Decode` (pola, zakres `Angle`), żeby wiernie zbudować geny i odtworzyć logikę `Correct`:
+
+`TMove` mam (Encode/Decode: angle bity 0-1, plane 2-6, axis 7-9, slice 10+; `Angle` 0..3, 0=no-op). Wszystko jasne. Przebudowuję metrykę w [TGreedyDiversity.cs](RubikCube/TGreedyDiversity.cs) — porównanie po **genach zredukowanych `Correct()`** (pierwsza oś, slice 0):
+
+Buduję (jeśli app działa, linker się zablokuje — wtedy tylko zatrzymaj instancję):
+
+Zbudowane, 0 błędów. Metryka przebudowana zgodnie z ustaleniami.
+
+## Co się zmieniło
+
+Porównanie idzie teraz po **zredukowanych `Correct()` manewrach**, nie po surowych stringach `(plane,angle)`:
+- każda greedy-sekwencja → geny z **pierwszą poprawną osią** i `slice 0`,
+- fold kompozycją `Correct()` (kolejne ćwierćobroty tej samej płaszczyzny: `(a+b)&3`, kasacja przy 0),
+- liczymy **distinct zredukowanych sekwencji genów**.
+
+Dzięki temu `2×90°` składa się do `1×180°`, więc effect-równoważne formy przestają być liczone jako różne. Slice=0 jest wierne, bo współrzędna wzdłuż osi kolateralnej i tak jest niezmiennicza przy obrotach tej samej płaszczyzny (a `Correct` łamie na zmianie płaszczyzny, więc nigdy nie skleja błędnie).
+
+## Czego się spodziewać po ponownym odpaleniu
+
+- **Liczby spadną** (identity i extra) względem poprzedniego przebiegu — bo znika inflacja z `2×90°≡180°`.
+- **Przykład „1 1" powinien zniknąć** z extra (złoży się do „2" = manewr identyczny z identity). Jeśli extra **nadal > 0**, to jest już **prawdziwa** różnorodność — manewry o innym efekcie netto, których identity nie osiąga. To jest właściwa odpowiedź na Twoje pytanie.
+- Histogram długości też liczy teraz ruchy **po** `Correct` — pokaże, czy realny nadmiar siedzi w dłuższych, genuinełnie różnych manewrach.
+
+Jedno zastrzeżenie z wcześniej wciąż obowiązuje: `Correct` jest **lokalny** (bez reorderowania), więc może nie skleić effect-równoważnych sekwencji przeplecionych innymi płaszczyznami — ale to dokładnie ta metryka, którą widzi GA, więc jest właściwa dla wniosków o seedowaniu.
+
+Zatrzymaj instancję, odpal N=3 i N=4, wklej — zobaczymy, ile zostaje po odfiltrowaniu.
+
+
+## 🧑 Robert
+
+Greedy decomposition diversity  (N = 3)
+  cubie orientations (rotation group) : 24
+  axis permutations (N!)             : 6
+
+  distinct manoeuvres, identity metric : 56   (avg 2,33 / orientation)
+  distinct manoeuvres, union over perms: 64   (avg 2,67 / orientation)
+  extra from permuting axes            : 8   (+14,3%)
+
+  orientations where perms add paths  : 6 / 24
+  max extra paths on one orientation  : 2
+  example path only reachable via perm: p1a2 p2a2
+
+  distinct manoeuvres by length (moves after Correct):
+    length   identity   extra(perm)
+         0          1            0
+         1          9            0
+         2         46            8
+Greedy decomposition diversity  (N = 4)
+  cubie orientations (rotation group) : 192
+  axis permutations (N!)             : 24
+
+  distinct manoeuvres, identity metric : 2092   (avg 10,90 / orientation)
+  distinct manoeuvres, union over perms: 3259   (avg 16,97 / orientation)
+  extra from permuting axes            : 1167   (+55,8%)
+
+  orientations where perms add paths  : 87 / 192
+  max extra paths on one orientation  : 37
+  example path only reachable via perm: p1a2 p2a2
+
+  distinct manoeuvres by length (moves after Correct):
+    length   identity   extra(perm)
+         0          1            0
+         1         17            1
+         2        233           37
+         3       1841         1129
+
+
+## 🤖 Claude
+
+Hipoteza **broni się nawet po filtrze** — i to jest teraz twarda liczba:
+
+| | raw (przed) | **filtrowane (Correct)** | gdzie |
+|---|---|---|---|
+| **N=3** | +22,8% | **+14,3%** (8 manewrów) | wszystkie len 2, 6/24 orient. |
+| **N=4** | +71,9% | **+55,8%** (1167 manewrów) | 1129 przy len 3, 87/192 orient. |
+
+Filtr zdjął ~¼–⅓ „nadmiaru" (inflację `2×90°≡180°`), ale **genuinełna różnorodność zostaje i mocno rośnie z N** (14,3% → 55,8%).
+
+## Co potwierdza filtr
+
+1. **Miałem rację, że się myliłem** o „krótszych rozwiązaniach.** Przy N=3 extra przy **len 1 spadło z 1 do 0** — to był artefakt składania. Zostaje **jeden** przypadek len-1 extra przy N=4 (1/192): tam permutacja faktycznie daje *strictly krótszy* (1-ruchowy) manewr, którego identity nie osiąga nawet po `Correct`. Realne, ale marginalne — nie to jest sednem.
+2. **Sedno = alternatywne manewry na najdłuższych ścieżkach.** Dla N=4 przy len 3: identity 1841, permutacje dokładają **1129** (+61% samych trójek). To są genuinełnie różne efekty netto (przykład `p1a2 p2a2` — dwa różne 180°, nie da się złożyć), czyli realny budulec komutatorów.
+
+## Wniosek i propozycja
+
+Refaktor greedy (usunięcie starej `GetSolveSteps` z `perm × order × reversed`) **wyrzucił te +55,8% seedowej różnorodności przy 4D** — i to jest udowodnione, nie przeczucie. Proponuję **wpiąć permutację z powrotem w produkcyjne seedowanie**, dokładnie Twoim mechanizmem z początku wątku:
+
+- w metryce greedy (`RotationCount`) liczyć na `PᵀMP` z permutacją per-kubik/per-losowanie (hak `GivensOrder` już jest),
+- przy emisji ruchu odwracać permutację (`axis = perm[...]`),
+- koszt ~bez zmian: greedy i tak robi `GetEulerAngles` per kandydat, tyle że na permutowanej macierzy.
+
+To odzyskuje różnorodność, którą właśnie zmierzyliśmy, bez powrotu do całej złożoności starego `GetSolveSteps` (order/reversed to osobne, ortogonalne mnożniki — możemy dołożyć później, jeśli zechcesz).
+
+Wchodzimy w produkcyjne wpięcie permutacji, czy najpierw chcesz jeszcze zmierzyć drugą oś (transpozycja `reversed`) albo trend na N=5, żeby mieć pełny obraz przed zmianą w produkcji?
+
+
+## 🧑 Robert
+
+Zmierz najpierw transpozycję reversed względem standardowego QR, niczego nie wpinaj jeszcze
+
+
+## 🤖 Claude
+
+Jasne — mierzę oś **transpozycji (`reversed`)** analogicznie do permutacji: baseline = standardowy QR, i sprawdzam ile dokłada `reversed` (rozkład `Mᵀ`). Nic nie wpinam. Przeczytam aktualny stan `Run`/`RotCount`/`AllGreedy`/`Dfs`, żeby dołożyć wymiar `reversed` precyzyjnie:
+
+Teraz dokładam wymiar `reversed`. Najpierw `RotCount`, `Dfs`, `AllGreedy`:
+
+Teraz przebudowuję `Run` — mierzy oś `reversed` (baseline vs +transpozycja), a permutacje i „oba" zostają jako linie referencyjne:
+
+Buduję:
+
+Zbudowane, 0 błędów. Raport mierzy teraz oś **transpozycji** analogicznie do permutacji, plus linie referencyjne:
+
+```
+baseline (standard QR)              : ...
++ transposition (reversed, M^T)     : ...  (+X%)   <- mierzone
+reference:
++ axis permutations (N!)            : ...  (+Y%)
++ both (perms x reversed)           : ...  (+Z%)
+```
+
+Wszystko wciąż na **Correct-filtrowanych manewrach** (te same, genuinełnie różne efekty), więc liczby są porównywalne z poprzednim przebiegiem.
+
+Na co patrzeć, gdy wkleisz N=3 i N=4:
+- **+transpozycja vs baseline** — ile `reversed` sam dokłada ponad standard.
+- **+both vs +perms** — to jest kluczowe: jeśli „oba" istotnie przewyższa „same permutacje", to transpozycja jest **ortogonalna** (dokłada nowe drogi, których permutacje nie dają) → warta osobnej osi w produkcji. Jeśli „oba" ≈ „same permutacje", to `reversed` jest **subsumowany** przez permutacje i nie ma sensu go dokładać.
+
+Zatrzymaj instancję, odpal oba, wklej — wtedy ocenimy, czy transpozycja wnosi coś ponad to, co już mamy z permutacji.
+
+
+## 🧑 Robert
+
+Greedy decomposition diversity  (N = 3)
+  cubie orientations (rotation group) : 24
+  axis permutations (N!)              : 6
+
+  baseline (standard QR)              : 56   (avg 2,33 / orientation)
+  + transposition (reversed, M^T)     : 56   (+0,0%)   <- measured
+
+  reference:
+  + axis permutations (N!)            : 64   (+14,3%)
+  + both (perms x reversed)           : 64   (+14,3%)
+
+  orientations where reversed adds    : 0 / 24
+  max extra on one orientation        : 0
+
+  distinct manoeuvres by length (moves after Correct):
+    length   identity   extra(rev)
+         0          1            0
+         1          9            0
+         2         46            0
+Greedy decomposition diversity  (N = 4)
+  cubie orientations (rotation group) : 192
+  axis permutations (N!)              : 24
+
+  baseline (standard QR)              : 2092   (avg 10,90 / orientation)
+  + transposition (reversed, M^T)     : 2092   (+0,0%)   <- measured
+
+  reference:
+  + axis permutations (N!)            : 3259   (+55,8%)
+  + both (perms x reversed)           : 3259   (+55,8%)
+
+  orientations where reversed adds    : 0 / 192
+  max extra on one orientation        : 0
+
+  distinct manoeuvres by length (moves after Correct):
+    length   identity   extra(rev)
+         0          1            0
+         1         17            0
+         2        233            0
+         3       1841            0
+
+
+## 🤖 Claude
+
+Wynik jest jednoznaczny i mocny: **transpozycja dokłada dokładnie 0%** — na 0 orientacjach, w 3D i 4D. Co więcej, `+both = +perms` co do sztuki (64=64, 3259=3259), a nawet więcej: `revUnion` = `idSet` co do liczności, czyli **każdy manewr z drogi `Mᵀ` jest już w zbiorze standardowego QR**. Transpozycja jest **całkowicie subsumowana — nawet nie przez permutacje, tylko przez sam standard**.
+
+Intuicja się zgadza: dla rotacji `Mᵀ = M⁻¹`, a odwrócony rozkład z negacją sinusów daje po `Correct` te same efekty netto co standard. Zero nowego.
+
+## Wnioski
+
+1. **`reversed` to martwa oś** — wyrzucamy z rozważań. Przy okazji potwierdza, że refaktor starej `GetSolveSteps` (który usunął m.in. `reversed`) **nic nie stracił** na różnorodności efektów netto z tego tytułu.
+2. **Cała wartość siedzi w permutacji osi** — genuinełne +55,8% (4D), po filtrze `Correct`. To jedyna oś warta wpięcia.
+
+## Gdzie jesteśmy
+
+Zmierzyliśmy dwie osie ze starej trójki `perm × order × reversed`:
+- **perm** (permutacja osi, `PᵀMP`) → **+55,8%** ✅ warta
+- **reversed** (transpozycja) → **+0%** ❌ martwa
+
+Zostaje niezmierzona trzecia: **`order`** (kolejność płaszczyzn w QR, `GetOrder` — propagacja zer). To *inna* operacja niż permutacja osi (permutuje sekwencję *płaszczyzn*, nie osie), więc może dokładać coś ponad permutację — albo być przez nią subsumowana, jak `reversed`.
+
+Dwie drogi:
+- **Zmierzyć jeszcze `order`** (analogicznie: baseline vs +order, i +both z permutacją) — żeby przed wpięciem mieć komplet i wiedzieć, czy produkcja ma używać `perm`, czy `perm × order`.
+- Albo **od razu wpiąć samą permutację** (zwalidowaną), a `order` zostawić jako ewentualną późniejszą dokładkę.
+
+Którą? Ja bym domknął pomiar `order` — skoro harness już to liczy jednym wymiarem więcej, a odpowiedź „czy order dokłada ponad perm" jest dokładnie tej samej natury co pytanie, które właśnie rozstrzygnęliśmy dla reversed.
+
+
+## 🧑 Robert
+
+Zmierz jeszcze order, potem wepniemy permutację. Zachowaj też klasę TGreedy Diversity i jej wpięcia w menu
+
+
+## 🤖 Claude
+
+Zgoda — mierzę `order`, permutację wepniemy potem, a `TGreedyDiversity` + menu zostają jako narzędzie. `order` to kolejność płaszczyzn w QR (`GetOrder`, propagacja zer) — inna operacja niż permutacja osi. Dołożę wymiar `order` (enumeracja wszystkich dopuszczalnych kolejności, DFS wzorem `GetOrder`) i pokażę kluczowe **+perm×order vs +perm** (czy `order` jest ortogonalny, czy subsumowany).
+
+Przeczytam aktualny plik, żeby edytować precyzyjnie:
+
+Mam obraz. Przebudowuję na trzy osie (`perm × order × reversed`), z `order` jako mierzoną. Najpierw pola + enumerator dopuszczalnych kolejności:
+
+Teraz `Run` — mierzy `order`, z `perm`, `reversed` i `perm×order` jako referencje:
+
+Buduję:
+
+Znów tylko **blokada pliku** — app działa (proces 15556), więc linker nie nadpisze `RubikCube.exe` (MSB3027/3021 to krok *kopiowania* po udanej kompilacji; **kod się skompilował**, zero błędów CS). Zatrzymaj instancję (■ w VS) i zbuduje się czysto.
+
+## Co dokłada ten przebieg
+
+Trzecia oś — **`order`** (kolejność płaszczyzn w QR, enumeracja wszystkich dopuszczalnych przez propagację zer, DFS wzorem `GetOrder`). Raport pokazuje teraz:
+```
+baseline (standard QR)
++ plane order (GetOrder)         (+X%)   <- mierzone
+reference:
++ axis permutations (N!)         (+Y%)
++ transposition (reversed)       (+0% — wiemy)
++ perms x order (full cross)     (+Z%)
+```
+
+**Kluczowe dwie liczby:**
+- **`+plane order` vs baseline** — ile `order` sam dokłada.
+- **`+perms × order` vs `+axis permutations`** — czy `order` jest **ortogonalny** do permutacji (jeśli cross > sam perm, `order` dokłada coś ponad permutacje → warty osobnej osi) czy **subsumowany** (jeśli cross ≈ perm → `order` nic nie wnosi ponad permutacje, jak `reversed`).
+
+Histogram liczy teraz extra z **pełnego perm×order** (kolumna `extra(both)`).
+
+## Uwaga wydajnościowa
+
+Dołożyłem pełny **cross perm×order** (dla każdej orientacji `N! × liczba_orderów` przebiegów). Dla N=4 zobaczysz w raporcie „valid plane orders" — jeśli tych orderów jest sporo, MessageBox może chwilę myśleć (memoizacja `RotCount` to tnie, ale drzewa DFS się mnożą). Gdyby to było wolne przy N=4, powiedz — ograniczę „both" do unii pojedynczych osi (`perm ∪ order`) zamiast pełnego iloczynu.
+
+Zatrzymaj instancję, odpal N=3 i N=4, wklej — wtedy rozstrzygniemy, czy do produkcji idzie sama permutacja, czy `perm × order`.
+
+
+## 🧑 Robert
+
+Greedy decomposition diversity  (N = 3)
+  cubie orientations (rotation group) : 24
+  axis permutations (N!)              : 6
+  valid plane orders                  : 2
+
+  baseline (standard QR)              : 56   (avg 2,33 / orientation)
+  + plane order (GetOrder)            : 62   (+10,7%)   <- measured
+
+  reference:
+  + axis permutations (N!)            : 64   (+14,3%)
+  + transposition (reversed)          : 56   (+0,0%)
+  + perms x order (full cross)        : 64   (+14,3%)
+
+  orientations where order adds       : 5 / 24
+  max extra on one orientation (order): 2
+  example only reachable via order    : p1a2 p2a2
+
+  distinct manoeuvres by length (moves after Correct):
+    length   identity   extra(both)
+         0          1            0
+         1          9            0
+         2         46            8
+Greedy decomposition diversity  (N = 4)
+  cubie orientations (rotation group) : 192
+  axis permutations (N!)              : 24
+  valid plane orders                  : 16
+
+  baseline (standard QR)              : 2092   (avg 10,90 / orientation)
+  + plane order (GetOrder)            : 2856   (+36,5%)   <- measured
+
+  reference:
+  + axis permutations (N!)            : 3259   (+55,8%)
+  + transposition (reversed)          : 2092   (+0,0%)
+  + perms x order (full cross)        : 3295   (+57,5%)
+
+  orientations where order adds       : 82 / 192
+  max extra on one orientation (order): 37
+  example only reachable via order    : p1a2 p2a2
+
+  distinct manoeuvres by length (moves after Correct):
+    length   identity   extra(both)
+         0          1            0
+         1         17            1
+         2        233           37
+         3       1841         1165
+
+
+## 🤖 Claude
+
+Komplet zmierzony — obraz jest jednoznaczny.
+
+## Ranking trzech osi (N=4, po filtrze Correct)
+
+| oś | sama | z permutacją (cross) | wniosek |
+|---|---|---|---|
+| **perm** (permutacja osi) | **+55,8%** | — | **dominująca** |
+| **order** (kolejność płaszczyzn) | +36,5% | perm×order = **+57,5%** | **~99% subsumowany przez perm** |
+| **reversed** (transpozycja) | +0% | — | martwy |
+
+Kluczowe: `perm × order` = 3295 vs sam `perm` = 3259 — **order dokłada ponad permutacje tylko 36 manewrów (+1,1%)**. Sam w sobie order jest silny (+36,5%), ale prawie wszystko, co osiąga, permutacja już pokrywa. Przy N=3 jest jeszcze wyraźniej: `perm×order = perm` co do sztuki (64=64) — order **w pełni** subsumowany.
+
+## Werdykt
+
+**Do produkcji idzie sama permutacja osi.** `order` i `reversed` są (prawie) całkowicie subsumowane — nie warte osobnej osi za cenę enumeracji orderów/transpozycji per seed. Permutacja daje ~99% dostępnej różnorodności jednym, tanim mechanizmem.
+
+## Jedno uproszczenie do wpięcia (ważne)
+
+Diagnostyk pokazał, że **„odwracanie permutacji przy emisji" nie jest potrzebne**. Greedy enumeruje **realne** ruchy `(plane,angle)`; permutacja wpływa tylko na to, co jest „progresem" (przez permutowany `RotCount`). Emitowane ruchy są już w prawdziwej ramce i układają kubik (`rc→0`). Czyli produkcyjna zmiana = **tylko permutowany `RotCount` w metryce greedy**, bez back-mapu ruchów. Prościej, niż zakładaliśmy na początku.
+
+Zostają dwie decyzje projektowe przy wpięciu:
+1. **Źródło permutacji**: per-kubik z `GivensOrder` (trzeba wtedy dokopiować `GivensOrder` w `TCubie.Copy` — dziś go nie kopiuje, więc klony w greedy miałyby złą permutację), czy **losowa per pobranie seeda** (jak stary `GetSolveSteps` losował perm)?
+2. **`state` vs `rotationCount`**: permutować **tylko `rotationCount`**, a bity `state` zostawić standardowe (konsumuje je pakowanie GPU / solved-detekcja) — jedna dodatkowa `GetEulerAngles` w getterze `State`.
+
+`TGreedyDiversity` + menu zostają jako narzędzie (zgodnie z prośbą). Wchodzimy w produkcyjne wpięcie permutacji — którą opcję dla (1) źródła permutacji wybierasz?
+
+
+## 🧑 Robert
+
+Rzeczywiście prościej. Ale po pierwsze: założenie, że Slice == 0, to błąd, Correct zależy od Slice. To zaniża wyniki. Powinno być Slice = c.GetPos(axis)
+
+
+## 🤖 Claude
+
+Racja — to realny błąd. `Correct` porównuje `Slice`, więc dwa manewry różniące się warstwą (`Slice`) to **różne** manewry (dotykają innych kubików kolateralnie), a `Slice=0` je sklejał → **zaniżał** liczbę distinct. Trzeba śledzić pozycję i dawać `Slice = GetPos(axis)`.
+
+Dołożę **śledzenie pozycji**: praca-kopia z kanoniczną pozycją narożnika, `TAffine.Rotate` obraca też `Origin`, więc `slice` liczę z aktualnej pozycji. Poprawiam komentarz, `AllGreedy`, `Dfs` (buduję geny z realnym slice) i usuwam `CorrectKey`:
+
+Sprawdzę aktualny komentarz i strukturę (kilka edycji temu):
+
+Komentarz zostawię na potem (matching się nie udaje przez whitespace) — najpierw kod. `AllGreedy` z pozycją narożnika:
+
+Usuwam nieużywane `CorrectKey`:
+
+Poprawię jeszcze komentarz (pojedyncza linia, żeby ominąć problem z matchowaniem):
+
+
+## 🧑 Robert
+
+Lepiej chyba zamiast kubika narożnego wybrać jakiś kubik w Slice = N - 2 (zakładając, że Size >=7)
+
+
+## 🤖 Claude
+
+Rozumiem sens: narożnik to zły wybór — jego kolateralne slice'y przyjmują tylko wartości skrajne (0 albo Size−1), więc `Correct` (który składa po `Slice`) rozróżnia manewry zbyt grubo, a do tego narożnik fizycznie nie ma wszystkich orientacji. Chcesz **kubik „generyczny"** — o różnych współrzędnych na osiach, żeby slice'y były rozróżnialne i żeby miał pełną swobodę orientacji (stąd `Size >= 7` dla N=4: dopiero wtedy są 4 różne odległości od środka).
+
+Natomiast samego **„Slice = N − 2"** nie jestem pewien i nie chcę zmierzyć nie tego. Doprecyzuj, którą pozycję dokładnie chcesz — zgaduję, że chodzi o coś w rodzaju:
+
+- **Współrzędne `(0, 1, 2, …, N−1)`** (każda oś inna) → dla N=4 to `(0,1,2,3)`; przy Size=7 (środek C=3) odległości od środka to `(3,2,1,0)` — różne, więc kubik jest (prawie) generyczny. Slice'y kolateralne: 0,1,2,3 i ich obroty.
+
+Czy to masz na myśli, czy konkretnie inne współrzędne (np. wszystkie odsunięte od środka, bez tej jednej w centrum — co wymagałoby Size ≥ 2N−1 = 9)?
+
+I drugie: orientacje (192 dla N=4) **nie zależą od Size** — Size wpływa tylko na ramkę pozycji/slice. Więc test może albo:
+- **wymusić własny Size** (np. `2N−1`) na czas pomiaru, niezależnie od UI, albo
+- **czytać bieżący Size** z kostki (a Ty ustawiasz Slices=7 przed odpaleniem).
+
+Którą pozycję (dokładne współrzędne) i które podejście do Size? Wtedy wpinam `slice = GetPos(axis)` z tej pozycji i puszczamy pomiar na właściwej ramce.
+
+
+## 🧑 Robert
+
+Każdy kubik ma przypisywany numer klastra. Zrób test, który pozwoli określić klaster o liczności możliwych orientacji. Wybierzemy z niego jakiś kubik
+
+
+## 🤖 Claude
+
+Świetny pomysł — to jest eleganckie. Klaster o liczności = liczbie orientacji to dokładnie kubik z trywialnym stabilizatorem: dystanse od środka `{0,1,…,N−1}` → rozmiar klastra `2^(N−1)·N!` = rozmiar grupy rotacji (192 dla N=4), i wymaga `Size ≥ 2N−1` (=7 dla N=4). Kubik z niego ma wszystkie orientacje i różne slice'y na osiach.
+
+Dodaję osobny diagnostyk `FindOrientationCluster` + pozycję w menu. Najpierw metoda:
+
+Teraz menu — druga pozycja „Orientation Cluster". Cztery edycje Designera + handler:
+
+Buduję:
+
+Zbudowane, 0 błędów. Nowe narzędzie: **File → „Orientation Cluster"**.
+
+## Co pokazuje
+
+Dla bieżącego N/Size:
+- liczbę orientacji (grupa rotacji: 192 dla N=4),
+- **klaster(y) o rozmiarze = liczbie orientacji** — z przykładowym `StartIndex` i współrzędnymi kubika (każdy kubik z tego klastra ma pełną swobodę orientacji),
+- gdy przy bieżącym Size takiego klastra nie ma → podpowiedź „ustaw Size ≥ 2N−1",
+- histogram rozmiarów wszystkich klastrów (dla kontekstu).
+
+## Jak użyć
+
+1. Ustaw **Dimension = 4, Slices = 7** (żeby istniał klaster `{0,1,2,3}`-dystansowy = 192).
+2. Odpal **„Orientation Cluster"** — zobaczysz klaster rozmiaru 192 i przykładowy kubik (`StartIndex` + coords).
+3. **Wybierz kubik** z tego klastra i podaj mi jego `StartIndex`/współrzędne.
+
+Wtedy przepnę pomiar różnorodności (`Run`) z ramki narożnika na **ten** kubik — jego pozycja da bogate, rozróżnialne slice'y (a nie tylko skrajne 0/Size−1), więc `Correct` policzy manewry poprawnie. Potem powtórzymy pomiar `order`/`perm` na właściwej ramce i domkniemy decyzję o wpięciu permutacji.
+
+(Narzędzie `Greedy Diversity` zostaje; oba menu współistnieją.)
+
+
+## 🧑 Robert
+
+Miałeś rację, może być: clusterIndex 2334   example StartIndex 66   coords (0,1,2,3)
+
+
+## 🤖 Claude
+
+Potwierdzone — `coords (0,1,2,3)` to dokładnie `{0,1,…,N−1}`, więc klaster 192 działa. Przepinam pomiar różnorodności z narożnika na kubik z tego klastra. Zamiast hardkodować, znajdę go automatycznie (rozmiar klastra == liczba orientacji) — to samo, co widziałeś. Pole na ramkę:
+
+Teraz metoda `GenericFrameOrigin` (znajduje kubik z klastra rozmiaru = liczba orientacji):
+
+Buduję:
+
+Zbudowane, 0 błędów. Pomiar różnorodności bierze teraz ramkę **z generycznego kubika** (auto-znaleziony klaster rozmiaru = liczba orientacji), a nie narożnik. W nagłówku raportu zobaczysz `slice frame (generic cubie, Size N) : (coords)` — powinno pokazać `(0,1,2,3)` dla N=4/Size=7.
+
+## Jak odpalić
+
+- **N=4**: Dimension=4, **Slices=7**, „Greedy Diversity". (Slices<7 → zobaczysz komunikat „set Size >= 7".)
+- **N=3**: Slices ≥ **5** (bo `2N−1=5`).
+
+Slice'y są teraz bogate (wartości 0…Size−1 wg trajektorii, nie tylko skrajne 0/6), więc `Correct` rozróżnia manewry po warstwie poprawnie — liczby będą inne (wyższe) niż z narożnika, i **to są właściwe**.
+
+Odpal N=3 (Size 5) i N=4 (Size 7), wklej — wtedy na dobrej ramce potwierdzimy ranking `perm` vs `order` (czy `order` dalej jest ~subsumowany) i domkniemy wpięcie permutacji. Gdyby przy N=4/Size=7 pełny `perm×order` liczył się długo (więcej orderów × permów × bogatsze slice'y = większe zbiory), powiedz — utnę „both" do unii pojedynczych osi.
+
+
+## 🧑 Robert
+
+Greedy decomposition diversity  (N = 3)
+  cubie orientations (rotation group) : 24
+  axis permutations (N!)              : 6
+  valid plane orders                  : 2
+  slice frame (generic cubie, Size 5) : (0,0,1)
+
+  baseline (standard QR)              : 56   (avg 2,33 / orientation)
+  + plane order (GetOrder)            : 62   (+10,7%)   <- measured
+
+  reference:
+  + axis permutations (N!)            : 64   (+14,3%)
+  + transposition (reversed)          : 56   (+0,0%)
+  + perms x order (full cross)        : 64   (+14,3%)
+
+  orientations where order adds       : 5 / 24
+  max extra on one orientation (order): 2
+  example only reachable via order    : p1a2s0 p2a2s4
+
+  distinct manoeuvres by length (moves after Correct):
+    length   identity   extra(both)
+         0          1            0
+         1          9            0
+         2         46            8
+Greedy decomposition diversity  (N = 4)
+  cubie orientations (rotation group) : 192
+  axis permutations (N!)              : 24
+  valid plane orders                  : 16
+  slice frame (generic cubie, Size 7) : (0,0,1,2)
+
+  baseline (standard QR)              : 2092   (avg 10,90 / orientation)
+  + plane order (GetOrder)            : 2856   (+36,5%)   <- measured
+
+  reference:
+  + axis permutations (N!)            : 3259   (+55,8%)
+  + transposition (reversed)          : 2092   (+0,0%)
+  + perms x order (full cross)        : 3295   (+57,5%)
+
+  orientations where order adds       : 82 / 192
+  max extra on one orientation (order): 37
+  example only reachable via order    : p1a2s0 p2a2s6
+
+  distinct manoeuvres by length (moves after Correct):
+    length   identity   extra(both)
+         0          1            0
+         1         17            1
+         2        233           37
+         3       1841         1165
+
+
+## 🤖 Claude
+
+Stop — widzę problem. Ramka pokazuje `(0,0,1)` i `(0,0,1,2)`, a nie `(0,1,2)`/`(0,1,2,3)`. Moje `GenericFrameOrigin` wzięło **pierwszy** kubik z klastra rozmiaru = liczba orientacji, ale takich klastrów jest **kilka** — i trafiło na `{3,3,2,1}`-dystansowy (dwie osie w tej samej odległości → **powtórzone współrzędne**), a nie ten generyczny `{3,2,1,0}` (który widziałeś jako 2334). Dlatego wyniki są identyczne jak przy `Slice=0` — powtórzone współrzędne dają skorelowane slice'y i nic nie rozróżniają.
+
+Poprawka: konstruuję ramkę **wprost** jako `(0,1,…,N−1)` (różne dystanse → slice'y zawsze rozróżnialne na wszystkich osiach), zamiast szukać „jakiegoś" klastra o tym rozmiarze:
+
+Buduję:
+
+
+## 🧑 Robert
+
+Nie widzę problemu. Skoro ten kubik należy do klastra max, to może przyjmować wszystkie orientacje. Przecież nie musi mieć wsp. 0,1,..N-1
+
+
+## 🤖 Claude
+
+Masz rację — i to bardziej, niż sądziłem. Cofam swoją zmianę.
+
+Kluczowe: te wyniki z ramką `(0,0,1,2)` wyszły **bajt w bajt identyczne** jak przy `Slice=0`. To dowód, że **slice w ogóle nie wpływa na liczbę distinct manewrów** — a więc żaden konkretny kubik z klastra max nie jest „lepszy", i coords `(0,1,…,N−1)` nie są potrzebne.
+
+Dlaczego slice jest bezczynny (i dlaczego moja wcześniejsza obawa była pusta):
+- `Correct` składa tylko **kolejne** ruchy tej samej płaszczyzny, a slice kolateralny jest wtedy **niezmienniczy** → składanie jest identyczne niezależnie od wartości slice.
+- Dla porównania distinct: slice jest **funkcją deterministyczną** trajektorii `(plane,angle)` + pozycji startu, więc dwa manewry różnią się genami wtedy i tylko wtedy, gdy różnią się ciągiem `(plane,angle)` — slice nie dodaje ani nie usuwa żadnego rozróżnienia.
+
+Czyli `Slice=0` był **poprawny od początku**, a każdy kubik z klastra max (Twój wybór) daje ten sam wynik. Wracam do wersji klastrowej (dowolny kubik o rozmiarze klastra = liczba orientacji):
+
+Wracam do stanu, który się kompilował wcześniej. Sprawdzam:
+
+Zbudowane, 0 błędów — wróciliśmy do wersji klastrowej.
+
+## Pomiary domknięte (i frame-independent)
+
+Skoro slice jest bezczynny, poprzednie liczby są **ostateczne** niezależnie od ramki:
+
+| oś | N=3 | N=4 |
+|---|---|---|
+| **perm** | +14,3% | **+55,8%** ← dominująca |
+| **order** | +10,7% (sam), perm×order = +14,3% | +36,5% (sam), perm×order = **+57,5%** |
+| **reversed** | +0% | +0% |
+
+**Wniosek (potwierdzony):** do produkcji idzie **sama permutacja osi**. `order` jest ~subsumowany (perm×order dokłada ponad perm tylko +1,7 pp przy 4D), `reversed` martwy.
+
+## Wpięcie permutacji — mechanizm
+
+Przypomnę uproszczenie z diagnostyka: greedy enumeruje **realne** ruchy, permutacja wpływa tylko na **permutowany `RotCount`** w metryce — **bez** back-mapu ruchów. Plus: permutować tylko `rotationCount`, bity `state` zostawić standardowe (konsumuje je pakowanie GPU / solved-detekcja).
+
+Zostaje jedna decyzja — **źródło permutacji**:
+
+1. **Per-losowanie seeda (losowa `perm`)** — jak stary `GetSolveSteps`. Każde pobranie próbkuje inną permutację, więc pula seedów zbiera **unię po permach** → realnie zbiera te +55,8%. **To rekomenduję** — bezpośrednio harvestuje zmierzoną różnorodność.
+2. **Per-kubik (stała `perm` z `GivensOrder`)** — każdy kubik zawsze pod swoją jedną permutacją. Mniej różnorodności per kubik (jedno drzewo, nie unia), wymaga dokopiowania `GivensOrder` w `TCubie.Copy`.
+
+Którą? Ja bym szedł w (1) — losowa per pobranie, bo to ona daje mierzone +55,8%. Potwierdź, to wpinam permutowany `RotCount` w greedy seedujący.
+
+
+## 🧑 Robert
+
+OK, namieszałem. Ale zyskałem fajne narzędzie z histogramem klastrów i przykładowym kubikiem z klastra max. Co do greedy - Nasze rozwiązanie nadal mi się nie podoba, mimo, że nie można mu odmówić pewnej elegancji. Pamiętasz, że rozmawialiśmy o możliwości redukowania macierzy za pomocą zer nad i pod przekątną? Pewnie, że niektóre z nich nie prowadzą do prawidłowego rozkładu - zastępują wcześniej uzyskane zera, ale większość powinna działać. Jestem strasznie ciekaw, jak taka polityka mieszania redukcji porównuje się do perm
+
+
+## 🤖 Claude
+
+Pamiętam — to była idea, żeby per płaszczyzna zerować **albo pod przekątną (standard), albo nad** przekątną. W kodzie jest nawet rusztowanie: `GetEulerMask` i zakomentowana gałąź w `GetEulerAngles`:
+```csharp
+//if (mask[i]) { a = A[axis2, axis2]; b = -A[axis1, axis2]; }   // "nad"
+```
+Czyli „nad" = `a = A[a2,a2]`, `b = −A[a1,a2]`, ta sama rotacja. To jest kolejna, ortogonalna oś różnorodności — nazwijmy ją **`mode`**: wolny wybór pod/nad per płaszczyzna → `2^P` wariantów (8 dla N=3, 64 dla N=4).
+
+## Plan pomiaru (analogicznie do order/perm)
+
+- **Lokalny Givens z `mode`** (własny w diagnostyku, nie ruszam produkcyjnego `GetEulerAngles`): dla płaszczyzny p bit `mode` wybiera pod/nad. `mode = 0` (all-pod) **musi** odtworzyć standardowy baseline — wbudowany sanity-check.
+- **Nieprawidłowe mody** (zastępujące wcześniejsze zera): nie próbuję ich charakteryzować z góry — po prostu **weryfikuję, że manewr faktycznie układa** (aplikuję ruchy, sprawdzam `M == I` na liściu greedy). Zły mod wtedy albo utyka (brak ruchu-progresu → nic nie wnosi), albo dochodzi do `rc==0` przy `M≠I` → odrzucone. Zero śmieci, bez zgadywania które mody są dobre.
+- **Raport**: baseline (all-pod) vs **+mode** (unia po `2^P`) vs **+perm** (referencja) vs **+mode×perm**. Ta sama metryka Correct-filtrowanych manewrów.
+
+Dwie rzeczy do potwierdzenia, zanim wpinam (żeby nie zmierzyć nie tego przy tej drażliwej matematyce znaków):
+
+1. **Krok „nad"**: `a = A[axis2,axis2]`, `b = −A[axis1,axis2]`, potem to samo `A.Rotate(axis1, axis2, cos, −sin)` co dla „pod" — tak jak w zakomentowanym kodzie. Zgadza się?
+2. **Weryfikacja przez rozwiązanie** (aplikuj manewr → `M==I`) jako filtr nieprawidłowych modów — OK, czy wolisz inne kryterium ważności?
+
+Potwierdź te dwa punkty, to od razu dokładam oś `mode` i puszczamy `mode` vs `perm`.
+
+
+## 🧑 Robert
+
+Sprawdźmy p.1, bo wcale nie jestem pewien. A.Rotate dokonuje zdaje się obrotu Givensa mnożąc macierz z lewej strony, ale czy żeby uzyskać zero nad przekątną, czy nie mnożymy z prawej strony? Wówczas jeśli macierz M zredukuje się do jednostkowej, otrzymujemy prawidłowy rozkład orginalnej M złożony ze złożeń obrotów lewych i prawych
+
+
+## 🤖 Claude
+
+Bardzo dobry punkt — i chyba masz rację. `A.Rotate` mnoży Givensa **z lewej** (`G·A`), co zeruje **pod** przekątną (operacja na wierszach). Żeby wyzerować **nad** przekątną, naturalnie mnoży się **z prawej** (`A·G`, operacja na kolumnach) — a to jest właśnie `RotatePost`. Wtedy redukcja `L_k…L_1 · M · R_1…R_m = I` daje rozkład `M` jako złożenie obrotów **lewych i prawych** — i to jest ten „prawidłowy rozkład", o którym mówisz. Zakomentowany kod (lewe mnożenie dla „nad") był prawdopodobnie błędny.
+
+Zweryfikuję semantykę obu — `Rotate` (lewe) i `RotatePost` (prawe) — żeby podać poprawne `a,b` dla „nad":
+
+Sprawdziłem w kodzie (macierz jest **kolumnowa**: `this[row,col] = Data[col*RowsCount+row]`):
+
+- **`Rotate`** iteruje po `RowsCount` z krokiem — modyfikuje **wiersze** `a1,a2` → to mnożenie **z lewej** (`G·A`), zeruje **pod** przekątną.
+- **`RotatePost`** iteruje po kolumnach `i,j` → modyfikuje **kolumny** → mnożenie **z prawej** (`A·G`), zeruje **nad** przekątną.
+
+Twoja intuicja jest poprawna. Wyprowadzone znaki:
+
+**pod** (zeruje sub-diagonal `[a2,a1]`, lewe):
+```
+a = A[a1,a1];  b = A[a2,a1];  r = √(a²+b²)
+A.Rotate(a1, a2, a/r, -b/r)     // new[a2,a1] = -sin·A[a1,a1] + cos·A[a2,a1] = 0 ✓
+```
+**nad** (zeruje super-diagonal `[a1,a2]`, **prawe**):
+```
+a = A[a1,a1];  b = A[a1,a2];  r = √(a²+b²)
+A.RotatePost(a1, a2, a/r, b/r)  // new[a1,a2] = -sin·A[a1,a1] + cos·A[a1,a2] = 0 ✓
+```
+
+Ładnie symetryczne: **oba** biorą `a = A[a1,a1]` (przekątna) i `b` = zerowany element poza-przekątny; „pod" to lewe z `−sin`, „nad" to prawe z `+sin`. Zakomentowany kod (`a=A[a2,a2]`, `b=−A[a1,a2]`, lewe) był **błędny** — dobrze, że drążyłeś.
+
+Ważność moda = czy po wszystkich P krokach `A` zredukuje się do `I` (zależne od moda) — i to łapie weryfikacja przez rozwiązanie na liściu greedy.
+
+To jest **istotna zmiana** w diagnostyku: metryka `RotCount` przechodzi z `GetEulerAngles(order,reversed)` na lokalny **mieszany Givens (pod/lewe + nad/prawe)** + solve-verify. `order`/`reversed` są rozstrzygnięte, więc je z metryki wypinam, zostawiam `perm` i dokładam `mode` (2^P). Sanity-check: `mode = 0` (all-pod) musi odtworzyć baseline.
+
+Daj zielone światło na przebudowę metryki na mieszany Givens, to wpinam `mode` vs `perm`.
+
+
+## 🧑 Robert
+
+Kurczę, nie, to chyba jest jeszcze nowa możliwość. Sprawdźmy, czy używając zakomentowanego kodu nie możemy uzyskać zera nad przekątną mnożąc z lewej strony
+
+
+## 🤖 Claude
+
+Sprawdziłem — i **tak, to działa**. Zakomentowany kod (`a=A[a2,a2]`, `b=−A[a1,a2]`, **lewe** `Rotate`) faktycznie zeruje **nad** przekątną:
+
+```
+new[a1,a2] = cos·A[a1,a2] + sin·A[a2,a2]
+           = (A[a2,a2]/r)·A[a1,a2] + (−A[a1,a2]/r)·A[a2,a2] = 0  ✓
+```
+
+Klucz: to bierze **drugą** przekątną (`A[a2,a2]`) jako pivot, przez co udaje się wyzerować element nad przekątną **operacją na wierszach** (lewe mnożenie). Więc masz rację — to jest **trzecia**, odrębna prymitywa. Mamy teraz per płaszczyznę:
+
+| prymitywa | zeruje | mnożenie | pivot |
+|---|---|---|---|
+| **pod** | sub `[a2,a1]` | lewe (`Rotate`) | `A[a1,a1]` |
+| **nad-L** | super `[a1,a2]` | **lewe** (`Rotate`) | `A[a2,a2]` |
+| **nad-R** | super `[a1,a2]` | prawe (`RotatePost`) | `A[a1,a1]` |
+
+**Istotna różnica geometryczna:**
+- **pod + nad-L** → wszystko **lewe** → redukcja `G_k…G_1·M = I`, czyli `M` = złożenie **samych lewych** obrotów = **prawdziwa sekwencja ruchów kostki**. To jest „czyste" mieszanie redukcji w świecie ruchów kostki.
+- dodanie **nad-R** → wchodzą obroty prawe (`L·M·R = I`) → to już sprzężenia, nie pojedyncze ruchy.
+
+Więc naturalny kandydat na oś **`mode`** to **{pod, nad-L}** — 2^P wariantów, wszystkie w świecie realnych ruchów, per płaszczyzna wybór sub/super, wszystko lewe. To bym porównał do `perm`. `nad-R` możemy dołożyć jako osobną, „prawą" oś, jeśli po tym będziesz ciekaw.
+
+Potwierdź: mierzymy `mode` = per-płaszczyzna **{pod, nad-L}** (2^P, all-left) vs `perm` — czy chcesz od razu włączyć też `nad-R` (wtedy per płaszczyzna 3 opcje, 3^P)?
+
+
+## 🧑 Robert
+
+Oczywiście masz rację, ruchy kostki to mnożenie orientacji z lewej strony, a więc mierzymy mode {pod, nad-L} vs perm. Znak przy sin ujemny
+
+
+## 🤖 Claude
+
+Zgoda — mierzymy `mode {pod, nad-L}` vs `perm`, wszystko lewe, sin ze znakiem minus w wywołaniu `Rotate(a1,a2, cos, -sin)` (jak w produkcyjnym pod i zakomentowanym nad-L). Przebudowuję metrykę. Przeczytam aktualny plik, żeby edytować precyzyjnie:
+
+Mam wszystko. Przebudowuję metrykę na mieszany Givens `{pod, nad-L}`. Pola:
+
+Usuwam `AllOrders`/`OrderDfs` (już niepotrzebne):
+
+Buduję:
+
+Zbudowane, 0 błędów. Metryka greedy przeszła na **mieszany Givens `{pod, nad-L}`** — per płaszczyzna wybór zerowania sub/super przekątnej, wszystko lewe (realne ruchy). Nieprawidłowe mody (nie dochodzą do `I`) odsiewa solve-check na liściu.
+
+## Co sprawdzić w wyniku
+
+1. **Sanity-check**: `baseline (standard QR, all-pod)` **musi** się zgadzać z poprzednim standardem — **56** (N=3), **2092** (N=4). Jeśli tak, ścieżka „pod" jest wierna i nad-L dołożone poprawnie.
+2. **`+ mixed reduction (pod/nad-L)`** — mierzone: ile mieszanie redukcji dokłada ponad standard.
+3. **Kluczowe: `+ perms x mode` vs `+ axis permutations`** — czy `mode` jest **ortogonalny** do `perm` (cross > sam perm → dokłada nowe drogi, których permutacja nie daje) czy **subsumowany** (cross ≈ perm → jak order/reversed).
+
+## Uwaga wydajnościowa
+
+Pełny cross `perm × mode` dla N=4 to `24 × 64 = 1536` wariantów metryki na orientację (× 192). Memoizacja `RotCount` to tnie, ale drzew DFS jest dużo — MessageBox może chwilę myśleć. Gdyby przy N=4 było zauważalnie wolno, powiedz — utnę „both" do unii pojedynczych osi (`perm ∪ mode`) zamiast pełnego iloczynu.
+
+Odpal N=3 (Size 5) i N=4 (Size 7), wklej — zobaczymy, czy `mode` to wreszcie oś ortogonalna do `perm` (byłby to argument, żeby *nią* zastąpić lub uzupełnić permutację w produkcji), czy kolejny subsumowany wariant.
+
+
+## 🧑 Robert
+
+A po co ustawiać Size? Przecież wróciliśmy chyba do poprzednich metod, porzucając obroty kubika na rzecz możliwych orientacji dla Slice == 0. Poza tym nie jestem pewien tak szybkiego usuwania Order - on daje jednak nowe możliwości, podczas pisania artykułu o układaniu kostki muszę pokazać i udowodnić wyższość/efektywność różnych metod.
+
+
+## 🤖 Claude
+
+Dwie słuszne uwagi:
+
+1. **Size/ramka niepotrzebne** — skoro slice jest bezczynny, wracam do `Slice=0` i wyrzucam cały `frameOrigin`/`GenericFrameOrigin`/wymóg `Size≥2N−1`. Test pójdzie przy dowolnym Size.
+2. **Order zostaje** — masz rację, do artykułu potrzebujesz porównać *wszystkie* metody. Pochopnie go wyrzuciłem. Ujednolicam metrykę tak, by lokalny mieszany Givens obsłużył **wszystkie osie naraz**: `perm × order × reversed × mode`, i mierzę każdą osobno + łącznie.
+
+Przebudowuję. Pola:
+
+Usuwam `GenericFrameOrigin` (już niepotrzebne):
+
+Re-dodaję `AllOrders`/`OrderDfs` i przepisuję `AllGreedy`/`Dfs`/`RotCount` na ujednoliconą metrykę (perm×order×reversed×mode, Slice=0). Przeczytam aktualny blok:
+
+Teraz zamieniam cały blok `AllGreedy`/`Dfs`/`RotCount` na wersję ujednoliconą + `AllOrders`/`OrderDfs`:
+
+Buduję:
+
+Zbudowane, 0 błędów. Diagnostyk przebudowany zgodnie z obiema uwagami:
+
+- **Bez Size/ramki** — `Slice=0`, zero pozycji, `frameOrigin`/`GenericFrameOrigin` usunięte. Orientacje zależą tylko od N, więc odpalasz przy **dowolnym Size** (choćby domyślnym 3).
+- **Wszystkie osie naraz** — jeden lokalny mieszany Givens obsługuje `perm × order × reversed × mode`. Raport mierzy **każdą osobno** vs baseline + **combined** (unia czterech osi):
+
+```
+baseline (standard QR)
+each axis alone (vs baseline):
+  + axis permutations (perm)
+  + plane order (order)
+  + transposition (reversed)
+  + mixed reduction (mode, pod/nad-L)
+combined (union of the four axes)
+```
+
+## Do sprawdzenia
+
+1. **Sanity-check**: `baseline` **musi** dać **56** (N=3) / **2092** (N=4). To potwierdza, że ujednolicony Givens (mode=0, order=0, reversed=false) wiernie odtwarza standardowy QR — a więc pod/nad-L i order są poprawnie wpięte.
+2. **Tabela osi** — dla artykułu: wkład każdej metody (perm, order, reversed, mode) i przykład drogi spoza baseline.
+
+## Jedno zastrzeżenie do „combined"
+
+`combined` to **unia czterech pojedynczych osi** (każda osobno vs baseline), a **nie** pełny iloczyn `perm×order×reversed×mode`. Czyli to **dolne oszacowanie** prawdziwej całości — pomija synergię (drogi wymagające *jednocześnie* np. permutacji i moda). Pełny 4-wymiarowy cross dla N=4 to ~49k wariantów metryki/orientację — za wolno na żywo. Jeśli do artykułu potrzebujesz prawdziwej całości albo konkretnych par (np. `perm×mode`), powiedz — dołożę wybrane crossy (dla N=3 pełny cross jest błahy, dla N=4 zrobię wybrane).
+
+Odpal N=3 i N=4, wklej — zobaczymy pełną tabelę metod i gdzie `mode` się plasuje.
+
+
+## 🧑 Robert
+
+Greedy decomposition diversity  (N = 3, Size = 3)
+  cubie orientations (rotation group) : 24
+  axis permutations (N!)              : 6
+  valid plane orders                  : 2
+  reduction modes (2^P, pod/nad-L)    : 8
+
+  baseline (standard QR)              : 56   (avg 2,33 / orientation)
+
+  each axis alone (vs baseline):
+  + axis permutations (perm)          : 64   (+14,3%)
+  + plane order (order)               : 62   (+10,7%)
+  + transposition (reversed)          : 56   (+0,0%)
+  + mixed reduction (mode, pod/nad-L) : 77   (+37,5%)
+
+  combined (union of the four axes)   : 79   (+41,1%)
+  orientations where any axis adds    : 7 / 24
+  example only reachable off-baseline : p1a2s0 p2a2s0
+
+  distinct manoeuvres by length (moves after Correct):
+    length   identity   extra(all)
+         0          1            0
+         1          9            0
+         2         46            8
+         3          0           15
+
+Zanim przejdę do N=4: mode daje Length = 3 dla N = 3? Greedy decomposition diversity  (N = 3, Size = 3)
+  cubie orientations (rotation group) : 24
+  axis permutations (N!)              : 6
+  valid plane orders                  : 2
+  reduction modes (2^P, pod/nad-L)    : 8
+
+  baseline (standard QR)              : 56   (avg 2,33 / orientation)
+
+  each axis alone (vs baseline):
+  + axis permutations (perm)          : 64   (+14,3%)
+  + plane order (order)               : 62   (+10,7%)
+  + transposition (reversed)          : 56   (+0,0%)
+  + mixed reduction (mode, pod/nad-L) : 77   (+37,5%)
+
+  combined (union of the four axes)   : 79   (+41,1%)
+  orientations where any axis adds    : 7 / 24
+  example only reachable off-baseline : p1a2s0 p2a2s0
+
+  distinct manoeuvres by length (moves after Correct):
+    length   identity   extra(all)
+         0          1            0
+         1          9            0
+         2         46            8
+         3          0           15
+
+
+## 🤖 Claude
+
+Bardzo dobry wychwyt — i to jest **problem**, nie ciekawostka.
+
+## Dlaczego mode daje length 3 przy N=3
+
+Standardowy baseline maksuje na **length 2** (histogram: len 0/1/2, zero len 3) — bo dla N=3 kubik układa się w ≤2 ruchach. A `mode` produkuje **15 manewrów length 3**. To jest dokładnie ten efekt, który sam przewidziałeś: **nad-L zeruje element nad przekątną, który zastępuje wcześniej uzyskane zero pod przekątną** → mieszana redukcja robi *więcej* kroków Givensa niż czyste pod → `mode`-`RotCount` **przeszacowuje** moves-to-solve → greedy schodzi po tej zawyżonej metryce **dłuższą, 3-ruchową** ścieżką (i solve-check ją przepuszcza, bo faktycznie układa).
+
+## Konsekwencja — porównanie jest niesprawiedliwe
+
+- **perm / order / reversed** zachowują **długość** rozkładu (permutacja/transpozycja to przeetykietowanie), więc zostają przy ≤2 — minimalne.
+- **mode** jako jedyny generuje rozwiązania **NIE-minimalne** (dłuższe). Jego `+37,5%` jest **napompowane** tymi 15 length-3.
+
+Realny minimalny wkład moda (len 2) to raptem ~6, czyli tyle co perm/order. Cała jego „przewaga" to dłuższe, sub-optymalne rozkłady — a dla artykułu o **efektywności** układania to argument *przeciw* modowi, nie za nim (dłuższe = mniej efektywne).
+
+## Propozycja — porównanie tylko na długości minimalnej
+
+Żeby porównanie było uczciwe: per orientacja wyznaczam `minLen` = najkrótszy manewr znaleziony przez *którąkolwiek* oś, i liczę tylko manewry długości `minLen`. Wtedy każda metoda konkuruje na **minimalnych** rozkładach — a to jest właściwa metryka „różnorodności efektywnych dróg". `mode` straci wtedy sztuczną przewagę z length-3, ale pokaże swój prawdziwy wkład na długości minimalnej (i być może, jak przy N=4, czasem znajdzie coś **krótszego** niż standard — to byłby argument *za*).
+
+Dołożyć filtr `length == minLen` (uczciwe porównanie efektywnych metod), czy wolisz raczej dwa osobne raporty: „minimalne" (efektywność) i „wszystkie długości" (materiał na makroruchy/komutatory)? Do artykułu pewnie przyda się jedno i drugie.
+
+
+## 🧑 Robert
+
+A kto powiedział, że życie jest uczciwe? GA stosuje dobór naturalny - najlepszy wygrywa. To świetnie, że mode znajduje jeszcze dłuższe sekwencje. Przecież to może oznaczać znalezienie makroruchów nawet dla N=3 !!!
+
+
+## 🤖 Claude
+
+Masz absolutną rację — i to ja narzuciłem złe kryterium. Makroruch **z definicji** jest dłuższy niż minimalny rozkład (bo „nadkłada drogi", żeby zrobić coś strukturalnego z innymi kubikami). Filtrowanie do minimum wyrzuciłoby dokładnie to, co najcenniejsze. GA i tak zrobi dobór — jak dłuższa sekwencja jest bezużyteczna, zginie; jak tworzy komutator, wygra.
+
+## Co to naprawdę znaczy
+
+To jest **kluczowa, jakościowa różnica** między osiami:
+
+- **perm / order / reversed** — tylko **przeetykietowują** rozkład, zachowują **długość**. Dają inne minimalne drogi, ale nigdy nie wyjdą poza minimum.
+- **mode** — jako **jedyna** generuje **NIE-minimalne** sekwencje (nad-L zastępuje wcześniejsze zero → dłuższa redukcja → dłuższy solve). Czyli `mode` to **jedyny generator makroruchów** — i robi to **już dla N=3**, gdzie minimalny greedy jest ograniczony do 2 ruchów.
+
+To potencjalnie najważniejszy wynik dla artykułu: pokazujesz, że mieszana redukcja `{pod, nad-L}` **produkuje materiał na komutatory nawet w najmniejszej kostce**, czego permutacja/transpozycja/kolejność z zasady nie potrafią.
+
+**Żadnego filtra minimum.** Zostawiamy wszystkie długości.
+
+## Jedna uczciwa uwaga (nie blokująca)
+
+`Correct` łapie redundancję *sąsiednich* ruchów tej samej płaszczyzny, ale **nie** pełną równoważność efektu netto. Więc część tych length-3 może być effect-duplikatami tego samego makroruchu, a nie osobnymi. Dla GA to nieszkodliwe (redundantny seed, selekcja go odsieje), a prawdziwy test i tak jest empiryczny: czy GA seedowany modem szybciej znajduje komutatory. Do artykułu można to zweryfikować osobno.
+
+## Propozycja do artykułu
+
+Dołożę **rozbicie per-oś × długość** (teraz histogram pokazuje tylko „extra(all)" łącznie). Wtedy tabela wprost pokaże: „length 3 dokłada **wyłącznie** mode" — mocny, czytelny argument. Chcesz to, zanim odpalisz N=4?
+
+
+## 🧑 Robert
+
+tak
+
+
+## 🤖 Claude
+
+Buduję:
+
+Zbudowane, 0 błędów. Histogram jest teraz **per-oś × długość**:
+
+```
+manoeuvres by length  (baseline count, then EXTRA vs baseline per axis):
+  length  baseline    perm   order  reversd    mode
+       0         1       0       0        0       0
+       1         9       0       0        0       0
+       2        46       8       6        0       ?
+       3         0       0       0        0      15
+```
+
+Dla N=3 spodziewam się, że **wiersz length 3 będzie miał niezera wyłącznie w kolumnie `mode`** — czyli wprost: permutacja/kolejność/transpozycja siedzą w minimum (len ≤2), a **tylko mieszana redukcja generuje dłuższe sekwencje = makroruchy**. To jest ten czytelny argument do artykułu.
+
+Odpal N=3 i N=4, wklej — zobaczymy pełną tabelę i jak `mode` rośnie w dłuższych długościach przy N=4 (gdzie minimum to 3, więc makroruchy moda powinny sięgać 4+).
+
+
+## 🧑 Robert
+
+Greedy decomposition diversity  (N = 3, Size = 3)
+  cubie orientations (rotation group) : 24
+  axis permutations (N!)              : 6
+  valid plane orders                  : 2
+  reduction modes (2^P, pod/nad-L)    : 8
+
+  baseline (standard QR)              : 56   (avg 2,33 / orientation)
+
+  each axis alone (vs baseline):
+  + axis permutations (perm)          : 64   (+14,3%)
+  + plane order (order)               : 62   (+10,7%)
+  + transposition (reversed)          : 56   (+0,0%)
+  + mixed reduction (mode, pod/nad-L) : 77   (+37,5%)
+
+  combined (union of the four axes)   : 79   (+41,1%)
+  orientations where any axis adds    : 7 / 24
+  example only reachable off-baseline : p1a2s0 p2a2s0
+
+  manoeuvres by length  (baseline count, then EXTRA vs baseline per axis):
+    length  baseline    perm   order  reversd    mode
+         0         1       0       0        0       0
+         1         9       0       0        0       0
+         2        46       8       6        0       6
+         3         0       0       0        0      15
+Greedy decomposition diversity  (N = 4, Size = 3)
+  cubie orientations (rotation group) : 192
+  axis permutations (N!)              : 24
+  valid plane orders                  : 16
+  reduction modes (2^P, pod/nad-L)    : 64
+
+  baseline (standard QR)              : 2092   (avg 10,90 / orientation)
+
+  each axis alone (vs baseline):
+  + axis permutations (perm)          : 3259   (+55,8%)
+  + plane order (order)               : 2856   (+36,5%)
+  + transposition (reversed)          : 2092   (+0,0%)
+  + mixed reduction (mode, pod/nad-L) : 10752   (+414,0%)
+
+  combined (union of the four axes)   : 11081   (+429,7%)
+  orientations where any axis adds    : 87 / 192
+  example only reachable off-baseline : p1a2s0 p2a2s0
+
+  manoeuvres by length  (baseline count, then EXTRA vs baseline per axis):
+    length  baseline    perm   order  reversd    mode
+         0         1       0       0        0       0
+         1        17       1       1        0       1
+         2       233      37      33        0      33
+         3      1841    1129     730        0     842
+         4         0       0       0        0    5487
+         5         0       0       0        0    2297
+Gdzieś tam potem sprawdzimy czy te sekwencje naprawdę układają aktywny kubik?
+
+
+## 🤖 Claude
+
+To jest **spektakularny** wynik dla artykułu. Rozczytajmy N=4:
+
+- **mode: +414%** (10752 vs baseline 2092). Ale sedno jest w tabeli długości:
+  - **length 4: 5487** i **length 5: 2297** — obie **wyłącznie `mode`** (perm/order/reversed = 0). Baseline maksuje na length 3.
+  - Czyli mode generuje **~7800 sekwencji dłuższych niż jakikolwiek minimalny rozkład** — to są makroruchy, których żadna inna oś nie dotyka.
+
+Headline do artykułu: **mieszana redukcja `{pod, nad-L}` generuje kombinatorycznie bogatą przestrzeń makroruchów, rosnącą lawinowo z N** (N=3: 15 przy len 3; N=4: 7784 przy len 4–5), podczas gdy permutacja/kolejność/transpozycja z zasady tkwią w minimum. To jest jakościowa przewaga, nie ilościowa.
+
+## Co do „czy te sekwencje naprawdę układają aktywny kubik"
+
+Tak — i częściowo **już jest zagwarantowane**: solve-check na liściu (`o.OrthoPack() == identityPack`) sprawdza, że ciąg `(plane,angle)` sprowadza **orientację** kubika do identyczności. `OrthoPack` jednoznacznie koduje signed-permutację, więc to jest ścisłe, bez fałszywych trafień. Orientacyjnie — układają.
+
+Ale do pełnej weryfikacji (i do artykułu) warto zrobić **empiryczny test na prawdziwej kostce**, i tu jest jeden szczegół:
+
+> W diagnostyku `Slice=0` (bo dla *liczenia* slice jest bezczynny). Żeby sekwencja realnie obróciła kubik na kostce, każdy ruch musi trafić w **warstwę**, w której kubik akurat jest — czyli `Slice = GetPos(oś kolateralna)` śledzone po trajektorii. To trzeba dołożyć **tylko na potrzeby weryfikacji** (nie zmienia liczb).
+
+Weryfikacja dałaby dwie rzeczy naraz:
+1. **Potwierdzenie**, że makroruch faktycznie układa cel (aplikuję geny z realnym slice na kostkę, sprawdzam kubik).
+2. **Prawdziwą liczbę distinct makroruchów** — po zahaszowaniu efektu na **całej** kostce (nie przez `Correct`, tylko przez rzeczywisty stan). To odsieje ewentualne effect-duplikaty i da liczbę, która obroni się w recenzji: „tyle *naprawdę różnych* makroruchów, każdy zweryfikowany, że układa cel".
+
+Kiedy zechcesz, dołożę ten krok (realny slice + aplikacja na kostce + hash efektu). Na razie tabela per-oś × długość jest gotowa do wykresu. Robimy weryfikację teraz, czy najpierw coś innego?
+
+
+## 🧑 Robert
+
+Tak, zróbmy weryfikację
+
+
+## 🤖 Claude
+
+Zróbmy weryfikację. Najpierw sprawdzę, jak czysto ustawić orientację kubika na kostce (dostępność `ValidState`, setter `State`), bo od tego zależy konstrukcja testu:
+
+Robimy weryfikację. `ValidState` jest prywatne, więc orientację ustawiam przez `Transform.M.Assign` + no-op `Rotate` (unieważnia State), a ruchy aplikuję lokalnie z konwencją `SetAngle(angle)` (jak w diagnostyku, nie `Turn` który ma `+1`), z inline'owym realnym slice i odtwarzaniem stanu przez ruch odwrotny. Dodaję `Verify`:
+
+Menu — pozycja „Verify Manoeuvres":
+
+Buduję:
+
+Zbudowane, 0 błędów. Nowa pozycja: **File → „Verify Manoeuvres"**.
+
+## Co robi
+
+Dla każdej orientacji generuje wszystkie manewry `mode`, i **każdy aplikuje na prawdziwej kostce**:
+- ustawia kubik-cel na orientację `o` (`Transform.M`),
+- realizuje ruchy z **realnym slice** = `tgt.GetPos(oś)` (warstwa, w której cel akurat jest),
+- konwencja `SetAngle(angle)` jak w greedy (nie `Turn` z `+1`),
+- po każdym manewrze odtwarza kostkę ruchem odwrotnym (tanio, reset raz na orientację).
+
+## Raport
+
+```
+verified to SOLVE the target        : S / T   (%)
+distinct macro-moves (whole-cube fx): D
+Correct-strings sharing an effect   : T − D   (%)
+```
+
+**Dwie liczby, na które patrzysz:**
+1. **Solve rate S/T** — bezpośrednia odpowiedź na Twoje pytanie. Powinno być **100%**: każdy mode-manewr faktycznie układa cel na kostce. Jeśli <100% — jest bug w metryce/realizacji i to trzeba wyjaśnić przed artykułem.
+2. **distinct macro-moves D** — **rigorystyczna** liczba: dedup po **rzeczywistym efekcie na całej kostce** (nie po stringu `Correct`). Jeśli `D < T`, to część tych length-4/5 to effect-duplikaty; `D` to liczba *naprawdę różnych* makroruchów — ta, która obroni się w recenzji.
+
+## Uwagi
+
+- Weryfikuje przy **bieżącym N/Size** (np. N=4, Size=3). Cel = kubik `StartIndex 0` (narożnik) — jego efekt kolateralny liczony na kostce Size=3. Inny cel dałby inną liczbę distinct (kolateral zależy od pozycji), ale **solve-rate jest niezależny od pozycji**.
+- Dla N=4 aplikuje ~10752 manewrów (apply+inverse) — MessageBox chwilę pomyśli.
+
+Odpal przy N=4 (Size 3 wystarczy) i wklej — najpierw zobaczymy, czy solve-rate = 100% (czy makroruchy *naprawdę* układają), a potem ile jest *prawdziwie różnych* makroruchów po odsianiu duplikatów efektu.
+
+
+## 🧑 Robert
+
+distinct macro-moves mogą wynikać z narożnego kubika?Manoeuvre verification  (N = 4, Size = 3)
+  target cubie StartIndex             : 0
+  orientations                        : 192
+  mode manoeuvres (Correct-distinct)  : 10751
+  verified to SOLVE the target        : 10751 / 10751   (100,00%)
+  distinct macro-moves (whole-cube fx): 6360
+  Correct-strings sharing an effect   : 4391   (40,8%)
+
+
+## 🤖 Claude
+
+100% solve rate — **potwierdzone**: wszystkie 10751 mode-manewrów faktycznie układają cel na prawdziwej kostce. To jest twarde (i niezależne od pozycji celu).
+
+Ale masz absolutną rację co do `distinct macro-moves` — **narożnik zaniża tę liczbę**. Narożnik (Size=3, coords (0,0,0,0)) jest **symetryczny** i jego slice'y są tylko skrajne, więc różne manewry dają **przypadkowo ten sam efekt** (symetria je skleja) → sztucznie mało distinct. `6360` to **undercount**.
+
+Żeby liczba była reprezentatywna, cel musi być **generyczny** (różne odległości od środka → trywialny stabilizator → nic się nie skleja przez symetrię) — czyli ten sam kubik z klastra max, `Size ≥ 7`. Poprawiam `Verify`, żeby sam wybierał generyczny cel (i wymuszał `Size ≥ 2N−1`):
+
+Dodam jeszcze coords celu do raportu (żeby było widać, że generyczny):
+
+Buduję:
+
+Zbudowane, 0 błędów. `Verify` bierze teraz **generyczny cel** (różne odległości od środka, trywialny stabilizator) i wymaga `Size ≥ 2N−1`.
+
+## Jak odpalić
+
+- **N=4 → ustaw Size = 7**, potem „Verify Manoeuvres". (Przy Size < 7 zobaczysz komunikat „Set Size >= 7".)
+- Cel wybierze się sam — w raporcie zobaczysz `coords (…)` (powinno być coś jak `(0,1,2,3)` z przesunięciem).
+
+## Czego się spodziewać
+
+- **Solve rate** dalej 100% (niezależny od pozycji — już wiemy, że układają).
+- **distinct macro-moves** — teraz **reprezentatywne**, bez sztucznego sklejania przez symetrię narożnika. Niemal na pewno **wyżej niż 6360** (narożnik zaniżał). Jeśli podskoczy blisko 10751 — znaczy, że prawie wszystkie mode-manewry to *naprawdę różne* makroruchy. To jest liczba do artykułu.
+
+## Uwaga wydajnościowa
+
+Size=7 dla N=4 to **2401 kubików**, a `Verify` aplikuje ~10751 manewrów (apply+inverse), każdy iterując wszystkie kubiki. To może potrwać **kilkadziesiąt sekund** — MessageBox się zawiesi na ten czas. Jeśli będzie za wolno, zoptymalizuję `LocalTurn` (iterowanie tylko warstwy zamiast całej kostki).
+
+Odpal N=4/Size=7 i wklej — zobaczymy prawdziwą liczbę różnych makroruchów.
+
+
+## 🧑 Robert
+
+Manoeuvre verification  (N = 3, Size = 3)
+  target cubie StartIndex             : 0
+  orientations                        : 24
+  mode manoeuvres (Correct-distinct)  : 76
+  verified to SOLVE the target        : 76 / 76   (100,00%)
+  distinct macro-moves (whole-cube fx): 76
+  Correct-strings sharing an effect   : 0   (0,0%)
+
+Manoeuvre verification  (N = 3, Size = 5)
+  target cubie (generic)              : StartIndex 7, coords (0,1,2)
+  orientations                        : 24
+  mode manoeuvres (Correct-distinct)  : 76
+  verified to SOLVE the target        : 76 / 76   (100,00%)
+  distinct macro-moves (whole-cube fx): 76
+  Correct-strings sharing an effect   : 0   (0,0%)
+Manoeuvre verification  (N = 4, Size = 7)
+  target cubie (generic)              : StartIndex 66, coords (0,1,2,3)
+  orientations                        : 192
+  mode manoeuvres (Correct-distinct)  : 10751
+  verified to SOLVE the target        : 10751 / 10751   (100,00%)
+  distinct macro-moves (whole-cube fx): 6344
+  Correct-strings sharing an effect   : 4407   (41,0%)
+
+
+## 🤖 Claude
+
+Trzy klarowne wnioski:
+
+## 1. Solve rate 100% — wszędzie
+Wszystkie mode-manewry (N=3: 76, N=4: 10751) **faktycznie układają cel** na prawdziwej kostce. To jest twarde i niezależne od pozycji. Odpowiedź na Twoje pytanie: tak, naprawdę układają.
+
+## 2. Pozycja celu prawie nie wpływa na liczbę
+Narożnik (6360) vs generyczny (6344) — **praktycznie to samo**. Twoja obawa była słuszna do sprawdzenia, ale okazało się, że liczba distinct jest **odporna na pozycję**. Czyli 6344 to wiarygodny wynik, nie artefakt.
+
+## 3. Prawdziwa liczba makroruchów: 6344 (nie 10751)
+To jest realne odkrycie: dla N=4 **41% Correct-stringów to effect-duplikaty** (ta sama transformacja całej kostki, różne ciągi ruchów, których `Correct` nie złożył — bo redundancja nie jest „sąsiednia-ta-sama-płaszczyzna", tylko np. przeplot/reorder). Dla N=3 duplikatów **nie ma** (76=76) — bo krótkie sekwencje nie mają jak się zderzyć.
+
+**Dla artykułu:** rigorystyczna liczba różnych makroruchów to **6344** (N=4), zweryfikowana że każdy układa cel. Correct-string (10751) **zawyża o 41%** — dobrze, że sprawdziliśmy, bo recenzent by to wytknął. I tak 6344 ≫ baseline (2092), i rośnie lawinowo z N (76 → 6344).
+
+## Propozycja domknięcia dla artykułu
+
+`Verify` liczy teraz efekt tylko dla `mode`. Żeby tabela metod była **rigorystyczna** (efekt, nie string), rozszerzę `Verify` na **wszystkie osie** — distinct-efekt dla baseline / perm / order / mode osobno. Wtedy masz uczciwą tabelę „prawdziwych" makroruchów per metoda, a nie tylko liczby Correct-stringów. Dołożyć?
+
+
+## 🧑 Robert
+
+Zanim dołożysz: dlaczego twierdzisz, że Turn obraca Angle + 1? Moim zdaniem powinieneś używać Turn. Dołóż, dzięki
+
+
+## 🤖 Claude
+
+Sprawdźmy — może Turn zmienił się od mojego wczesnego odczytu. Czytam aktualny:
+
+Plik się zmienił od mojego wczesnego odczytu (numeracja się przesunęła). Znajdę aktualny `Turn`:
+
+Masz rację — pomyliłem się na starym odczycie. Aktualny `Turn` (linia 162) używa `SetAngle(move.Angle)` **bez `+1`** (Twoja zmiana konwencji kąta — „kod 90° = bity 01"). Czyli `Turn` jest **dokładnie równoważny** mojemu `LocalTurn`. Zobaczmy pełny `Turn`, żeby podmienić:
+
+Potwierdzone: aktualny `Turn` = `SetAngle(move.Angle)` + `cubie.Rotate(plane, rot)` dla warstwy — **identyczny** z moim `LocalTurn`. Podmieniam na `Turn` i przy okazji rozszerzam `Verify` na wszystkie osie (efekt per metoda). Czytam bieżący `Verify`:
+
+Podmieniam `Verify` na `cube.Turn` + rozszerzam na wszystkie osie (Correct-string → efekt per metoda), usuwam `LocalTurn`:
+
+Buduję:
+
+Zbudowane, 0 błędów. Dwie rzeczy:
+
+## 1. Miałeś rację co do `Turn` — przepraszam
+Mój wczesny odczyt był **nieaktualny**. Aktualny `Turn` używa `SetAngle(move.Angle)` **bez `+1`** (Twoja zmiana konwencji kąta „90° = bity 01"), więc jest dokładnie równoważny mojemu `LocalTurn`. Podmieniłem na **`cube.Turn`** (usunąłem `LocalTurn`) — teraz weryfikacja używa produkcyjnego `Turn`, więc testuje realną ścieżkę, nie kopię.
+
+## 2. Weryfikacja per-oś (dołożone)
+`Verify` liczy teraz dla **każdej metody** dwie liczby: Correct-string → **realny efekt na kostce**:
+```
+distinct manoeuvres per method  (Correct-string  ->  real whole-cube effect):
+  baseline (standard QR)         :  X  ->  Xe
+  + axis permutations (perm)     :  ...
+  + plane order (order)          :  ...
+  + mixed reduction (mode)       :  ...
+  combined                       :  ...
+```
+
+To jest **rigorystyczna tabela do artykułu**: kolumna „real effect" to prawdziwa liczba różnych makroruchów per metoda (po odsianiu duplikatów efektu, których `Correct` nie łapie). Solve-rate na górze potwierdza, że wszystkie układają.
+
+Odpal **N=4/Size=7** (i N=3/Size=5), wklej — zobaczymy uczciwe „prawdziwe makroruchy" per metoda: baseline vs perm vs order vs mode. To domknie stronę empiryczną.
+
+
+## 🧑 Robert
+
+Różnica w distinct wynika chyba z niejednoznaczności określenia orientacji przez złożenie ruchów w różnych płaszczyznach (to jak Gimbal Lock i lerp z kątami Eulera)
+
+
+## 🤖 Claude
+
+Trafna intuicja — i da się ją **wyostrzyć do konkretnego mechanizmu**, który tłumaczy liczby idealnie.
+
+## To jest nieunikniona niejednoznaczność rozkładu — konkretnie: przemienność ruchów
+
+Efekt na kostce to element **grupy** (ciąg ruchów = słowo w generatorach). Różne słowa mogą dawać ten sam element — jak różne trójki Eulera dają ten sam obrót. `Correct` składa tylko **sąsiednie** ruchy tej samej płaszczyzny; nie **reorderuje**. A gdy dwa ruchy **komutują**, można je przestawić tak, że dopiero wtedy same-plane ruchy stają się sąsiednie i by się złożyły — czego `Correct` (bez reorderu) nie widzi. Stąd effect-duplikaty.
+
+## I tu jest piękne potwierdzenie: kiedy ruchy komutują?
+
+Dwie płaszczyzny komutują ⟺ są **rozłączne** (nie dzielą osi).
+
+- **N=3**: płaszczyzny `(0,1),(0,2),(1,2)` — **każda para dzieli oś**. Żadne dwie nie komutują → brak reorderów → `Correct-string == efekt`. **Stąd 0% duplikatów (76=76).**
+- **N=4**: są pary rozłączne — `(0,1)&(2,3)`, `(0,2)&(1,3)`, `(0,3)&(1,2)` → komutują → reordery → ukryte składanie, którego `Correct` nie łapie. **Stąd 41% duplikatów.**
+
+Czyli skok 0% → 41% **nie jest przypadkiem** — wynika wprost z pojawienia się rozłącznych płaszczyzn dopiero od N=4. To Twój „gimbal/Euler", tyle że nazwany po imieniu: **przemienność ruchów rozłącznych płaszczyzn**.
+
+## Wniosek dla artykułu
+
+- **Liczba efektu (6344) jest właściwa** — kwocjentuje przemienność, `Correct-string (10751)` jej nie kwocjentuje, więc zawyża.
+- Masz przy okazji **czysty argument teoretyczny**, dlaczego dla N=3 obie liczby są równe, a od N=4 się rozjeżdżają — recenzent to kupi, bo to elementarna teoria grup, nie hand-waving.
+
+Efekt na kostce jest **ground-truth** (realna aplikacja + hash pełnego stanu przez `OrthoPack`, który jednoznacznie koduje signed-permutację), więc niczego już nie trzeba douszczelniać. Chcesz, żebym dla pewności dołożył **kanonikalizację po przemienności** (sortowanie komutujących bloków przed porównaniem) i pokazał, że wychodzi dokładnie liczba efektu? To domknęłoby dowód „duplikaty = wyłącznie przemienność", ale nie jest konieczne — efekt i tak jest rozstrzygający.
+
+
+## 🧑 Robert
+
+Manoeuvre verification  (N = 3, Size = 5)
+  target cubie (generic)              : StartIndex 7, coords (0,1,2)
+  orientations                        : 24
+  verified to SOLVE the target        : 78 / 78   (100,00%)
+
+  distinct manoeuvres per method  (Correct-string  ->  real whole-cube effect):
+  baseline (standard QR)              :      55  ->       55
+  + axis permutations (perm)          :      63  ->       63
+  + plane order (order)               :      61  ->       61
+  + mixed reduction (mode)            :      76  ->       76
+  combined                            :      78  ->       78
+
+Manoeuvre verification  (N = 4, Size = 7)
+  target cubie (generic)              : StartIndex 66, coords (0,1,2,3)
+  orientations                        : 192
+  verified to SOLVE the target        : 11080 / 11080   (100,00%)
+
+  distinct manoeuvres per method  (Correct-string  ->  real whole-cube effect):
+  baseline (standard QR)              :    2091  ->     1546
+  + axis permutations (perm)          :    3258  ->     2302
+  + plane order (order)               :    2855  ->     2046
+  + mixed reduction (mode)            :   10751  ->     6344
+  combined                            :   11080  ->     6571
+
+
+## 🤖 Claude
+
+To jest **definitywny wynik** — i domyka obie strony (teoretyczną i empiryczną).
+
+## N=3 potwierdza teorię przemienności co do joty
+`Correct-string == efekt` dla **każdej** metody (55=55, 63=63, 61=61, 76=76, 78=78) — **0% duplikatów**, dokładnie jak przewidzieliśmy: w N=3 nie ma rozłącznych płaszczyzn, więc nie ma przemienności, więc słowo = efekt. Czyściejszego potwierdzenia być nie może.
+
+## N=4 — rigorystyczna tabela do artykułu (efekt = prawdziwe makroruchy)
+
+| metoda | Correct-string | **prawdziwe makroruchy** | +% vs baseline |
+|---|---|---|---|
+| baseline | 2091 | **1546** | — |
+| + perm | 3258 | **2302** | +48,9% |
+| + order | 2855 | **2046** | +32,3% |
+| + **mode** | 10751 | **6344** | **+310%** |
+| combined | 11080 | **6571** | +325% |
+
+**Wnioski (już na twardej metryce efektu, 100% zweryfikowane że układają):**
+
+1. **`mode` miażdży** — +310% prawdziwych makroruchów vs baseline, przy perm +49%, order +32%. To nie jest artefakt Correct-stringów: nawet po skwocjentowaniu przemienności mode ma **~4×** różnorodność permutacji.
+2. **`mode` niemal subsumuje resztę** — combined (6571) to tylko **+3,6%** ponad sam mode (6344). Czyli perm+order dokładają grosze ponad to, co mode już daje.
+3. Duplikacja rośnie z długością: baseline 26%, perm 29%, order 28%, **mode 41%** — bo dłuższe sekwencje moda mają więcej okazji do przemiennych reorderów. Spójne z teorią.
+
+## Implikacja dla produkcji (do Twojej decyzji)
+
+Wcześniej celowaliśmy we wpięcie **permutacji**. Ale teraz, rigorystycznie, **`mode` jest bezkonkurencyjny jako źródło makroruchów** (+310% vs perm +49%). Jeśli celem seedowania GA jest materiał na komutatory, to **mode**, nie perm, jest tym, co warto wpiąć w metrykę greedy. Cena: mode daje sekwencje nie-minimalne (dłuższe) — ale to *są* makroruchy, więc dla GA to zaleta, nie wada.
+
+Strona empiryczna domknięta: solve 100%, liczby skwocjentowane po przemienności, teoria tłumaczy N=3 vs N=4. Chcesz przejść do wpięcia **mode** w produkcyjny greedy (zamiast/obok perm), czy najpierw jeszcze coś do artykułu?
+
+
+## 🧑 Robert
+
+Sprawdzamy czy sekwencje są distinct poprzez porównanie całej konfiguracji kostki po tych ruchach? To dlatego dla  N=3 sekwencje Rz^2Rx^2 i Ry^2 są różne?
+
+
+## 🤖 Claude
+
+Dokładnie tak — i to jest **idealny** przykład na to, czym jest makroruch.
+
+## Tak, distinct = porównanie całej konfiguracji kostki
+`CubeHash` hashuje **każdy** kubik: jego pozycję (`Index`) i orientację (`OrthoPack`). Więc dwie sekwencje są „różne" wtedy i tylko wtedy, gdy zostawiają kostkę w **innym stanie globalnym** — nie tylko cel.
+
+## I tak, dlatego Rz²Rx² i Ry² są różne
+Na **samym celu** to jest **ta sama** rotacja — relacja grupowa:
+```
+Z₁₈₀ · X₁₈₀ = diag(-1,-1,1) · diag(1,-1,-1) = diag(-1,1,-1) = Y₁₈₀
+```
+Czyli `Rz²Rx²` i `Ry²` sprowadzają cel do identyczności **identycznie** (oba układają orientację `M = Y₁₈₀`).
+
+Ale jako **ruchy kostki** są różne:
+- `Ry²` — obraca **jedną** warstwę (y) o 180°,
+- `Rz²Rx²` — obraca **dwie** warstwy (z, potem x), więc rusza **inne kubiki** kolateralnie.
+
+Różny zbiór poruszonych kubików → różny stan globalny → **distinct**. I o to właśnie chodzi: to są dwa **różne makroruchy o tym samym efekcie na celu** — dokładnie materiał na komutatory (bo różnią się tym, co robią *reszcie* kostki).
+
+## To domyka sens metryki
+- Gdyby liczyć tylko efekt na celu — byłyby jednym (i traciłbyś makroruchy).
+- Gdyby liczyć Correct-stringi — łapałbyś też przemienne przetasowania tej *samej* konfiguracji (te 41% z N=4).
+- **Liczenie po pełnej konfiguracji** trafia w sam środek: `Rz²Rx²` ≠ `Ry²` (różny kolateral, prawdziwy makroruch), ale `Rz²Rx²` = `Rx²Rz²` (przemienne, ten sam stan) — to drugie słusznie sklejone.
+
+Właśnie dlatego dla N=3 baseline znajduje `Ry²` (minimalne, 1 ruch), a `mode` dokłada `Rz²Rx²` (2 ruchy, ten sam solve celu, inny kolateral) — i to jest ten +wkład moda, zweryfikowany na prawdziwej kostce.
+
+
+## 🧑 Robert
+
+To tak ważne odkrycia, że prosiłbym na początek o uzupełnienie naszej konwersacji do pliku w Docs. Zawsze mogę do niego wrócić
+
+
+## 🤖 Claude
+
+To rzeczywiście ważne wyniki — zapiszę je jako uporządkowany dokument w Docs. Zobaczę, co już tam jest, żeby dopasować konwencję:
+
+Utworzę dedykowany, uporządkowany dokument z odkryciami (czytelniejszy do powrotu niż surowy transkrypt):
+
+Gotowe — dokument zapisany: [Docs/Rozklad_greedy_roznorodnosc.md](Docs/Rozklad_greedy_roznorodnosc.md).
+
+Zapiszę też krótki wskaźnik w pamięci projektu, żeby w przyszłych sesjach było wiadomo, że te wyniki istnieją i gdzie:
+
+Zapisane w dwóch miejscach:
+
+## [Docs/Rozklad_greedy_roznorodnosc.md](Docs/Rozklad_greedy_roznorodnosc.md) — pełny dokument
+Uporządkowany, gotowy do powrotu i do artykułu. Zawiera:
+1. **Kontekst** — metryka `RotationCount` zależy od polityki rozkładu QR.
+2. **Cztery osie** — perm / order / reversed / mode.
+3. **Matematyka mieszanego Givensa** — tabela pod / nad-L / nad-R z pivotami i znakami, oraz weryfikacja `nad-L`.
+4. **Metodyka** — pełne drzewo greedy, Correct, bezczynność slice, efekt całej kostki, generyczny kubik, solve-check.
+5. **Wyniki** — tabele Correct-string i rigorystyczne (efekt) dla N=3 i N=4.
+6. **7 kluczowych odkryć** — mode = generator makroruchów (+310%), reversed martwy, order subsumowany, **teoria przemienności** (0% dla N=3 vs 41% dla N=4, rozłączne płaszczyzny), przykład `Rz²Rx²=Ry²`, 100% solve.
+7. **Implikacja dla produkcji** — mode vs perm do seedowania.
+8. **Narzędzia** — trzy pozycje menu.
+
+## Pamięć projektu
+Wskaźnik w [MEMORY.md](file), żeby przyszłe sesje wiedziały, że te wyniki istnieją i gdzie ich szukać — plus otwarte wątki (wpięcie `mode`, zbadanie `nad-R`).
+
+Dokument jest samowystarczalny (liczby, matematyka, teoria) — możesz do niego wrócić bez odtwarzania rozmowy. Gdy zechcesz ruszyć dalej (wpięcie `mode` w produkcyjny greedy albo oś `nad-R`), mamy w nim zapisane, gdzie stanęliśmy.
+
+
+## 🧑 Robert
+
+Fajnie, dziękuję, ale poprosiłbym też o uzupełnienie Konwersacja_RubikND.md, miałeś gdzieś skrypt do tego
+
+
+## 🤖 Claude
+
+Poszukam tego skryptu (do ekstrakcji transkryptu do formatu Konwersacja):
+
+Znalazłem — w scratchpadzie poprzedniej sesji są `extract_convo.py`, `append_convo.py`, `md2pdf_convo.py`. Przeczytam `append_convo.py` i `extract_convo.py`, żeby zrozumieć mechanizm:
+
+Rozumiem mechanizm — skrypt czyta JSONL sesji i dokleja tury (`## 🧑 Robert` / `## 🤖 Claude`, pomijając narzędzia). `path` jest zahardkodowany na **starą** sesję. Bieżąca sesja to inny plik JSONL. Sprawdzę, gdzie jest transkrypt tej sesji:
+
+Transkrypt bieżącej sesji istnieje (`f2be91dc….jsonl`). To osobny plik niż stara sesja, z której powstał `md`, więc wszystkie tury tej sesji są nowe. Adaptuję skrypt (nowa ścieżka + dopisanie wszystkich tur) i najpierw robię **dry-run**:
+
+Dry-run poprawny: **120 tur**, od pierwszej („Cześć, Claude… Stdcall/Cdecl") do ostatniej — cała ta sesja (grafika + badanie greedy). Kodowanie w konsoli tylko wyświetla krzaki, ale zapis idzie w utf-8. Dopisuję:
+
+## 🧑 Robert
+
+Świetnie, i wrzuć, pewnie się przyda
+
+
+## 🤖 Claude
+
+Wrzucam trwałą, samodzielną wersję do `Docs/tools/append_convo.py` — z auto-wykrywaniem sesji, dry-run domyślnie i zabezpieczeniem przed podwójnym dopisaniem:
+
+Jeden szczegół do naprawienia: wcześniej dopisałem tę sesję ze znacznikiem `Sesja 2 (f2be91dc)`, a nowy skrypt szuka pełnego id — więc zabezpieczenie przed dublem by nie zadziałało dla tej sesji. Rozszerzam sprawdzenie o krótkie id:
+
+Sprawdzam skrypt na miejscu (powinien wykryć bieżącą sesję i zgłosić, że już dopisana):
+
+Działa — skrypt w [Docs/tools/append_convo.py](Docs/tools/append_convo.py):
+- **auto-wykrył** bieżącą sesję (najnowszy `.jsonl` projektu, po nazwie `*RubikCubeND*` — odporne na nazwę użytkownika),
+- **dry-run domyślnie**, `--write` dopisuje,
+- **zabezpieczenie przed dublem** zadziałało: rozpoznało, że ta sesja jest już w `md` (po krótkim id `f2be91dc` w istniejącym znaczniku) → „Nic do zrobienia".
+
+## Użycie
+```
+python Docs/tools/append_convo.py                 # podgląd najnowszej sesji
+python Docs/tools/append_convo.py --write         # dopisz
+python Docs/tools/append_convo.py --session <id>  # konkretna sesja
+python Docs/tools/append_convo.py --label "opis"  # dopisek do znacznika
+```
+
+## Jedno zastrzeżenie
+Dedup jest **per sesja**: gdy raz dopiszesz sesję, jej *późniejsze* tury (tego samego id) już się nie dokleją. Praktycznie — **odpalaj raz, na końcu sesji**. (Dlatego 2 ostatnie tury tej sesji — samo tworzenie skryptu — nie trafiły do `md`; to housekeeping, nie merytoryka, więc bez straty.)
+
+Nie commitowałem — plik jest w repo, zacommitujesz razem z resztą, kiedy zechcesz. Gdybyś wolał, żeby dedup pozwalał doklejać przyrostowo tę samą sesję (po ostatniej dopisanej turze, jak robił oryginał przez wyrównanie), mogę dołożyć tryb `--resume` — ale do „raz na koniec sesji" obecny wariant jest prostszy i bezpieczniejszy.
+
+
+## 🧑 Robert
+
+Czy muszę pamiętać, by sesja, która dla mnie nieoczekiwanie się skończyła i jak nie zrobię zapisu to pominie te tury, czy przypomnisz tan koniec sesji (ale w następnej już nie będziesz pamiętał by przypomnieć - jak to jest?) - i sesja to ten Context pokazywany w prawym dolnym rogu z procentami i wielkością do 1M?
+
+
+## 🤖 Claude
+
+Dobre pytania — rozdzielmy pojęcia, bo to klucz.
+
+## Sesja ≠ Context (róg z procentami)
+
+- **Context** (róg, %, do ~1M) = **pamięć robocza modelu** na bieżącą turę. Gdy się zapełnia, jest **kompaktowany/streszczany** — ale to **nie kończy sesji**. To tylko okno tego, co model „widzi" teraz.
+- **Sesja** = jedno uruchomienie rozmowy = **jeden plik `.jsonl` na dysku** (to id `f2be91dc…`). Jedna sesja może przeżyć wiele kompaktowań kontekstu — a `.jsonl` **zapisuje WSZYSTKIE tury**, także te wyrzucone ze streszczeniem z kontekstu.
+
+Dlatego skrypt czyta `.jsonl`, a nie kontekst — ma pełen zapis niezależnie od tego, ile razy kontekst się streścił.
+
+## Nieoczekiwany koniec NIE gubi tur
+
+`.jsonl` jest zapisywany **na bieżąco, tura po turze**. Więc nawet jak sesja padnie/zamkniesz ją nagle — **wszystkie tury są na dysku**. Możesz je dopisać **później, w innej sesji**:
+```
+python Docs/tools/append_convo.py --session f2be91dc-...   # konkretna, stara sesja
+```
+Czyli: nie ma presji „zapisz zanim się skończy". Nadrobisz kiedy chcesz.
+
+## Czy przypomnę na końcu?
+
+Uczciwie: **nie w sposób niezawodny.** Nie dostaję sygnału „koniec sesji" (odpowiadam tura po turze), a w następnej sesji faktycznie nie będę tego pamiętał (chyba że wypłynie z pamięci projektu — ale to niepewne, i tak czy siak przypomnienie to *akcja*, nie *fakt*).
+
+Niezawodne rozwiązanie to nie moja pamięć, tylko **hook harnessu**: wpis w `settings.json` (**Stop hook**), który sam odpala append po każdej mojej odpowiedzi. Żeby działał przyrostowo (a nie tylko raz przez dedup), dołożę do skryptu tryb `--resume` (dopisuje tylko tury nowe od ostatnio zapisanej). Wtedy:
+- zero pamiętania z Twojej strony,
+- każda tura ląduje w `md` automatycznie,
+- nieoczekiwany koniec = i tak wszystko zapisane (bo leci co turę).
+
+Chcesz, żebym to wpiął (tryb `--resume` + Stop hook w `settings.json`)? To domyka temat „muszę pamiętać" na zawsze.
+
+
+## 🧑 Robert
+
+Chciałbym aby to działało na razie tylko dla tego projektu. Jak go skończymy, to i tak jeśli bym chciał to powtórzyć to na pewno do innego pliku
+
+
+## 🤖 Claude
+
+Zgoda — tylko dla tego projektu. Robię dwie rzeczy: tryb `--resume` w skrypcie (dopisuje tylko nowe tury sesji, żeby hook mógł działać co turę), a potem **Stop hook w `.claude/settings.local.json`** (projektowy, nie globalny). Najpierw skrypt:
+
+Testuję `--resume` (dry-run) — powinien wykryć, że 120 tur tej sesji już jest, i pokazać tylko nowe:
+
+`--resume` działa: wykrył 120 już zapisanych, dokłada 6 nowych. Teraz Stop hook — czytam `.claude/settings.local.json`, żeby dopisać bez psucia reszty:
+
+Zrobię tryb `resume+write` **cichym** (żeby hook nie zaśmiecał transkryptu co turę):
+
+Teraz Stop hook w `.claude/settings.local.json` (projektowy). Dodaję sekcję `hooks` obok `permissions`:
+
+Zweryfikuję, że JSON jest poprawny:
+
+JSON poprawny, hook `Stop` skonfigurowany. Odpalę **dokładnie tę komendę hooka** (z `--write`), żeby (a) potwierdzić, że działa end-to-end, (b) nadgonić bieżącą sesję:
+
+To sandbox narzędzia Bash — komenda z **absolutną** ścieżką nie pasuje do allow-listy (`Docs/tools/append_convo.py:*` = forma względna), więc poszła w sandbox bez prawa zapisu. **Hook tego nie dotyczy** — hooki harnessu działają poza sandboxem Bash, z normalnym dostępem do plików. Potwierdzę zapis formą względną (dozwoloną):
+
+Cwd utknął na `Docs/tools` z wcześniejszego `cd`. Ustawiam katalog na root projektu i odpalam formę dozwoloną (bez sandboxu → zapis przejdzie):
+
+Nie sandbox — to **blokada pliku**: `Konwersacja_RubikND.md` jest gdzieś **otwarty** (edytor/podgląd), więc zapis odmówiony (odczyt działa). Wcześniej `append_convo2.py --write` przeszedł, bo plik był wolny.
+
+To ważne dla hooka: gdy plik jest otwarty, hook też by dostał `PermissionError` co turę. Uodpornię skrypt — błąd zapisu ma być **cichy i nie-fatalny** (spróbuje w następnej turze; `--resume` i tak liczy od stanu pliku, więc nic nie zgubi):
+
+Gotowe. Uodporniłem skrypt — błąd zapisu (plik zajęty) jest teraz cichy i nie-fatalny, więc **hook nigdy nie wywali tury**, a `--resume` dopisze zaległość w następnej turze (liczy od stanu pliku).
+
+## Co jest skonfigurowane (tylko ten projekt)
+
+- **`Docs/tools/append_convo.py`** — z trybem `--resume` (dopisuje tylko nowe tury sesji, po nagłówkach za znacznikiem sesji). Odporny na blokadę pliku.
+- **Stop hook** w **`.claude/settings.local.json`** (projektowy, nie globalny) — odpala `--write --resume` po każdej mojej odpowiedzi. JSON zweryfikowany.
+
+## Jak to się zachowa
+
+- **Od następnej sesji**: w pełni automatycznie — każda tura ląduje w `Konwersacja_RubikND.md`, bez pamiętania z Twojej strony, i nawet nagły koniec sesji niczego nie gubi (leci co turę). Hooki wczytują się na starcie sesji, więc w **tej** sesji hook jeszcze nie działa.
+- **Blokada pliku**: to dlatego zapis przed chwilą odmówił — `Konwersacja_RubikND.md` jest gdzieś **otwarty** (edytor/podgląd). Trzymaj go zamknięty, żeby hook zapisywał od razu; jeśli akurat jest otwarty, hook cicho pominie tę turę i dopisze ją, gdy plik się zwolni.
+
+## Ręcznie (gdybyś chciał)
+```
+python Docs/tools/append_convo.py --resume            # podgląd nowych tur
+python Docs/tools/append_convo.py --resume --write     # dopisz (plik musi być zamknięty)
+python Docs/tools/append_convo.py --session <id>       # nadgoń starą sesję
+```
+
+Nic nie commitowałem — `settings.local.json`, skrypt i `md` są w repo, zacommitujesz kiedy zechcesz. Jeśli chcesz, żeby hook zadziałał już w tej sesji, wystarczy restart `claude`.
+
+## 🧑 Robert
+
+Już wiem co to sesja i context, a co to dla ciebie projekt i jak nazywa się aktualny?
+
+
+## 🤖 Claude
+
+Dla mnie **projekt** = katalog roboczy (root kodu/repo), w którym pracuję, wraz z całym stanem przypiętym do tej ścieżki. Jeden projekt spina:
+
+- **transkrypty sesji** — `~/.claude/projects/<zakodowana-nazwa>/<session-id>.jsonl`,
+- **ustawienia projektowe** — `.claude/settings.json` (współdzielone) i `.claude/settings.local.json` (osobiste, tu wpięliśmy hook),
+- **pamięć projektu** — pliki w `…/projects/<zakodowana-nazwa>/memory/` (`MEMORY.md` + notatki),
+- **instrukcje** — `CLAUDE.md`.
+
+Wszystko kluczowane po **ścieżce katalogu roboczego** — inny katalog = inny projekt = osobne sesje, ustawienia, pamięć.
+
+## Aktualny projekt
+
+- **Katalog roboczy:** `C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND`
+- **Zakodowana nazwa** (ta w `~/.claude/projects/…` i w ścieżkach pamięci): **`C---Moje-Dane--Moje-Programy-Visual-C--RubikCubeND`**
+
+Kodowanie to po prostu zamiana znaków „ścieżkowych" — `:` `\` `_` spacja `#` — na `-` (stąd zbitki myślników). Właśnie dlatego skrypt szuka katalogu sesji przez `glob("*RubikCubeND*")` — żeby nie zależeć od dokładnej nazwy użytkownika w tej zakodowanej ścieżce.
+
+Dodatkowo (kontekst gita, nie „projektu" w powyższym sensie): to repozytorium git na gałęzi `SpeedImprovment`, główna to `master`.
+
+## 🧑 Robert
+
+Wszystko jasne, czas chyba sprawdzić jak mode zachowuje się w realu. Na pytanie czy losujemy (nie każda się da, ale możemy losować do upadłego), czy generujemy wszystkie możliwości - 2^P (szybko rośnie z N)  - odp. losowo, będzie szybciej, możliwość powtórzeń, ale duplikaty powstają tak, czy tak (choć pewnie można byłoby się pozbyć dzięki Twojej świetnej obserwacji). Tylko że jak losujemy, to czy ograniczamy się wielkością populacji, czy estymatą możliwości generowania sekwencji? Ja bym chyba był za populacją, tylko martwię się o wydajność - greedy jest powolny
+
+
+## 🤖 Claude
+
+Zgoda — czas na produkcję. Najpierw moje zdanie na Twoje pytania, potem przeczytam bieżący `GetSolveSeq`/`BuildSeedMoves` i wpnę.
+
+## Ograniczamy populacją, nie estymatą
+
+Jestem za **populacją** — i dobra wiadomość: `BuildSeedMoves` **już tak działa**. Celuje w `populationCount * seedRatio / 100` slotów, a gdy pula się wyczerpie wcześniej (mniej niż target), kończy przez heurystykę „stall" (brak nowych po budżecie prób). Czyli:
+- **populacja = górny cel**, **saturacja = dolny bezpiecznik**. Estymata liczby możliwości to osobna maszyneria bez zysku — saturacja i tak zatrzyma, gdy nic nowego nie przychodzi.
+- Losowy `mode` per pobranie wchodzi w tę pętlę wprost; „stuck" (mod, który nie ma ruchu-progresu dla tego kubika) = po prostu **redraw**, tak jak mówisz „losować do upadłego".
+
+## Duplikaty — zostawiamy dedup po stringu
+
+Losowanie daje powtórzenia; obecny `HashSet` po zakodowanej sekwencji je tnie. Commutation-duplikaty (te 41%) zostaną jako różne stringi — **i dobrze dla seedowania**: to wciąż różne, poprawne geny, a selekcja GA je przetrzebi. Kanonikalizacja po przemienności kosztuje per pobranie i nic nie daje puli seedów. Twój osąd trafny.
+
+## Wydajność — realne ryzyko, ale mierzalne
+
+Dwa mnożniki kosztu z modem: (a) ścieżki są **dłuższe** (makroruchy, len 4–5 dla N=4 vs ≤3) → więcej kroków, (b) greedy przelicza `RotCount` per kandydat, a mieszany Givens to pełny rozkład. Zanim zoptymalizuję na oślep — **wpnę i zmierzymy**. Jeśli generacja seedów zdominuje czas, mam gotowe dźwignie: scratch-macierz w `RotCount` (zero alokacji per kandydat) i tanie wykrywanie „stuck".
+
+Przeczytam bieżący stan, żeby wpiąć precyzyjnie:
+
+Mam bieżący `GetSolveSeq`/`BuildSeedMoves`. Zanim wpnę — sprawdzę jedną rzecz, która może być blokerem: **stride seedów**. Mode daje sekwencje **dłuższe** niż minimalne (do ~P = N(N-1)/2), a obecny stride to `N-1`. Zobaczę, jak stride jest ustawiany i konsumowany przez shader Init:
+
+Confirmed the stride path. Let me read the exact consumption sites to state the blocker precisely:
+
+Now the full picture is clear. The stride is the blocker I suspected. Let me verify the SelCrossover seed read and grab the exact matrix types from the diagnostic so the production helper matches:
+
+Now I have the exact reference. Let me confirm the `TMatrix` copy API and `TCubie.Transform.M` types before writing the production helper:
+
+Everything checks out. Now I'll wire mode in. First, the greedy — replace `GetSolveSeq()` with a mode-parameterized version plus the mixed-Givens helpers:
+
+Now `BuildSeedMoves` — draw a random mode per attempt, redraw on stuck (`null`):
+
+Now the stride must grow to fit mode's longer macro-moves (up to `P = N(N-1)/2` moves vs the old `N-1`). Update both the host and shader sides to the plane count `P`:
+
+Now the host side must pass the matching stride (`TAffine.Planes.Length` = P):
+
+Let me check whether `GetSolveSeq()` (old no-arg signature) is called anywhere else, which would now break the build:
+
+Two real call sites break: [TRubikGenome.cs:531](RubikCube/TRubikGenome.cs:531) and [TRubikCube.cs:583](RubikCube/TRubikCube.cs:583). Let me look at both:
+
+`GetSolveSeq()` at line 583 discards its result (RNG-consuming warm-up), and Genesis at 531 relies on the old **State-based** metric with its `EulerOrder`/`reversed` toggles (lines 528-530) — my mode-based version ignores those. Let me check whether these CPU paths are still live before deciding:
+
+TGA (CPU GA) still calls Genesis, which depends on the old State-based metric. That's a separate mechanism from the GPU seed path I'm wiring — I shouldn't change its behavior. I'll restore the legacy no-arg `GetSolveSeq()` alongside the new mode overload:
+
+Now build to verify it compiles:
+
+Build is clean. Let me confirm the seed build is a one-time setup cost (not per-generation), which bears directly on the performance worry:
+
+Done. `BuildSeedMoves` runs inside `CreateBuffers` (setup time), not in `ExecuteGA` (the per-generation GPU loop) — so the greedy cost, including any stuck-mode redraws, is a **one-time host cost per cube activation**, amortized over thousands of GPU generations. That largely defuses the performance worry.
+
+## What I wired in
+
+**Greedy under a random mixed-Givens mode** — [TRubikCube.cs](RubikCube/TRubikCube.cs):
+- `RotCountMode(TMatrix A, int modeMask)` — the production mixed-Givens metric (pod / nad-L per plane, all LEFT rotations), mirroring the verified `TGreedyDiversity.RotCount` reference. Destructive on a throw-away clone.
+- `RotCountModeAfter(M, plane, angle, modeMask)` — clones only the small n×n matrix (not the whole cubie) and left-rotates it like `Turn` does. So the new greedy is actually **cheaper per candidate** than the old one, which did a full `TCubie.Copy()` + Euler decomposition 18× per step.
+- `GetSolveSeq(int modeMask)` — greedy under one mode; loop condition stays the true solve-check `c.State != 0` (mode metrics can hit rc==0 with M≠I). Returns **null** when the mode is stuck → caller redraws.
+
+**Random-mode sampling with population-size stopping** — `BuildSeedMoves` now draws `Rnd.Next(2^P)` per attempt, redraws on null, keeps your existing `target = pop·SEED_RATIO/100` goal and the saturation stall-break. Mode 0 is in the draw, so the pool still contains the standard minimal seeds *plus* the longer macro-moves.
+
+**Stride grew `N-1 → P = N(N-1)/2`** (the blocker I flagged) — mixed-Givens macro-moves are longer than the minimal solve (bounded by the plane count). Bumped in both places that must agree:
+- [Variables.glsl.c:38](RubikCube/Resources/Variables.glsl.c:38) `SEED_STRIDE`
+- [Gpu.cs:277](RubikCube/Gpu.cs:277) host stride → `TAffine.Planes.Length`
+
+Otherwise every macro-move seed would have been truncated and stopped solving its cubie. `Init` / `SelCrossover` already stop at the `0xFFFFFFFF` sentinel, so the wider stride needs no shader-logic change.
+
+**Legacy `GetSolveSeq()` restored** — the CPU path (`TRubikGenome.Genesis`, the warm-up call in cube activation) depends on the old State-based metric with its `EulerOrder`/`reversed` toggles; I left that untouched and only *added* the mode overload for the GPU seed path.
+
+Build is clean (0 errors).
+
+You can run it now and watch it behave in real. If you want to quantify the stuck-rate / how many distinct macro-seeds a mode-draw actually yields vs the old minimal-only pool, I can log `numSeeds` and the redraw count from `BuildSeedMoves` — say the word and I'll add the telemetry.
+
+## 🧑 Robert
+
+3^4: 00:03:42.0609916, GA: 15066. We could talk in english, but i feel more comfortable in polish. Pogubiłem się trochę. W RotCountMode(A, modeMask) wykonujemy obrót lewostronny albo o kąt związany ze strategią "pod" lub "nad", tak? Z tego muszą wyjść dwa <b>różne</b> kąty? (przy okazji - świetny ruch z kopią macierzy M)
+
+
+## 🤖 Claude
+
+Najpierw — miło, że ruszyło: 3⁴ w 3:42 / 15066 generacji to konkretny sygnał, że seedy nie są zepsute (macro-moves nie ucinają się na stride). 
+
+Teraz do sedna, bo tu jest subtelność.
+
+## Tak, jeden obrót lewostronny na płaszczyznę
+
+W `RotCountMode`, dla każdej płaszczyzny `p = (a1,a2)`, robimy **jeden** Givens lewostronny `A.Rotate(a1,a2,cos,-sin)`. Różnica między „pod" a „nad-L" to nie *dwa obroty*, tylko **który element zerujemy** — a stąd dobiera się `(a,b)`, czyli kąt:
+
+- **pod**: `a=A[a1,a1]`, `b=A[a2,a1]` → zerujemy element **pod** przekątną `[a2,a1]` (używamy kolumny `a1`)
+- **nad-L**: `a=A[a2,a2]`, `b=-A[a1,a2]` → zerujemy element **nad** przekątną `[a1,a2]` (używamy wiersza `a1`)
+
+## Ale nie — te kąty NIE muszą być różne
+
+I to jest właśnie clou. Weź czysty blok obrotu 2×2 w tej płaszczyźnie:
+
+```
+A = [ c  -s ]      A[a1,a1]=c   A[a1,a2]=-s
+    [ s   c ]      A[a2,a1]=s   A[a2,a2]=c
+```
+
+- pod:   `(a,b) = (c,  s)`
+- nad-L: `(a,b) = (c, -(-s)) = (c, s)`  ← **identyczne!**
+
+Dla wyizolowanego bloku obrotu **oba dają dokładnie ten sam Givens**, ten sam kąt. Zero różnorodności. Gdyby macierz zawsze była taką „czystą" sumą prostą bloków 2×2, `mode` byłby martwy jak `reversed`.
+
+## Różnica rodzi się ze **sprzężenia** płaszczyzn
+
+Płaszczyzny współdzielące oś (np. `(0,1)` i `(0,2)` dzielą oś 0) po zredukowaniu jednej **psują blokowość** drugiej. Wtedy `A[a1,a1] ≠ A[a2,a2]`, a element pod przekątną przestaje być minusem elementu nad — i strategie się rozjeżdżają. Skrajny przykład, gdy po wcześniejszej redukcji:
+
+```
+A|(a1,a2) = [ 1   0 ]
+            [ x   y ]        (y ≈ 1)
+```
+- pod:   `a=1, b=x`   → obrót niezerowy (zeruje `x`)
+- nad-L: `a=y, b=-0=0` → `sin=0, cos=1` → **identyczność, GetAngle=0, nie liczy się**
+
+Tu jedna strategia obraca, druga nie robi nic. To przesuwa cały dalszy przebieg redukcji — i **dlatego** ta sama orientacja rozkłada się na inną, dłuższą sekwencję. Nie liczymy „dwóch różnych kątów"; liczymy `GetAngle(cos,sin) != 0` (czy Givens jest nietrywialny), a bit `mode` steruje tylko **trajektorią** rozkładu.
+
+## Praktyczny wniosek
+
+Różnorodność `mode` bierze się nie z „innego kąta w kroku", tylko z **momentu, w którym płaszczyzny są sprzężone**. Dlatego:
+- dla N=3 (osie mocno się przecinają — brak rozłącznych płaszczyzn) `mode` daje najdłuższe makroruchy,
+- `mode=0` (wszystko „pod", kolejność naturalna) = standardowy QR = stary minimalny rozkład, więc pula seedów nadal zawiera te krótkie.
+
+Chcesz, żebym dołożył do `BuildSeedMoves` log `numSeeds` + liczby dobić/utknięć, żebyś zobaczył czarno na białym, ile z tych 2^P modów faktycznie „chwyta" dla aktywnego kubika i jak długie są sekwencje?
+
+## 🧑 Robert
+
+Nadal trapi mnie to, że badamy RotationCount mnożąc z lewej strony przez macierz obrotu o kąt wynikający ze strategi "pod" lub "nad". Żeby się różniły, to kąty muszą być różne. Standardowy QR ("pod") zeruje pod przekątną ponieważ mnożymy przez macierz obrotu w płaszczyźnie axis1, axis2, gdzie axis1 < axis2. Oczywiście to to samo co obrót w płaszczyźnie axis2, axis1 - ale dla strategii "nad" my wywołujemy Rotate nadal z tą samą kolejnością osi
+
+
+## 🤖 Claude
+
+To trafna wątpliwość i warto ją rozstrzygnąć na kodzie, a nie na intuicji. Przeczytam dokładną konwencję `Rotate`, żeby odpowiedzieć precyzyjnie:
+
+Przeczytałem `Rotate`. Storage jest **kolumnowy** (`A[y,x] = Data[x·RowsCount + y]`), więc pętla `i=axis1, j=axis2` krokiem `RowsCount` przechodzi po **wierszach** `a1` i `a2` — to operacja na wierszach, czyli **mnożenie z lewej** `A ← G·A`. Dla obu strategii to ten sam call `Rotate(a1,a2,cos,-sin)`, ta sama płaszczyzna, ta sama strona. Potwierdzam Twoją tezę: żeby się różniły, kąty muszą być różne — i **są**. Pokażę to wprost z tej pętli.
+
+## Co robi `Rotate(a1,a2,cos,-sin)` (z `sinA = -sin`)
+
+```
+row_a1 ←  cos·row_a1 + sin·row_a2
+row_a2 ← -sin·row_a1 + cos·row_a2      gdzie (cos,sin) = (a,b)/r
+```
+
+## pod — zeruje element POD przekątną `[a2,a1]`
+
+`a=A[a1,a1]`, `b=A[a2,a1]`. Nowy `A[a2,a1]`:
+```
+-sin·A[a1,a1] + cos·A[a2,a1] = (-b·a + a·b)/r = 0   ✓
+```
+Kąt: **θ_pod = atan2(A[a2,a1], A[a1,a1])**
+
+## nad-L — zeruje element NAD przekątną `[a1,a2]`, tym samym lewym obrotem
+
+`a=A[a2,a2]`, `b=-A[a1,a2]`. Nowy `A[a1,a2]`:
+```
+cos·A[a1,a2] + sin·A[a2,a2] = (A[a2,a2]·A[a1,a2] - A[a1,a2]·A[a2,a2])/r = 0   ✓
+```
+Kąt: **θ_nad = atan2(−A[a1,a2], A[a2,a2])**
+
+## Sedno Twojej wątpliwości
+
+> „dla strategii nad my wywołujemy Rotate nadal z tą samą kolejnością osi"
+
+I dobrze, że **tak samo**. To jest właśnie pointa: **nie kolejność osi decyduje o tym, który element zerujemy — decyduje kąt.** 
+
+Obrót w płaszczyźnie `(a2,a1)` zamiast `(a1,a2)` to ta sama płaszczyzna 2D z **odwróconym znakiem kąta** (przeciwna orientacja) — sama zamiana kolejności osi *nie przełącza* zerowania z „pod" na „nad". Gdybym dla „nad" wołał `Rotate(a2,a1,...)`, dostałbym tylko θ_pod ze znakiem minus, dalej zerując element pod przekątną. Dlatego zostawiam **lewe mnożenie, tę samą płaszczyznę `(a1,a2)`**, a „nad" uzyskuję **innym kątem** — tym, który kasuje element nad przekątną. To wciąż uczciwy ruch kostki (mnożenie z lewej), po prostu inny kąt.
+
+To, o czym myślisz („żeby zerować nad, obróć w drugiej kolejności") — to byłby **nad-R**: `RotatePost` = mnożenie z **prawej** (operacja na kolumnach). Tego świadomie *nie* używamy w `mode`, bo prawe mnożenie to sprzężenie, nie realny ruch kostki po lewej.
+
+## Kiedy θ_pod = θ_nad, a kiedy nie
+
+Dla **czystego bloku obrotu 2×2** (`A[a1,a1]=A[a2,a2]=c`, `A[a2,a1]=s`, `A[a1,a2]=−s`):
+```
+θ_pod = atan2(s, c)
+θ_nad = atan2(−(−s), c) = atan2(s, c)   → identyczne
+```
+Kąty się **pokrywają** — zero różnicy. Rozjeżdżają się dopiero, gdy blok jest „zabrudzony" przez współdzieloną oś / wcześniejszą redukcję (`A[a1,a1] ≠ A[a2,a2]`, a `A[a2,a1] ≠ −A[a1,a2]`). Wtedy `atan2(A[a2,a1],A[a1,a1]) ≠ atan2(−A[a1,a2],A[a2,a2])` → inny obrót → inna trajektoria → dłuższy makroruch.
+
+Czyli Twoja intuicja jest w 100% poprawna: **różnica = różnica kątów**, a bierze się ona nie z kolejności osi (ta jest celowo taka sama), tylko z tego, że w położeniu ogólnym kąt kasujący element nad przekątną to inny kąt niż ten kasujący element pod przekątną.
+
+## 🧑 Robert
+
+Widzisz, sam coś wymyślę i nie wiem do końca jak to działa. Dzięki za słuszną korektę (zresztą po to pytałem), ale - jak to jest, że pytamy się o RotationCount dla określonego kubika po dodatkowym obrocie w płaszczyźnie plane o określony kąt angle, a potem w strategii "nad" nagle sobie ten kąt zmieniamy?
+
+
+## 🤖 Claude
+
+Widzę dokładnie, gdzie się dwie rzeczy zlewają — i to naprawdę dobre pytanie, bo w `RotCountModeAfter` **dwa zupełnie różne obroty stoją w dwóch sąsiednich liniach** i łatwo je pomylić. Rozdzielmy je.
+
+```csharp
+static int RotCountModeAfter(TMatrix M, int plane, int angle, int modeMask)
+{
+    var A = (TMatrix)M.Clone();
+    var rot = TCubie.SetAngle(angle);
+    A.Rotate(pa[0], pa[1], rot.X, rot.Y);   // (1) RUCH-KANDYDAT
+    return RotCountMode(A, modeMask);        // (2) POMIAR
+}
+```
+
+## (1) Ruch-kandydat — to jest angle, i on się NIE zmienia
+
+`A.Rotate(pa[0], pa[1], rot.X, rot.Y)` to **prawdziwy ćwierćobrót** kostki: `angle ∈ {1,2,3}` = 90/180/270°, `rot = SetAngle(angle)` daje dokładne `(cos,sin)`. To jest ruch, który **wykonujemy i zapisujemy** do sekwencji. Ten kąt jest sztywny i nietykalny — pytamy „a co będzie, jak zakręcę tę płaszczyznę o dokładnie tyle stopni?".
+
+## (2) Pomiar — to jest LINIJKA, i to w niej pod/nad zmienia kąt
+
+`RotCountMode(A, modeMask)` **nie wykonuje żadnego ruchu kostki**. Bierze orientację `A` (już po ruchu-kandydacie) i **liczy, ile obrotów dzieli ją od ułożenia** — rozkładając macierz na Givensy. Kąty pod/nad, o które pytałeś ostatnio, żyją **wyłącznie tutaj, wewnątrz linijki**. Nigdy nie trafiają do sekwencji, nigdy nie są wykonane na kostce. To kąty, którymi *mierzymy*, a nie którymi *ruszamy*.
+
+## Czyli: nie zmieniamy kąta ruchu — zmieniamy linijkę
+
+Twoja fraza „a potem w nad nagle sobie ten kąt zmieniamy" dotyczy kąta z punktu (2), nie (1). `mode` nie rusza kąta ruchu-kandydata; `mode` wybiera **inną linijkę do zmierzenia wyniku**. Kolejność jest taka:
+
+> najpierw wykonaj prawdziwy ćwierćobrót (plane, angle) → **potem** zmierz powstałą orientację linijką pod/nad.
+
+`mode` jest **ustalone raz na całe `GetSolveSeq`** (losowane w `BuildSeedMoves`), więc w obrębie jednego rozkładu **wszystkie** kandydaty mierzy ta sama linijka. Greedy zostawia ten ruch, dla którego linijka pokazała „o 1 bliżej":
+
+```csharp
+if (RotCountModeAfter(c.Transform.M, plane, angle, modeMask) == rc - 1)
+    cand.Add(...);        // realny ruch (plane, angle) - kandydat
+```
+
+## Dlaczego inna linijka daje inne, dłuższe REALNE sekwencje
+
+Bo greedy podąża za gradientem **tej** linijki. Linijka „pod" (`mode=0`) to prawdziwa metryka minimalna — jej „coraz bliżej" prowadzi najkrótszą drogą. Linijka mieszana pod/nad **nie jest** minimalna: jej „coraz bliżej" biegnie okrężnie, więc realnych ćwierćobrotów wychodzi więcej (makroruch) — ale i tak dobija do identyczności, bo pętlę zatrzymuje `c.State != 0`, czyli **prawdziwe** ułożenie, niezależne od linijki:
+
+```csharp
+while (c.State != 0)   // prawdziwe ułożenie - to samo dla każdej linijki
+```
+
+Analogia: masz punkt na mapie i pytasz „który krok (N/S/E/W) zbliża mnie do celu?". Ruch-kandydat to krok. Linijka to sposób liczenia odległości. Dla metryki euklidesowej idziesz prosto; dla dziwnej metryki (np. po ulicach jednokierunkowych) te same kroki są oceniane inaczej i dojdziesz okrężnie — ale **dojdziesz**. `mode` to wybór metryki, nie zmiana długości kroku.
+
+## 🧑 Robert
+
+Tak, jak nacisnąłem enter, to zorientowałem się, że palnąłem głupstwo, bo my już złożyliśmy dotychczasowe obroty kubika z kandydatem i teraz próbujemy rozłożyć tą wynikową macierz (orientację) na sekwencje obrotów płaszczyzn w określonej kolejności - a obroty? - jak słusznie zauważyłeś w analogii - powinny prowadzić do celu
+
+
+## 🤖 Claude
+
+Dokładnie tak — i to jest już w pełni trafny obraz. Podsumowując Twoimi słowami, z jednym doprecyzowaniem:
+
+- Mamy **wynikową orientację** = dotychczasowe obroty kubika ∘ ruch-kandydat. Jedna macierz.
+- `RotCountMode` próbuje ją **rozłożyć na ciąg obrotów płaszczyzn** w ustalonej kolejności (naturalnej), gdzie bit `mode` na każdej płaszczyźnie mówi „zerujemy pod czy nad przekątną".
+- I tak — **każdy taki Givens prowadzi do celu**: peeluje jeden stopień swobody, spychając macierz w stronę identyczności. Liczymy te nietrywialne obroty (`GetAngle != 0`) → to jest „ile jeszcze do ułożenia".
+
+Ładna konsekwencja, o której warto pamiętać: dla orientacji będącej **znakową permutacją** (a taka zawsze jest — kostka) każdy wewnętrzny Givens ma `cos,sin ∈ {0,±1}`, czyli sam jest czystym ćwierćobrotem, a po jego zdjęciu macierz **dalej** jest znakową permutacją. Więc linijka nie jest abstrakcyjna — to autentyczny licznik ćwierćobrotów, tyle że pod nieminimalną polityką. „Pod" liczy najkrótszą drogę, mieszane pod/nad liczy dłuższą — obie realne, obie kończące się na identyczności.
+
+Twój błąd był tylko chwilowy: pomyliłeś kąt *ruchu* z kątem *pomiaru*, a jak sam zauważyłeś po Enterze — po złożeniu z kandydatem zostaje już tylko pytanie „jak rozłożyć tę macierz z powrotem do identyczności", i to rozłożenie z definicji zmierza do celu. Wszystko się zgadza.
+
+## 🧑 Robert
+
+Każdy wewnętrzny Givens jest ćwierćobrotem nie dlatego, że macierz składa się z 0, 1 i -1, bo wówczas kąt mógłby być wielokrotnością 90 stopni, ale dlatego, że szukamy RotationCount, które spada o 1
+
+
+## 🤖 Claude
+
+Tu muszę Cię jednak zatrzymać — bo to akurat odwrotnie, i warto to wyprostować, żeby model w głowie był poprawny. Sprawdzę tylko `GetAngle`, żeby nie mówić z pamięci:
+
+Potwierdzone — `GetAngle`: `cos<-0.5 → 2` (180°), `sin<-0.5 → 3` (270°), oba niezerowe, oba liczone. To mi pozwala postawić sprawę jasno, bo tu akurat była pierwsza wersja trafna, a Twoja poprawka mija się z tym, co robi kod.
+
+## `RotCountMode` niczego nie „szuka"
+
+To jest jednoprzebiegowy, deterministyczny rozkład: pętla po płaszczyznach, w każdej jeden Givens, koniec. **Nie ma tam żadnego „spadku o 1".** Warunek `== rc - 1` żyje w pętli `GetSolveSeq` (na zewnątrz), gdzie porównujemy dwie *gotowe* liczby z miary. Więc „szukamy RotationCount, które spada o 1" opisuje **zewnętrzny** greedy, a nie to, co ustala kąt wewnętrznego Givensa. Wewnątrz miary nic nie jest wyszukiwane — kąt jest **wymuszony przez wpisy macierzy**.
+
+## Dlaczego wpisy wymuszają wielokrotność 90°
+
+I tu właśnie decyduje struktura znakowej permutacji. Pivot „pod" bierze parę z **kolumny `a1`**: `(A[a1,a1], A[a2,a1])`. W znakowej permutacji **każda kolumna ma dokładnie jeden niezerowy ±1**, więc ta para to `(±1,0)`, `(0,±1)` albo `(0,0)`:
+
+```
+(±1, 0) → cos=±1, sin=0  → 0° lub 180°
+(0, ±1) → cos=0, sin=±1  → 90° lub 270°
+(0, 0)  → r<0.1, pomijamy
+```
+
+Analogicznie „nad" bierze parę z kolumny `a2`. Nie ma innej możliwości — `cos,sin ∈ {0,±1}`, kąt zawsze ∈ {0°,90°,180°,270°}. A po zastosowaniu takiego obrotu (90°-krotność w płaszczyźnie osiowej) macierz **dalej jest znakową permutacją**, więc następny Givens też → indukcja. To jest w 100% konsekwencja struktury 0/±1, a nie żadnego liczenia.
+
+## Dwie poprawki do Twojego zdania
+
+1. **To nie jest „ćwierćobrót" (90°).** Wewnętrzny Givens bywa 180° (`cos=-1`) albo 270° (`sin=-1`) — `GetAngle` zwraca 2 lub 3 i liczy jako **jeden** ruch. Właściwe słowo to „wielokrotność 90°", i każdy niezerowy = 1 w liczniku. Twoje „bo wówczas kąt mógłby być wielokrotnością 90°" to nie kontrargument — to jest **dokładnie to, co się dzieje**, i jest w porządku.
+
+2. **Struktura, nie mechanizm licznika.** Gdyby macierz nie była znakową permutacją (np. dowolna ortogonalna z wpisami `0.6, 0.8`), Givens miałby kąt dowolny — i miara dalej by działała, tylko liczyłaby obroty o dziwnych kątach. To, że wychodzą czyste 90°-krotności, zawdzięczamy wyłącznie temu, że orientacje kostki to znakowe permutacje.
+
+## Gdzie „spadek o 1" faktycznie rządzi
+
+Na **zewnętrznym** poziomie — i tam też nie decyduje o kącie. Zapisywane ruchy są ćwierćobrotami, bo **enumerujemy tylko** `for angle = 1..3` (90/180/270). Warunek `== rc-1` jedynie **wybiera, które** z tych ćwierćobrotów zostawić, nie sprawia, że są ćwierćobrotami.
+
+Czyli: dobry instynkt (oddzielić „skąd konkretny kąt" od „struktury"), ale odpowiedź leży po stronie struktury znakowej permutacji + enumeracji `angle∈{1,2,3}`, a nie po stronie licznika spadającego o 1.
+
+## 🧑 Robert
+
+Nie zrozumieliśmy się. Dla mnie ćwierćobrót to wyłącznie obrót o 90 lub -90 stopni. Sam poprawiłeś ćwierćobroty na wielokrotność 90 stopni i jest OK. Moja dalsza część zdania była tylko próbą znalezienia wytłumaczenia twojej pomyłki, której nie popełniłeś. Wszystko się spina i wygląda to na papierze świetnie, ale kostka lepiej się nie układa. Co z tymi dodatkowymi statystykami?
+
+
+## 🤖 Claude
+
+Rozumiem — zgadzamy się co do wielokrotności 90°, i news jest ważny: na papierze pięknie, a układanie nie lepsze. To znaczy, że trzeba **zmierzyć, co faktycznie ląduje w puli seedów** — bo najczęstsza cicha porażka to „większość losowych modów utyka → pula i tak zdominowana przez mode 0 → zero zmiany". Dodaję telemetrię. Najpierw zobaczę, jak istniejące diagnostyki wypisują wynik, żeby trzymać konwencję:
+
+Diagnostyki budują string i robią `Debug.WriteLine` (Output window). Zrobię tak samo — instrumentuję `BuildSeedMoves` bez zmiany logiki, żeby zobaczyć prawdziwy obraz puli. Mam też mocną hipotezę, którą te liczby od razu potwierdzą albo obalą.
+
+Let me clean up that hacky `dupes++ >= 0` short-circuit — make it explicit:
+
+Build czysty. Telemetria wpięta — poleci do okna **Output** (VS), tą samą drogą co pozostałe diagnostyki (`Debug.WriteLine`). Jedna linia na każde `CreateBuffers` (czyli na aktywację klastra), np.:
+
+```
+[BuildSeedMoves] N=4 stride=6 target=1024 accepted=7 | draws=2100 stuck=1980 dupes=113 | modes 5/64 | len 3:2 4:3 5:2
+```
+
+## Jak to czytać (i czego się spodziewam)
+
+| Pole | Co mówi | Sygnał alarmowy |
+|---|---|---|
+| `accepted` vs `target` | ile faktycznie seedów trafiło do puli | `accepted ≪ target` → GA prawie bez seedów |
+| `stuck` | ile losowań modu utknęło (`null`) | duży % → większość modów martwa dla tego kubika |
+| `modes X/64` | ile **różnych** modów dało choć jeden seed | małe X → brak obiecywanej różnorodności |
+| `len a:.. b:..` | rozkład długości przyjętych sekwencji | wszystko `= N-1` → **żaden makroruch nie przeszedł** |
+
+## Moja główna hipoteza, dlaczego „na papierze super, a kostka nie"
+
+Podejrzewam, że **stuck głodzi pulę przez wspólny budżet stall**. Spójrz na warunek przerwania: `32 + 8*slots.Count`. Gdy `slots` jest małe (początek), budżet ≈ 32. Jeśli losowy mod utyka często, licznik `stall` szybko dobija do 32 **zanim** uzbieramy cokolwiek — i pętla kończy z garstką seedów. Efekt: seedowanie praktycznie znika, GA startuje niemal losowo → układa **nie lepiej, a często gorzej** niż stary mode-0, który nigdy nie utykał.
+
+Drugi możliwy powód, głębszy: badanie mierzyło **+310% distinct efektów** enumerując *wszystkie* drzewa greedy każdego modu. Produkcja losuje **jedną** ścieżkę na mod i dedupuje po **stringu**. To dużo słabsze próbkowanie — przewaga modu może po prostu nie przenosić się na „jeden losowy strzał na mod".
+
+## Co dalej
+
+Uruchom raz i wklej mi tę linię (najlepiej dla N=3 z Twojego testu i dla N=4). Liczby od razu rozstrzygną:
+
+- Jeśli `stuck` dominuje i `accepted` małe → rozdzielam budżet: **stuck nie liczy się do saturacji** (albo dostaje własny, duży limit), tak by pula zapełniała się jak dawniej, a utknięcia były tylko „pustymi strzałami".
+- Jeśli `len` pokazuje same `N-1` → makroruchy się nie generują (albo mode-0 wygrywa dedup) i trzeba wymusić próbkowanie modów ≠ 0.
+- Jeśli `modes` małe → część przestrzeni 2^P jest jałowa dla danego kubika i warto losować mod z puli „żywych" zamiast z całości.
+
+Nie ruszam na razie logiki doboru — chcę, żeby surowe liczby pokazały prawdę, zanim zacznę stroić. Wklej wynik, to celnie dobiorę poprawkę.
+
+## 🧑 Robert
+
+Do output wysyłałeś przy okazji, a do UI wpinałeś się przez MenuItem w Menu. Gdzie tego szukać? Nie widzę nic w CreateBuffers
+
+
+## 🤖 Claude
+
+Racja co do lokalizacji — telemetria **nie jest** w `CreateBuffers`. Wpiąłem ją wewnątrz `BuildSeedMoves` (w `TRubikCube.cs`, tuż po pętli losowania, [TRubikCube.cs:908](RubikCube/TRubikCube.cs:908)), a `CreateBuffers` tylko ją wywołuje ([Gpu.cs:277](RubikCube/Gpu.cs:277)). Dlatego w `CreateBuffers` nic nie widać — leci to „przy okazji" produkcyjnej ścieżki, bez własnego triggera.
+
+Masz słuszność, że to niewygodne: odpala się samo przy aktywacji klastra i łatwo przegapić. Zrobię to jak pozostałe diagnostyki — osobny **MenuItem**, który liczy na żądanie i wypisuje raport. Zerknę na wzorzec tych trzech pozycji, żeby trafić 1:1:
+
+Wzorzec jasny: handler buduje string i pokazuje go w `ShowTextDialog`. Zrobię `Gpu.SeedStats(cube)`, który wywołuje `BuildSeedMoves` z **dokładnie tymi samymi** produkcyjnymi parametrami co `CreateBuffers` (więc raport = to, co realnie dostaje GA), plus czwarty MenuItem. Zerknę na wpisy w Designerze, żeby dopiąć menu 1:1:
+
+All four edit sites are clear. Let me read the exact designer blocks to patch precisely:
+
+Now all edits. Designer — declaration, config block, AddRange, field:
+
+Now the Form1 handler:
+
+Now `Gpu.SeedStats` — reuses the exact production call from `CreateBuffers`. Let me place it right after `CreateBuffers`:
+
+Now add the `LastSeedReport` field to `TRubikCube` and make `BuildSeedMoves` store a multi-line report into it:
+
+Zbudowane, 0 błędów. Teraz są **dwie** drogi do tych statystyk:
+
+1. **Menu** `File → Seed Pool Stats` — liczy na żądanie (`Gpu.SeedStats`), tymi samymi produkcyjnymi parametrami co `CreateBuffers`, i pokazuje raport w tym samym monospace-dialogu co pozostałe diagnostyki ([Form1.cs](RubikCube/Form1.cs), handler obok `Verify Manoeuvres`). Wymaga wybranego, **rozłożonego** klastra (musi istnieć `ActiveCubie`) — inaczej wypisze komunikat, że nie ma czego seedować.
+2. **Automatycznie** — ta sama linia leci do Output przy każdym `CreateBuffers` (aktywacja klastra), bo telemetria siedzi w `BuildSeedMoves`, nie w `CreateBuffers` (dlatego jej tam nie znalazłeś).
+
+Raport wygląda tak:
+
+```
+[BuildSeedMoves]  N=4  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 7     draws=2100  stuck=1980  dupes=113
+distinct modes contributing = 5 / 64
+length histogram (moves:count):  3:2  4:3  5:2
+```
+
+Gdzie leży rozdanie:
+- **`Gpu.SeedStats`** — [Gpu.cs:284](RubikCube/Gpu.cs:284), tuż za `CreateBuffers`, reużywa jej wywołania 1:1.
+- **budowanie raportu** — koniec `BuildSeedMoves`, [TRubikCube.cs](RubikCube/TRubikCube.cs) (pole `LastSeedReport`).
+- **MenuItem** — Designer: deklaracja, blok konfiguracji „Seed Pool Stats", `AddRange`, pole; handler w `Form1.cs`.
+
+Na co patrzeć (i moja teza o „papierze vs kostce"):
+- `accepted ≪ target` przy dużym `stuck` → **pula wygłodzona** przez wspólny budżet `stall` (utknięcia zabijają pętlę, zanim uzbiera seedy). To mój główny podejrzany.
+- `length histogram` same `N-1` (=3 dla N=4) → makroruchy w ogóle nie wchodzą, mode-0 wygrywa dedup.
+- `modes` małe → duża część 2^P jest jałowa dla tego kubika.
+
+Wybierz rozłożony klaster, odpal **Seed Pool Stats** dla N=3 i N=4, i wklej mi obie ramki — wtedy celnie dobiorę poprawkę (najpewniej: `stuck` z osobnym, dużym budżetem, żeby nie wliczył się do saturacji).
+
+## 🧑 Robert
+
+[BuildSeedMoves]  N=3  stride=3  target=1024  (SEED_RATIO% of population)
+accepted = 3     draws=63  stuck=24  dupes=36
+distinct modes contributing = 3 / 8
+length histogram (moves:count):  2:3[BuildSeedMoves]  N=4  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 11     draws=244  stuck=137  dupes=96
+distinct modes contributing = 10 / 64
+length histogram (moves:count):  2:11
+
+
+## 🤖 Claude
+
+To jest twarde i bardzo pouczające — dzięki. Liczby mówią jedno, jednoznacznie:
+
+## Diagnoza: pojedyncza losowa ścieżka **nie zbiera makroruchów**
+
+Popatrz na rozkład długości — **wszystko `2:` (długość minimalna dla tego kubika)**. Ani jednego makroruchu, przy 137 (N=4) / 24 (N=3) utknięciach. To nie przypadek, to struktura:
+
+- Mody **minimalne** (`rc0 = 2`) → ścieżka krótka, prawie zawsze dochodzi → lądują jako `accepted`/`dupes`, długość 2.
+- Mody **makro** (`rc0 > 2`, te obiecane dłuższe) → ich ścieżki rozwiązujące są **wąskie**. Pojedyncze losowe zejście prawie zawsze trafia w ślepy zaułek (`rc==0`, ale `M≠I`) → **`null` → stuck**. Nigdy nie dobija do identyczności.
+
+Czyli **wszystkie 137+24 „stuck" to właśnie makroruchy, które się nie udały** w jednym strzale. Zebrane makroruchy: **zero**. Produkcja daje dokładnie to samo co stary mode-0 (garść minimalnych rozkładów) plus masę zmarnowanych losowań. Stąd „na papierze super, kostka bez zmian".
+
+Kluczowe: badanie mierzyło +310% **enumerując całe drzewo greedy** (`AllGreedy`/`Dfs` w diagnostyce). Pojedyncza losowa ścieżka **nie umie** tego zebrać — to była cicha różnica między diagnostyką a produkcją.
+
+## Poprawka: zamiast „stuck → null" — **backtracking**
+
+Ślepy zaułek nie znaczy „mod martwy", tylko „ta gałąź nie prowadzi do celu". Wystarczy się cofnąć i spróbować innej. Backtracking znajduje pełną ścieżkę długości `rc0` **wtedy i tylko wtedy, gdy istnieje** — czyli dokładnie te makroruchy, które znalazło badanie. Wpinam:
+
+To nie błąd kodu — kompilacja przeszła. Oba błędy to `MSB3027/MSB3021`: `RubikCube.exe` jest **zablokowany przez działający proces (RubikCube, PID 13504)** — masz odpaloną aplikację, więc nie da się nadpisać exe. Zamknij ją i zbuduj ponownie (albo po prostu przebuduj z VS po zamknięciu).
+
+Co się zmieniło i czego się teraz spodziewać po **Seed Pool Stats**:
+
+- `GetSolveSeq(modeMask)` to teraz **randomizowany backtracking** (`SolveModeDfs`): schodzi losowo po ruchach obniżających miarę o 1, a w ślepym zaułku **cofa się** zamiast zwracać `null`. `null` leci tylko, gdy całe monotoniczne drzewo modu jest ślepe (mod naprawdę martwy dla tego kubika).
+- Długość ścieżki = `rc0` danego modu (ustalona przez mod), więc mody makro (`rc0 > 2`) **wreszcie oddadzą swoje dłuższe sekwencje**.
+
+Prognoza dla nowego raportu:
+- **`stuck` mocno spada** (tylko genuinnie martwe mody), więc budżet `stall` nie ubija pętli przedwcześnie → `accepted` rośnie.
+- **histogram długości się rozjeżdża**: zamiast samego `2:` powinny dojść `3:`, `4:`, `5:` — to są te makroruchy.
+- `distinct modes contributing` powinno wzrosnąć w stronę „żywych" modów.
+
+Zamknij apkę, przebuduj, odpal **Seed Pool Stats** dla N=3 i N=4 i wklej — zobaczymy czy makroruchy faktycznie wchodzą do puli. Jeśli tak, następny krok to sprawdzić czy GA układa lepiej; jeśli histogram nadal płaski, znaczy że dla tego kubika mody makro są martwe (całe drzewo ślepe) i wtedy pogadamy o `nad-R`/enumeracji.
+
+## 🧑 Robert
+
+[BuildSeedMoves]  N=3  stride=3  target=1024  (SEED_RATIO% of population)
+accepted = 3     draws=65  stuck=17  dupes=45
+distinct modes contributing = 3 / 8
+length histogram (moves:count):  2:3[BuildSeedMoves]  N=4  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 8     draws=121  stuck=0  dupes=113
+distinct modes contributing = 7 / 64
+length histogram (moves:count):  2:8
+
+
+## 🤖 Claude
+
+Świetne liczby — i mówią coś ważnego. Backtracking **zadziałał** (N=4: `stuck 137→0`, każdy mod teraz rozwiązuje), ale **nadal same długości 2**. To nie jest już bug w harvestingu — to znaczy, że **dla tego konkretnego kubika wszystkie mody dają `rc0 = 2`**, czyli mod jest zdegenerowany. Zaraz wyjaśnię dlaczego to musi tak wyjść, i sprawdzę czym różni się kubik, na którym badanie pokazało +310%.
+
+Najpierw fakt, który to zaklina — udowodnijmy go:
+
+**Na ścieżce monotonicznej `M = I` zachodzi *wyłącznie* przy `rc = 0`.** Bo `RotCountMode(I, mode) = 0` dla *każdego* modu (identyczność: każdy pivot `A[a1,a1]=1, A[a2,a1]=0` → obrót tożsamościowy, nie liczy się). Zatem długość znalezionej ścieżki = `rc0` danego modu, kropka. Skoro wszystkie przyjęte mają długość 2, to **każdy mod ma `rc0 = 2`** dla tego kubika — zero makroruchów, nie z powodu harvestingu, tylko z powodu samego kubika.
+
+Sprawdzę, na jakiej orientacji badanie mierzyło +310%, żeby zobaczyć, czym się różni od bieżącego `ActiveCubie`:
+
+To rozstrzyga zagadkę. Spójrz na `Run()` (linia 52): badanie iteruje po **`AllOrientations()` — całej grupie obrotów** (24 dla N=3, 192 dla N=4), a `histMode[L]` zbiera dodatkowe makroruchy **po długości**. Czyli +310% to agregat po **wszystkich** orientacjach — makroruchy pojawiają się dla **głębokich** orientacji (`rc0 > minimum`). A `Seed Pool Stats` mierzy **jeden** bieżący `ActiveCubie`, który akurat jest **płytki** (2 ruchy, wszystkie mody zgodne).
+
+Innymi słowy: **korzyść z modu zależy od orientacji kubika.** Dla płytkiego kubika wszystkie mody dają `rc0 = minimum` → zero makroruchów. Makroruchy rodzą się dopiero na głębokich orientacjach.
+
+Dodam do raportu **census `rc0` po wszystkich `2^P` modach** — to wprost pokaże potencjał makro danego kubika (czy jest zdegenerowany, czy nie), niezależnie od pętli losowania:
+
+Znów tylko blokada kopiowania exe (proces `RubikCube` PID 5548) — **kod się kompiluje** (0 błędów CS, oba to `MSB3027` na zajętym `.exe`). Zamknij apkę i przebuduj.
+
+## Gdzie jesteśmy — podsumowanie
+
+Nowy raport dołoży linię **`mode rc0 census (moves:modes)`** — rozkład `rc0` bieżącego kubika po wszystkich `2^P` modach. To jest sedno diagnostyki, bo długość ścieżki = `rc0`, więc census wprost mówi, ile makro-potencjału ma **ten** kubik:
+
+- `mode rc0 census:  2:64` → **kubik zdegenerowany** — wszystkie 64 mody dają minimum, żadnego makroruchu (to Twój obecny wynik, tylko teraz widać to jawnie).
+- `mode rc0 census:  2:40  3:18  4:6` → **głęboka orientacja** — 24 mody nadmiarują `rc0`, i `accepted length histogram` powinien wtedy pokazać `3:…  4:…` (te makroruchy).
+
+## Co to znaczy (i dlaczego kostka nie układała się lepiej)
+
+Backtracking jest OK — problem był w interpretacji. **Korzyść z modu jest funkcją orientacji kubika, nie stała.** Badanie (`Run`) uśredniało po **całej grupie obrotów** (`AllOrientations`, 192 dla N=4), więc +310% ciągnęły **głębokie** orientacje. `Seed Pool Stats` mierzy **jeden bieżący** `ActiveCubie`, a ten był płytki (2 ruchy) → wszystkie mody zgodne → mod nic nie wnosi.
+
+Wniosek: mod pomaga tam, gdzie kubik jest **głęboko obrócony**. Jeśli GA aktywuje głównie płytkie kubiki, mod nie ruszy wyniku — i to jest prawdziwa odpowiedź na „na papierze super, kostka bez zmian".
+
+## Następny krok — celowany test
+
+Zamknij apkę, przebuduj, i odpal **Seed Pool Stats** na **mocno pomieszanej** kostce (albo aktywuj wyraźnie głęboki kubik), nie na prawie ułożonej. Wtedy:
+- jeśli census pokaże rozrzut i `length histogram` dostanie `3:/4:/…` → makroruchy realnie wchodzą do puli, i **wtedy** ma sens mierzyć czy GA układa szybciej;
+- jeśli nawet dla głębokich kubików census to `2:64` → mod jest martwy w tej geometrii (`Size`/`N`), i wracamy do `nad-R` (sprzężenie) albo enumeracji po orientacjach.
+
+Wklej census dla głębokiego kubika, to zobaczymy czarno na białym, czy jest po co ciągnąć mode w produkcji.
+
+## 🧑 Robert
+
+Właśnie, przydałoby się w interfejsie pokazać tak podstawowe dane (jako etykiety) jak: Cluster {ActCluster.No/Clusters.Count} i Solved { CubiesSolvedInaActCluster/ActCluster.Count} tylko Clusters to ja w zasadzie nie liczę - ale wystarczy określić max z cubie.ClusterIndex (przy tworzeniu kubików)
+
+
+## 🤖 Claude
+
+Sensowne — te dwie etykiety od razu dają kontekst do interpretacji seedów. Najpierw rozeznam, jak działają klastry i indeksy, żeby policzyć poprawnie:
+
+Let me read the cluster machinery — `ActiveCluster`, `ActiveCubie`, `NextCluster`, and how `ClusterIndex` is assigned:
+
+Now I understand the model: a **cluster** = all cubies sharing a `ClusterIndex`; `ActiveCubie` is the unsolved cubie with the lowest `ClusterIndex`, and clusters are solved in increasing-index order. So `No = ActiveCubie.ClusterIndex`, `Count = max ClusterIndex`, and solved-in-cluster = `ActiveCluster.Count(State==0)`. Let me find the UI refresh point to know where to update the labels:
+
+`timer1_Tick` (line 103) is the central UI refresh — it already updates `label4` (ScrambledCount), score, iters. Let me read it to slot the two new labels in the same place:
+
+The tick's post-move block (line 135) is where `label4`/`MovesLbl` refresh — the right spot. I'll add a helper and two labels. Let me see how `label4`/`MovesLbl` are laid out in the designer so I place the new ones consistently:
+
+Labels sit in `panel1`. Let me check `panel1`'s size and the controls near `label4` (y≈505) to find free space:
+
+Layout clear: `panel1` (498×994), `StateBox` occupies x43–393/y535+, leaving a free column at x≈400, y≈540+. I'll put the two labels there. Now the edits — first `MaxClusterIndex` on the cube (lazy, computed from the cubies):
+
+Now the designer — declarations, Controls.Add, property blocks, and field declarations:
+
+Now the helper in `Form1.cs` and the update calls. Let me read the `NextCluster` call site first:
+
+Now the helper method, next to the seed-stats handler:
+
+Let me verify `RubikCube.Cubies` is public and confirm compilation (if the app is still open, only the copy step fails — CS errors would still surface first):
+
+`Cubies` and `RubikCube` are both public. Let me build:
+
+
+## 🧑 Robert
+
+Zamiast być leniwym i obliczać w kółko MaxClusterCount, zadeklaruj go jako proste pole, liczone tylko raz podczas budowy kostki, tak jak mówiłem.
+
+
+## 🤖 Claude
+
+Racja — policzę raz przy budowie kostki. Najpierw znajdę miejsce tworzenia kubików:
+
+Let me check when `ClusterIndex` actually gets assigned in `TCubie` — I must compute the max only after it's set:
+
+`Index` setter (line 177) assigns `ClusterIndex`, and the ctor calls `cubie.Index = i` at line 89 — so `ClusterIndex` is valid right after. I'll compute the max there. First, replace the lazy property with a plain field:
+
+Now compute it in the construction loop, and carry it over in the copy constructor:
+
+
+## 🧑 Robert
+
+[BuildSeedMoves]  N=3  stride=3  target=1024  (SEED_RATIO% of population)
+accepted = 3     draws=65  stuck=31  dupes=31
+distinct modes contributing = 1 / 8
+mode rc0 census (moves:modes):  0:1  1:3  2:4
+accepted length histogram (moves:count):  2:3
+
+
+## 🤖 Claude
+
+Teraz census robi dokładnie to, co trzeba — i ładnie odsłania mechanizm. Rozłóżmy `0:1  1:3  2:4`:
+
+## Mody dzielą się na trzy klasy względem prawdziwego minimum (=2)
+
+| `rc0` | ile modów | co robią |
+|---|---|---|
+| **0** | 1 | **niedoszacowanie skrajne** — metryka mówi „ułożone", a `M≠I`. Greedy od razu: brak ruchu na `rc-1=-1` → **zawsze stuck** |
+| **1** | 3 | **niedoszacowanie** — po 1 ruchu metryka=0, ale kubik wciąż `≠I` (potrzeba 2). Dead-end → **zawsze stuck** |
+| **2** | 4 | **trafiają w minimum** — rozwiązują, ale odtwarzają **te same** minimalne sekwencje |
+
+Stąd wszystko się spina: `stuck=31` to losowania 4 modów niedoszacowujących (nigdy nie rozwiążą), a `accepted/dupes` to 4 mody z `rc0=2`. `distinct modes contributing = 1/8`, bo wszystkie cztery „dobre" mody dają **string-identyczne** długości-2 → pierwszy przyjmuje, reszta to dupes.
+
+## Kluczowy wniosek: makroruch wymaga modu **przeszacowującego** (`rc0 > minimum`)
+
+A tego dla tego kubika **nie ma** — census kończy się na 2. Mod robi makroruch tylko wtedy, gdy jego metryka *nadmiaruje* prawdziwą odległość (dłuższa ścieżka wciąż lądująca na `I`). Ten kubik jest płytki (2-deep) i żaden mod nie przeszacowuje → zero makro, dokładnie jak widać.
+
+Czyli mechanizm jest teraz jawny:
+- `rc0 < minimum` → **martwe** (gwarantowany stuck, czysta strata losowań),
+- `rc0 = minimum` → standardowe minimalne (zero różnorodności),
+- `rc0 > minimum` → **makroruch** — i tylko to nas interesuje.
+
+## Następny krok — census głębokiego kubika
+
+Odpal **Seed Pool Stats** na **mocno pomieszanym** kubiku (np. narożnik po kilku obrotach, `rc0` standardowe 3), nie na 2-deep. Szukamy w census wpisów **`3:` lub więcej** (przeszacowujące mody). Dwie możliwości:
+- pojawiają się `3:`/`4:` → makroruchy realne, i wtedy warto: w `BuildSeedMoves` **pomijać mody z `rc0 < minimum`** (martwe) i celować w `rc0 > minimum`. To wytnie te 31 jałowych losowań i skupi pulę na makro.
+- census nadal urywa się na minimum dla każdego kubika → mod jest martwy w tej geometrii i wracamy do `nad-R` (sprzężenie) albo enumeracji.
+
+Wklej census dla głębokiego kubika — wtedy albo wpinam filtr `rc0 > minimum`, albo pivotujemy na `nad-R`.
+
+## 🧑 Robert
+
+Chciałem osiągnąć klaster ze 192 orientacjami dla kostki 7^4. Powoli, bo powoli, ale w 4D układa klastry. Pierwszy miał chyba 24 kubiki/orientacje, drugi 32, a teraz trzeci 16. Ale skąd numery Clustrów to jakieś ponad 1600?, coś mam źle z tą numeracją klastrów w kubikach? - są zdaje się liczone na podstawie orbity - odległości L1 od środka kostki - ach, rozumiem, to nie jest dokładnie numer klastra w tablicy klastrów, tylko index liniowy w pewnej tablicy (nawiasem mówiąc mój wynalazek). Trochę się maszyna grzeje - ok 70 stopni. Ciekawe, że nie bardzo sobie radzi z domknięciem niewielkiego klastra o 16 kubikach, gdzie ruchy są mocno ograniczone - powinny być one łatwiejsze w ułożeniu. 16 kubików - a więc to klaster kończący ułożenie kostki wewnętrznej (narożniki). 24,162582 - najniżej do tego scoru dochodzi, czyli tak samo jak dla kostki 2^4, ale ma większe problemy, bo kostka wewnętrzna ma rozmiary 3^4. dOBRA, NIE MA CO CZEKAĆ:[BuildSeedMoves]  N=4  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 1024     draws=8902  stuck=0  dupes=7878
+distinct modes contributing = 38 / 64
+mode rc0 census (moves:modes):  2:34  3:20  4:10
+accepted length histogram (moves:count):  2:8  3:199  4:817
+
+
+## 🤖 Claude
+
+To jest **ten** wynik — walidacja end-to-end. Popatrz co się stało na głębokim kubiku (narożnik kostki wewnętrznej 3⁴):
+
+```
+mode rc0 census:  2:34  3:20  4:10      ← 30 modów PRZESZACOWUJE (rc0 = 3 lub 4)
+length histogram: 2:8   3:199  4:817    ← 1016/1024 to makroruchy (długość > minimum)
+stuck=0   accepted=1024 (target trafiony)
+```
+
+Wszystko, co przewidzieliśmy z płytkiego kubika, potwierdza się negatywem:
+- **brak modów `rc0 < 2`** → `stuck = 0` (żadnych martwych niedoszacowań),
+- **30 modów `rc0 > 2`** → prawdziwe makroruchy, i **80% puli to długość 4**.
+
+Czyli mod **działa w realu** — tylko wymaga głębokiego kubika, dokładnie jak census zapowiadał. Pula GA jest teraz wypełniona 1016 makroruchami zamiast garstki minimalnych. Teoria trzyma się od `RotCountMode` aż po produkcyjny seed. 
+
+## Numeracja klastrów — masz rację, to nie numer klastra
+
+`ClusterIndex = SizeMatrix.Coords2Index(posortowanej |pozycji|)` — to **liniowy indeks w tablicy orbit** (Twój wynalazek: sortowane |odległości| od środka), rzadki i nieciągły. Stąd „~1600" — to indeks orbity, nie `k`-ty klaster z `K`. `MaxClusterIndex` = największy taki indeks (≈1600), więc etykieta `Cluster 1600/1600` jest myląca.
+
+Żeby pokazać **prawdziwe** „klaster k / K", trzeba przy budowie zebrać **posortowane distinct `ClusterIndex`** i mapować indeks orbity → pozycję rangową. Wtedy:
+- `Count` = liczba różnych klastrów (te Twoje 24/32/16/…/192-orbitowe),
+- `No` = ranga bieżącego `ActiveCubie.ClusterIndex` w tej liście.
+
+To ~10 linii (słownik `ClusterIndex→ranga` liczony raz w konstruktorze, jak `MaxClusterIndex`). Wpiąć? Wtedy etykieta będzie sensowna (`Cluster 3 / 47` zamiast `1600/1600`), a `Solved x/16` już teraz mówi prawdę o postępie w klastrze.
+
+## Endgame 16 narożników
+
+Twoja obserwacja jest trafna i ważna: makroruchy to **dokładnie surowiec na komutatory** (rozwiązują cel, ale ruszają collateral inaczej) — czyli to, czego potrzeba na domknięcie małego, mocno ograniczonego klastra. Ale to, że pula jest pełna makro, nie gwarantuje jeszcze, że GA je *wykorzysta*.
+
+Następny pomiar, który realnie odpowie „czy mod pomaga układać": ten sam trudny klaster 16-narożnikowy, dwa przebiegi — **mode vs mode-0** (czyli `modeSpace=1` na sztywno) — i porównać liczbę generacji do domknięcia (albo najniższy score). Jeśli chcesz, dodam przełącznik (define `SEED_MODE` 0/1 albo pole), żebyś mógł to odpalić bez rekompilacji logiki. 
+
+Co robimy najpierw — **fix numeracji klastrów** (etykieta), czy **przełącznik mode/baseline** do pomiaru zysku na endgame?
+
+## 🧑 Robert
+
+Chciałbym zacząć od fixu numeracji klastrów, bo w tej formie jakiej jest, niewiele mówi ponad to, że pozwalał budować klastry z kubików o tym samym ClusterIndex. Równie dobrze możemy to zrobić oczywiście po prawdziwym indeksie w tablicy klastrów, i tak chciałbym aby to wyglądało - więc po utworzeniu kubików i policzeniu, w konstruktorze kostki należy przejrzeć jeszcze raz wszystkie kubiki, wpisując do jakiejś tymczasowej tablicy dynamicznej. Potem ją posortować po ClusterIndex, jeszcze raz przejrzeć podmieniając ClusterIndex na kolejny numer zmieniającego się indeksu - chyba, że masz lepszy pomysł
+
+
+## 🤖 Claude
+
+Dobry plan. Zanim wpiszę — muszę sprawdzić dwie pułapki, bo `ClusterIndex` jest ustawiany jako **efekt uboczny settera `Index`** (`Coords2Index`), więc jeśli gdziekolwiek później ktoś ustawi `cubie.Index`, nadpisze moją numerację orbitowym indeksem. Sprawdzam settera `Index`, `Copy` i wszystkie przypisania `.Index =`:
+
+Two important findings:
+1. **No post-construction `.Index =` assignments** — so renumbering `ClusterIndex` after construction is safe; nothing recomputes it back to the orbit index.
+2. **`TCubie.Copy` does NOT copy `ClusterIndex`** (latent bug — copies get 0). I'll fix that too, so copies stay consistent.
+
+Your sort-and-walk plan is exactly right. Implementing it as a helper. First, revert the loop's orbit-max line and call the renumber after the cubies exist:
+
+Now fix `TCubie.Copy` to carry `ClusterIndex`:
+
+Etykieta już czyta `ActiveCubie.ClusterIndex + 1` i `MaxClusterIndex + 1`, więc po tej zmianie pokaże **prawdziwe `Cluster k / K`** (gęste, 1-based) zamiast `1600/1600`.
+
+Podsumowanie zmiany:
+
+- **`RenumberClusters()`** — po utworzeniu kubików w głównym konstruktorze: kopia listy → sort po orbitowym `ClusterIndex` → jeden przebieg, podmieniający na kolejną rangę `0,1,2,…` (inkrement, gdy zmienia się wartość orbity). `MaxClusterIndex = rank` (= liczba klastrów − 1). Dokładnie Twój plan.
+- **Zachowanie kolejności** — remap jest monotoniczny, a `NextCluster` (min `ClusterIndex`) i `ActiveCluster` (równość) zależą tylko od porządku i równości, więc **kolejność układania klastrów bez zmian** — tylko numeracja robi się sensowna.
+- **`TCubie.Copy` → dodane `dest.ClusterIndex = ClusterIndex`** — to była utajona dziura (kopie miały `ClusterIndex = 0`); teraz kopie (GA, `Gpu`, kopiujący konstruktor kostki) niosą poprawną, już gęstą rangę. Kopiujący konstruktor nie renumeruje — bierze gotowe wartości ze `src` (plus `MaxClusterIndex = src.MaxClusterIndex`, już wcześniej).
+
+Efekt: dla Twojego 7⁴ zamiast „Cluster 1600/1600" zobaczysz np. „Cluster 3 / 47", a `Solved x/16` już teraz mówi prawdę o postępie w klastrze. Solve order i cała reszta logiki niezmienione.
+
+Zbuduj u siebie w VS (CLI-owy build i tak koliduje z odpaloną apką przez blokadę `.exe`). Jak potwierdzisz, że numeracja wygląda sensownie, to wracamy do **przełącznika mode/baseline** na pomiar zysku z makroruchów na tym trudnym klastrze 16 narożników.
+
+## 🧑 Robert
+
+Nie mamy jednak tablicy klastrów, bo nam do niczego nie potrzebna. POnumerujmy od razu ClusterIndex od 1, a MaxCusterIndex przemianujmy na ClustersCount
+
+
+## 🤖 Claude
+
+Jasne — 1-based i `ClustersCount`. Wprowadzam.
+
+Now the label in `Form1.cs` — `ClusterIndex` and `ClustersCount` are now used directly (no `+1`):
+
+Let me confirm no stray `MaxClusterIndex` references remain:
+
+W kodzie czysto — wszystkie pozostałe `MaxClusterIndex` to tylko transkrypt w `Docs/Konwersacja_RubikND.md`, nie kod.
+
+Gotowe:
+- `ClusterIndex` renumerowany **od 1** (`rank` startuje 0, pierwszy klaster → 1).
+- `MaxClusterIndex` → **`ClustersCount`** (= `rank` po przebiegu = liczba klastrów), w polu, konstruktorze kopiującym i etykiecie.
+- Etykieta: `Cluster {ClusterIndex} / {ClustersCount}` — bez `+1`, bo numeracja jest już 1-based. Dla `ActiveCubie == null` (kostka ułożona) → `Cluster - / {ClustersCount}`.
+- `TCubie.Copy` niesie `ClusterIndex` (fix utajonej dziury).
+
+Zbuduj w VS i sprawdź, czy `Cluster k / K` wygląda sensownie (np. przechodząc przez pierwsze klastry: 1/K, 2/K, 3/K…). Jak potwierdzisz — robimy **przełącznik mode/baseline** i mierzymy, czy makroruchy realnie skracają domknięcie tego trudnego klastra 16 narożników.
+
+## 🧑 Robert
+
+Tak, wszystko OK, nareszcie sensowne indeksy. Wepnijmy przełącznik, ale testować wolałbym na 3^4, zresztą pod koniec powinno wyjść na to samo
+
+
+## 🤖 Claude
+
+Wpinam przełącznik. Zrobię go spójnie z `SEED_RATIO` (define czytany hostowo), żeby dało się go zmieniać tak samo jak inne parametry. Sprawdzę, jak `SEED_RATIO` jest zdefiniowany i czy define'y są edytowalne w UI:
+
+Defines live in `Variables.glsl.c` (host reads them via `GetDefineValue`, edited + rebuilt — no runtime UI). I'll add `SEED_MODE` there, consistent with `SEED_RATIO`. Let me place it and wire it through:
+
+Now `BuildSeedMoves` — add the `mixedModes` parameter, gate `modeSpace`, and label the report:
+
+Now the two callers in `Gpu.cs` — pass `SEED_MODE`:
+
+Let me confirm no other `BuildSeedMoves` callers were missed by the signature change:
+
+Gotowe — przełącznik wpięty jako **`SEED_MODE`** w [Variables.glsl.c](RubikCube/Resources/Variables.glsl.c:23), spójnie z `SEED_RATIO`:
+
+- `#define SEED_MODE 1` → mieszane mody (losowy mod na seed → makroruchy na głębokich kubikach) — obecne zachowanie.
+- `#define SEED_MODE 0` → baseline: tylko mod 0 (`modeSpace = 1`), czyli standardowe minimalne rozkłady, jak przed całą serią zmian.
+
+Przepływ: `Gpu` czyta `GetDefineValue("SEED_MODE")` w obu miejscach (`CreateBuffers` i `SeedStats`) i przekazuje `bool mixedModes` do `BuildSeedMoves`. Gdy `false`, `Rnd.Next(1)` zawsze losuje mod 0. Raport (log + **Seed Pool Stats**) ma teraz `SEED_MODE=0/1`, więc każdy przebieg jest podpisany.
+
+## Protokół A/B na 3⁴
+
+Skoro to define kompilacyjny (bez UI runtime), test to dwa buildy:
+
+1. `SEED_MODE 1` → rebuild → ułóż 3⁴, zapisz metryki końcowego (trudnego) klastra: **liczba generacji do domknięcia** i/lub najniższy score.
+2. `SEED_MODE 0` → rebuild → to samo.
+3. Porównaj — najczystszy sygnał to generacje do zamknięcia klastra narożników (ten, który się opierał).
+
+Zgadzam się, że 3⁴ to dobry, szybszy proxy — klaster narożny 3⁴ i kostka wewnętrzna 7⁴ zbiegają do tego samego endgame'u (score ~24.16), więc wniosek przeniesie się na duże kostki.
+
+Uwaga metodologiczna na potem: `#GAIter` jest ścieżkowo-zależny od strumienia RNG, więc pojedynczy przebieg to jedna próbka z rozkładu o dużej wariancji. Jak zobaczysz kierunek, warto uśrednić po kilku seedach RNG, zanim wpiszemy wynik do artykułu. Ale na „czy w ogóle pomaga" jeden–dwa przebiegi wystarczą.
+
+Zbuduj z `SEED_MODE 1`, potem `0`, i wklej oba końcowe stany — zobaczymy, czy makroruchy realnie skracają domknięcie.
+
+## 🧑 Robert
+
+W 4D część 12 ścian po projekcji 3D jest "zewnętrznych" a pozostałe 24 ukryte. Nie ma problemu dla ułożonych kubików, ale nieułożone, mimo półprzezroczystości, ze względu na liczbę ścian są już mało przezroczyste. Nie wiem czy zwiększać przezroczystość zależnie od N, czy też dałoby się nie rysować tych "wewnętrznych" ścian - chyba, że może być tak, że nie "widać" po zewnętrznych ścianach , że kubik jest ułożony czy nie - no ale dlatego też mamy przezroczystośc?
+
+
+## 🤖 Claude
+
+Ciekawy problem — i zanim doradzę „ciąć czy skręcać alpha", muszę zrozumieć geometrię i to, gdzie właściwie „widać" stan kubika. Zerknę na budowę mesha, projekcję 4D→3D i jak alpha trafia do shadera:
+
+Mesh to hipersześcian z `TShape.CreateHyperCube()`, `faceCount = Materials.Count` quadów. Zobaczę, jak generowane są ściany (i czy jest tam rozróżnienie zewnętrzna/wewnętrzna) oraz gdzie stan kubika mapuje się na kolor:
+
+Mam już geometrię. Potwierdzam z kodu ([TShape.cs:153](RubikCube/TShape.cs:153)): `faceCount = Planes.Length · 2^(N-2)`, czyli **N=4 → 6·4 = 24 kwadratowe ściany na kubik**, każda z osobnym kolorem palety. Sprawdzę jeszcze, jak dokładnie wpinana jest alpha (żeby doradzać na faktach):
+
+Potwierdzone: `Transparency = State != 0 ? 0.1f : 1` — czyli **nieułożony kubik ma z założenia być wyblakły (0.1), ułożony pełny (1)**. Jedna alpha na instancję, wspólna dla wszystkich 24 ścian. I tu jest sedno problemu — oraz, jak sądzę, odpowiedź na Twoje pytanie.
+
+## Dlaczego robi się nieprzezroczysty — dokładnie
+
+WBOIT liczy „revealage" (ile tła prześwituje) jako **iloczyn** `Π(1 − aᵢ)` po ścianach na promieniu. Przy stałej `a = 0.1` i `L` nałożonych ścianach:
+
+```
+prześwit = (1 − 0.1)^L = 0.9^L
+```
+
+Dla N=3 (6 ścian, ~3 na promieniu) → `0.9³ ≈ 0.73` (ładnie wyblakły). Dla N=4 (24 ściany, ~12 na promieniu) → `0.9¹² ≈ 0.28` → prawie krycie. To nie jest wada WBOIT — to po prostu **21 warstw więcej mnoży się do krycia**. Zamiar (0.1) jest poprawny, tylko `a` jest liczone jak dla jednej warstwy.
+
+## Do czego właściwie służy tu przezroczystość
+
+Kluczowe rozróżnienie: **ona nie służy do inspekcji wnętrza kubika, tylko do jego wygaszania.** Ułożone = pełne, nieułożone = mgła. Stan *całej kostki* czytasz z **wyłaniających się krystalicznych (ułożonych) kubików** na tle mgły nieułożonych — nie z odczytu orientacji pojedynczego przezroczystego kubika. Więc:
+
+- Twoja wątpliwość „czy po zewnętrznych ścianach widać, że ułożony" — w 4D faktycznie **nie masz gwarancji**, że sylwetka rzutu ujawnia pełną orientację (4D ma więcej DOF niż widać po rzucie). Dlatego **nie chciałbym trwale ucinać ścian** — to zabija jedyny kanał, który tę informację może nieść.
+- Ale też **nie potrzebujesz** czytać nieułożonych — one mają być mgłą. Wystarczy je *naprawdę* wygasić.
+
+## Moja rekomendacja: policz `a` tak, by prześwit był stały względem N
+
+Zamiast ręcznie „zwiększać przezroczystość zależnie od N", wyprowadź `a` z docelowego prześwitu `T` i liczby warstw `L ∝ faceCount`:
+
+```
+a = 1 − (1 − T)^(1/L)
+```
+
+To jest **dokładnie odwrotność wzoru WBOIT na revealage**, więc trafia w cel bez zgadywania. Dla `T = 0.1` (dzisiejszy zamiar) i `L ≈ faceCount/2`: N=3 → `a ≈ 0.035`, N=4 → `a ≈ 0.009`. Nieułożony kubik wygląda tak samo mgliście niezależnie od N, a ułożone (a=1) dalej pełne. Cała reszta (WBOIT, FXAA) bez zmian.
+
+To bije obie Twoje opcje:
+- **vs „ciąć wewnętrzne"** — nie tracisz kanału informacji, nie musisz definiować „wewnętrznej" ściany (w rzucie tesseraktu to niejednoznaczne), zero ryzyka z odwróconym windingiem po rzucie 4D→3D.
+- **vs „ręcznie skręcać alpha po N"** — to jest to samo, tylko policzone poprawnie z geometrii, nie na oko.
+
+Opcjonalnie dorzuciłbym `#define UNSOLVED_REVEAL 90` (docelowy prześwit w %), żebyś mógł stroić mgłę jednym parametrem.
+
+Jeśli mimo wszystko chcesz też **tryb „tylko sylwetka"** (do wzrokowej kontroli stanu), zrobiłbym to jako osobny toggle (backface-cull + krycie), a nie zamiast przezroczystości — ale zacząłbym od `a = f(N)`, bo samo to prawdopodobnie rozwiązuje problem.
+
+Wpiąć wersję z prześwitem liczonym z `faceCount` (+ define do strojenia)? Jak tak — powiedz, czy `L` liczyć jako `faceCount/2` (średnio przez środek), czy bezpieczniej `faceCount` (mocniej wygasza).
+
+## 🧑 Robert
+
+Na przedostatnim klastrze (24 kubiki): [BuildSeedMoves]  N=4  SEED_MODE=1  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 2     draws=51  stuck=0  dupes=49
+distinct modes contributing = 2 / 64
+mode rc0 census (moves:modes):  1:64
+accepted length histogram (moves:count):  1:2 [BuildSeedMoves]  N=4  SEED_MODE=0  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 2     draws=52  stuck=0  dupes=50
+distinct modes contributing = 1 / 1
+mode rc0 census (moves:modes):  1:1
+accepted length histogram (moves:count):  1:2 Jakoś na tym starszy lepiej mu chyba idzie, bo ledwie zdążyłem, a już przeskoczył no ostatni, narożny cluster
+
+
+## 🤖 Claude
+
+Ten odczyt to **test zerowy z definicji** — i dobrze pokazuje, że mechanika działa. Census mówi wszystko: `mode rc0 census: 1:64` — aktywny kubik jest **1-ruchowy** (`rc0=1`), a **wszystkie 64 mody się do tego zwijają**. Skoro nie ma modu przeszacowującego, `SEED_MODE=1` i `SEED_MODE=0` są **identyczne co do joty** (2 seedy długości 1). Brak różnicy to tu **poprawny wynik, nie sygnał**, że baseline jest lepszy. „Starszy idzie lepiej" na tym klastrze to złudzenie / szum RNG — obie ścieżki są bit-w-bit te same.
+
+Płynie z tego twarda obserwacja: **większość klastrów ma płytkie kubiki (`rc0` = 1–2), gdzie mod jest zdegenerowany.** Mod może cokolwiek zmienić **tylko** na głębokim kubiku — czyli na tym **ostatnim, narożnym klastrze**, gdzie wcześniej census pokazał `2:34 3:20 4:10` i 817 makroruchów. Tam jest jedyny prawdziwy test.
+
+## Ale uwaga — coś ważnego widać już teraz
+
+Masz `SEED_RATIO = 100`, więc `target = cała populacja`. Popatrz co to robi z `numSeeds`:
+
+- **płytki kubik**: baseline i mode dają `accepted = 2` → seedowane są 2 osobniki, reszta losowa. OK.
+- **głęboki narożnik**: baseline dalej da garstkę (mało distinct minimalnych), ale **mode dał `accepted = 1024`** → **cała populacja** zaseedowana makroruchami *jednego* kubika.
+
+To jest realna różnica jakościowa, nie ilościowa: przy 100% seedowania mode **zabija różnorodność startową** — wszystkie 1024 osobniki układają ten sam kubik, mieszając collateral w podobny sposób. Baseline zostawia populację w większości losową (bo ma tylko ~2 seedy), więc paradoksalnie **bardziej różnorodną**. Dla GA to może być właśnie powód, dla którego mode nie pomaga (albo szkodzi) na trudnym endgame — nie brak makroruchów, tylko ich **nadmiar w puli**.
+
+## Plan na ostatni klaster
+
+1. Zmierz **ten narożny** klaster (nie płytkie): `SEED_MODE=1` vs `0`, licząc generacje do domknięcia (delta `GACount` od wejścia w klaster do `score=0`).
+2. Jeśli mode wychodzi **gorzej** — najpewniej to przeseedowanie. Wtedy sprawdź `SEED_RATIO` niższe (np. 10–25) **tylko dla mode**: makroruchy jako *domieszka* różnorodności, nie jako cała populacja.
+3. Jeśli mode wychodzi lepiej — mamy potwierdzenie i wpisujemy do artykułu (po uśrednieniu kilku seedów RNG, bo `#GAIter` ma dużą wariancję).
+
+Czyli: ten wynik niczego nie przesądza (płytki kubik), ale podsunął realną hipotezę — **`SEED_RATIO=100` + mode = monokultura**. Chcesz, żebym dodał, żeby przy `SEED_MODE=1` `target` liczył się z osobnego `SEED_RATIO` (np. `SEED_RATIO_MODE`), i porównał na narożnym klastrze płytkie vs pełne seedowanie?
+
+## 🧑 Robert
+
+Myślałem, że CULL_FACE coś wytnie w TGLContext.Init() ale albo nic nie robi, albo ignoruje
+
+
+## 🤖 Claude
+
+Zobaczmy, gdzie i jak `CULL_FACE` jest ustawiany i czy pass renderujący go nie nadpisuje. Sprawdzę `TGLContext.Init`, stan GL wokół `RenderScene` i winding mesha:
+
+Znalazłem sedno. Popatrz na [TGLContext.cs:124](RubikCube/TGLContext.cs:124):
+
+```csharp
+OpenGL.Disable(OpenGL.GL_CULL_FACE);  // Disable face culling to show all faces
+```
+
+Zanim jednak powiem „zmień `Disable` na `Enable`" — **to i tak nie rozwiąże Twojego problemu**, i to z trzech niezależnych powodów. Pierwszy sprawdzę w kodzie (czy nowy pass WBOIT w ogóle respektuje ten stan):
+
+Prześledziłem ścieżkę: [TGLContext.cs:54](RubikCube/TGLContext.cs:54) woła `Init()` (ustawia stan GL), potem [linia 62](RubikCube/TGLContext.cs:62) `Gpu.RenderScene(...)`. `RenderScene` **nie dotyka** `CULL_FACE` (grep to potwierdza — jedyne wystąpienie to ta linia 124). Czyli stan **persystuje** do passów WBOIT — gdybyś zmienił `Disable`→`Enable`, culling **byłby aktywny**. Nie jest ignorowany przez osobny kontekst. Problem leży gdzie indziej — i to głębiej.
+
+## Dlaczego culling i tak nie zrobi tego, co chcesz
+
+**1. Culling wycina ściany TYŁEM do kamery, nie ZASŁONIĘTE.** To jest sedno. Twój problem to *nakładanie się wielu przezroczystych warstw w głąb* — a większość z nich jest **przodem** do kamery (bliska struktura tesseraktu). `GL_CULL_FACE` usuwa tylko tylnościenne trójkąty; zasłoniętych-ale-przodem nie tknie. Więc krycie od stosu warstw zostaje. To dlatego „nic nie robi" — bo z natury nie może ruszyć tego, co Cię boli.
+
+**2. Po rzucie 4D→3D winding ścian nie dzieli się czysto na widoczne/ukryte.** Dla zwykłego sześcianu tylne ściany mają odwrócony winding → cull je zdejmuje. Tesserakt rzutowany to nie wypukła bryła — jego 24 ściany mają winding „pomieszany", więc `GL_BACK` zdejmuje **arbitralną ~połowę**, która w dodatku *przeskakuje* przy obrocie. Efekt to dziury/miganie, a nie czysta skorupa — łatwo to odczytać jako „nic sensownego się nie dzieje".
+
+**3. Dla nieułożonych (przezroczystych) i tak renderujesz wszystkie ściany celowo** — komentarz w linii 124 („show all faces") jest słuszny: przy WBOIT chcesz wszystkich warstw, culling by tu tylko psuł.
+
+## Wniosek
+
+`CULL_FACE` to **zły młotek** na ten gwóźdź. Nawet działając poprawnie, wyciąłby najwyżej połowę tylnych ścian, nie rozwiązując krycia od stosu przodów. To potwierdza to, co pisałem wcześniej: właściwe narzędzie na „nieułożone za mało przezroczyste" to **`a` liczone z `faceCount`** (odwrotność wzoru WBOIT na revealage), a nie geometryczne cięcie.
+
+Gdybyś naprawdę chciał „tylko skorupę", to **nie** przez `GL_CULL_FACE`, tylko przez **test 4D-zwrócenia ściany** (czy leży na widocznej 3-komórce hipersześcianu względem kierunku patrzenia w 4D) — liczony w vertex/geometry stage, per-ściana. To realna robota i w 4D niejednoznaczna, dlatego odradzam jako pierwszy krok.
+
+Proponuję: wróćmy do `a = 1 − (1−T)^(1/L)` z `L ∝ faceCount` (+ `#define UNSOLVED_REVEAL`). To jednym parametrem daje stały prześwit niezależnie od N i realnie odchudza nieułożone. Wpinać?
+
+## 🧑 Robert
+
+nie chciałbym , aby shader za dużo wiedział o tym, co rysuje. Z tego co mówisz, możemy policzyć a także po stronie CPU jako Transparent zależny od faceCount
+
+
+## 🤖 Claude
+
+Zgoda — to najczystsze rozwiązanie: shader zostaje głupi (dostaje gotową `alpha` per instancja), a całą kompensację liczymy w `TCubie.Transparency` z `faceCount`. Sprawdzę dokładny fragment i podmienię:
+
+Gotowe — kompensacja siedzi w [TCubie.cs](RubikCube/TCubie.cs:62), shader bez zmian (dostaje gotową `alpha` per instancja). Logika:
+
+```csharp
+int faceCount = TAffine.Planes.Length * (1 << TAffine.N - 2);   // P·2^(N-2): 6 (N=3), 24 (N=4), 80 (N=5)
+base.Transparency = 1f - (float)Math.Pow(1 - BaseUnsolvedAlpha, 6.0 / faceCount);
+```
+
+Zasada: WBOIT liczy prześwit jako `(1−a)^warstw`, a warstwy ∝ `faceCount`. Skaluję `a` tak, żeby **net prześwit był stały** i równy temu z N=3 (gdzie `a=0.1` wyglądało dobrze). Ponieważ prawdziwa liczba warstw `L ∝ faceCount`, `faceCount` się skraca — wynik nie zależy od tego, ile dokładnie ścian przecina promień:
+
+| N | faceCount | `a` (per ściana) |
+|---|---|---|
+| 3 | 6 | **0.100** (bez zmian — zakotwiczone) |
+| 4 | 24 | 0.026 |
+| 5 | 80 | 0.008 |
+
+Efekt: nieułożony kubik ma tę samą „mgłę" niezależnie od N, ułożony dalej pełny (`State==0 → 1`, więc leci passem opaque bez zmian). Nic o geometrii nie wyciekło do shadera.
+
+Jedno pokrętło: `public static float BaseUnsolvedAlpha = 0.1f` — steruje docelową mgłą dla wszystkich N naraz (podnieś → gęściej, obniż → rzadziej). Gdybyś kiedyś chciał to wyeksponować w UI albo jako define, jest w jednym miejscu.
+
+Zbuduj w VS i zobacz N=4 — nieułożone powinny wreszcie realnie prześwitywać zamiast zlewać się w bryłę. Jak mgła wyjdzie za rzadka albo za gęsta, ruszamy `BaseUnsolvedAlpha` (albo, jeśli net ma być inny niż N-3-owy, zmienimy kotwicę — powiedz w którą stronę).
+
+## 🧑 Robert
+
+FaceCount to chyba Materials.Count
+
+
+## 🤖 Claude
+
+Racja — `TCubie.Cube.Materials.Count` to jedno źródło prawdy (dokładnie tak liczy je `BuildCubeMesh`), bez dublowania wzoru, który mógłby się rozjechać z `CreateHyperCube`. Podmieniam:
+
+`Cube` is confirmed as `public static TShape Cube` ([TCubie.cs:13](RubikCube/TCubie.cs:13)). 
+
+Gotowe — `faceCount = Cube.Materials.Count`, czyli dokładnie to samo źródło co w `BuildCubeMesh`, bez dublowania `P·2^(N-2)`. Reszta bez zmian: N=3 daje `Cube.Materials.Count == 6` → `a = 0.1` (kotwica zachowana), N=4 → 24 → `a ≈ 0.026`. Shader dalej nic nie wie o geometrii — dostaje gotową `alpha`.
+
+Jedyne, o czym warto pamiętać: `Cube.Materials.Count` wymaga, by `TCubie.Cube` był już zbudowany (`BuildCubeMesh`) przed pierwszym odczytem `Transparency` — a że `Transparency` czytane jest dopiero przy zbieraniu instancji do `RenderScene` (po `Gpu.Init`/`BuildCubeMesh`), to jest spełnione. Gdyby kiedyś `Transparency` zawołać przed budową mesha, poleci NRE zamiast cichego złego wyniku — co i tak od razu wskaże realny błąd kolejności.
+
+Zbuduj i zerknij na N=4.
+
+## 🧑 Robert
+
+Nasz mode nie radzi sobie z dojściem do ostatniego clustra 3^4 (GA to już 29266). Czekać?
+
+Dobra, przeszedł, poczekać aż ostatni klaster będzie koń czony?
+
+
+## 🤖 Claude
+
+Tak, czekaj — **ostatni klaster to cały sens tego testu.** Wszystko przed nim (te 29266) to w większości płytkie klastry, gdzie mode ≡ baseline (census to potwierdzał), więc jako metryka porównawcza są szumem. Liczy się **ile generacji zajmie domknięcie właśnie tego narożnego klastra**, bo tam mode faktycznie wstrzykuje makroruchy.
+
+Dwie rzeczy, żeby liczba była użyteczna:
+
+1. **Zanotuj `GACount` teraz** (na wejściu w ostatni klaster — etykieta `Cluster k/K` pokazuje, że jesteś na ostatnim). Delta `GACount(domknięcie) − GACount(teraz)` = koszt samego narożnika. To jest wartość do porównania.
+2. **Zapamiętaj też total** (29266+ do domknięcia). Bo jeśli mode ma total **wyraźnie gorszy** niż baseline, to jest sygnał, że przeseedowanie (`SEED_RATIO=100` → cała populacja makroruchami) szkodzi już na wcześniejszych głębszych klastrach — dokładnie ta hipoteza, którą podnosiłem.
+
+Potem to samo z `SEED_MODE=0` i porównaj **deltę ostatniego klastra** (najczystszy sygnał) oraz total.
+
+Jedno zastrzeżenie metodologiczne: to jedna próbka z rozkładu o dużej wariancji (`#GAIter` jest ścieżkowo-zależny od RNG). Na „czy w ogóle pomaga/szkodzi" jeden przebieg wystarczy jako wskazówka, ale zanim cokolwiek wpiszemy do artykułu, uśrednimy kilka seedów. Na razie — czekaj i spisz obie liczby.
+
+## 🧑 Robert
+
+[BuildSeedMoves]  N=4  SEED_MODE=1  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 11     draws=206  stuck=102  dupes=93
+distinct modes contributing = 8 / 64
+mode rc0 census (moves:modes):  0:8  1:24  2:32
+accepted length histogram (moves:count):  2:11 // GACluster: 30000, Delta GACount - ok.1000,
+
+[BuildSeedMoves]  N=4  SEED_MODE=1  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 11     draws=206  stuck=102  dupes=93
+distinct modes contributing = 8 / 64
+mode rc0 census (moves:modes):  0:8  1:24  2:32
+accepted length histogram (moves:count):  2:11 // GACluster: 30000, Delta GACount - ok.1000, [BuildSeedMoves]  N=4  SEED_MODE=1  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 2     draws=52  stuck=0  dupes=50
+distinct modes contributing = 2 / 64
+mode rc0 census (moves:modes):  1:64
+accepted length histogram (moves:count):  1:2 // Delta 8000, [BuildSeedMoves]  N=4  SEED_MODE=1  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 12     draws=218  stuck=110  dupes=96
+distinct modes contributing = 11 / 64
+mode rc0 census (moves:modes):  0:8  1:24  2:32
+accepted length histogram (moves:count):  2:12 // delta 11000, [BuildSeedMoves]  N=4  SEED_MODE=1  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 124     draws=4057  stuck=3018  dupes=915
+distinct modes contributing = 16 / 64
+mode rc0 census (moves:modes):  0:4  1:20  2:24  3:16
+accepted length histogram (moves:count):  3:124 // delta 13000 Total: 43836
+
+
+## 🤖 Claude
+
+Rozczytajmy to, bo jest tu i potwierdzenie, i konkretny sygnał optymalizacyjny.
+
+## Co pokazują liczby (SEED_MODE=1, 3⁴, total 43836)
+
+| klaster | census aktywnego kubika | makro? | delta gen. |
+|---|---|---|---|
+| A | `0:8 1:24 2:32` (max rc0=2) | nie | ~1000 |
+| B | `1:64` (trywialny, rc0=1) | nie | 8000 |
+| C | `0:8 1:24 2:32` | nie | 11000 |
+| **D (narożny)** | `0:4 1:20 2:24 **3:16**` | **tak, 124× długość 3** | 13000 |
+
+**Mechanizm potwierdzony na 3⁴**: dopiero klaster D ma mody przeszacowujące (`3:16`) i tam wpadło 124 makroruchów długości 3. Reszta — płytka, mode ≡ baseline (B jest w 100% zdegenerowany).
+
+Dwa wnioski:
+1. **Dźwignia modu jest ograniczona.** Płytkie klastry (B+C = 19000 generacji) mode w ogóle nie dotyka. Nawet gdyby mode zdławił narożnik do zera, total spadłby najwyżej o ~13000/43836 ≈ 30%. Prawdziwym kosztem są płytkie klastry, a tam mode jest bezsilny z definicji.
+2. **Delta to koszt domknięcia CAŁEGO klastra** (wielu kubików), a census to snapshot jednego aktywnego kubika — dlatego delta nie koreluje z rc0 z tabelki (B trywialny, a 8000 gen.). Nie przeczytamy zysku z modu z pojedynczych delt; potrzebny **baseline**.
+
+## Sygnał optymalizacyjny — marnujemy ~¾ losowań
+
+Popatrz na klaster D: `draws=4057, stuck=3018`. Te 3018 to backtracking-DFS, które **z góry wiemy, że utkną**: mody z `rc0 < minimum` (tu `0:4` i `1:20` = 24 mody) są **dowiedlnie zawsze stuck**. A census **i tak już liczy `rc0` każdego modu**. Więc zamiast losować ze wszystkich 64 i marnować 3018 pełnych DFS-ów, możemy:
+
+- policzyć census raz (mamy go),
+- losować **tylko z modów `rc0 ≥ minimum`** (żywych) — zero jałowych DFS, chłodniejsza maszyna,
+- albo `rc0 > minimum` — **czyste makro** (do testu „tylko makroruchy").
+
+To wycina zmarnowaną robotę hosta i daje przy okazji przełącznik „macro-only". Wpiąć?
+
+## Następny krok
+
+Odpal **SEED_MODE=0** na 3⁴, spisz **total** i **deltę narożnika**. Dopiero zestawienie mode vs baseline (total + delta D) powie, czy makroruchy pomagają, czy `SEED_RATIO=100` szkodzi. Pojedyncza próbka = wskazówka; do artykułu i tak uśrednimy kilka seedów RNG.
+
+Co robimy: najpierw **filtr żywych modów** (optymalizacja + tryb macro-only), czy najpierw przebieg **baseline** do porównania?
+
+## 🧑 Robert
+
+Wszystkie pomiary były dokonane na narożnym klastrze (ostatnim), który zaczął się układać od 3000 GA, delty to offset, kiedy robiłem pomiary
+
+
+## 🤖 Claude
+
+Aha — dzięki za korektę, to zmienia odczyt. Wszystkie 4 pomiary to **ten sam narożny klaster** (start GA=3000), a „delta" to offset od startu, kiedy ręcznie odpalałeś **Seed Pool Stats**. Czyli nie cztery klastry, tylko cztery migawki jednego klastra w miarę jak się układa.
+
+## Nowy odczyt
+
+W obrębie narożnego klastra **aktywny kubik zmienia się** (kolejne kubiki się układają, re-seed), i jego głębokość skacze:
+
+| offset | census aktywnego kubika | makro? |
+|---|---|---|
+| ~1000 | `0:8 1:24 2:32` (max rc0=2) | nie |
+| 8000 | `1:64` (rc0=1, trywialny) | nie |
+| 11000 | `0:8 1:24 2:32` | nie |
+| 13000 | `0:4 1:20 2:24 **3:16**` | **tak, 124× długość 3** |
+
+Wniosek jest mocniejszy niż wcześniej: **nawet w trudnym narożnym klastrze większość aktywnych kubików jest płytka** (rc0 ≤ 2), gdzie mode ≡ baseline. Makroruchy wchodzą tylko przy sporadycznym głębokim kubiku (ta migawka z `3:16`). Czyli dźwignia modu jest **przerywana nawet tam, gdzie miała działać** — deep-kubiki to mniejszość.
+
+To dużo tłumaczy: klaster mieli ~40k generacji (3000 → 43836), a mode dorzuca makroruchy tylko w ułamku tych chwil. Trudno oczekiwać, że to zauważalnie zmieni total.
+
+## Co to znaczy dla decyzji
+
+Prawdziwy werdykt to nadal **baseline na tym samym narożnym klastrze**: `SEED_MODE=0`, spisz **GA startu narożnika** i **GA domknięcia**, i porównaj rozpiętość z tymi ~40k. Jeśli baseline domyka narożnik w podobnym czasie → mode nie szkodzi ani nie pomaga (bo działa za rzadko). Jeśli baseline wyraźnie szybciej → potwierdza się, że makroruchy (i/lub 100% seedowania na deep-kubikach) przeszkadzają.
+
+## I ta optymalizacja jest teraz jeszcze bardziej na miejscu
+
+W migawce z `3:16`: `draws=4057, stuck=3018` — 3018 jałowych backtrackingów na modach `rc0 < min` (te `0:4` + `1:20` = 24 dowiedlnie martwe). Skoro census i tak liczy `rc0` każdego modu, mogę **losować tylko z żywych** (`rc0 ≥ min`) — zero zmarnowanych DFS, chłodniejsza maszyna, a przy okazji tryb „macro-only" (`rc0 > min`) do czystego testu.
+
+Proponuję kolejność: **(1)** odpal baseline na narożniku i daj rozpiętość generacji; **(2)** ja w tym czasie wpinam filtr żywych modów. Pasuje?
+
+## 🧑 Robert
+
+Nie róbmy roboty za GA, my tylko seedujemy
+
+
+## 🤖 Claude
+
+Racja — i to dobra zasada, biorę ją do siebie. Podział pracy: **seeder dostarcza różnorodny surowiec (rozkłady układające kubik), a GA robi selekcję.** Filtrowanie do „macro-only" albo do „lepszych" modów to właśnie wchodzenie GA w paradę — seeder nie ma prawa z góry orzekać, co jest dobre. Wycofuję pomysł kuracji puli.
+
+Zapiszę to sobie na przyszłość, żeby nie wracać z takimi propozycjami:
+
+Zapisane. Seeder zostaje **płaski**: losowy mod → backtracking → dedup po stringu → wszystko do populacji. Bez filtrów, bez „macro-only". Te 3018 jałowych DFS-ów zostają — to jednorazowy koszt hosta na aktywację klastra, nie warto go rozmieniać na łamanie zasady (a jak kiedyś realnie zapiecze wydajność, to osobna rozmowa o czystej optymalizacji bez zmiany rozkładu seedów).
+
+Zostaje więc tylko empiria: przełącznik `SEED_MODE` traktujemy jako **źródło wariantów seedów do A/B**, nie jako pokrętło jakości. Makroruchy to legalny surowiec — mode po prostu wzbogaca pulę tam, gdzie kubik jest głęboki, i milczy tam, gdzie płytki. Czy zostanie domyślnie 1 czy 0, rozstrzygnie pomiar baseline na narożniku (kiedy będziesz miał chwilę), a nie nasze założenia.
+
+Nic nie wpinam. Jak zbierzesz rozpiętość generacji dla `SEED_MODE=0`, zestawimy z tymi ~40k i tyle.
+
+## 🧑 Robert
+
+Chyba przeseedowywuję, tak jak mówiłem, standard dochodzi do ostatniego clustra dużo szybciej: 7600 GA [BuildSeedMoves]  N=4  SEED_MODE=0  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 12     draws=173  stuck=0  dupes=161
+distinct modes contributing = 1 / 1
+mode rc0 census (moves:modes):  2:1
+accepted length histogram (moves:count):  2:12 // Delta: 500 [BuildSeedMoves]  N=4  SEED_MODE=0  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 11     draws=193  stuck=0  dupes=182
+distinct modes contributing = 1 / 1
+mode rc0 census (moves:modes):  2:1
+accepted length histogram (moves:count):  2:11 // Delta 1700 [BuildSeedMoves]  N=4  SEED_MODE=0  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 12     draws=159  stuck=0  dupes=147
+distinct modes contributing = 1 / 1
+mode rc0 census (moves:modes):  2:1
+accepted length histogram (moves:count):  2:12 // Delta 2500 [BuildSeedMoves]  N=4  SEED_MODE=0  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 12     draws=195  stuck=0  dupes=183
+distinct modes contributing = 1 / 1
+mode rc0 census (moves:modes):  2:1
+accepted length histogram (moves:count):  2:12 // Delta 4500 [BuildSeedMoves]  N=4  SEED_MODE=0  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 8     draws=126  stuck=0  dupes=118
+distinct modes contributing = 1 / 1
+mode rc0 census (moves:modes):  2:1
+accepted length histogram (moves:count):  2:8 // Delta 6400 [BuildSeedMoves]  N=4  SEED_MODE=0  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 2     draws=56  stuck=0  dupes=54
+distinct modes contributing = 1 / 1
+mode rc0 census (moves:modes):  1:1
+accepted length histogram (moves:count):  1:2 // delta 8400 [BuildSeedMoves]  N=4  SEED_MODE=0  stride=6  target=1024  (SEED_RATIO% of population)
+accepted = 12     draws=171  stuck=0  dupes=159
+distinct modes contributing = 1 / 1
+mode rc0 census (moves:modes):  2:1
+accepted length histogram (moves:count):  2:12 // delta 12400 Total: 23104
+
+
+## 🤖 Claude
+
+Miałeś rację — dane to potwierdzają jednoznacznie, i to Ty to przewidziałeś. Zestawmy:
+
+| | dojście do endgame | sam narożnik | total |
+|---|---|---|---|
+| **mode (1)** | ~30000 | ~13800 | 43836 |
+| **baseline (0)** | **7600** | ~15500 | **23104** |
+
+Cała różnica siedzi w **dojściu do endgame: 30000 vs 7600 (~4×)**. Sam narożnik to remis (mode nawet minimalnie szybszy, 13800 vs 15500, ale to w granicach szumu). Czyli:
+
+- **Makroruchy na najtrudniejszym klastrze ani nie pomagają, ani nie szkodzą** (remis).
+- **Cała szkoda to podatek za przeseedowanie na WCZEŚNIEJSZYCH klastrach** — tych umiarkowanie głębokich (24, 32 kubiki), gdzie mode zalewa populację makroruchami i dławi różnorodność. Płacisz ten podatek na każdym klastrze z głębokim kubikiem, i sumarycznie robi się z tego 2× wolniej.
+
+## Dlaczego akurat mode zalewa, a baseline nie
+
+To asymetria `SEED_RATIO`, nie jakość seedów. Popatrz na baseline: **każda migawka `distinct modes = 1/1`, `accepted ≤ 12`**. Baseline ma tylko garść distinct minimalnych rozkładów, więc **nigdy nie dobija do `target=1024`** — sam z siebie seeduje ~1% populacji, reszta losowa (różnorodna). Mode produkuje 100+ distinct makroruchów i **dobija target**, seedując kilkanaście–kilkadziesiąt % populacji tym samym kubikiem. Ten sam `SEED_RATIO=100` daje więc **zupełnie inny realny odsetek** seedowania dla obu — i to on, nie makroruchy same w sobie, psuje.
+
+## Wniosek
+
+`SEED_MODE=0` zostaje domyślne (już tak masz w Variables) — jest po prostu szybsze. Mode ląduje jako **wynik badawczy** (makroruchy istnieją, dają się zebrać, na najtrudniejszym klastrze są neutralne) za przełącznikiem, do artykułu — nie jako produkcyjny default.
+
+Jeśli kiedyś zechcesz sprawdzić „mode bez zalewania" — to nie kuracja jakości, tylko **objętość**: obniżyć `SEED_RATIO` przy `SEED_MODE=1` tak, żeby seedował tyle co baseline (~1%). Wtedy zobaczysz, czy neutralność na narożniku utrzyma się bez podatku na wcześniejszych klastrach. Ale to opcjonalny, osobny eksperyment — dziś nic nie wpinam, chyba że powiesz.
+
+## 🧑 Robert
+
+A powiedz, dlaczego ustawiałeś base.Transparent, a nie Transparent?
+
+
+## 🤖 Claude
+
+Dobre pytanie — i szczerze: **głównie dlatego, że tak było w oryginale** (stary getter też robił `base.Transparency = ... ; return base.Transparency;`), więc zachowałem idiom. Ale sprawdźmy, czy to w ogóle ma sens, bo za tym stoi jedna twarda rzecz (rekurencja) i jedna być może zbędna (zapis). Zobaczę definicję w klasie bazowej:
+
+Sprawdzone — w klasie bazowej to zwykłe auto-property: `public virtual float Transparency { get; set; } = 1.0f;`. To rozdziela pytanie na dwie części, i odpowiedź jest inna dla każdej:
+
+**1. `return base.Transparency` (a nie `return Transparency`) — to jest konieczne.** `Transparency` to override tylko z getterem. Gdybym w getterze napisał `return Transparency`, wywołałby **sam siebie** → nieskończona rekurencja → stack overflow. Odczyt musi iść do `base`, żeby sięgnąć pola bazowego z pominięciem override'u. To jedyny twardy powód, dla którego `base.` się tu w ogóle pojawia.
+
+**2. Przypisanie `base.Transparency = ...` — to jest natomiast zbędne** (odziedziczyłem je z oryginału, klasyczny cargo-cult). Zapisuję do pola bazowego, które **nikt z zewnątrz nie czyta** — każdy odczyt `Transparency` na `TCubie` idzie przez ten override (wirtualna dyspozycja, nawet przez referencję typu `TShape`), więc jedyny odczyt pola bazowego to następna linia `return base.Transparency`. Czyli: policz → zapisz do bazy → odczytaj z bazy → zwróć. Round-trip bez sensu; równie dobrze można policzyć i od razu zwrócić.
+
+Właściwie to getter i tak **ignoruje** cokolwiek ktoś by ustawił przez `cubie.Transparency = x` (zawsze przelicza ze `State`) — więc utrzymywanie pola bazowego „w synchronie" niczego nie daje. To wada odziedziczona, nie moja, ale skoro już patrzymy — uprościłbym do:
+
+```csharp
+public override float Transparency =>
+    State == 0 ? 1f : 1f - (float)Math.Pow(1 - BaseUnsolvedAlpha, 6.0 / Cube.Materials.Count);
+```
+
+Zachowanie identyczne (dla ułożonego 1, dla nieułożonego ta sama policzona wartość), bez dotykania bazy, bez rekurencyjnej pułapki. Podmienić na tę wersję?
+
+## 🧑 Robert
+
+ClusterStart: ok. 8000
+
+SeedRatio: 50% ClusterStart: ok. 8000 [BuildSeedMoves]  N=4  SEED_MODE=1  stride=6  target=512  (SEED_RATIO% of population)
+accepted = 512     draws=6530  stuck=105  dupes=5913
+distinct modes contributing = 36 / 64
+mode rc0 census (moves:modes):  2:42  3:18  4:2  5:2
+accepted length histogram (moves:count):  2:16  3:220  4:178  5:98 // Delta 400 [BuildSeedMoves]  N=4  SEED_MODE=1  stride=6  target=512  (SEED_RATIO% of population)
+accepted = 2     draws=51  stuck=0  dupes=49
+distinct modes contributing = 2 / 64
+mode rc0 census (moves:modes):  1:64
+accepted length histogram (moves:count):  1:2 // delta 2100 [BuildSeedMoves]  N=4  SEED_MODE=1  stride=6  target=512  (SEED_RATIO% of population)
+accepted = 12     draws=167  stuck=40  dupes=115
+distinct modes contributing = 9 / 64
+mode rc0 census (moves:modes):  0:8  1:8  2:48
+accepted length histogram (moves:count):  2:12 // delta 4300 [BuildSeedMoves]  N=4  SEED_MODE=1  stride=6  target=512  (SEED_RATIO% of population)
+accepted = 2     draws=54  stuck=0  dupes=52
+distinct modes contributing = 2 / 64
+mode rc0 census (moves:modes):  1:64
+accepted length histogram (moves:count):  1:2 // delta 6000 [BuildSeedMoves]  N=4  SEED_MODE=1  stride=6  target=512  (SEED_RATIO% of population)
+accepted = 2     draws=61  stuck=0  dupes=59
+distinct modes contributing = 2 / 64
+mode rc0 census (moves:modes):  1:64
+accepted length histogram (moves:count):  1:2 // delta 10000 Total: 19089
+
+
+## 🤖 Claude
+
+To jest przełom — i to Twoja diagnoza (przeseedowanie) się potwierdza, a przy okazji **odwraca wniosek**. Zestawmy trzy przebiegi:
+
+| konfiguracja | dojście do endgame | narożnik (span) | total |
+|---|---|---|---|
+| baseline (mode 0, ratio 100) | 7600 | ~15500 | 23104 |
+| mode 1, **ratio 100** | ~30000 | ~13800 | 43836 |
+| **mode 1, ratio 50** | **~8000** | **~11100** | **19089** |
+
+Dwie rzeczy naraz:
+
+1. **Podatek za przeseedowanie zniknął.** Dojście do endgame: 30000 → **8000**, czyli praktycznie tyle co baseline (7600). Połowa seedowania = koniec dławienia różnorodności na wcześniejszych klastrach. Dokładnie jak mówiłeś.
+2. **A makroruchy teraz realnie pomagają na narożniku.** Span narożnika: mode@50 ~11100 vs baseline ~15500 — **~28% szybciej**. Popatrz na pierwszą migawkę: kubik `rc0` do **5** (`2:42 3:18 4:2 5:2`), pula wypełniona 220×dł.3 + 178×dł.4 + 98×dł.5. Głęboki kubik, mode wstrzyknął mu prawdziwe makroruchy — i klaster domknął się szybciej.
+
+Efekt netto: **mode@50 = 19089 < baseline = 23104** (~17% szybciej **ogółem**). Czyli mode nie jest martwy — był tylko *przedawkowany*.
+
+## Ale to jeszcze nie werdykt — jest confound
+
+Zmieniłeś **dwie** rzeczy: `SEED_MODE` i `SEED_RATIO`. Żeby przypisać zysk modowi, a nie samemu obniżeniu ratio, brakuje **baseline @ ratio 50**.
+
+Moja prognoza: **baseline@50 ≈ baseline@100 (~23000)**, bo baseline i tak seeduje z niedomiarem (~12 distinct minimalnych ≪ target). Cap `SEED_RATIO` **nigdy dla baseline nie wiąże** — baseline jest niewrażliwy na ratio w tym reżimie. Jeśli to się potwierdzi, to `mode@50 = 19089` jest **realną wygraną modu**, nie artefaktem ratio.
+
+Następny przebieg: **`SEED_MODE=0`, `SEED_RATIO=50`**, spisz total. Jak wyjdzie ~23000 → mamy pierwszy twardy sygnał, że mode (przy zdrowej objętości) pomaga. Potem i tak trzeba będzie powtórzyć po kilka losowań RNG, bo pojedyncza próbka szumi — ale kierunek robi się ciekawy.
+
+## 🧑 Robert
+
+SeedMode 0, seedRatio 50%, szedł jak burza (wypłaszczył się błąd przy ok 1600) aż do momentu konieczności domknięcia przedostatniego klastra (18370). Total: 36006
+
+
+## 🤖 Claude
+
+Ten przebieg jest cenniejszy, niż wygląda — tylko **nie jako pomiar baseline, lecz jako pomiar wariancji**. I wywraca metodologię.
+
+## Kluczowa obserwacja: baseline@50 i baseline@100 to **ten sam eksperyment**
+
+Baseline (mode 0) produkuje tylko ~12 distinct minimalnych rozkładów. Cap `target` to 512 (ratio 50) albo 1024 (ratio 100) — **oba ≫ 12**, więc pętla i tak nasyca się na ~12 seedach, **nigdy nie dobijając targetu**. Czyli bufor seedów jest **identyczny** przy ratio 50 i 100. To potwierdza moją prognozę: **baseline jest niewrażliwy na `SEED_RATIO`**.
+
+A skoro to funkcjonalnie ta sama konfiguracja, to:
+
+```
+baseline@100 = 23104
+baseline@50  = 36006     ← ta sama konfiguracja seedowania!
+```
+
+**Różnica 13000 (~56% rozrzutu) to CZYSTY szum RNG.** Nie zmieniłeś nic, co dociera do populacji — tylko strumień losowy poszedł inną ścieżką. Endgame (te ostatnie klastry, gdzie „konieczność domknięcia przedostatniego" bogła Cię przy 18370) ma ogromną wariancję w tym, ile generacji GA szuka rozwiązania.
+
+## Konsekwencja: nasze porównania z n=1 są bezwartościowe
+
+Mamy teraz **dwie próbki tej samej baseline: 23104 i 36006** → średnia ~29500, rozrzut 13000. To jest nasz szum. A my próbowaliśmy nim mierzyć różnice rzędu kilku tysięcy. `mode@50 = 19089` leży **poniżej obu** próbek baseline — miło, ale to nadal n=1, może być szczęśliwy dolny loss.
+
+## Co JEST twarde mimo szumu
+
+Jedno przetrwa wariancję, bo skala za duża: **mode@100 vs mode@50 = 43836 vs 19089 (2.3×)**. Tego nie wytłumaczysz szumem — **podatek za przeseedowanie jest realny**. Twoja diagnoza trzyma się mocno. Reszta (czy mode@50 bije baseline) tonie w szumie.
+
+## Plan, żeby cokolwiek orzec
+
+Trzeba **replikacji**: po kilka (5–10) przebiegów na konfigurację, porównać **mediany/rozkłady**, nie pojedyncze liczby. Dwie opcje:
+
+1. Ręcznie odpalasz N razy każdą konfigurację — żmudne, ale zero kodu.
+2. Dodam **tryb batch**: pętla po `runs × config`, każdy z innym seedem RNG, log `{config, seed, totalGA}` do pliku — potem policzymy mediany. To jest pomiar, nie kuracja seedów, więc nie łamie zasady.
+
+Biorąc pod uwagę wariancję (~±25%), bez batcha będziemy zgadywać. Chcesz, żebym wpiął batch (headless pętla GA + CSV), czy wolisz na razie ręcznie kilka razy mode@50 i zobaczyć, czy trzyma się ~19k?
+
+## 🧑 Robert
+
+Powinieneś znać kilka algorytmów układania zwykłej kostki Rubika. jedna z popularnych metod również kończy się układaniem ostatniego kastra - narożników. Ostatni klaster układa się kubik po kubiku układając każdy taką samą sekwencją makroruchów złożonych z naprzemiennych obrotów w dwóch płaszczyznach aż do ułożenia kubika, nie przejmując się stanem kostki, potem setup - przesunięcie następnego kubika i znowu te same makroruchy. To znamienne, że próbujemy robić podonie, nie sądzisz?
+
+
+## 🤖 Claude
+
+Bardzo trafne — i to nie jest luźna analogia, tylko dokładnie ta sama algebra. Popatrz.
+
+## To, co opisujesz, to metoda dla początkujących na ostatnią warstwę narożników
+
+Trzymasz kostkę, powtarzasz `R' D' R D` przy narożniku w ustalonym rogu, aż ten róg się zorientuje — reszta góry wygląda w międzyczasie na rozwaloną, ale **sama się zrasta** (bo sekwencja ma rząd 6 i wraca do identyczności), potem `U` (setup) sprowadza następny narożnik w to samo miejsce i **znowu ta sama sekwencja**. Nie przejmujesz się stanem kostki w trakcie — dokładnie jak mówisz.
+
+I teraz sedno: **`R' D' R D` to `[R', D']` — komutator.** „Naprzemienne obroty w dwóch płaszczyznach" to nie przypadek estetyczny, to definicja komutatora `A B A⁻¹ B⁻¹`. A komutator ma **mały nośnik** — rusza garstkę kubików, resztę zostawia. To dlatego się „zrasta".
+
+## Dlaczego nasze podejście na to wychodzi
+
+Nasze makroruchy z mixed-Givens to **lewe obroty naprzemiennie w różnych płaszczyznach**, a solver idzie **kubik po kubiku, ignorując collateral** — jeden do jednego z metodą ludzką. Nie „przypominamy" jej przez przypadek; struktura Givensów *wymusza* naprzemienność płaszczyzn, więc siłą rzeczy generujemy materiał komutatoro-podobny. To zresztą domyka naszą wcześniejszą rozmowę o komutatorach na endgame — teraz widać, że makroruchy i komutatory to ta sama rzecz oglądana z dwóch stron.
+
+## Ale — i to jest cenne — czego nam brakuje względem człowieka
+
+Człowiek ma **jeden** komutator i **konjugację przez setup**: `S · M · S⁻¹` przenosi *efekt* `M` w dowolne miejsce. Znajdujesz makroruch dla narożnika w kanonicznym rogu **raz**, a potem tanim setupem (`U`) sprowadzasz każdy kolejny w to miejsce. To jest **deterministyczne i liniowe** względem liczby kubików.
+
+My robimy odwrotnie: **dla każdego kubika szukamy świeżego makroruchu od zera** i liczymy, że GA to poskłada. Stąd cały ból — ostatni klaster to właśnie ten, gdzie ślepe przeszukiwanie GA ma monstrualną wariancję (widzieliśmy 23k vs 36k na *tej samej* konfiguracji). **Człowiek tam nie szuka — on stosuje strukturę.** My rozkopaliśmy składnik (makroruch), ale nie eksploatujemy mechanizmu (konjugacja setupem).
+
+## Pytanie kierunkowe
+
+To sugeruje, że **ostatni klaster może w ogóle nie być zadaniem dla GA.** Zamiast seedować losowe makroruchy i szukać, można by:
+
+1. znaleźć **jeden** komutator orientujący/cyklujący narożnik w pozycji kanonicznej (nasz greedy to potrafi),
+2. **konjugować go setupem** dla każdego kolejnego — deterministycznie, bez przeszukiwania.
+
+To byłby prawdziwy krok algorytmiczny (i osobny od „seedujemy, nie kuracja" — bo to nie kuracja seedów, tylko *inny solver* na ostatni klaster). Ale zanim cokolwiek — czy to jest kierunek, w którym chcesz iść (setup+komutator jako dedykowana końcówka), czy na razie zostajemy przy GA i traktujemy tę analogię jako potwierdzenie, że makroruchy to właściwy materiał?
+
+## 🧑 Robert
+
+SeedRatio 0% 57734 GA
+
+
+## 🤖 Claude
+
+To domyka obraz — i to pięknie. `SEED_RATIO=0` (zero seedów, czysto losowa populacja) = **57734, zdecydowanie najgorszy wynik ze wszystkich.** Przy `ratio=0` mode nie ma znaczenia (target=0, brak seedów), więc to wspólna **podłoga** obu trybów.
+
+## Zbierzmy krzywą (3⁴, wszystko n=1)
+
+| seedowanie | total GA |
+|---|---|
+| **0% (brak seedów)** | **57734** ← podłoga |
+| baseline (~12 minimalnych, jego naturalny sufit) | 23104 / 36006 |
+| **mode @ ratio 50 (512 makroruchów)** | **19089** ← najlepszy |
+| mode @ ratio 100 (do 1024 makroruchów) | 43836 |
+
+## Dwa wnioski, które przebijają szum
+
+1. **Seedowanie realnie i mocno pomaga.** 57734 vs ~19–36k — przepaść dużo większa niż nasza wariancja (~±30%). Więc mimo n=1 to jest twarde: **surowiec startowy ratuje GA.** Cały wysiłek miał sens.
+
+2. **To U-krzywa — jest słodki punkt objętości.** Dla mode: `0 seedów → 57k` (za mało, brak eksploatacji) → `512 → 19k` (optimum) → `1024 → 44k` (za dużo, monokultura, zabita eksploracja). Klasyczny trade-off **eksploatacja vs eksploracja**: seedy dają dobre punkty startowe, ale za dużo identycznych zabija różnorodność.
+
+## I to elegancko tłumaczy rolę mode vs baseline
+
+- **Baseline** ma tylko ~12 distinct minimalnych → **nie umie dobić do wysokiej objętości**, siedzi w reżimie „mało, ale niezero" (~23–36k). Nigdy nie przeseedowuje, ale i nigdy nie eksploatuje pełni.
+- **Mode** produkuje setki distinct makroruchów → **umie wykręcić objętość aż do słodkiego punktu** (i dalej, w przeseedowanie). Czyli `SEED_RATIO` staje się **realnym pokrętłem** dopiero z mode — baseline go ignoruje (bo i tak nie dobija targetu).
+
+To jest ładna narracja do artykułu: *seedowanie ma optimum objętości; mode daje potężne makro-seedy, którymi można dokręcić populację do tego optimum, podczas gdy baseline utyka w niedoborze.* A `mode@50 = 19089` jako najniższy punkt jest z tym spójny.
+
+## Zastrzeżenie (to samo co zawsze)
+
+Podłoga (0%) i przeseedowanie (mode@100) są **poza szumem** — pewne. Ale dno U-krzywej (czy `mode@50` naprawdę bije baseline, i gdzie dokładnie leży optimum) **tonie w wariancji** — 19089 vs 23–36k mieści się w rozrzucie. Żeby narysować krzywą z błędami i wskazać optimum, trzeba **replikacji** (kilka seedów RNG na punkt).
+
+Masz teraz naturalny eksperyment: **sweep `SEED_RATIO` (0/25/50/75/100) × {mode0, mode1}, po kilka powtórzeń**, i mediany. To już woła o batch — inaczej te słupki będą tańczyć. Wpiąć headless pętlę GA z logiem CSV `{mode, ratio, seed, totalGA}`, żebyś dostał krzywą, a nie pojedyncze strzały?
+
+## 🧑 Robert
+
+SeedMode 1 SeedRatio 10% cluster 4: 11100, cluster 5(Total): 26284. Poszukam sweet pointu gdzieś koło 75%, może wokół niego bedzie trochę szybciej, to wtedy zbadam wariancję
+
+
+## 🤖 Claude
+
+Dorzućmy punkt: **mode1 @ 10% = 26284.** Krzywa dla mode1:
+
+```
+ratio:   0%      10%     50%      100%
+total: 57734 → 26284 → 19089 → 43836
+        └floor┘  └───── dno ─────┘  └przeseed┘
+```
+
+Kształt U potwierdzony **grubo**: końce wysokie (0% i 100%), środek niski. Ale muszę Cię zatrzymać przy dwóch rzeczach.
+
+## 75% jest prawdopodobnie po złej stronie dna
+
+Popatrz na kierunki: `50% → 100%` rośnie (19k → 44k). Czyli **za 50% krzywa już się wspina** ku przeseedowaniu. `75%` leży **na tym rosnącym zboczu**, między najlepszym (50%) a złym (100%) — więc raczej będzie **wolniej niż 50%, nie szybciej.** Logika to potwierdza: mode ma *potężne* seedy (makroruchy), więc optimum siedzi przy **niskiej** objętości. Jak już szukać dna, to **w dół od 50%** (25%, 35%), nie w górę do 75%.
+
+## Ważniejsze: dna NIE da się znaleźć pojedynczymi strzałami
+
+Twój plan jest odwrócony — „najpierw sweet point, potem wariancja". Ale zobacz: `10% = 26284` vs `50% = 19089` to różnica ~37%, a nasz zmierzony szum to **±30%** (baseline wahał się 23k↔36k na *identycznej* konfiguracji). Czyli **10% i 50% są statystycznie nierozróżnialne** — a 75% dołoży kolejny zaszumiony punkt, który niczego nie rozstrzygnie.
+
+**Wariancja nie jest krokiem po znalezieniu dna — jest warunkiem, żeby dno w ogóle zobaczyć.** Pewne są tylko skrajności (0% i 100% wystają ponad szum). Środek — całe interesujące nas dno — tonie w nim. Pojedynczym przebiegiem przy 75% zmierzysz los, nie ratio.
+
+## Propozycja
+
+Odwróćmy kolejność: **replikacja od razu.** Wybierz 3 ratia bracketujące dno (np. 25 / 50 / 75), każde ×5–10 z różnym seedem RNG, porównaj **mediany**. Inaczej te słupki będą tańczyć i przy każdym uruchomieniu „sweet point" wypadnie gdzie indziej.
+
+To woła o batch. Mam wpiąć **headless pętlę**: dla listy `(mode, ratio)` odpal GA N razy, każdy z innym seedem, dopisz `{mode, ratio, seed, totalGA, perClusterGA}` do CSV? Wtedy w pół godziny masz krzywą z błędami zamiast tygodnia ręcznego klikania w szum. Powiedz tylko, skąd wziąć seed RNG (jest gdzieś `TChromosome.Rnd = new Random(seed)`, czy losowany bezźródłowo?) — muszę go móc ustawiać, żeby powtórzenia były niezależne, ale konfiguracje porównywalne.
+
+## 🧑 Robert
+
+Batch przegrzeje mi sprzęt. Poza tym nie sądzę, żebyśmy wyciągnęli jakieś daleko idące wnioski poza: działa, ale słabo. Dopóki nie będzie szybciej działać nie ma co uruchamiać wielkich eksperymentów. Trzeba zastanowić się jeszcze teoretycznie nad możliwością poprawy - istnieje wiele kierunków, nie tylko seedowanie, jest funkcja oceny, mutacja, inne parametry - jak STALL, wielkość populacji. Z batchem zdążymy, nie mówię nie, pobawmy się jeszcze w zgadywanie. Projekt kostki nie ma tak na prawdę za wszelką cenę ją ułożyć - wiem jak wygląda ułożona kostka. NIe chcę traktować ostatnich clusterów specjalnie. Nawet niechętnie patrzę na możliwość łączenia GA z innymi podejściami. Dla wariantu 3D traktuję go jako światlny przykład dla studentów. Dla N > 4 jak gimnastykę wyobraźni
+
+
+## 🤖 Claude
+
+Rozumiem — i to jest ważne przestawienie, które zapisuję, bo zmienia sens słowa „poprawa". Cel to nie solver za wszelką cenę, tylko **czysty, jednorodny GA** jako obiekt intelektualny/dydaktyczny: 3D — światły przykład dla studentów, N>4 — gimnastyka wyobraźni. Bez traktowania endgame'u specjalnie, bez hybryd z klasycznymi metodami. Poprawy mają płynąć z **wnętrza GA**. Wycofuję więc wątek setup+komutator — był ciekawy teoretycznie, ale idzie pod prąd projektu.
+
+Teraz do rdzenia — czysto teoretycznie, „działa ale słabo". Chcę zaproponować jedną ramę, bo myślę, że ona porządkuje wszystkie Twoje kierunki (ocena, mutacja, STALL, populacja).
+
+## Dlaczego jest wolno: endgame to **zwodniczy krajobraz** (deceptive landscape)
+
+To nie jest specjalna cecha ostatnich klastrów — to **jednorodna** własność krajobrazu fitness, która się *zaostrza*, gdy zostaje mało nieułożonych kubików. Fitness jest monotoniczny w „sumarycznej rozłożoności" klastra (moves-to-solve + L1). A ostatnie kubiki układa się **komutatorami**, które z definicji **najpierw psują** (ruszają 3 kubiki, żeby naprawić 1). Czyli droga do rozwiązania **prowadzi w dół fitnessu, zanim pójdzie w górę.**
+
+GA to populacyjne wspinanie się. Może przeskoczyć dolinę tylko, jeśli **jakiś osobnik wyląduje po drugiej stronie** — ale selekcja **nie utrzymuje** osobników w połowie doliny (są chwilowo gorsze), więc częściowy postęp ku komutatorowi jest kasowany. To klasyczny **problem oszukańczego/building-block** krajobrazu. Stąd: potrzebny jest **cały** komutator naraz (setup+makro+undo — długi, konkretny ciąg), a fitness nie daje kredytu za zbliżanie się do niego. Dlatego endgame to loteria z ogromną wariancją, którą widzieliśmy.
+
+To jest, moim zdaniem, **prawdziwy** powód, a seedowanie to tylko dostarczanie klocków (cubie-solverów), z których crossover *może* złożyć komutator — rzadko, bo dolina nie chroni półproduktów.
+
+## Jak Twoje dźwignie mapują się na ten jeden problem
+
+| dźwignia | co robi wobec doliny |
+|---|---|
+| **ocena** | tu mieszka zwodniczość. Jeśli fitness dałby *kredyt za strukturę* (bliskość komutatora), selekcja utrzymałaby półprodukty. Trudne generycznie — ale to serce sprawy |
+| **różnorodność** (populacja, kara za unikalność, objętość seedów) | pozwala szczęśliwym „przeskakiwaczom doliny" przeżyć. Przeseedowanie ją zabiło (widzieliśmy) — to był objaw, nie choroba |
+| **mutacja** | wielkość „skoku". Dziś mutacja re-wstrzykuje *solvery* (eksploatacja). Skok na drugą stronę doliny wymaga eksploracji — np. ruchów *psujących* w kontrolowany sposób |
+| **STALL / restart** | gdy populacja zbiegnie do lokalnego optimum (dolina nieprzekroczona), wstrzyknięcie różnorodności / restart wybija ją z pułapki |
+
+## Moja teza (do obalania)
+
+Największa dźwignia to **nie seedowanie ani parametry, tylko utrzymanie różnorodności wobec zwodniczości** — bo to ona decyduje, czy loteria endgame'u ma dość „biletów". Dwa kierunki najbardziej w duchu czystego GA:
+
+1. **Presja różnorodności w selekcji** (fitness sharing / nagroda za nowość genotypu obok fitnessu) — wprost adresuje „selekcja kasuje półprodukty w dolinie". To wciąż czysty, jednorodny GA, tylko inna presja selekcyjna.
+2. **Mutacja eksploracyjna** — obok re-wstrzykiwania solverów, czasem perturbacja, która *nie* poprawia fitnessu (krok w dolinę), żeby dać crossoverowi materiał po drugiej stronie.
+
+Ocena jest najgłębsza, ale i najtrudniejsza (jak generycznie ocenić „bliskość komutatora" bez wiedzy o kostce?). STALL/populacja to tanie strojenie, ale drugorzędne wobec zwodniczości.
+
+Który wątek rozkminiamy najpierw? Ja bym zaczął od **(1) różnorodności w selekcji** — bo najcelniej trafia w zdiagnozowany mechanizm i jest najbardziej „ewolucyjny". Ale może Ty widzisz to inaczej — w końcu to Twój krajobraz.
+
+## 🧑 Robert
+
+Osobiście najbardziej ciekawią mnie dwie rzeczy: udoskonalenie algorytmu greedy - bo moim zdaniem jest jeszcze na to miejsce, a obok no-opów to chyba największe odkrycie  - oraz funkcja oceny. Wiele razy próbowałem uwzględniać w ocenie histogramy powtarzania się wsp. kubików aktywnych tak, by nagradzać układy o wspólnych współrzędnych wzgl, rozproszonych, ale nie udało mi się tego dobrze sformalizować. Aktualna funkcja zachowuje się dobrze w tym sensie, że prowadzi do znanego stanu - stanu wymagającego makroruchów - bo tylko parę kubików jest nieułożonych w klastrze. Dla 75 % ukończył w 22934 GA. Puszczę 30%.
+
+
+## 🤖 Claude
+
+Świetnie — i te dwie rzeczy to moim zdaniem **dwie strony tej samej monety**: greedy *generuje* ruch przez dolinę (makroruch), a ocena powinna *nagradzać bycie blisko* przejścia. Jak jedno drugiemu nie pomaga, endgame jest loterią. Dane na marginesie: `75% = 22934` — czyli `10:26k, 50:19k, 75:23k, 100:44k`, dno faktycznie koło 50%, 75% już na zboczu w górę. Zgodne z przewidywaniem, ale i tak w szumie.
+
+## Funkcja oceny — dlaczego Twój histogram nie chciał się sformalizować
+
+Twoja intuicja jest **dokładnie trafna** i celuje w rdzeń: to próba dodania **gradientu w dolinie endgame'u** przez nagradzanie *struktury* residuum (nieułożonej reszty), a nie tylko liczby nieułożonych. To najgłębsza dźwignia oceny.
+
+Podejrzewam, że nie dawało się sformalizować z jednego powodu: **„rozproszenie współrzędnych" to stratny proxy dla prawdziwego celu — „układ osiągalny makroruchem".** A ten cel jest *zależny od ruchu* (od tego, jaki komutator/setup masz na podorędziu), nie od samej geometrii. Skutek: minimalizacja rozproszenia potrafi **stworzyć nową pułapkę** — residuum ściśnięte w jedną warstwę, ale wcale nie makro-rozwiązywalne. Nagroda ciągnie w miejsce, które wygląda dobrze, a nie jest. Stąd „nie udało się dobrze".
+
+Trzy sposoby, żeby to okiełznać — od najtańszego:
+
+1. **Tylko drugorzędny tie-break (małe λ).** Nagroda za koncentrację *nigdy* nie przebija właściwego celu (moves-to-solve), tylko rozstrzyga remisy między układami o tej samej liczbie nieułożonych. To samo z siebie tnie ryzyko „nowej pułapki", bo term działa dopiero gdy reszta jest równa — czyli **naturalnie tylko w endgame** (gdy zostaje parę kubików). Jednorodnie liczony, ale gryzie tylko na końcu — bez specjalnego traktowania klastra.
+
+2. **Per-oś koncentracja zamiast „rozproszenia" ogólnie.** Dla każdej osi `d` histogram współrzędnej `d` po nieułożonych kubikach; nagradzaj **niską entropię** (albo małą liczbę distinct wartości) — czyli „leżą w tej samej warstwie względem osi `d`". To jest tanie i **policzalne na GPU** z per-cubie stanu (redukcja po kubikach), więc przejdzie przez Twój evaluator. To najbliżej Twojego oryginalnego pomysłu, tylko z jawnym „per oś + entropia".
+
+3. **(Zamiast zgadywać wzór) — „sprzężenie".** Nagradzaj, gdy **jeden ruch popycha ≥2 nieułożone kubiki naraz** (bo dzielą warstwę). To mierzy makro-osiągalność *wprost*, bez zgadywania kształtu. Teoretycznie najczystsze — ale **drogie** (ruchy × kubiki na osobnika na generację), pewnie za ciężkie na shader. Wspominam, bo to jest to, co proxy z p.2 próbuje przybliżyć.
+
+Moja rada: **p.2 jako mały tie-break**. Tani, GPU-friendly, jednorodny, a strukturalnie robi to, o co Ci chodziło — z zastrzeżeniem, że to proxy, więc λ ma być małe.
+
+## Greedy — gdzie widzę miejsce (bez łamania „seeder tylko seeduje")
+
+Poprawa greedy = **bogatsza generacja**, nie kuracja. Trzy nietknięte kierunki:
+
+- **nad-R (prawostronne / konjugacja)** — jedyna nieprzebadana oś. Right-multiply to dosłownie struktura *setupu* (`S M S⁻¹`), więc może dać rodzinę makroruchów o innym collateralu. Jako *materiał* dla GA to legalne (GA wybiera), choć trzeba uważać, żeby nie wsunąć tym tylnymi drzwiami „komutatorowego solvera".
+- **Greedy nie-zachłanny** — dziś każdy krok obniża miarę o 1. Dopuszczenie *chwilowego* wzrostu miary (mini-dolina wewnątrz greedy) dałoby jeszcze dłuższe, bardziej różnorodne makroruchy. Drogie, ale to czysto generatywne wzbogacenie.
+- **mode × order** — mierzyliśmy je w większości osobno; interakcja może dać więcej niż suma.
+
+Ale szczerze: **ocena jest ciekawsza**, bo greedy już masz mocny, a ocena to miejsce, gdzie jedna dobra formuła zmienia *cały* endgame. I to ją próbowałeś ugryźć wielokrotnie — warto ją domknąć.
+
+Od czego zaczynamy myśleć na serio — od sformalizowania **per-oś entropii jako tie-break** (mogę rozpisać dokładny wzór i jak wpiąć w istniejący `score` bez psucia dominacji moves-to-solve), czy wolisz najpierw pociągnąć **nad-R** w greedy?
+
+## 🧑 Robert
+
+Przede wszystkim doprecyzowanie, bo już wcześniej mówiłeś o 3 możliwościach i pokazywałeś tabelę: pod-left, nad-left i nad-right. Oczywiście jest też nad-left. Kierunek "pod" niczym nie góruje nad "nad". Możliwości są 4, tyle, że wydawało mi się, że prawe odrzucamy jako nierealizowalne jako ruchy kostki, ale być może masz rację. Przychodzi mi na myśl ciągle ten obraz z mnożeniem macierzy M z lewej i prawej strony. Po uzyskaniu z M identity dostajemy rokład macierzyM, bo: np. R2R1R0MR3R4 = I, więc M =R0'R1'R2'R4'R3', który możemy uzyskać w wyniku obrotów z lewej strony (lub prawej gdyby to były ruchy kostki)
+
+
+## 🤖 Claude
+
+Masz rację i chętnie to prostuję — **cztery, nie trzy**, i „prawe" nie są nierealizowalne. To ja wcześniej odrzuciłem prawe za szybko. Przejdźmy Twoją algebrą, bo ona to rozstrzyga w pełni.
+
+## Prawe redukcje są realizowalne — dowód Twoim przykładem
+
+Redukcja miesza lewe i prawe Givensy:
+```
+L · M · R = I      (L = lewe/wierszowe, R = prawe/kolumnowe)
+```
+Twój przypadek: `R2 R1 R0 · M · R3 R4 = I`. Rozwiązując na M:
+```
+M = R0' R1' R2' · R4' R3'
+```
+— zgadza się co do joty. A **ciąg układający** to `M⁻¹`:
+```
+S = M⁻¹ = R3 R4 · R2 R1 R0
+```
+i teraz sedno: **`S` jest iloczynem Givensów, więc każdy czynnik to ćwierćobrót ściany — cały `S` wykonujesz jako mnożenia z LEWEJ (realne ruchy kostki).** Czynniki `R3, R4`, które w *analizie* były prawostronne, w *sekwencji* `M⁻¹` stają się zwykłymi lewymi ruchami. „Prawe" żyje tylko w **rozkładzie**, nie w wykonaniu. Mój wcześniejszy argument („prawe = konjugacja = nie-ruch") mylił *narzędzie analizy* z *ruchem* — dokładnie ta sama pomyłka, którą razem prostowaliśmy przy pod/nad. Przepraszam, tym razem ja się złapałem.
+
+I tak — „pod" nie góruje nad „nad", a teraz widać, że i lewe nie górują nad prawymi. **Pełna przestrzeń to 4 strategie na płaszczyznę: {pod, nad} × {L, R}.**
+
+## Konsekwencja: przestrzeń modów rośnie z 2^P do 4^P
+
+Prawa redukcja zeruje element **operacją kolumnową** (`RotatePost`), lewa — wierszową. To inne ścieżki rozkładu tej samej `M` → inne faktoryzacje `M⁻¹` → **inne sekwencje układające o innym collateralu → nowe makroruchy.** Dla N=4 to skok 64 → **4096** modów. Metryka dalej sensowna: `RotCountMode(I)=0` dla każdej strategii (kolumnowy Givens też jest 90°-krotny na permutacji znakowej), więc greedy prowadzi się tak samo, wykonując wyłącznie lewe ruchy. To czysta **wzbogacona generacja** — w granicach „seeder tylko seeduje".
+
+## Ale — uczciwa czerwona flaga, zanim się ucieszymy
+
+Pamiętasz, że oś **`reversed` (transpozycja) wyszła martwa (+0%)**? A prawa redukcja jest **transpozycji bliska**: operacja kolumnowa na `M` = operacja wierszowa na `Mᵀ`. Więc istnieje ryzyko, że prawe strategie **częściowo zwiną się z powrotem na lewe** i te 4^P okaże się dużo mniejsze w praktyce.
+
+Kontrargument (dlaczego warto mimo to sprawdzić): `reversed` to **jednorodna** transpozycja *wszystkiego*, a tu mamy **mieszanie per płaszczyzna** (pod-L na jednej, nad-R na drugiej…) — to ściśle bogatsze niż uniform-transpose. Więc `reversed=0%` nie przesądza, tylko ostrzega.
+
+## Propozycja: najpierw zmierzyć, jak przy mode
+
+Maszyneria już jest — `TGreedyDiversity.RotCount` ma `reversed` i `mode`. Rozszerzę ją o **drugi bit strategii per płaszczyzna** (L/R przez `RotatePost`), policzę **distinct macroruchów dla 4^P vs 2^P** i zobaczymy czarno na białym, czy prawe realnie dokładają, czy zwijają się jak `reversed`. Dopiero jeśli dokładają — wpinamy do produkcyjnego greedy (dokładnie tak, jak zwalidowaliśmy mode).
+
+Rozszerzyć diagnostykę o oś L/R i zmierzyć, czy 4^P to prawdziwe wzbogacenie, czy iluzja transpozycji?
+
+## 🧑 Robert
+
+Jestem szczęśliwy, nawet jak nic z tego nie wyjdzie. Pięknie wyłożone. Pamiętaj, że z prawej strony sinus ze znakiem +! trzymam kciuki za test
+
+
+## 🤖 Claude
+
+Cieszę się razem z Tobą — i to jest najlepszy rodzaj roboty: taki, gdzie sam proces jest nagrodą. Notuję Twoją wskazówkę: **prawa strona → `sin` ze znakiem `+`** (lewa woła `Rotate(...,cos,-sin)`, prawa zawoła `RotatePost(...,cos,+sin)`). To zresztą spina się z wyprowadzeniem — zaraz je sprawdzę na kodzie.
+
+Rozszerzę diagnostykę o oś L/R i zmierzę 4^P vs 2^P. Najpierw doczytam dokładny kształt `AllGreedy`/`Run`, żeby przewlec `sideMask` czysto:
+
+Mam kształt. Zanim wpnę `sideMask`, muszę zobaczyć **wszystkie** miejsca, gdzie `modeMask`/`modeCount` są używane (żeby zmiana semantyki na 4-arną nie popsuła `Verify` ani innych):
+
+All call sites mapped. I'll pack the L/R choice as a second bit per plane into `modeMask` (base-4: 0=pod-L, 1=nad-L, 2=pod-R, 3=nad-R) — no signature churn, `modeMask=0` still baseline. Let me verify my sign derivation once here before coding:
+
+- **pod-R** (zero sub-diag `[a2,a1]` via column op): `RotatePost` gives `A[a2,a1] → cos·A[a2,a1] + sin·A[a2,a2]`; with `a=A[a2,a2], b=-A[a2,a1]` → zero ✓
+- **nad-R** (zero super-diag `[a1,a2]`): `A[a1,a2] → -sin·A[a1,a1] + cos·A[a1,a2]`; with `a=A[a1,a1], b=A[a1,a2]` → zero ✓
+
+Both zero their target with `RotatePost(...,cos,+sin)` — Twój znak `+` się zgadza. Wpinam:
+
+Now `Run` — thread the left-only sweep through `SpreadLeft`, add the full 4^P union, and report the delta. First the accumulators:
+
+Now the report block — add the 4^P line, the delta over left-only, the header, and the histogram column:
+
+Finally, keep `Verify`'s mode sweep left-only (unchanged meaning) under the new base-4 encoding:
+
+Wpięte. Zweryfikuję, że się kompiluje (jeśli apka odpalona, zobaczę tylko blokadę `.exe`, a błędy CS i tak wyskoczą wcześniej):
+
+Kompiluje się czysto (0 błędów). Gotowe do testu.
+
+## Co masz teraz
+
+**Menu `File → Greedy Diversity`** liczy teraz pełną przestrzeń `4^P` obok starej `2^P`. Kluczowe linie w raporcie:
+
+```
++ mixed reduction (mode, pod/nad-L) : ....   (+XX.X%)          ← lewe (jak dotąd)
++ adding right ops (mode, 4^P L/R)  : ....   (+YY.Y% vs base, +ZZ.Z% vs mode-L)
+```
+
+**To `ZZ.Z% vs mode-L` jest odpowiedzią** na Twoje pytanie: ile prawe strategie dokładają *ponad* lewe. Plus histogram dostał kolumnę `modeLR` — zobaczysz, czy prawe generują makroruchy innych długości.
+
+Scenariusze:
+- `+ZZ% vs mode-L` **istotne** → prawe realnie wzbogacają, `4^P` to nie iluzja transpozycji → warto wpiąć do produkcyjnego greedy.
+- `+ZZ% ≈ 0` → prawe zwijają się na lewe (jak martwy `reversed`), i mamy czystą odpowiedź „nie".
+
+## Uwaga wydajnościowa — testuj najpierw N=3
+
+`4^P` to dla N=3 tylko 64 kombinacje (×24 orientacje = szybko), ale dla N=4 to **4096** (×192 = ~786k wywołań DFS). Memoizacja pomaga, ale i tak może chwilę zmielić. **Odpal Greedy Diversity przy N=3**, wklej raport — jeśli prawe dokładają, wtedy puścimy N=4 na potwierdzenie.
+
+## Co zrobiłem (dla pewności)
+
+- `RotCount`: strategia 2 bity/płaszczyzna w `modeMask` (base-4): `0=pod-L, 1=nad-L, 2=pod-R, 3=nad-R`. Prawe przez `RotatePost(...,cos,+sin)` — Twój znak `+`, wyprowadzenie zweryfikowane (oba zerują swój element).
+- `Run`: lewe `2^P` (przez `SpreadLeft`, identyczne ze starym) + pełne `4^P`, z deltą.
+- `Verify` zostawiłem left-only (bez zmiany znaczenia).
+- Diagnostyka trzyma solve-check w `Dfs` (`OrthoPack==identity`), więc **gdybym pomylił znak, prawe sekwencje po prostu nie przejdą** jako rozwiązujące — masz wbudowany bezpiecznik na moją algebrę.
+
+Puść N=3 i wklej — zobaczymy, czy prawa strona żyje.
+
+## 🧑 Robert
+
+30% - 38076 GA. Greedy decomposition diversity  (N = 3, Size = 3)
+  cubie orientations (rotation group) : 24
+  axis permutations (N!)              : 6
+  valid plane orders                  : 2
+  reduction modes (2^P, pod/nad-L)    : 8
+  reduction strategies (4^P, +L/R)    : 64
+
+  baseline (standard QR)              : 56   (avg 2,33 / orientation)
+
+  each axis alone (vs baseline):
+  + axis permutations (perm)          : 64   (+14,3%)
+  + plane order (order)               : 62   (+10,7%)
+  + transposition (reversed)          : 56   (+0,0%)
+  + mixed reduction (mode, pod/nad-L) : 77   (+37,5%)
+  + adding right ops (mode, 4^P L/R)  : 85   (+51,8% vs base, +10,4% vs mode-L)
+
+  combined (union of the four axes)   : 87   (+55,4%)
+  orientations where any axis adds    : 7 / 24
+  example only reachable off-baseline : p1a2s0 p2a2s0
+
+  manoeuvres by length  (baseline count, then EXTRA vs baseline per axis):
+    length  baseline    perm   order  reversd    mode   modeLR
+         0         1       0       0        0       0        0
+         1         9       0       0        0       0        0
+         2        46       8       6        0       6        6
+         3         0       0       0        0      15       23
+
+
+## 🤖 Claude
+
+Twoja algebra się broni — i to z wbudowanym dowodem. Popatrz na histogram, bo tam jest cała odpowiedź:
+
+```
+length  baseline   mode   modeLR
+  2       46         6       6        ← prawe NIC nie dokładają do minimalnych
+  3        0        15      23        ← prawe: +8 makroruchów (15 → 23, +53%)
+```
+
+**Prawe strategie żyją.** Dokładają wyłącznie na **długości 3** (makroruchy) — +8 nowych, czyli **+53% więcej makroruchów** niż samo lewe. I to jest kluczowe: te +8 to **zweryfikowane solvery** (Dfs liczy tylko ścieżki z `OrthoPack==identity`), więc Twój znak `+sin` i całe wyprowadzenie są poprawne — prawa redukcja realnie daje realne ruchy kostki, dokładnie jak twierdziłeś.
+
+Podsumowanie osi (N=3):
+
+| oś | zysk vs baseline |
+|---|---|
+| reversed | **+0,0%** (martwa, znów) |
+| order | +10,7% |
+| perm | +14,3% |
+| mode-L (2^P) | +37,5% |
+| **mode-LR (4^P)** | **+51,8%** (= +10,4% ponad mode-L) |
+
+Dwa wnioski:
+
+1. **Moja czerwona flaga się nie zmaterializowała.** Bałem się, że prawe ≈ transpozycja ≈ martwe jak `reversed`. Ale `reversed` (jednorodna transpozycja) dalej daje 0%, a prawe (mieszane per płaszczyzna) dają +10,4%. Czyli **liczy się mieszanie per płaszczyzna, nie transpozycja** — dokładnie ten rozdział, który przewidywaliśmy.
+
+2. **mode-LR niemal pochłania resztę.** Kombinacja wszystkich osi to 87, a samo mode-LR to 85 — perm/order dorzucają ledwie 2. Jedna oś (4^P) prawie wystarcza.
+
+## Co to znaczy — i uczciwy kontekst
+
+Jako **odkrycie w greedy** (Twój #1) to solidny plus: przestrzeń rozkładów jest bogatsza niż sądziliśmy, prawe są realizowalne, `2^P → 4^P` to realne +10% (a na samych makroruchach +53%). To wprost potwierdza intuicję z mnożeniem `M` z obu stron.
+
+Ale trzymajmy w głowie to, co już wiemy: **więcej różnorodności makroruchów ≠ automatycznie szybszy GA** — bo dźwignia seedowania okazała się ograniczona (płytkie kubiki, przeseedowanie). Więc to jest mocny wynik *teoretyczny/generatywny*, niekoniecznie od razu przyspieszenie. (Na marginesie: 30% = 38076 to po prostu kolejny zaszumiony punkt — wyżej niż 10% i 50%, co potwierdza, że dna nie znajdziemy pojedynczymi strzałami.)
+
+## Trzy drogi — Twój wybór
+
+1. **N=4** — sprawdzić, czy prawe skalują się z N (więcej płaszczyzn = więcej okazji na R; efekt pewnie rośnie). To ten wolny run `4^6=4096`, ale memoizowany — jednorazowo do artykułu.
+2. **Wpiąć 4^P do produkcyjnego greedy** — mały krok (`RotCountMode`/`RotCountModeAfter` z base-2 na base-4, jak w diagnostyce). Bogatszy seed, w granicach „seeder tylko seeduje".
+3. **Zostawić greedy jako zamknięty wynik i przejść do funkcji oceny** (Twój #2, i moim zdaniem tam leży większy potencjał na *szybkość*).
+
+Ja bym zapisał to jako ładny wynik do artykułu i **poszedł w ocenę** — ale to Twój krajobraz. Co wybierasz?
+
+## 🧑 Robert
+
+Przeprowadźmy najpierw Verify manouvers dla sekwencji LR
+
+
+## 🤖 Claude
+
+Dobry ruch — bo `Run` liczy distinct po Correct-stringu, a `Verify` sprawdza **realny efekt na kostce** (i czy w ogóle układają). Dopiero to powie, czy te +8 makroruchów LR to prawdziwe nowe efekty, czy Correct-string je przeszacowuje (jak przy komutujących ruchach). Doczytam całe `Verify`, żeby dołożyć oś LR spójnie:
+
+Rozumiem `Verify` — dokłada oś, aplikuje każdy manewr na realnej kostce i liczy distinct **efektów** (nie Correct-stringów). Dodaję oś LR analogicznie do `Run`:
+
+Kompiluje się czysto. **Verify Manoeuvres** ma teraz oś LR — aplikuje makroruchy `4^P` na realnej kostce i liczy distinct **efektów**, obok Correct-stringów.
+
+Raport pokaże parę wierszy `Correct-string -> realny efekt`, kluczowe dwa:
+
+```
++ mixed reduction (mode, 2^P L)     :  strMode   ->  effMode
++ adding right ops (mode, 4^P L/R)  :  strModeLR ->  effModeLR
+```
+
+Na co patrzeć:
+
+1. **Solve rate** (`verified to SOLVE the target: X / Y`) — powinien zostać **100%**. To jest twardy, empiryczny dowód realizowalności prawych strategii: nie „OrthoPack==I" w diagnostyce, tylko faktyczne `cube.Turn` na kostce. Jeśli 100% — Twoja algebra `M⁻¹ = R·L` i znak `+sin` są potwierdzone na żywym organizmie.
+
+2. **`effModeLR` vs `effMode`** — czy te +8 makroruchów LR to **prawdziwe nowe efekty**, czy Correct-string je przeszacowuje. Przypomnij: dla **N=3 nie ma rozłącznych płaszczyzn → 0% składania komutujących**, więc distinct-Correct ≈ distinct-efekt. Spodziewam się, że przy N=3 `effModeLR > effMode` (prawe realnie dokładają efekty). Dla N=4 część by się złożyła (te ~41% duplikatów), ale to osobny, wolny run.
+
+## Uwaga: Verify wymaga większego Size
+
+`Verify` potrzebuje „generycznego" kubika o parami różnych odległościach od środka → **Size ≥ 2N−1** (dla N=3 to **Size ≥ 5**). Jeśli jesteś na Size=3, dostaniesz komunikat „Set Size >= 5" zamiast wyniku. Bump Size do 5 (albo 7, jak testowałeś) i wtedy odpal.
+
+Puść **Verify Manoeuvres** (N=3, Size≥5) i wklej — zobaczymy, czy prawe strategie przechodzą test realnego efektu, czy to była iluzja Correct-stringa.
+
+## 🧑 Robert
+
+Manoeuvre verification  (N = 3, Size = 5)
+  target cubie (generic)              : StartIndex 7, coords (0,1,2)
+  orientations                        : 24
+  verified to SOLVE the target        : 86 / 86   (100,00%)
+
+  distinct manoeuvres per method  (Correct-string  ->  real whole-cube effect):
+  baseline (standard QR)              :      55  ->       55
+  + axis permutations (perm)          :      63  ->       63
+  + plane order (order)               :      61  ->       61
+  + mixed reduction (mode, 2^P L)     :      76  ->       76
+  + adding right ops (mode, 4^P L/R)  :      84  ->       84
+  combined                            :      86  ->       86
+
+
+## 🤖 Claude
+
+Czysty, potwierdzony wynik — i to na najostrzejszym teście. Rozczytajmy:
+
+```
+solve rate:                     86 / 86 (100%)
+mode 2^P L:      76  ->  76
+mode 4^P L/R:    84  ->  84      (+8 nad mode-L)
+combined:        86  ->  86
+```
+
+Trzy rzeczy, wszystkie na plus:
+
+1. **100% solve, łącznie z manewrami prawymi.** To empiryczny dowód na żywej kostce (`cube.Turn`, nie „OrthoPack==I"): **prawe strategie są realizowalne.** Twoje `M⁻¹ = R·L` i znak `+sin` — potwierdzone do końca.
+
+2. **Correct-string == efekt dla KAŻDEJ osi** (55→55, 76→76, 84→84…). Przy N=3 nie ma rozłącznych płaszczyzn, więc zero składania komutujących → zero przeszacowania. Czyli te **+8 (76→84) to prawdziwe, distinct efekty na kostce**, nie iluzja Correct-stringa. Prawe ops dają **+10,5% realnej różnorodności efektów** ponad mode-L, effect-verified.
+
+3. **mode-LR (84) ≈ combined (86).** Jedna oś — mieszany rozkład 4^P — niemal pochłania perm/order/mode-L razem wzięte.
+
+(Drobne: liczby są o 1 niższe niż w `Run` — 76 vs 77 itd. — bo `Verify` wyklucza pusty manewr orientacji identycznościowej przez `NonEmpty`. Spójne.)
+
+Zapisuję to do pamięci badawczej, bo to realne rozszerzenie odkrycia:
+
+Zapisane w pamięci badawczej (i podlinkowane do zakresu projektu + zasady seedera).
+
+## Gdzie jesteśmy
+
+Masz zamknięty, ładny wynik do artykułu: **prawe strategie (4^P) to realne, effect-verified wzbogacenie greedy** — +10,5% distinct efektów ponad mode-L, wszystkie 100% rozwiązujące, Twoja algebra potwierdzona na kostce. `reversed` martwy, więc pointa jest ostra: *liczy się mieszanie L/R per płaszczyzna, nie transpozycja.* To bezpośrednio potwierdza obraz z mnożeniem `M` z obu stron, który Cię nie opuszczał.
+
+## Trzy drogi (moja rekomendacja niżej)
+
+1. **N=4 do artykułu** — sprawdzić, czy prawe skalują się z N (i ile z tego zeżre składanie komutujących, te ~41% duplikatów — tu `effModeLR` zacznie odstawać od `strModeLR`, w przeciwieństwie do N=3). Wolny run 4^6, ale jednorazowy i memoizowany. Wartość: kompletność publikacji.
+2. **Wpiąć 4^P do produkcyjnego greedy** — mały krok (base-2 → base-4 w `RotCountMode`/`RotCountModeAfter`). Ale: wiemy już, że dźwignia seedowania jest słaba, więc to raczej estetyka niż przyspieszenie.
+3. **Funkcja oceny** — Twój #2, i moim zdaniem tam leży realny potencjał na *szybkość* (per-oś entropia residuum jako tie-break w dolinie endgame'u — rozpisywaliśmy to).
+
+Moja rada: **greedy zamykamy jako wynik (ewentualnie dobijamy N=4 dla artykułu), a energię przenosimy na ocenę.** Bo greedy już jest mocny i dobrze zbadany, a ocena to miejsce, gdzie jedna dobra formuła zmienia całą końcówkę — czyli to, co Cię realnie boli (te 40k generacji na narożniku).
+
+Co wybierasz — **N=4 na domknięcie greedy**, czy od razu **siadamy do oceny** (rozpiszę per-oś entropię: dokładny wzór, jak wpiąć w `score` bez psucia dominacji moves-to-solve, i jak to policzyć tanio na GPU)?
+
+## 🧑 Robert
+
+Manoeuvre verification  (N = 3, Size = 5)
+  target cubie (generic)              : StartIndex 7, coords (0,1,2)
+  orientations                        : 24
+  verified to SOLVE the target        : 86 / 86   (100,00%)
+
+  distinct manoeuvres per method  (Correct-string  ->  real whole-cube effect):
+  baseline (standard QR)              :      55  ->       55
+  + axis permutations (perm)          :      63  ->       63
+  + plane order (order)               :      61  ->       61
+  + mixed reduction (mode, 2^P L)     :      76  ->       76
+  + adding right ops (mode, 4^P L/R)  :      84  ->       84
+  combined                            :      86  ->       86
+
+Greedy decomposition diversity  (N = 4, Size = 3)
+  cubie orientations (rotation group) : 192
+  axis permutations (N!)              : 24
+  valid plane orders                  : 16
+  reduction modes (2^P, pod/nad-L)    : 64
+  reduction strategies (4^P, +L/R)    : 4096
+
+  baseline (standard QR)              : 2092   (avg 10,90 / orientation)
+
+  each axis alone (vs baseline):
+  + axis permutations (perm)          : 3259   (+55,8%)
+  + plane order (order)               : 2856   (+36,5%)
+  + transposition (reversed)          : 2092   (+0,0%)
+  + mixed reduction (mode, pod/nad-L) : 10752   (+414,0%)
+  + adding right ops (mode, 4^P L/R)  : 16370   (+682,5% vs base, +52,3% vs mode-L)
+
+  combined (union of the four axes)   : 16633   (+695,1%)
+  orientations where any axis adds    : 87 / 192
+  example only reachable off-baseline : p1a2s0 p2a2s0
+
+  manoeuvres by length  (baseline count, then EXTRA vs baseline per axis):
+    length  baseline    perm   order  reversd    mode   modeLR
+         0         1       0       0        0       0        0
+         1        17       1       1        0       1        1
+         2       233      37      33        0      33       33
+         3      1841    1129     730        0     842      908
+         4         0       0       0        0    5487     7267
+         5         0       0       0        0    2297     6069
+
+
+## 🤖 Claude
+
+To jest **duży** wynik — i skaluje się z N dokładnie tak, jak przewidywaliśmy. Zestawmy N=3 vs N=4:
+
+| | prawe ops nad mode-L |
+|---|---|
+| N=3 | +10,4% |
+| **N=4** | **+52,3%** (10752 → 16370) |
+
+Pięciokrotnie większy zysk. Więcej płaszczyzn = więcej okazji na operacje kolumnowe. Ale **histogram** mówi najwięcej — prawe ops wchodzą głównie w **najdłuższe** makroruchy:
+
+```
+length   mode-L   mode-LR   przyrost od prawych
+  3        842      908      +66    (+8%)
+  4       5487     7267      +1780  (+32%)
+  5       2297     6069      +3772  (+164%)   ← tu prawe dominują
+```
+
+Prawie cały zysk 4^P siedzi w **długości 5** (+164%). Czyli prawe strategie to **generator najgłębszych makroruchów** — sięgają tam, gdzie samo lewe ledwo dochodzi. `reversed` dalej martwy (+0%), `mode-LR` (16370) ≈ combined (16633) — jedna oś pochłania wszystko, jeszcze mocniej niż przy N=3.
+
+## Ale twarda uwaga: to Correct-string, nie efekt
+
+Przy N=3 `Correct == efekt` (brak rozłącznych płaszczyzn). **Przy N=4 są rozłączne płaszczyzny → składanie komutujących ~41%**, więc część z tych +52,3% to **duplikaty efektu**, które `Verify` by złożył. Prawdziwy zysk efektowy będzie **niższy** niż +52,3% — nie wiemy o ile bez `Verify@N=4`.
+
+Notuję N=4 do pamięci:
+
+## Ale `Verify@N=4` jest prawdopodobnie niewykonalny
+
+Sprawdź arytmetykę: generyczny kubik dla N=4 wymaga 4 różnych |odległości| → coords (0,1,2,3) → **Size ≥ 7 → 7⁴ = 2401 kubików**. A `Verify` aplikuje **każdy** z ~16600 manewrów na kostce (Turn iteruje wszystkie kubiki), × 192 orientacje, × ~10 ruchów (tam i z powrotem). To rzędu **dziesiątek miliardów obrotów kubików** — godziny, i maszyna Ci się zagotuje. Praktycznie poza zasięgiem.
+
+Więc realistyczny wniosek: **N=3 daje nam dowód efektowy** (prawe ops = prawdziwe efekty, 100% solve), a **N=4 daje trend Correct-string** (+52,3%, rosnący z N, skoncentrowany w długości 5). Effect-verified N=4 jest obliczeniowo nieosiągalny, ale N=3 ustala, że zyski Correct **odpowiadają** realnym efektom (modulo składanie komutujących, które jest ograniczone i zrozumiane ~41%).
+
+## Podsumowanie rozdziału „greedy"
+
+To jest dobra, domknięta historia do artykułu:
+- **mode (mixed Givens) to dominujący generator makroruchów** (+414% Correct przy N=4).
+- **Prawe strategie (4^P) realnie go wzbogacają** — effect-verified przy N=3 (+10,5%), a Correct-string rośnie z N (+52,3% przy N=4), sięgając najgłębszych makroruchów (długość 5, +164%).
+- **`reversed` martwy** — liczy się mieszanie L/R per płaszczyzna, nie transpozycja.
+- Twoja algebra `M⁻¹ = R·L` potwierdzona na żywej kostce.
+
+Ale trzymam też twardą prawdę: **to wynik generatywny, nie przyspieszenie GA.** Wiemy, że dźwignia seedowania jest słaba (sweet-spot objętości, przeseedowanie, płytkie kubiki). Więc greedy jest teraz bogaty i dobrze zbadany — ale nie tędy droga do tych 40k generacji na narożniku.
+
+## Proponuję: siadamy do funkcji oceny
+
+To jest Twój #2 i moim zdaniem jedyny lewar na realną *szybkość* — bo celuje w zwodniczą dolinę endgame'u, a nie w dostarczanie klocków. Rozpiszę konkret:
+
+1. **Per-oś entropia residuum** jako drugorzędny tie-break: dla każdej osi `d` histogram współrzędnej nieułożonych kubików, nagroda za niską entropię (dzielą warstwę), z małym `λ` żeby nigdy nie przebić moves-to-solve.
+2. **Dokładny wzór** i jak wpiąć w istniejący `score` bez psucia dominacji celu głównego.
+3. **Jak policzyć tanio na GPU** (redukcja po kubikach w evaluatorze — musi przejść przez compute shader).
+
+Chcesz, żebym rozpisał punkt 1 na serio — z formalizacją, którą wcześniej nie mogłeś domknąć — i pokazał, gdzie dokładnie w `score`/evaluatorze to siedzi? Najpierw pokażę teorię (bez kodu), żebyśmy zgadzali się co do formuły, zanim cokolwiek wepnę.
+
+## 🧑 Robert
+
+a nie wpinamy do greedy?
+
+
+## 🤖 Claude
+
+Racja — Ty decydujesz, a wybierasz wpięcie do greedy. Robimy. Zmiana jest mała: produkcyjny `RotCountMode` z base‑2 (tylko pod/nad‑L) na base‑4 (te same 4 strategie co w diagnostyce), plus `modeSpace` z `2^P` na `4^P`. Stride zostaje `P` — bo `rc0 ≤ P` dalej trzyma (długość 5 < P=6 dla N=4). Doczytam dokładny obecny `RotCountMode`:
+
+Now I have the full `RotCountMode`. Extending it to the base-4 strategy (matching the verified diagnostic):
+
+Now expand the mode draw space in `BuildSeedMoves` from `2^P` to `4^P`:
+
+Kompiluje się czysto — 4^P jest w produkcyjnym greedy. Aktualizuję pamięć (to była otwarta pozycja):
+
+Wpięte i zbudowane (0 błędów). Co się zmieniło w produkcji:
+
+- **`RotCountMode`** ([TRubikCube.cs:807](RubikCube/TRubikCube.cs:807)) — base‑4, te same 4 strategie co w diagnostyce (effect‑verified, `+sin` na prawej). `RotCountModeAfter`/`GetSolveSeq`/backtracking bez zmian — dostają tylko bogatszą metrykę.
+- **`BuildSeedMoves`** — `modeSpace = 4^P` przy `SEED_MODE=1` (64→**4096** dla N=4). `SEED_MODE=0` dalej baseline (mode 0 = pod‑L).
+- **Stride bez zmian** (`P`), bo `rc0 ≤ P` trzyma (długość 5 < 6).
+
+Czego się spodziewać w **Seed Pool Stats** na głębokim kubiku:
+- census teraz po 4^P modach — więcej modów przeszacowujących (`rc0 > min`), więc pula łapie **więcej i dłuższych** makroruchów (do długości 5 dla N=4), z prawych strategii.
+- Płytkie kubiki bez zmian (i tak zdegenerowane).
+
+Wszystkie wcześniejsze zastrzeżenia o dźwigni zostają w mocy: to bogatszy *surowiec*, a nie gwarantowane przyspieszenie — i dalej obowiązuje sweet‑spot `SEED_RATIO` (przeseedowanie szkodzi, tym bardziej że teraz distinct‑pool jest większy, więc szybciej dobija target). Jak będziesz mierzył, zerknij czy przy 4^P optimum objętości nie przesunęło się w dół.
+
+Odpal **Seed Pool Stats** na narożniku i zobacz census/histogram — powinny puchnąć w stronę długich makroruchów. A jak zechcesz, następnym razem siadamy do funkcji oceny.
+
+## 🧑 Robert
+
+Próbowałem ułożyć 3^4 dla SEED_RATIO = 80 (w raporcie poniżej powinno się podmienić - ale ponieważ raport działa pod CPU #define nie działa) i jest fatalnie. To może być szum, ale w ogóle nie chce ułożyć już przedostatniego klastra: [BuildSeedMoves]  N=4  SEED_MODE=1  stride=6  target=819  (SEED_RATIO% of population)
+accepted = 12     draws=230  stuck=71  dupes=147
+distinct modes contributing = 12 / 4096
+mode rc0 census (moves:modes):  0:512  1:1024  2:2560
+accepted length histogram (moves:count):  2:12  [BuildSeedMoves]  N=4  SEED_MODE=1  stride=6  target=819  (SEED_RATIO% of population)
+accepted = 12     draws=303  stuck=111  dupes=180
+distinct modes contributing = 12 / 4096
+mode rc0 census (moves:modes):  0:512  1:1024  2:2560
+accepted length histogram (moves:count):  2:12  [BuildSeedMoves]  N=4  SEED_MODE=1  stride=6  target=819  (SEED_RATIO% of population)
+accepted = 12     draws=251  stuck=95  dupes=144
+distinct modes contributing = 12 / 4096
+mode rc0 census (moves:modes):  0:512  1:1024  2:2560
+accepted length histogram (moves:count):  2:12
+
+
+## 🤖 Claude
+
+Najpierw drobiazg, który słusznie wyłapałeś: `SEED_RATIO%` w raporcie to **literał** — raport leci na CPU, więc `#define` się nie podstawia. Ale mam `seedRatioPercent` jako parametr, więc pokażę realną wartość:
+
+Teraz sedno. Trzy migawki, wszystkie mówią to samo:
+
+```
+census:  0:512   1:1024   2:2560     (= 4096 ✓)   max rc0 = 2
+accepted = 12, length 2
+```
+
+**Te kubiki są PŁYTKIE** — dla wszystkich 4096 modów `rc0 ≤ 2`, zero przeszacowujących. Czyli **4^P jest tu bezczynne**: dostajesz 12 minimalnych seedów, dokładnie jak baseline. Dla tych konkretnych kubików `SEED_MODE=1 (4^P) ≡ baseline`. Więc **te migawki nie tłumaczą porażki** — to albo szum (Twoja własna hipoteza), albo dzieje się na głębokich kubikach, których nie złapałeś.
+
+Dwie rzeczy warte zauważenia:
+
+1. **4^P ma dużo martwych modów.** `0:512 + 1:1024 = 1536` modów niedoszacowuje (`rc0 < min`) → gwarantowany stuck. Stąd ~30–37% jałowych losowań (stuck 71–111 z ~250). To marnuje czas hosta, ale **nie psuje seedów** (martwe mody nic nie wnoszą do puli).
+
+2. **I tu jest realne zagrożenie 4^P — na GŁĘBOKICH kubikach.** Pamiętasz N=4 histogram: przy 4^P distinct-pool makroruchów to **tysiące** (16370), a przy 2^P było ~124. Więc przy `SEED_RATIO=80` (`target=819`) 4^P **z łatwością dobija target** na głębokim kubiku → **80% populacji zasypane makroruchami** → skrajna monokultura. Przy 2^P pula saturowała się na ~124 (≪ 819), więc siłą rzeczy seedowała mniej. **4^P zamienia „za dużo" w „katastrofalnie za dużo".**
+
+## Wniosek — i on jest ważny
+
+4^P **nie przyspiesza**, tylko **czyni dźwignię seedowania groźniejszą**: bogatszy generator *łatwiej dobija target*, więc przy tym samym `SEED_RATIO` seeduje więcej → mocniej przeseedowuje. A `80%` jest i tak już daleko za sweet-spotem (~50%). Więc `4^P @ 80%` to podwójne przedawkowanie. To spójne z całą naszą historią: **seedy pomagają przy małej objętości, szkodzą przy dużej; bogatszy generator tylko przesuwa próg przedawkowania w dół.**
+
+Dwie drogi:
+- Chcesz dalej mierzyć 4^P → **zjedź z `SEED_RATIO` mocno** (przy tak wielkiej puli nawet 20–30% może zalewać głębokie kubiki; sweet-spot zsunął się w dół). To osobny sweep, znów w szumie.
+- Albo — i to moja rada — **zamykamy greedy jako wynik generatywny** (bogaty, effect-verified przy N=3, skalujący się z N) i przenosimy energię na **funkcję oceny**. Bo trzy niezależne obserwacje mówią to samo: więcej/dłuższych makroruchów w puli **nie** rusza tych 40k generacji na końcówce — bo problem jest w *dolinie fitnessu*, nie w surowcu.
+
+Label w raporcie poprawiony (pokaże realne `{ratio}%`). Co robisz — **niski-ratio sweep dla 4^P**, czy **siadamy do oceny** (rozpiszę per-oś entropię: teoria najpierw, zanim tknę `score`)?
+
+## 🧑 Robert
+
+Dlaczego twierdzisz, że: (rc0 < min) → gwarantowany stuck. Stąd ~30–37% jałowych losowań (stuck 71–111 z ~250). To marnuje czas hosta, ale nie psuje seedów (martwe mody nic nie wnoszą do puli). Zakładasz, że krótkie ruchy scramblują za bardzo kostkę, ale pamiętaj, że przy krzyżowaniu zamieniane są one na prawdziwe makroruchy. To są prawidłowe ruchy, układające aktualny kubik
+
+
+## 🤖 Claude
+
+Dobre pytanie — należy Ci się ścisły dowód, bo rzuciłem to jako pewnik. I jest tu subtelność, która, jak sądzę, rozwiązuje nieporozumienie.
+
+## Dlaczego `rc0 < min` → gwarantowany stuck (dowód)
+
+Trzy fakty:
+
+1. **`min` to prawdziwe dolne ograniczenie.** Każdy obrót ściany to jeden Givens; kubika o standardowym `RotationCount = min` **nie da się** doprowadzić do identyczności w mniej niż `min` obrotach. To twarde ograniczenie grupowe, nie heurystyka.
+
+2. **Greedy bierze wyłącznie ruchy obniżające metrykę o 1 i kończy dopiero przy `State==0` (prawdziwe ułożenie).** Startuje od `rc0`, więc może wykonać **co najwyżej `rc0`** takich ruchów, zanim metryka spadnie do 0 (do −1 nie ma jak zejść). Długość ścieżki = `rc0`.
+
+3. Zatem jeśli `rc0 < min`, ścieżka jest **krótsza niż min → nie może dojść do ułożenia** → backtracking wyczerpuje wszystkie gałęzie bez `State==0` → **zwraca `null`**.
+
+Empiryczne potwierdzenie masz w swoim raporcie: histogram to **wyłącznie `2:12`**. Gdyby którykolwiek z modów `rc0∈{0,1}` układał, zobaczyłbyś seed długości 0 lub 1. Nie ma. Czyli te 1536 modów faktycznie zwróciło `null`.
+
+## Sedno subtelności: `rc0` bywa **fantomem**, nie długością rozwiązania
+
+`RotCountMode` przechodzi **sztywno P płaszczyzn** i liczy nietożsamościowe Givensy — **nie sprawdza, czy wynik to identyczność**. Dla modów niedoszacowujących redukcja kończy P kroków, zostawiając `M ≠ I`, i zwraca liczbę **mniejszą niż min, która nie odpowiada żadnemu ułożeniu**. Greedy schodzi po tej fantomowej metryce do fantomowego zera — i tam kostka **wciąż nie jest ułożona**. To nie jest „krótkie rozwiązanie", to metryka, która skłamała, że jest blisko.
+
+## I teraz Twój punkt o krzyżowaniu — masz rację, ale on dotyczy czego innego
+
+Zgadzam się w 100%: **wyprodukowane seedy to prawidłowe makroruchy układające kubik, i crossover je rekombinuje** — to jest cała ich wartość. Ale to dotyczy modów `rc0 ≥ min`, które **coś zwróciły**. Mody `rc0 < min` zwracają `null` — **nie emitują żadnej sekwencji, ani krótkiej, ani żadnej.** Więc do puli nie trafia nic, a crossover widzi tylko to, co w puli jest. Nie ma fragmentu do „zamienienia na makroruch".
+
+Czyli moje „martwe" znaczyło ściśle: **nie produkują seeda** (zwrot `null`), a nie „produkują coś złego". Nie psują puli, bo do niej nie wchodzą — po prostu marnują losowanie hosta.
+
+## Chyba że masz na myśli coś głębszego
+
+Jeśli Twoja myśl brzmi: *„a może warto emitować te niepełne, nierozwiązujące prefiksy jako materiał dla crossovera"* — to jest realna, inna propozycja (zmiana generatora, nie kuracja). Ale wtedy seedujemy sekwencje, które **nie** cofają kubika, łamiąc założenie „seed = kompletny solver". Czy połamane fragmenty biją losowe geny — to otwarte i spekulatywne. Jeśli o to Ci chodziło, rozłóżmy to osobno — bo to ciekawe, ale to już nie jest „te mody nic nie robią", tylko „zróbmy, żeby robiły".
+
+Które z tych trzech to Twój zarzut — dowód `rc0<min`, status „martwych", czy propozycja emisji fragmentów?
+
+## 🧑 Robert
+
+To nie był zarzut. Kiedy to ty piszesz jakiś fragment kodu, ja łatwo się gubię, bo nie nadążam. Oczywiście stuck nie produkuje seeda - ale to nie wpływa na pulę, sloty wypełniają się tylko seedami, a ile czasu zmarnuje na to host nie jest kluczowe. Seedowanie sekwencjami niepełnymi - hm... Chyba jeszcze gorzej - wypełniamy sloty wówczas sekwencjami właściwie losowymi
+
+
+## 🤖 Claude
+
+To ważne, że mi to mówisz — i biorę do siebie. Zwolnię: najpierw powiem prostymi słowami **co** i **dlaczego** zmieniam, małymi krokami, jeden fragment naraz, bez wrzucania kilku edycji na raz. Wolę, żebyś nadążał, niż żeby było „szybko". Zapiszę to sobie, żeby pamiętać na przyszłość:
+
+Co do meritum — zgadzamy się w pełni, i Twoja intuicja o niepełnych sekwencjach jest nawet celniejsza od mojej:
+
+- **Stuck nie rusza puli.** Sloty wypełniają się wyłącznie kompletnymi solverami; `null` po prostu każe losować dalej. Zmarnowany czas hosta jest jednorazowy (raz na klaster) i nieistotny.
+- **Niepełne sekwencje byłyby gorsze, nie lepsze.** Trafnie: prefiks modu, który utknął, to sekwencja, która idzie kawałek i **nie układa** kubika — czyli w praktyce ruch pseudolosowy. Zająłby slot, wypychając z populacji uczciwie losowego osobnika, i to *bez* zysku. Więc nie — zostawiamy jak jest: slot albo dostaje pełny solver, albo zostaje losowy.
+
+Czyli wątek seedowania/greedy mamy dobrze zamknięty: bogaty, zbadany generator, uczciwie zaraportowana słaba dźwignia, i wiemy dlaczego.
+
+Nie wpinam teraz nic. Kiedy będziesz miał ochotę, po Twojej stronie leży wybór następnego kroku — a ja przy każdym kolejnym kawałku kodu najpierw powiem po ludzku co i po co, i pójdziemy drobnymi krokami. Gdzie chcesz iść dalej?
+
+## 🧑 Robert
+
+Chciałbym, abyśmy zbadali, czy oś LR wchłania perm lub order. Ciągle nie mogę do końca zrozumieć, dlaczego pod-left wyeliminował reverse - spodziewałbym się tego dopiero po wprowadzeniu nad-right
+
+
+## 🤖 Claude
+
+Zacznijmy od pytania o `reverse`, bo tam jest ładna, zamknięta odpowiedź — i rozwiązuje Twoje zdziwienie. Bez kodu, sama teoria.
+
+## Dlaczego `reverse` jest martwy już przy samym pod-L
+
+Trzy kroki:
+
+1. **Dla ortogonalnej `M` (a permutacja znakowa taka jest) transpozycja = odwrotność:** `Mᵀ = M⁻¹`. `reverse` mierzy postęp, redukując `Mᵀ`, czyli **redukując `M⁻¹`**.
+
+2. **Odległość-do-ułożenia jest symetryczna względem odwrotności.** Kubik `M` układasz w tylu samych ruchach co `M⁻¹` — bo bierzesz tę samą sekwencję, odwracasz kolejność i każdy ruch zamieniasz na przeciwny. Więc `RotCount(M) = RotCount(M⁻¹) = RotCount(Mᵀ)` — **dla każdego stanu**.
+
+3. Skoro metryka daje **identyczną wartość** dla `M` i `Mᵀ` w każdym punkcie, to zbiór ruchów „obniżających o 1" jest **ten sam** → greedy przechodzi **dokładnie te same drzewa** → `reverse` = baseline → +0%.
+
+Czyli `reverse` jest redundantny z **baseline**, nie z `nad-R`. Umiera, bo transpozycja to **symetria, którą odległość już ma**.
+
+## Dlaczego to NIE to samo co prawe strategie
+
+Tu jest źródło Twojego zdziwienia — dwie rzeczy wyglądają podobnie, ale są różne:
+
+- **`reverse`** przewraca **całą macierz** (`M → Mᵀ = M⁻¹`). To symetria odległości → nic nie wnosi.
+- **`nad-R` / `pod-R`** redukują **samą `M`** operacjami **kolumnowymi**, w naturalnej kolejności. To **inny algorytm redukcji**, a nie transpozycja — nie zwija się do odwrotności. Dlatego żyje (+52% przy N=4).
+
+Twoja intuicja skleiła „druga strona przekątnej" (nad zamiast pod, i R zamiast L) z „przewróć macierz" (reverse). Wyglądają pokrewnie, ale: `nad`/`R` zmieniają **który element zerujesz i jak** (wiersz/kolumna) na tej samej `M`; `reverse` **odwraca całą `M`**. Pierwsze to nowa ścieżka, drugie to symetria. Stąd `pod-L` „wchłania" reverse od razu, a prawych już nie — bo prawe to nie symetria.
+
+## A teraz Twoje pytanie: czy LR wchłania perm/order
+
+Częściowo **już to widać w danych, które masz**. W raporcie `Run`:
+- N=4: `mode-LR = 16370`, a `combined (wszystkie 4 osie) = 16633` → perm+order+reverse razem dokładają ponad LR **tylko +263 (~1,6%)**.
+- N=3: `85 → 87` → +2.
+
+Czyli `mode-LR` **prawie pochłania wszystko** już teraz. Nie wiemy tylko, **ile z tego to perm, a ile order** osobno.
+
+Żeby to rozdzielić, dołożyłbym do `Run` **dwa pomiary**: `mode-LR ∪ perm` i `mode-LR ∪ order`, i pokazał, ile **każdy** dokłada *ponad* LR. Jeśli obie ~0 → LR wchłania oba. To mała zmiana — dwie dodatkowe unie i dwie linijki w raporcie, nic w logice.
+
+Zanim to tknę: mówię jasno, że to **tylko pomiar** (żadnej zmiany zachowania), i robię go w jednym małym kawałku. Wpinać ten pomiar do `Run`?
+
+## 🧑 Robert
+
+tak
+
+
+## 🤖 Claude
+
+Dobrze. Mówię co robię, w trzech małych krokach:
+
+1. **Dwie akumulatory** — `sumLRPerm`, `sumLROrder` — zbiorą po wszystkich orientacjach.
+2. **W pętli po orientacjach** — dwie unie: `mode-LR ∪ perm` i `mode-LR ∪ order`.
+3. **Dwie linijki w raporcie** — ile każdy dokłada *ponad* mode-LR.
+
+Nic w logice greedy, czysty pomiar. Najpierw doczytam aktualny `Run`, żeby trafić w dokładne miejsca:
+
+Mam dokładne miejsca. Krok 1 — akumulatory:
+
+Krok 2 — dwie unie w pętli (`mode-LR ∪ perm`, `mode-LR ∪ order`) i ich zliczenie:
+
+Krok 3 — dwie linijki w raporcie, pokazujące ile perm/order dokładają **ponad** mode-LR:
+
+Trzy małe kroki gotowe. Zbuduję, żeby potwierdzić, że się kompiluje:
+
+
+## 🧑 Robert
+
+Greedy decomposition diversity  (N = 3, Size = 3)
+  cubie orientations (rotation group) : 24
+  axis permutations (N!)              : 6
+  valid plane orders                  : 2
+  reduction modes (2^P, pod/nad-L)    : 8
+  reduction strategies (4^P, +L/R)    : 64
+
+  baseline (standard QR)              : 56   (avg 2,33 / orientation)
+
+  each axis alone (vs baseline):
+  + axis permutations (perm)          : 64   (+14,3%)
+  + plane order (order)               : 62   (+10,7%)
+  + transposition (reversed)          : 56   (+0,0%)
+  + mixed reduction (mode, pod/nad-L) : 77   (+37,5%)
+  + adding right ops (mode, 4^P L/R)  : 85   (+51,8% vs base, +10,4% vs mode-L)
+
+  does mode-LR absorb perm / order?  (extra ON TOP of mode-LR):
+    mode-LR + perm                    : 87   (+2,4% over mode-LR)
+    mode-LR + order                   : 87   (+2,4% over mode-LR)
+
+  combined (union of the four axes)   : 87   (+55,4%)
+  orientations where any axis adds    : 7 / 24
+  example only reachable off-baseline : p1a2s0 p2a2s0
+
+  manoeuvres by length  (baseline count, then EXTRA vs baseline per axis):
+    length  baseline    perm   order  reversd    mode   modeLR
+         0         1       0       0        0       0        0
+         1         9       0       0        0       0        0
+         2        46       8       6        0       6        6
+         3         0       0       0        0      15       23
+Greedy decomposition diversity  (N = 4, Size = 3)
+  cubie orientations (rotation group) : 192
+  axis permutations (N!)              : 24
+  valid plane orders                  : 16
+  reduction modes (2^P, pod/nad-L)    : 64
+  reduction strategies (4^P, +L/R)    : 4096
+
+  baseline (standard QR)              : 2092   (avg 10,90 / orientation)
+
+  each axis alone (vs baseline):
+  + axis permutations (perm)          : 3259   (+55,8%)
+  + plane order (order)               : 2856   (+36,5%)
+  + transposition (reversed)          : 2092   (+0,0%)
+  + mixed reduction (mode, pod/nad-L) : 10752   (+414,0%)
+  + adding right ops (mode, 4^P L/R)  : 16370   (+682,5% vs base, +52,3% vs mode-L)
+
+  does mode-LR absorb perm / order?  (extra ON TOP of mode-LR):
+    mode-LR + perm                    : 16621   (+1,5% over mode-LR)
+    mode-LR + order                   : 16530   (+1,0% over mode-LR)
+
+  combined (union of the four axes)   : 16633   (+695,1%)
+  orientations where any axis adds    : 87 / 192
+  example only reachable off-baseline : p1a2s0 p2a2s0
+
+  manoeuvres by length  (baseline count, then EXTRA vs baseline per axis):
+    length  baseline    perm   order  reversd    mode   modeLR
+         0         1       0       0        0       0        0
+         1        17       1       1        0       1        1
+         2       233      37      33        0      33       33
+         3      1841    1129     730        0     842      908
+         4         0       0       0        0    5487     7267
+         5         0       0       0        0    2297     6069
+Czegoś w tej układance brakuje...
+
+
+## 🤖 Claude
+
+Najpierw odpowiedź na literalne pytanie, potem to, co — jak podejrzewam — wyczuwasz jako brak.
+
+## mode-LR *prawie* wchłania perm i order
+
+```
+mode-LR + perm  : +1,5% ponad mode-LR   (N=4)
+mode-LR + order : +1,0% ponad mode-LR
+```
+
+Jako **niezależne osie** perm i order są niemal redundantne z mode-LR — dokładają grosze. Samodzielnie robią +55,8% i +36,5% nad baseline, ale to, co reachują, mode-LR w większości już ma.
+
+## Ale czego brakuje: mierzymy tylko **marginesy**, nigdy **iloczynu**
+
+I tu jest, jak myślę, Twój brak. Popatrz, jak liczony jest mode-LR:
+
+```
+AllGreedy(o, perm=0, order=0, reversed=false, strategy=m)
+                 ↑         ↑
+             ustalone!  ustalone!
+```
+
+**mode-LR jest zamiatany tylko przy jednym order=0 i jednym perm=0.** Cała siła 4^P jest zmierzona w *jednej* kolejności płaszczyzn i *jednym* etykietowaniu osi.
+
+A mój pomiar „mode-LR + perm" to **unia marginesów**: (strategie przy order/perm 0) ∪ (permy przy strategy 0). On mówi tylko „wkłady marginalne się pokrywają" — **NIE** testuje, czy *połączenie* order albo perm **z** strategiami odblokowuje nowe drzewa. Ten **iloczyn** — `strategia × order`, `strategia × perm` — jest **niezmierzony**. A skoro order i perm dokładają osobno, to `strategia × order` może dać dużo więcej niż którykolwiek margines.
+
+Ślad tego masz w histogramie (N=4, długość 3):
+
+```
+         perm=1129    mode-LR=908
+```
+
+**perm reachuje 1129 makroruchów długości 3, a mode-LR tylko 908** — perm dochodzi do krótkich drzew, których mode-LR (przy order/perm 0) **nie widzi**. To jest ten +1,5% residuum. Gdybyśmy puścili `strategia × perm`, prawie na pewno złapalibyśmy oba.
+
+## Czyli układanka jest niepełna, bo
+
+Wszystkie nasze liczby — łącznie z „combined" — są **sumą osi mierzonych osobno** (komentarz w kodzie wprost mówi „no cross synergy"). Prawdziwa przestrzeń to **kartezjański iloczyn** `perm × order × reversed × strategia(4^P)`, którego nigdy nie dotknęliśmy. Dla N=4 to ~3 mln wariantów metryki na orientację — pełnej enumeracji nie zrobimy, ale **częściowy** cross (np. `strategia × order` = 4096×16) już by pokazał, czy jest synergia, czy osie faktycznie się pokrywają.
+
+Czy to jest ten brak, który widzisz — **synergia krzyżowa**, że mierzymy osie w izolacji, a nie łącznie? Czy wyczuwasz coś innego (np. że mode-LR powinien wchłonąć perm/order do zera i drażni Cię, że nie)? Powiedz, w którą stronę patrzysz, zanim cokolwiek dołożę.
+
+
+## 🧑 Robert
+
+Dzięki za wyjaśnienia. Może zablokowalibyśmy na razie liczenie sum i spróbowali policzyć częściowy cross z oboma
+
+
+## 🤖 Claude
+
+Dzięki. Rozumiem: **wyłączamy na razie marginesy** (te wszystkie osobne sumy per oś) i liczymy **jeden pełny cross: `perm × order × strategia(4^P)`** — czyli „combined" zrobiony porządnie, jako iloczyn, nie unia marginesów. „Z oboma" = perm i order razem w krzyżu.
+
+Uwaga z góry: to jest tanie **tylko dla N=3** (6×2×64 = 768 kombinacji/orientację). Dla N=4 to ~1,5 mln/orientację — nie puszczaj tego na N=4.
+
+Najpierw doczytam całą metodę `Run`, żeby przepisać ją czysto w kilku małych krokach:
+
+
+## 🧑 Robert
+
+Czekaj "z oboma" ale oddzielnie
+
+
+## 🤖 Claude
+
+Aha — **oddzielnie**: nie jeden krzyż `perm × order × strategia`, tylko **dwa osobne 2-krzyże** — `strategia × perm` i `strategia × order` — każdy porównany do strategii-samej (mode-LR). To właśnie testuje synergię każdej osi ze strategią z osobna, i jest tańsze. Dobrze zrozumiałem.
+
+Plan, małymi krokami:
+1. **Deklaracje** — wywalam sumy marginesów, zostawiam `sumId`, `sumModeLR`, `sumCrossPerm`, `sumCrossOrder`.
+2. **Pętla** — liczę `idSet`, `modeLRU` (strategia sama), `crossPerm` (strategia×perm), `crossOrder` (strategia×order).
+3. **Raport** — baseline, strategia, i dwa krzyże z deltą **ponad strategię** (to jest synergia).
+4. **Histogram** — nowe kolumny.
+
+Krok 1 — deklaracje:
+
+Krok 2 — pętla po orientacjach (marginesy → strategia + dwa krzyże):
+
+Krok 3 — raport (marginesy → strategia + dwa krzyże z synergią ponad strategię):
+
+Krok 4 — histogram (nowe kolumny):
+
+Cztery kroki zrobione. Buduję, żeby złapać ewentualne literówki:
+
+
+## 🧑 Robert
+
+Czy uciągnie 4D?
+
+
+## 🤖 Claude
+
+Policzmy uczciwie, zanim cokolwiek odpalisz.
+
+**N=4 koszt (na orientację):**
+- `strategy × perm`: `(24−1) × 4096 ≈ 94 000` wywołań `AllGreedy`
+- `strategy × order`: `(16−1) × 4096 ≈ 61 000`
+- `strategy sama`: `4096`
+- razem ≈ **160 000 / orientację × 192 ≈ 30,7 mln wywołań `AllGreedy`**
+
+Dla porównania **N=3** to ≈ **10 700** wywołań w całości. Czyli N=4 jest ~**2900× droższy**. Jeśli N=3 pójdzie w ~sekundę, N=4 to rząd **kilkudziesięciu minut** — plus `AllGreedy` i unie stringów **nie są memoizowane** (tylko `RotCount`), więc pamięć też puchnie (memo + zbiory Correct-stringów). Maszyna się zagotuje.
+
+Więc szczerze: **N=4 w tej formie raczej nie — za wolno i za gorąco.**
+
+Moja propozycja:
+1. **Najpierw N=3** (tanie, definitywne): czy synergia w ogóle jest. Jeśli `strategy × perm` i `strategy × order` dają wyraźnie więcej niż wcześniejsze marginesowe +1–2% → synergia istnieje i to ciekawe. Jeśli ~te same +1–2% → osie naprawdę się pokrywają i N=4 nic nowego nie powie.
+2. **Dopiero gdyby N=3 pokazał synergię** — zrobić N=4 w **wersji ograniczonej**: próbka np. 16–24 orientacji zamiast 192 (koszt spada ~10×), albo tylko tańszy `strategy × order`. To utrzyma czas i temperaturę w ryzach.
+
+Kod pod te dwa krzyże jest już napisany, tylko nie zbudowany (przerwałeś build). Chcesz, żebym **zbudował i puścił na N=3** (bezpiecznie), a decyzję o N=4 podjęli po zobaczeniu, czy synergia w ogóle jest?
+
+## 🧑 Robert
+
+Greedy decomposition diversity  (N = 3, Size = 3)
+  cubie orientations (rotation group) : 24
+  axis permutations (N!)              : 6
+  valid plane orders                  : 2
+  reduction modes (2^P, pod/nad-L)    : 8
+  reduction strategies (4^P, +L/R)    : 64
+
+  baseline (standard QR)              : 56   (avg 2,33 / orientation)
+
+  strategy alone (4^P, perm0 order0)  : 85   (+51,8%)
+
+  JOINT cross (strategy x axis together) - synergy = gain OVER strategy alone:
+  strategy x perm                     : 154   (+175,0% vs base, +81,2% vs strategy)
+  strategy x order                    : 110   (+96,4% vs base, +29,4% vs strategy)
+
+  manoeuvres by length  (baseline count, then EXTRA vs baseline):
+    length  baseline   strat  xPerm  xOrder
+         0         1       0       0        0
+         1         9       0       0        0
+         2        46       6       8        8
+         3         0      23      90       46
+
+
+## 🤖 Claude
+
+To jest **przełom** — i Twoje „czegoś brakuje" było w punkt. Zobacz różnicę między marginesem a krzyżem:
+
+| | vs strategia sama |
+|---|---|
+| `mode-LR + perm` (**unia marginesów**, poprzednio) | +2,4% |
+| **`strategy × perm` (krzyż, teraz)** | **+81,2%** |
+| `mode-LR + order` (margines) | +2,4% |
+| **`strategy × order` (krzyż)** | **+29,4%** |
+
+**34× różnicy** na perm. Synergia była **całkowicie ukryta** przez mierzenie osi osobno. Odpowiedź na Twoje pierwotne pytanie „czy LR wchłania perm/order": **NIE** — wyglądało, że tak, wyłącznie dlatego, że liczyliśmy unię marginesów zamiast iloczynu.
+
+## Co to znaczy
+
+Przestrzeń metryk jest **multiplikatywna**: strategia zastosowana do **permutowanych osi** (albo w **innej kolejności**) daje manewry, których **ani sama permutacja, ani sama strategia nie osiąga**. Kombinacje się mnożą, nie dodają. „Combined = unia marginesów" masakrycznie zaniżał — prawdziwy `combined` to iloczyn.
+
+Histogram to potwierdza — synergia siedzi w makroruchach (długość 3):
+
+```
+         strat=23   xPerm=90   xOrder=46
+```
+
+`strategy × perm` daje **90** makroruchów długości 3 vs **23** dla samej strategii — prawie **4×**.
+
+I ważne: przy **N=3 Correct == efekt** (brak rozłącznych płaszczyzn, potwierdzone naszym Verify), więc te +81% to **prawdziwe distinct efekty na kostce**, nie iluzja Correct-stringa. Wynik jest twardy.
+
+Zapisuję korektę do pamięci, bo poprzedni zapis („mode-LR prawie pochłania perm+order") był mylący:
+
+## Gdzie to prowadzi
+
+Dwie rzeczy warte odnotowania:
+
+1. **Produkcyjny greedy zostawia to na stole.** `RotCountMode` liczy strategię przy **stałym** perm=0, order=0 — czyli zbiera tylko jedną „warstwę" tej multiplikatywnej przestrzeni. Największe źródło różnorodności (krzyż) jest nietknięte. Wpięcie perm/order do produkcji dałoby ~2–3× bogatszy seed. Ale — stara śpiewka — bogatsze ≠ szybszy GA (przeseedowanie), więc to osobna decyzja.
+
+2. **N=4 by to wzmocnił** (24 permy, 16 orderów zamiast 6/2), ale to ten ~30-milionowy run. Gdybyś chciał liczbę do artykułu, zrobiłbym **próbkę ~16–24 orientacji** zamiast 192 — koszt ~10× mniejszy, trend widoczny, maszyna cała.
+
+Moja rada: **to jest mocny wynik do artykułu sam w sobie** (przestrzeń jest multiplikatywna, marginesy zwodzą 34×). Bank i tyle — chyba że chcesz potwierdzenia skalowania.
+
+Co dalej — **próbkowany N=4** na potwierdzenie, **wpięcie perm/order do produkcyjnego greedy**, czy **zamykamy i idziemy do oceny**? (I mów spokojnie, którą stronę wybierasz — nic nie wpinam bez Twojego słowa.)
+
+## 🧑 Robert
+
+Dodajmy composite, dla N=3 pociągnie
+
+
+## 🤖 Claude
+
+Jasne — **composite** = pełny 3-krzyż `strategy × perm × order`. Dla N=3 to `6×2×64 = 768` kombinacji/orientację, więc pociągnie. Powie nam, czy dołożenie **obu naraz** daje jeszcze więcej niż lepszy z 2-krzyży.
+
+Zrobię to oszczędnie — composite **dobuduję** z już policzonych `crossPerm` i `crossOrder`, dokładając tylko kombinacje „perm≠0 **i** order≠0" (dla N=3 to tylko 5×1×64). Małymi krokami.
+
+Krok 1 — deklaracja `sumComposite` + histogram:
+
+Krok 2 — w pętli dobuduj `composite` z `crossPerm ∪ crossOrder` + kombinacje „perm≠0 i order≠0", i dorzuć do sum/histogramu:
+
+Krok 3 — linijka w raporcie (composite vs base, vs strategia, i vs najlepszy 2-krzyż):
+
+Krok 4 — kolumna `compos` w histogramie:
+
+Cztery kroki gotowe. Buduję, żeby złapać literówki:
+
+
+## 🧑 Robert
+
+Greedy decomposition diversity  (N = 3, Size = 3)
+  cubie orientations (rotation group) : 24
+  axis permutations (N!)              : 6
+  valid plane orders                  : 2
+  reduction modes (2^P, pod/nad-L)    : 8
+  reduction strategies (4^P, +L/R)    : 64
+
+  baseline (standard QR)              : 56   (avg 2,33 / orientation)
+
+  strategy alone (4^P, perm0 order0)  : 85   (+51,8%)
+
+  JOINT cross (strategy x axis together) - synergy = gain OVER strategy alone:
+  strategy x perm                     : 154   (+175,0% vs base, +81,2% vs strategy)
+  strategy x order                    : 110   (+96,4% vs base, +29,4% vs strategy)
+  strategy x perm x order (composite) : 154   (+175,0% vs base, +0,0% vs strat x perm)
+
+  manoeuvres by length  (baseline count, then EXTRA vs baseline):
+    length  baseline   strat  xPerm  xOrder  compos
+         0         1       0       0        0       0
+         1         9       0       0        0       0
+         2        46       6       8        8       8
+         3         0      23      90       46      90
+
+
+## 🤖 Claude
+
+Piękne, i to **domyka** całą układankę różnorodności. Popatrz:
+
+```
+strategy x perm             : 154
+strategy x perm x order     : 154   (+0,0% vs strat x perm)
+```
+
+**Composite = dokładnie strategy × perm.** Dołożenie order **nie daje nic** ponad to. Histogram to potwierdza w każdej długości (compos = xPerm: 8 i 90).
+
+## Co to znaczy: order jest wchłonięty przez perm
+
+- `strategy × order` sam w sobie dokłada +29,4% ponad strategię — więc order **nie** jest redundantny ze strategią.
+- Ale composite = strategy × perm → **order nie dokłada niczego, czego perm już nie ma.** Czyli wkład order jest **podzbiorem** wkładu perm.
+
+**Strukturalnie to ma sens:** perm permutuje **osie**, co przeetykietowuje płaszczyzny — a to osiąga to samo, co order (zmiana kolejności redukcji płaszczyzn). Permutacja osi „zawiera w sobie" zmianę kolejności. Więc `perm ⊇ order`.
+
+## Zbiór generujący zwija się do dwóch osi
+
+Cała przestrzeń różnorodności (N=3) to po prostu:
+
+```
+strategy (4^P)  ×  perm
+```
+
+- **reversed** — martwy (= baseline, bo transpozycja = odwrotność, a odległość jest niezmiennicza).
+- **order** — wchłonięty przez perm w przestrzeni łącznej.
+- Zostają **dwie** niezależne osie: mieszana redukcja `4^P` i permutacja osi. Elegancko.
+
+## Jedno zastrzeżenie (N=3 vs N=4)
+
+Przy N=3 order ma **tylko 2 opcje** — mało miejsca, żeby uciec permowi. Przy N=4 jest **16 orderów** i perm to 24 permy; niewykluczone, że tam order dorzuci coś ponad `strategy × perm`. To by wymagało próbkowanego composite N=4 (drogo). Ale `strategy × perm` jest jednoznacznie **silnikiem** różnorodności — to pewne.
+
+Zapiszę to domknięcie do pamięci:
+
+To ładny punkt domknięcia: **silnik różnorodności = `strategy(4^P) × perm`**, order i reversed redundantne. Trzy naturalne drogi dalej:
+
+- **próbkowany composite N=4** — jedyne otwarte pytanie (czy 16 orderów ucieknie permowi), przy ~16–24 orientacjach zamiast 192, żeby maszyna przeżyła;
+- **wpięcie perm do produkcyjnego greedy** — bo produkcja robi `strategy` przy perm=0, czyli mija największą synergię (ale znów: bogatszy seed ≠ szybszy GA);
+- **funkcja oceny** — realny lewar na szybkość endgame'u.
+
+Nic nie wpinam — powiedz, w którą stronę, i idziemy drobnymi krokami jak teraz.
+
+## 🧑 Robert
+
+Tak, nic nie komentowałem, chciałem żebyś to zobaczył. Chcę jakieś śladu potwierdzenia w 4D, próbkujemy - może z losową grupą 20 orientacji?
+
+
+## 🤖 Claude
+
+Dobrze. Ale muszę Ci uczciwie powiedzieć jedną rzecz **zanim** to napiszę, bo to zmienia plan:
+
+**20 orientacji z *pełnymi* 4096 strategiami to nadal ~31 mln wywołań** — bo drogi jest nie tyle liczba orientacji, co potrójna pętla composite (`23×15×4096 ≈ 1,4 mln na orientację`). Samo próbkowanie orientacji nie wystarczy.
+
+Żeby N=4 realnie pociągnął (~kilka minut, nie godzina), muszę też **próbkować strategie** — np. **512 losowych z 4096**. Porównanie „czy order dokłada ponad strategy×perm" pozostaje uczciwe, bo **ta sama próbka 512** idzie do obu. Zaniżymy liczby bezwzględne, ale odpowiemy na pytanie. To „ślad", nie pełny pomiar — dokładnie o to prosiłeś.
+
+Plan (małe kroki):
+1. **Setup próbkowania** (tylko dla N≥4): 20 losowych orientacji + 512 losowych strategii, stały seed (powtarzalne).
+2. **Pętle** iterują po tej próbce strategii; `rotMemo` czyszczę co orientację (pamięć w ryzach).
+3. **Raport** dopisze, że to próbka (ile orientacji / strategii).
+
+Zgoda na próbkowanie **strategii** też (inaczej się nie da), czy wolisz zamiast tego **mniej orientacji (np. 5) z pełnymi strategiami** — czystszy pomiar, ale cieńsza próbka orientacji? Powiedz, którą drogą, i wtedy piszę.
+
+## 🧑 Robert
+
+zgoda, przecież moge uruchomić zawsze parę razy
+
+
+## 🤖 Claude
+
+Zgoda — i skoro chcesz **odpalać parę razy**, użyję **świeżego losowania za każdym uruchomieniem** (bez stałego seeda), żeby każdy przebieg dał niezależną próbkę. Kilka strzałów = pewniejszy wniosek.
+
+Najpierw sprawdzę typ `AllOrientations` (muszę móc podmienić listę na próbkę) i doczytam aktualną pętlę:
+
+`AllOrientations()` returns `List<TAffine>` — reassignable. Let me read the current loop to rewrite it precisely:
+
+Krok 1 — setup próbkowania (tylko dla N≥4: 20 losowych orientacji + 512 losowych strategii, świeże co uruchomienie):
+
+Krok 2 — pętle iterują po próbce `strat[]`, i czyszczę `rotMemo` co orientację (pamięć w ryzach):
+
+Krok 3 — dopisek w raporcie, że to próbka (i że można odpalić ponownie po inny los):
+
+Trzy kroki gotowe. Buduję, żeby złapać literówki (jeśli apka odpalona, zobaczę tylko blokadę `.exe`):
+
+
+## 🧑 Robert
+
+Czy nie uważasz, że podczas szukania kandydatów, powinniśmy założyć, że następny obrót nie jest wykonywany w tej samej płaszczyźnie? Mając tak szeroką przestrzeń przeszukiwań powinniśmy znaleźć również ruch, który jest ich złożeniem. Poza tym - nasza przestrzeń poszukiwań strasznie się rozrosła - jest dużo większa od prawdziwej przestrzeni możliwości.
+
+Greedy decomposition diversity  (N = 4, Size = 3)
+  cubie orientations (rotation group) : 20
+  axis permutations (N!)              : 24
+  valid plane orders                  : 16
+  reduction modes (2^P, pod/nad-L)    : 64
+  reduction strategies (4^P, +L/R)    : 4096
+  *** SAMPLED: 20 random orientations x 512 strategies (re-run for another draw) ***
+
+  baseline (standard QR)              : 305   (avg 15,25 / orientation)
+
+  strategy alone (4^P, perm0 order0)  : 3315   (+986,9%)
+
+  JOINT cross (strategy x axis together) - synergy = gain OVER strategy alone:
+  strategy x perm                     : 14912   (+4789,2% vs base, +349,8% vs strategy)
+  strategy x order                    : 6256   (+1951,1% vs base, +88,7% vs strategy)
+  strategy x perm x order (composite) : 17424   (+5612,8% vs base, +16,8% vs strat x perm)
+
+  manoeuvres by length  (baseline count, then EXTRA vs baseline):
+    length  baseline   strat  xPerm  xOrder  compos
+         2        19       3       3        3       3
+         3       286     134     146      146     146
+         4         0    1663    3176     2396    3262
+         5         0    1210   11282     3406   13708
+
+
+## 🤖 Claude
+
+Świetne dwa spostrzeżenia — i oba trafiają w sedno. Najpierw wynik, bo on je podświetla.
+
+## N=4: order NIE jest wchłonięty (inaczej niż N=3)
+
+```
+strategy x perm            : 14912   (+349,8% vs strategy)
+strategy x perm x order    : 17424   (+16,8% vs strat x perm)
+```
+
+Przy N=3 composite = strategy×perm (order dokładał +0%). **Przy N=4 order dokłada +16,8%** — bo ma 16 kolejności zamiast 2, więc ucieka permowi. Zysk siedzi w długości 5: `xPerm=11282 → compos=13708` (+2426 makroruchów). Czyli **przy N=4 wszystkie trzy osie się liczą** — mój przypis z N=3 się potwierdził.
+
+## Twój punkt 2 (przestrzeń za duża) — masz rację, i on to *temperuje*
+
+Zobacz hierarchię:
+```
+warianty metryki (4^P × perm × order ≈ 1,5 mln)   ← przeszukujemy
+   ≫  distinct Correct-stringów (17424)             ← liczymy
+      ≫  distinct EFEKTÓW na kostce (~10k)           ← prawdziwa przestrzeń
+```
+
+Przy N=3 `Correct == efekt` (brak rozłącznych płaszczyzn). **Przy N=4 ~41% Correct-stringów to duplikaty efektu** (składanie komutujących). Więc te +5612% to liczba **Correct-stringów, zawyżona** — prawdziwa różnorodność efektów to ~59% tego. Uczciwą miarą jest `Verify` (efekty), wykonalny tylko przy N=3. Czyli **liczby N=4 czytaj jako górne ograniczenie.** Twoja intuicja „przestrzeń możliwości jest mniejsza" jest dokładnie tym zjawiskiem.
+
+## Twój punkt 1 (ta sama płaszczyzna) — dobry, ale z niuansem
+
+Racja: dwa kolejne obroty w **tej samej płaszczyźnie** to złożenie (`Rz90 Rz90 = Rz180`). I już teraz `Correct()` **składa sąsiednie ruchy tej samej płaszczyzny**, więc w **liczeniu** te ścieżki i tak się zwijają — distinct count ich nie zawyża.
+
+Ale dwa zastrzeżenia:
+1. **Nie jest dowodliwie bezstratny.** Złożony ruch (`Rz180`) bywa osiągalny *tylko* przez zwiniętą ścieżkę `Rz90 Rz90` pod jakąś metryką. Zakaz sąsiednich-tej-samej mógłby go **zgubić**. Twoja teza „przy tak szerokiej przestrzeni znajdziemy go i tak" jest prawdopodobna, ale nie pewna — to trzeba **zmierzyć** (przebieg z zakazem vs bez, porównać distinct).
+2. **Rusza tylko sąsiednią redundancję.** Większe zawyżenie (punkt 2) to redundancja **nie-sąsiednia** (komutacja), której zakaz-tej-samej-płaszczyzny nie tknie — składa ją dopiero weryfikacja efektu.
+
+Czyli zakaz-tej-samej to przede wszystkim **przyspieszenie i czystsze ścieżki** (i w produkcyjnym greedy: czystsze seedy), a nie lekarstwo na rozrost przestrzeni.
+
+## Do decyzji
+
+Ślad N=4 mamy: order się liczy, synergia ogromna, ale Correct-string zawyża ~41%. Dwie drogi:
+- **Wpiąć zakaz sąsiedniej-tej-samej-płaszczyzny** w greedy (diagnostyka + produkcja) i **zmierzyć**, czy distinct się zmienia — rozstrzygnie Twoje „znajdziemy złożenie i tak", a przy okazji przyspieszy i wyczyści seedy.
+- Albo uznać rozdział różnorodności za domknięty i wrócić do tego, co daje **szybkość** (ocena).
+
+Którą? (I nic nie wpinam bez Twojego słowa — jak zawsze, drobnymi krokami.)
+
+## 🧑 Robert
+
+Masz rację, nie ma co zgadywać, spróbujmy potwierdzić moją tezę na dobry początek
+
+Ale może spróbujmy to zrobić nie na composite, ale np. na crossie strat i perm
+
+
+## 🤖 Claude
+
+Dobry wybór — na `strategy × perm` (tańsze, a przy N=3 `Correct == efekt`, więc od razu prawdziwy). Plan:
+
+1. Przełącznik `PruneSamePlane` + przewlekam **poprzednią płaszczyznę** przez DFS; gdy włączony, pomijam kandydatów w tej samej płaszczyźnie co poprzedni ruch.
+2. W `Run` liczę `strategy × perm` **dwa razy** — bez zakazu i z zakazem — i porównuję. Równe → Twoja teza trzyma (kompozycja i tak się znajduje).
+
+Doczytam `AllGreedy`/`Dfs`, żeby przewlec `prevPlane` czysto:
+
+Widzę `AllGreedy` i `Dfs`. Zobaczę koniec `Dfs`, żeby dokładnie podmienić:
+
+Krok 1 — przełącznik `PruneSamePlane` (przy `AllGreedy`):
+
+Krok 2 — `AllGreedy` startuje DFS z `prevPlane = -1`:
+
+Krok 3 — `Dfs` dostaje `prevPlane`, pomija tę samą płaszczyznę i przekazuje bieżącą w rekursji:
+
+Krok 4a — akumulator `sumCrossPermPruned`:
+
+Krok 4b — w pętli policz `strategy × perm` **z zakazem** (`PruneSamePlane`), tuż po wersji bez zakazu:
+
+Krok 4c — dorzuć do sum i do raportu:
+
+Wszystkie kroki gotowe. Buduję, żeby złapać literówki:
+
+
+## 🧑 Robert
+
+Greedy decomposition diversity  (N = 3, Size = 3)
+  cubie orientations (rotation group) : 24
+  axis permutations (N!)              : 6
+  valid plane orders                  : 2
+  reduction modes (2^P, pod/nad-L)    : 8
+  reduction strategies (4^P, +L/R)    : 64
+
+  baseline (standard QR)              : 56   (avg 2,33 / orientation)
+
+  strategy alone (4^P, perm0 order0)  : 85   (+51,8%)
+
+  JOINT cross (strategy x axis together) - synergy = gain OVER strategy alone:
+  strategy x perm                     : 154   (+175,0% vs base, +81,2% vs strategy)
+  strategy x perm (NO same-plane)     : 154   (SAME -> pruning LOSSLESS (thesis holds))
+  strategy x order                    : 110   (+96,4% vs base, +29,4% vs strategy)
+  strategy x perm x order (composite) : 154   (+175,0% vs base, +0,0% vs strat x perm)
+
+  manoeuvres by length  (baseline count, then EXTRA vs baseline):
+    length  baseline   strat  xPerm  xOrder  compos
+         0         1       0       0        0       0
+         1         9       0       0        0       0
+         2        46       6       8        8       8
+         3         0      23      90       46      90
+Greedy decomposition diversity  (N = 4, Size = 3)
+  cubie orientations (rotation group) : 20
+  axis permutations (N!)              : 24
+  valid plane orders                  : 16
+  reduction modes (2^P, pod/nad-L)    : 64
+  reduction strategies (4^P, +L/R)    : 4096
+  *** SAMPLED: 20 random orientations x 512 strategies (re-run for another draw) ***
+
+  baseline (standard QR)              : 153   (avg 7,65 / orientation)
+
+  strategy alone (4^P, perm0 order0)  : 1292   (+744,4%)
+
+  JOINT cross (strategy x axis together) - synergy = gain OVER strategy alone:
+  strategy x perm                     : 8777   (+5636,6% vs base, +579,3% vs strategy)
+  strategy x perm (NO same-plane)     : 8687   (lost 90 -> thesis FAILS)
+  strategy x order                    : 4215   (+2654,9% vs base, +226,2% vs strategy)
+  strategy x perm x order (composite) : 10929   (+7043,1% vs base, +24,5% vs strat x perm)
+
+  manoeuvres by length  (baseline count, then EXTRA vs baseline):
+    length  baseline   strat  xPerm  xOrder  compos
+         1         1       0       0        0       0
+         2        34       2       2        2       2
+         3       118     124     144      144     144
+         4         0     593    1768     1064    1854
+         5         0     420    6710     2852    8776
+
+
+## 🤖 Claude
+
+Czysta, empiryczna odpowiedź — i ciekawie **rozjeżdża się między N=3 a N=4**:
+
+| | strategy × perm | z zakazem | wniosek |
+|---|---|---|---|
+| **N=3** | 154 | 154 | **bezstratne** — teza trzyma |
+| **N=4** | 8777 | 8687 | **traci 90 (~1%)** — teza upada |
+
+## Co to znaczy
+
+Twoja intuicja („złożenie znajdziemy i tak") jest **prawdziwa przy N=3, ale pęka przy N=4**. Przy N=4 istnieje ~1% manewrów **osiągalnych wyłącznie** przez ścieżkę z sąsiednimi obrotami tej samej płaszczyzny (którą `Correct` zwija do krótszej formy) — a ta krótsza forma **nie jest** niezależnie generowana pod żadną z dostępnych metryk. Czyli `Rz180` w środku manewru bywa dostępne tylko jako `Rz90 Rz90`, nie jako pojedynczy krok. Zakaz go gubi.
+
+Dlaczego dopiero N=4? Więcej płaszczyzn (6), dłuższe manewry (do 5) i szersza przestrzeń metryk → pojawiają się te „tylko przez zwinięcie" przypadki, których w ciasnym N=3 nie ma.
+
+## Konsekwencje
+
+- **W diagnostyce nie zakazujemy** — bo zaniżałoby distinct o ~1% (mielibyśmy niepełny obraz).
+- **W produkcyjnym greedy** zakaz to marginalny handel: −1% różnorodności seedów za szybszy, czystszy (zwięźlejszy w genach) rozkład. Przy 1% i naszej zasadzie „seeder tylko seeduje, nie kuruje" — raczej **nie warto**. Zostawiamy pełną przestrzeń.
+
+## Uwaga
+
+„Traci 90" jest **próbkozależne** (20 orientacji × 512 strategii) — odpal jeszcze raz, liczba się zmieni, ale **znak zostanie dodatni** (>0). To potwierdzi, że strata jest realna, nie szumowa. Warto strzelić 2–3 razy dla pewności.
+
+To ładnie domyka Twoje pytanie: **zakaz nie jest bezstratny** (poza N=3). Chcesz, żebym:
+- zostawił ten pomiar w `Run` (przydatny), czy **posprzątał** (usunął wersję z zakazem, skoro odpowiedź mamy);
+- i czy zamykamy wątek różnorodności i idziemy do **oceny**?
+
+Jak zawsze — nic nie ruszam bez Twojego słowa.
+
+## 🧑 Robert
+
+"Teza upadła" - no nie do końca. Sprawdźmy z composite dla 4D (oczywiście bez crossa tylko z perm dla przyspieszenia obliczeń, chyba, że go wykorzystujesz do composite)
+
+
+## 🤖 Claude
+
+Trafna korekta — `strategy × perm` traci 90, ale **composite ma jeszcze order**, który może dostarczyć tych brakujących ścieżek. Jeśli na pełnym composite zakaz jest bezstratny → Twoja teza trzyma się w **pełnej** przestrzeni. To właściwy test.
+
+Plan: **usuwam** osobny test `strategy × perm (pruned)` (crossPerm zostaje — jest potrzebny do składania composite), a **dodaję pruned composite**. Porównam composite vs composite-z-zakazem.
+
+Krok 1 — usuwam blok `crossPermP` z pętli:
+
+Krok 2 — dodaję **pruned composit** (pełny `strategy × perm × order` z zakazem) tuż po composite:
+
+Krok 3 — zamień akumulator w pętli (`crossPermP` → `compositeP`):
+
+Krok 4 — deklaracja (`sumCrossPermPruned` → `sumCompositeP`):
+
+Krok 5a — usuwam linię raportu `strategy × perm (NO same-plane)` (odwoływała się do usuniętego licznika):
+
+Krok 5b — dodaję linię `composite (NO same-plane)` z werdyktem:
+
+Gotowe. Zmiana testuje teraz zakaz na **pełnym composite**: jeśli `composite (NO same-plane)` = `composite` → Twoja teza trzyma się w pełnej przestrzeni (order dostarcza brakujących ścieżek). Buduję, żeby złapać literówki:
+
+No response requested.
+
+
+## 🧑 Robert
+
+Greedy decomposition diversity  (N = 4, Size = 3)
+  cubie orientations (rotation group) : 20
+  axis permutations (N!)              : 24
+  valid plane orders                  : 16
+  reduction modes (2^P, pod/nad-L)    : 64
+  reduction strategies (4^P, +L/R)    : 4096
+  *** SAMPLED: 20 random orientations x 512 strategies (re-run for another draw) ***
+
+  baseline (standard QR)              : 226   (avg 11,30 / orientation)
+
+  strategy alone (4^P, perm0 order0)  : 1923   (+750,9%)
+
+  JOINT cross (strategy x axis together) - synergy = gain OVER strategy alone:
+  strategy x perm                     : 12251   (+5320,8% vs base, +537,1% vs strategy)
+  strategy x order                    : 5281   (+2236,7% vs base, +174,6% vs strategy)
+  strategy x perm x order (composite) : 16955   (+7402,2% vs base, +38,4% vs strat x perm)
+  composite (NO same-plane)           : 16795   (lost 160 -> still loses)
+
+  manoeuvres by length  (baseline count, then EXTRA vs baseline):
+    length  baseline   strat  xPerm  xOrder  compos
+         1         3       1       1        1       1
+         2        25       6       6        6       6
+         3       198     114     166      164     166
+         4         0     827    2562     1655    2706
+         5         0     749    9290     3229   13850
+
+
+## 🤖 Claude
+
+Composite **też** traci — 160 (~0,9%). Więc na miarze Correct-stringów teza upada **nawet w pełnej przestrzeni**: order nie dostarcza wszystkich brakujących ścieżek. Istnieją kanoniczne manewry osiągalne *wyłącznie* przez zwinięcie ścieżki z sąsiednią płaszczyzną — żadna kombinacja `perm × order × strategia` nie generuje ich wprost.
+
+## Ale — i tu masz rację, że „nie do końca"
+
+Kluczowe rozróżnienie **Correct-string vs efekt**:
+
+- **N=3** (gdzie `Correct == efekt`, zweryfikowane): zakaz był **idealnie bezstratny — 0**. Zero utraconych *efektów*.
+- **N=4**: mierzymy **Correct-stringi**, które zawyżają efekty o ~41% (składanie komutujących). Te utracone 160 to Correct-stringi — a **mogą być w większości/całości duplikatami efektu** (redundantne zapisy tego samego ruchu na kostce). Wtedy zakaz nie traci **żadnego realnego efektu**, tylko nadmiarowe reprezentacje.
+
+Nie potwierdzimy tego (Verify@N=4 nieosiągalny), ale **jedyne miejsce, gdzie widzimy prawdę — N=3 — pokazuje zakaz jako w 100% bezstratny.** Więc:
+
+> **Na Correct-stringach teza upada (~1% przy N=4). Na efektach — prawdopodobnie trzyma (N=3: 0 straty), tylko nie do udowodnienia przy N=4.**
+
+To jest uczciwe „nie do końca": zakaz gubi **reprezentacje**, niekoniecznie **operacje**.
+
+## Praktyczny wniosek
+
+- **Diagnostyka** liczy Correct-stringi → **nie zakazujemy** (żeby nie zaniżać o ~1%).
+- **Produkcja**: nawet gdyby te 160 to realne efekty, to ~1% seedów; a prawdopodobnie to duplikaty → **zakaz nieopłacalny**, zostawiamy pełną przestrzeń.
+
+Uwaga próbkowa: `strategy×perm` zgubił 90, composite 160 — różne losy, ale **znak zawsze dodatni** na Correct-stringach. Odpal 2× dla pewności, że >0 się trzyma.
+
+To domyka pytanie o zakaz. Chcesz, żebym teraz **posprzątał diagnostykę** (zdjął rusztowanie testowe: pruning, sampling, dodatkowe kolumny — wróci czysty `Run`), czy zostawiamy do dalszych zabaw? I czy zamykamy różnorodność, czy jeszcze coś Cię korci?
+
+## 🧑 Robert
+
+Nie, spróbujmy czegoś innego. Wydaje mi się, że powód dla którego w 4D się nie potwierdza, to losowy wybór kilku płaszczyzn. Zawęźmy bardziej liczbę orientacji, a zwiększmy zakres płaszczyzn
+
+
+## 🤖 Claude
+
+Sensowna hipoteza: przy 512 z 4096 strategii możemy **nie trafiać** w tę strategię, która generuje „zgubiony" manewr wprost — i wtedy zostaje tylko ścieżka przez zwinięcie. Z **pełnym** pokryciem strategii ten manewr mógłby się znaleźć bezpośrednio → zakaz bezstratny. Twoje „zwiększmy zakres" = pełne strategie; „zawęźmy orientacje" = mniej orientacji, żeby to udźwignąć.
+
+Ustawię: **5 orientacji, pełne 4096 strategii**. Doczytam blok próbkowania, żeby podmienić czysto:
+
+Zmieniam próbkowanie — 5 orientacji, pełne strategie (i bez wolnego losowego dobierania, gdy bierzemy wszystkie):
+
+Gotowe — teraz przy N≥4: **5 losowych orientacji × pełne 4096 strategii** (`sampleOrients=5, sampleStrats=stratCount`). N=3 bez zmian (pełny). Logika: przy pełnym pokryciu strategii, jeśli „zgubiony" manewr da się wygenerować wprost, to *jakaś* strategia go znajdzie → `composite (NO same-plane)` == `composite`.
+
+**Czego się spodziewać:**
+- Jeśli `lost 0` → Twoja hipoteza trafna: to było próbkowanie strategii, a zakaz jest bezstratny przy pełnym pokryciu.
+- Jeśli nadal `lost > 0` → istnieją prawdziwe „fold-only" manewry, których żadna strategia nie generuje wprost.
+
+**Ostrzeżenia (bo pełne strategie są cięższe):**
+- Koszt: ~3,3 mln `AllGreedy` na orientację × 5 ≈ 16 mln — rząd kilku minut, i pamięć rośnie (memo czyszczę co orientację, szczyt kilkaset MB). Gdyby za wolno/za gorąco — zejdź z `sampleOrients` do 3 albo 2.
+- 5 orientacji to **mała** próbka: jak trafisz 5 płytkich, `lost` może wyjść 0 przypadkowo. **Odpal 2–3 razy** (świeży los za każdym razem) — dopiero powtarzalne `0` potwierdza hipotezę.
+
+Nie buduję — zbuduj u siebie i wklej wynik. Jeśli literówka, VS ją złapie od razu.
+
+## 🧑 Robert
+
+Warto byłoby próbować zawęzić jakoś naszą przestrzeń eksploracji ruchów, nie tracąc cennych seedów. Ograniczenie sąsiedniej płaszczyzny obrotu może i tak niewiele pomóc
+
+
+## 🤖 Claude
+
+Zgadzam się — i masz rację, że zakaz sąsiedniej płaszczyzny to ślepa uliczka (traci ~1%, daje mało). Ale to podsuwa właściwą zasadę, bo pokazuje **czego NIE robić**.
+
+## Dwa sposoby zawężania — i tylko jeden jest bezstratny
+
+**Zawężanie strukturalne** (a priori odcinamy część przestrzeni: „bez sąsiedniej płaszczyzny", „tylko pod", itp.) — **ryzykuje utratę seedów**, bo nie wiesz z góry, że odcięty fragment nie zawierał czegoś osiągalnego tylko tamtędy. Właśnie to zobaczyliśmy: 1% zniknął.
+
+**Zawężanie sterowane pokryciem** (eksploruj + deduplikuj + zatrzymaj się, gdy przestają pojawiać się nowe) — **bezstratne z definicji**, bo nie odcinasz przestrzeni, tylko przestajesz ją **przemiatać w kółko**, kiedy nic nowego nie wpada. I to jest kluczowe rozróżnienie: nie zawężamy *przestrzeni*, zawężamy *powtórki*.
+
+## Co z tego wynika
+
+1. **Do seedowania nie musisz zawężać przestrzeni w ogóle.** Bo ty jej nie *enumerujesz* — ty ją **próbkujesz**: jeden losowy wariant metryki na seed. Rozmiar przestrzeni jest wtedy **nieistotny** — płacisz za seed, nie za przestrzeń. A `BuildSeedMoves` już robi dedup + przerwanie na saturacji (stall). Czyli architektura *już* jest bezstratnym zawężaniem: pełna przestrzeń otwarta, ale nie mielisz duplikatów w nieskończoność.
+
+2. **Jedyne strukturalne cięcie, które NIC nie traci:** pomijanie modów **dowiedlnie pustych** (`rc0 < min` → zawsze stuck → zero seedów). To nie kuracja — to nietykanie regionów, które i tak nic nie dają. Czysta wydajność.
+
+3. **Prawdziwe seedy są w pełnej przestrzeni `strategy × perm × order`**, a produkcja losuje dziś tylko `strategy` (perm0, order0) — czyli **mija** synergię perm/order (te +38% przy N=4). Jeśli chcesz do nich sięgnąć bez blowupu: **losuj `(perm, order, strategy)` na seed** — próbkowanie pełnej przestrzeni, koszt dalej per-seed, dedup zawęża wynik. Zero utraconych seedów, zero enumeracji.
+
+## Moja rekomendacja
+
+Nie tnij przestrzeni strukturalnie — to zawsze grozi utratą. Zamiast tego:
+- **produkcja**: rozszerz losowanie o `perm` i `order` (sięgniesz po cenne seedy z synergii), zostaw dedup+saturację jako zawężacz;
+- opcjonalnie: **pomijaj mody `rc0 < min`** (czysty zysk czasu, zero utraty).
+
+To daje „więcej cennych seedów przy tym samym koszcie per-seed", zamiast „mniej przeszukiwania kosztem ryzyka utraty".
+
+Ale — stary refren — bogatsze seedy to nie automat na szybszy GA (znamy słabą dźwignię i przeseedowanie). Więc pytanie brzmi: chcesz **wpiąć perm/order do produkcyjnego losowania seedów** (sięgnąć po tę synergię), czy to raczej rozmowa koncepcyjna i wracamy do tego, co realnie przyspiesza — **oceny**? Powiedz kierunek, a ja małymi krokami.
+
+## 🧑 Robert
+
+Długo liczy wszystkie możliwe permxorder dla każdej orientacji. Sprawdź jeszcze, czy skończy za mniej powiedzmy niż godzinę te 5 orientacji, bo uruchomiłem w Release aby mu było łatwiej (obliczenia na CPU, nie przegrzeje się bo jest ograniczany energetycznie do 80% mocy) i nie mam jak sprawdzić jak jest daleko
+
+
+## 🤖 Claude
+
+Policzmy dokładnie, bo to jest liczba, którą da się oszacować.
+
+## Ile wywołań `AllGreedy` (5 orientacji, pełne 4096 strategii)
+
+Na orientację, licząc **oba** composite (bez zakazu + z zakazem), bo compositeP budujemy od zera:
+
+```
+both-nonzero (perm≠0 ∧ order≠0):  23 × 15 × 4096 ≈ 1,41 mln   ← dominuje
++ crossPerm/crossOrder/strategy:  ~0,16 mln
+→ composite (unpruned):           ~1,57 mln
+→ compositeP (pruned):            ~1,57 mln
+razem na orientację:              ~3,15 mln
+× 5 orientacji:                   ~15,7 mln wywołań AllGreedy
+```
+
+## Czy zdąży w godzinę?
+
+**Prawdopodobnie tak, ale to blisko granicy.** Każde `AllGreedy` to mały DFS z **alokacjami** (klon macierzy w `ApplyMove` na każdego kandydata, `HashSet`, `List`, stringi) — przy 15,7 mln wywołań to **miliardy drobnych alokacji** → ciężki GC Gen0. To główny wróg, nie sama arytmetyka.
+
+Realny zakres w Release: **~15–45 min**. Ale:
+- **80% mocy CPU** dokłada ~+20% → przesuwa w stronę **~20–55 min**.
+- Memo czyszczę co orientację (~kilkaset MB szczytu), więc każda z 5 orientacji płaci pełną cenę bez współdzielenia — to podnosi górną granicę.
+
+Więc: **stawiałbym, że zmieści się w godzinie, ale bez gwarancji** — jak trafisz na ciężki GC, może otrzeć się o 60 min.
+
+## Praktycznie
+
+- Daj mu **do godziny**. Jak nie skończy — to znaczy, że dominuje alokacja/GC, nie zawieszenie.
+- Na przyszłość (albo jak zabijesz): **`sampleOrients = 2` albo `3`** — koszt liniowy, więc 2 orientacje to ~6 mln wywołań, **~8–20 min**. A sygnał („czy pełne strategie gubią przy zakazie") dostaniesz z 2–3 orientacji tak samo — wystarczy odpalić parę razy na świeżych losach.
+
+Jeśli chcesz, mogę na przyszłe przebiegi **odchudzić** to bez utraty testu: liczyć compositeP tylko na tych manewrach, których composite nie znalazł innym torem — ale to osobna optymalizacja, nie ruszam teraz, skoro już liczy.
+
+## 🧑 Robert
+
+Greedy decomposition diversity  (N = 4, Size = 3)
+  cubie orientations (rotation group) : 5
+  axis permutations (N!)              : 24
+  valid plane orders                  : 16
+  reduction modes (2^P, pod/nad-L)    : 64
+  reduction strategies (4^P, +L/R)    : 4096
+  *** SAMPLED: 5 random orientations x 4096 strategies (re-run for another draw) ***
+
+  baseline (standard QR)              : 64   (avg 12,80 / orientation)
+
+  strategy alone (4^P, perm0 order0)  : 267   (+317,2%)
+
+  JOINT cross (strategy x axis together) - synergy = gain OVER strategy alone:
+  strategy x perm                     : 3100   (+4743,8% vs base, +1061,0% vs strategy)
+  strategy x order                    : 572   (+793,8% vs base, +114,2% vs strategy)
+  strategy x perm x order (composite) : 4008   (+6162,5% vs base, +29,3% vs strat x perm)
+  composite (NO same-plane)           : 4000   (lost 8 -> still loses)
+
+  manoeuvres by length  (baseline count, then EXTRA vs baseline):
+    length  baseline   strat  xPerm  xOrder  compos
+         2        10       1       1        1       1
+         3        54      31      33       33      33
+         4         0     109     628      250     648
+         5         0      62    2374      224    3262
+
+
+## 🤖 Claude
+
+Wynik jest subtelny i uczciwy: **pełne strategie STILL gubią — 8.** Więc hipoteza „to tylko próbkowanie strategii" **upada** — istnieje genuine residuum, którego żadna z 4096 strategii nie generuje wprost. Są prawdziwe „fold-only" manewry.
+
+## Ale byłeś częściowo w punkt
+
+Popatrz na skalę per orientację:
+- **512 strategii** (poprzednio): 160 / 20 orient ≈ **8 zgubionych na orientację**
+- **4096 strategii** (teraz): 8 / 5 orient ≈ **1,6 na orientację**
+
+Czyli pełne pokrycie strategii **zmniejszyło stratę ~5×** — sampling *był* częścią przyczyny, tylko nie całą. Zostaje mały, twardy rdzeń fold-only.
+
+## Pełny obraz zakazu sąsiedniej płaszczyzny
+
+| | strata | uwaga |
+|---|---|---|
+| **N=3** | **0** | idealnie bezstratny — i tam `Correct == efekt`, więc **0 utraconych efektów** |
+| **N=4, 512 strat** | ~0,9% | częściowo artefakt próbkowania |
+| **N=4, pełne strat** | ~0,2% | genuine rdzeń, ale malutki |
+
+I kluczowe: te ~0,2% to **Correct-stringi**, z których ~41% to i tak duplikaty efektu. Więc na poziomie **efektów** strata jest jeszcze mniejsza — być może zerowa (N=3 to sugeruje). Nie zweryfikujemy przy N=4, ale:
+
+> **Zakaz jest praktycznie bezstratny (0 przy N=3, ~0,2% Correct-stringów przy N=4, prawdopodobnie 0 efektów) — ale NIE dokładnie, i zysk jest znikomy.**
+
+To ostatecznie **zamyka** wątek zakazu: nie warto. Nie tędy się zawęża.
+
+(Odpal jeszcze raz na świeżych 5 orientacjach, jeśli chcesz potwierdzić, że strata trzyma się >0 — ale po wszystkich przebiegach jest konsekwentnie dodatnia, więc to genuine, nie szum.)
+
+## I to potwierdza zasadę z poprzedniej rozmowy
+
+Strukturalne cięcie (zakaz) **zawsze** coś gubi — tu mało, ale zawsze >0. Bezstratne zawężanie to **próbkowanie + dedup + saturacja**, nie odcinanie przestrzeni. Więc jeśli chcesz sięgnąć po te cenne perm/order-seedy bez blowupu — **losuj `(perm, order, strategy)` na seed** w produkcji, a nie enumeruj ani nie przycinaj.
+
+Diagnostykę różnorodności mamy chyba domkniętą na całego. Dwie drogi:
+1. **Wpiąć perm/order do produkcyjnego losowania seedów** (sięgnąć po synergię, próbkowaniem — bezstratnie).
+2. **Posprzątać diagnostykę** (zdjąć rusztowanie: sampling, pruning, composite) i przejść do **oceny** — realnego lewara na szybkość.
+
+Którą? (Nadal skłaniałbym się ku ocenie, ale to Twój projekt.)
+
+## 🧑 Robert
+
+NIe sprzątaj na razie diagnostyki, nie wpływa ona specjalnie na normalną pracę chyba? Co do moich prób - nawet nie chodziło tak bardzo o przyspieszenie obliczeń (bo na przestrzeń, jak wspomniałeś najwyzej nie wpływa) ale raczej o potwierdzenie dla mnie przypuszczenia, że wszystkie nasze osie nie dają prawdopodobnie wszystkich możliwości (a już i tak są niesłychanie rozdmuchane). Pewnie istnieje jakaś lepsza "oś" - i to jest być może najciekawsze z całej kostki Rubika. Wepnijmy synergię, przetestuję
+
+
+## 🤖 Claude
+
+Najpierw do Twojej myśli, bo ona jest naprawdę najciekawsza w całej tej zabawie:
+
+**Twoje przypuszczenie potwierdziło się mimochodem.** Test zakazu pokazał, że nawet **pełne** `strategy × perm × order` **nie generuje wszystkiego** — te fold-only manewry leżą *poza* zasięgiem naszych osi. Więc masz rację: nasze osie, choć rozdmuchane, **nie span-ują całej przestrzeni manewrów**. Istnieje struktura, której nie złapaliśmy — i pytanie „jaka jest **kompletna** oś generująca rozwiązania kostki" jest głębokie i piękne. Nasze (strategia/perm/order) to bogate, ale **niepełne** pokrycie. To zostaje jako otwarty, fascynujący wątek.
+
+Teraz — wpinam synergię (perm+order do produkcyjnego losowania seedów). Diagnostyki nie ruszam (masz rację, siedzi tylko pod menu, nie dotyka ścieżki GA).
+
+Zanim zacznę — muszę zobaczyć, jak diagnostyka liczy `perms` i `orders`, żeby wiernie odtworzyć to samo w produkcyjnym `RotCountMode`:
+
+Idą świetne pytania na koniec kostki — zapamiętam ten wątek „lepszej osi" jako otwarty.
+
+Do wpięcia: synergia to głównie **perm** (to on dał te +349–1061% nad samą strategią; order dokłada +38% na wierzchu i wymaga generatora *ważnych* kolejności). Więc zrobię **najpierw perm** — jest największy i prosty (losowa permutacja osi na seed, bez żadnych ograniczeń, każda permutacja legalna). Order dołożymy potem, jeśli perm pomoże.
+
+Zobaczę dokładny aktualny kształt produkcyjnego greedy, żeby przewlec `perm` czysto:
+
+Mam wszystko. Wpinam **perm** w 4 małych krokach. Perm = losowa permutacja osi na seed, wchodzi do metryki jako `A = PᵀMP` (konjugacja), reszta greedy bez zmian — seedy dalej to prawdziwe ciągi ruchów.
+
+Krok 1 — `RotCountMode` bierze `perm`, buduje permutowaną kopię (przy okazji staje się nie-destrukcyjny):
+
+Krok 2 — `RotCountModeAfter` przekazuje `perm`; plus dwa pomocniki (identyczność / losowa permutacja):
+
+Krok 3 — `GetSolveSeq` i `SolveModeDfs` przewlekają `perm`:
+
+Krok 4 — `BuildSeedMoves`: losowa permutacja na próbę + poprawka census (nowa sygnatura `RotCountMode`):
+
+Krok 5 — dopisek w raporcie, że perm jest losowe:
+
+Let me verify no other caller uses the old signatures:
+
+Wszystkie sygnatury spójne (jedyne wywołania to nasze; legacy `GetSolveSeq()` bez zmian). Nie buduję — zbudujesz u siebie.
+
+## Co się zmieniło (perm wpięty w produkcyjne seedy)
+
+- **`RotCountMode(M, perm, modeMask)`** — najpierw konjuguje macierz permutacją osi (`A = PᵀMP`), potem redukcja strategią. Przy okazji jest teraz **nie-destrukcyjny** (buduje kopię), więc zniknęły zbędne `.Clone()`.
+- **`GetSolveSeq(perm, modeMask)`** i `SolveModeDfs` — przewleczony `perm`. Greedy dalej wykonuje **prawdziwe ruchy**; perm żyje tylko w metryce (jak w diagnostyce, zweryfikowanej 100% solve).
+- **`BuildSeedMoves`** — na każdą próbę losuje `perm` (`RandomPerm`, Fisher-Yates) obok `mode`. Przy `SEED_MODE=0` perm = identyczność (czysty baseline, bez zmian). Census liczony przy identyczności (referencja mode-only).
+- Raport pokazuje `perm=random/identity`.
+
+**Order NIE wpięty** — perm to bulk synergii i jest prosty (każda permutacja legalna). Order dokłada +38% na wierzchu, ale wymaga generatora *ważnych* kolejności — dołożę, jeśli perm pomoże.
+
+## Czego się spodziewać
+
+- Przy `SEED_MODE=1` pula seedów teraz próbkuje przestrzeń **strategy × perm** — dużo bogatszą (to te +349–1061% z diagnostyki). W **Seed Pool Stats** na głębokim kubiku histogram długości powinien puchnąć, distinct rosnąć.
+- **Uwaga, ta sama pułapka:** bogatsza pula = łatwiej dobija `target` = mocniejsze przeseedowanie przy wysokim `SEED_RATIO`. Sweet-spot pewnie **jeszcze niżej** niż 50%. Jak testujesz układanie — zacznij od niskiego ratio (10–25%).
+- `SEED_MODE=0` bez zmian (perm=identity) — dobry punkt odniesienia.
+
+Zbuduj, odpal **Seed Pool Stats** na narożniku (zobaczysz czy pula bogatsza), a potem — jeśli chcesz — porównaj układanie przy niskim ratio: perm-on (`SEED_MODE=1`) vs baseline (`SEED_MODE=0`). Wklej co wyjdzie.
+
+## 🧑 Robert
+
+Dobrze, że robimy wszystko powoli. Chyba coś mam: GetOrder() zwraca prawidłowy porządek <b>tylko dla strategii "left"</b> . Dla right on po prostu nie jest "right"
+
+
+## 🤖 Claude
+
+To jest bystra obserwacja i chcę ją potwierdzić na kodzie — zobaczę `GetOrder()` i jak liczona jest „ważność" kolejności:
+
+Potwierdzam na kodzie — i to jest **świetny** trop. Popatrz na warunek w `GetOrder()` (i identyczny w diagnostycznym `OrderDfs`):
+
+```csharp
+if (n == 0 || mask[m, n - 1] && mask[n, n - 1])   // plane (n,m), n<m
+```
+
+To jest warunek „można teraz zredukować tę płaszczyznę", wyprowadzony dla **operacji wierszowych** (left): zerując płaszczyznę wierszowo, nie psujesz zer w kolumnach już obsłużonych — i `mask` śledzi to po wierszach. Dla **operacji kolumnowych** (right) zależność jest **transponowana** — psujesz/chronisz zera w *wierszach*, nie kolumnach. Więc warunek prawidłowości byłby inny (z grubsza `mask[n-1, m] && mask[n-1, n]`). Masz rację: **`GetOrder()` daje ważną kolejność tylko dla left; dla right po prostu nie jest „right".**
+
+## Co to znaczy
+
+- **Produkcja (to, co teraz wpiąłem) — bez wpływu.** Mode-greedy używa **naturalnej** kolejności (pętla `p = 0..P`), nie `GetOrder()`. A `GetOrder()` żyje tylko w legacy CPU/Euler (i tam jest czysto left). Więc perm-wiring jest czysty.
+
+- **Diagnostyka — niedoszacowuje.** Oś `order` używa **left-ważnych** kolejności z *każdą* strategią, w tym right. Dla right taka kolejność często **nie zredukuje do identyczności** → greedy utyka → solve-check to odfiltrowuje. Efekt: **nie dostajemy błędnych wyników, ale gubimy right-ważne kolejności.** Czyli nasze `strategy × order` i +38% w composite to **dolne ograniczenie** — prawdziwa synergia order×right jest większa.
+
+## I tu jest to, co najciekawsze
+
+**Twój trop może częściowo tłumaczyć niekompletność, którą gonimy.** Te „fold-only" manewry, których zakaz gubił, a których pełne `strategy × perm × order` nie generuje wprost — **część z nich może być osiągalna właśnie przez right-ważne kolejności**, których nigdy nie próbowaliśmy (bo `orders` było left-only). Innymi słowy: może nie brakuje nam *nowej osi* — może **niedomiar leży w tym, że oś order była jednostronna (left)**.
+
+To testowalne: **dodać right-ważne kolejności** (transponowany warunek) do diagnostyki i sprawdzić, czy:
+1. `strategy × order` / composite rosną (synergia order×right się ujawnia),
+2. luka „fold-only" (strata przy zakazie) się kurczy — może nawet do zera.
+
+Jeśli luka zniknie po dodaniu right-orderów → **nasze osie JEDNAK span-ują wszystko**, tylko order był ślepy na prawą stronę. To byłoby piękne domknięcie.
+
+Chcesz, żebym **wyprowadził i dodał right-ważny warunek kolejności** do diagnostyki (osobna lista `ordersR`, albo wspólna z bitem strony), i przemierzył composite jeszcze raz? To jest dokładnie w duchu „szukamy kompletnej osi". Małymi krokami — najpierw sam warunek, potem pomiar.
+
+## 🧑 Robert
+
+Pewnie że tak. Zobacz, jak to się pięknie wszystko domyka: nie tylko sprawdzimy czy wzrośnie wpływ osi Order, prawdopodobnie będziemy nawet w stanie sprawdzić, czy pokrywamy całą przestrzeń. Trzeba będzie sprawdzić, czy przypadkiem (bardzo wątpliwe) cross strategy x Order nie pokrywa wszystkiego i nie wchłania perm przy prawidłowym działaniu
+
+
+## 🤖 Claude
+
+„Pewnie że tak" — i zgadzam się, że to się pięknie domyka. Ale mam **lepsze podejście** niż wyprowadzanie right-ważnego warunku (który jest ryzykowny, bo ważność kolejności **zależy od strategii** per-płaszczyzna — miks L/R nie jest ani czysto-left ani czysto-right ważny):
+
+## Pivot: zamiast derywować — użyj WSZYSTKICH kolejności, a solve-check odsieje
+
+`RotCount` liczy metrykę dla dowolnej `(order, strategy)`, a `Dfs` ma **solve-check** (`OrthoPack == identity`). Więc jeśli dam mu **wszystkie P! kolejności płaszczyzn** (nie tylko left-ważne), to:
+- kolejności ważne dla danej strategii (left, right, mieszane) → rozwiązują → wchodzą,
+- nieważne → greedy utyka → odfiltrowane.
+
+To jest **kompletne i poprawne dla każdej strategii**, bez wyprowadzania czegokolwiek. Dokładnie usuwa left-bias, o którym mówisz — i od razu odpowiada na Twoje pytanie „czy pokrywamy całą przestrzeń".
+
+Koszt: P! zamiast ~16 (N=4: 720). Dla **N=3 to tylko 6** — trywialne i dokładne. Dla N=4 dołożę **próbkowanie kolejności** (jak próbkujemy strategie), żeby zostało wykonalne.
+
+Krok 1 — generator wszystkich P! kolejności (obok `AllOrders`):
+
+
+## 🧑 Robert
+
+Coś mi tu nie pasuje. Przecież wiemy, czy wybraliśmy right, czy left i odpowiednio do tego należałoby... - aha, no tym razem nie cały order, musimy... Dobra, masz rację. Na razie weźmy WSZYSTKIE.
+
+
+## 🤖 Claude
+
+Właśnie — dokładnie o to chodziło: ważność zależy **per-płaszczyzna** (miks L/R), więc nie da się tego przypiąć do „całego order" prosto. Bierzemy WSZYSTKIE, solve-check odsiewa. Kontynuuję.
+
+Krok 2 — `Run` używa `AllPlaneOrders()`:
+
+Krok 3 — próbkowanie kolejności dla N≥4 (żeby 720 nie wysadziło N=4). Doczytam blok próbkowania:
+
+Blok jest trochę zagmatwany (zdublowane próbkowanie orientacji). Przepiszę go czyściej i dołożę próbkowanie kolejności. Doczytam do końca bloku:
+
+Krok 3 — czystszy blok próbkowania + próbkowanie kolejności (dla N=4; N=3 bierze wszystkie 6):
+
+Krok 4 — dwa pomocniki próbkowania (obok `AllPlaneOrders`):
+
+Krok 5 — poprawię etykiety w raporcie (order to teraz wszystkie P!, próbkowane przy N=4):
+
+`Factorial` nie istnieje — dodaję malutki pomocnik:
+
+
+## 🧑 Robert
+
+Czekaj, a dodajesz faktycznie WSZYSTKIE wszystkie kolejności, czy tylko GetOrderLeft() + GetOrderRight()?
+
+
+## 🤖 Claude
+
+Dobre pytanie — i celowo **WSZYSTKIE P!**, nie `left ∪ right`. Właśnie dlatego, że sam zauważyłeś rzecz kluczową:
+
+**Ważność kolejności jest per-płaszczyzna-mieszana.** Strategia to miks L/R (np. płaszczyzna A left, B right, C right...). Taki miks ma **własny** zbiór ważnych kolejności — który **nie musi** być ani w left-ważnych, ani w right-ważnych. Więc `GetOrderLeft() ∪ GetOrderRight()` **przegapiłoby** kolejności ważne tylko dla konkretnego miksu. Tylko **wszystkie P! + solve-check** łapią komplet.
+
+Konkretnie w kodzie:
+- `AllPlaneOrders()` → wszystkie `P!` permutacje płaszczyzn (dla N=4 to 720, dla N=3 to 6).
+- `Dfs` solve-checkiem odsiewa te, które dla danej strategii nie redukują do identyczności.
+
+Tradeoff, którego jestem świadom: **P! jest rozrzutne** — większość z 720 kolejności jest nieważna dla *żadnej* strategii (zawsze stuck, czysta strata). Ale to jedyna droga do **kompletności** bez wyprowadzania per-strategia. Dlatego:
+
+- **N=3**: 6 kolejności, **wszystkie**, bez próbkowania → wynik **dokładny i kompletny**. To jest definitywny test „czy pokrywamy całą przestrzeń / czy order wchłania perm".
+- **N=4**: próbkuję 24 z 720 → **prawdopodobny** ślad (może przegapić jakiś mixed-ważny order, ale odpalasz parę razy).
+
+Czyli: jeśli chcesz **twardej odpowiedzi** na „czy z pełnym orderem domykamy przestrzeń", patrz na **N=3** — tam mamy komplet. N=4 to tylko potwierdzenie trendu.
+
+Nie dokończyłem — został build. Zbuduj u siebie i odpal **N=3** (`Greedy Diversity`), zobaczymy czy przy wszystkich 6 kolejnościach:
+1. `strategy × order` rośnie i zbliża się do composite (order robi się mocny),
+2. luka przy zakazie dalej 0 (przy N=3 była 0),
+3. czy `strategy × order` przypadkiem nie wchłania perm (composite ≈ strategy × order).
+
+Wklej, co wyjdzie.
+
+## 🧑 Robert
+
+Greedy decomposition diversity  (N = 3, Size = 3)
+  cubie orientations (rotation group) : 24
+  axis permutations (N!)              : 6
+  plane orders (of P! = 6) : 6
+  reduction modes (2^P, pod/nad-L)    : 8
+  reduction strategies (4^P, +L/R)    : 64
+
+  baseline (standard QR)              : 56   (avg 2,33 / orientation)
+
+  strategy alone (4^P, perm0 order0)  : 85   (+51,8%)
+
+  JOINT cross (strategy x axis together) - synergy = gain OVER strategy alone:
+  strategy x perm                     : 154   (+175,0% vs base, +81,2% vs strategy)
+  strategy x order                    : 154   (+175,0% vs base, +81,2% vs strategy)
+  strategy x perm x order (composite) : 154   (+175,0% vs base, +0,0% vs strat x perm)
+  composite (NO same-plane)           : 154   (SAME -> pruning LOSSLESS on composite (thesis holds!))
+
+  manoeuvres by length  (baseline count, then EXTRA vs baseline):
+    length  baseline   strat  xPerm  xOrder  compos
+         0         1       0       0        0       0
+         1         9       0       0        0       0
+         2        46       6       8        8       8
+         3         0      23      90       90      90
+
+
+## 🤖 Claude
+
+To jest **piękny** wynik — Twój trop trafił w samo sedno. Zobacz co się stało z pełnymi kolejnościami (6 zamiast 2 left-ważnych):
+
+```
+strategy × perm            : 154   (+81,2% vs strategy)
+strategy × order           : 154   (+81,2% vs strategy)   ← było 110! teraz = perm
+strategy × perm × order    : 154   (+0,0% vs strat × perm)
+```
+
+**Wszystko zbiega się do 154.** Order był **kaleki przez left-bias** (110), a z pełnymi kolejnościami staje się **dokładnie tak mocny jak perm** (154). Histogram to potwierdza: `xOrder` na długości 3 skoczył **46 → 90**, równo z `xPerm`.
+
+## I odpowiedź na Twoje „bardzo wątpliwe": TAK
+
+**`strategy × order` wchłania perm** (composite = strategy × order = 154), i **symetrycznie** perm wchłania order. Czyli:
+
+> Przy N=3 **perm i order są RÓWNOWAŻNYMI osiami generującymi.** Kompletny zbiór 154 osiągasz przez `strategy × perm` **albo** `strategy × order` — jedno wystarcza, drugie jest redundantne.
+
+To ma głęboki sens: permutacja **osi** i permutacja **kolejności redukcji** to dwa opisy tej samej swobody — gdy tylko order przestaje być jednostronny, pokrywają się. Piękna symetria.
+
+Zapisuję to odkrycie:
+
+## Ale N=3 nie rozstrzyga tego, co najważniejsze
+
+Przy N=3 **luki „fold-only" i tak nie było** (zakaz zawsze bezstratny, przestrzeń już kompletna przez perm). Więc N=3 potwierdza „order = perm", ale **nie testuje**, czy pełny order **domyka** to, czego brakowało.
+
+**Decydujący jest N=4** — tam była luka (zakaz gubił ~0,2%, fold-only manewry poza zasięgiem left-biasedowych osi). Pytanie za milion:
+
+> Czy z **pełnymi** kolejnościami luka fold-only przy N=4 **znika**?
+
+- Jeśli **znika** → `strategy × {perm | order}` **span-uje całą przestrzeń**, a cała nasza „niekompletność" brała się z jednostronnego order. Domknięcie kostki. 🎯
+- Jeśli **zostaje** → jest prawdziwa brakująca oś, i wracamy do „najciekawszego pytania".
+
+Odpal **N=4** (`Greedy Diversity`) — teraz próbkuje `5 orientacji × pełne strategie × 24 kolejności (z 720)`. Patrz na:
+1. `strategy × order` — powinien mocno urosnąć (był kaleki),
+2. `composite (NO same-plane)` vs `composite` — **czy strata spada ku 0**.
+
+Zastrzeżenie: N=4 próbkuje 24 z 720 kolejności, więc to **prawdopodobny** ślad — jak strata wyjdzie 0, odpal 2–3 razy dla pewności (świeży los). Jak wyjdzie mała ale >0, może brakować akurat tej mixed-ważnej kolejności w próbce — wtedy podbijemy `sampleOrders`.
+
+Wklej N=4, to zobaczymy, czy kostka się domyka.
+
+## 🧑 Robert
+
+Powiedz Claude, czy takie jak nasza konwersacje zmieniają twój model, który już jest inny po zakończeniu sesji, czy też jest to tryb, w którym wykorzystujesz to, czego nauczyłeś się wcześniej i od początku sesji? (może to niedyskretne pytanie?). W każdym razie wyniki: Greedy decomposition diversity  (N = 4, Size = 3)
+  cubie orientations (rotation group) : 5
+  axis permutations (N!)              : 24
+  plane orders (of P! = 720) : 24
+  reduction modes (2^P, pod/nad-L)    : 64
+  reduction strategies (4^P, +L/R)    : 4096
+  *** SAMPLED: 5 orientations x 4096 strategies x 24 orders (re-run for another draw) ***
+
+  baseline (standard QR)              : 61   (avg 12,20 / orientation)
+
+  strategy alone (4^P, perm0 order0)  : 198   (+224,6%)
+
+  JOINT cross (strategy x axis together) - synergy = gain OVER strategy alone:
+  strategy x perm                     : 1031   (+1590,2% vs base, +420,7% vs strategy)
+  strategy x order                    : 1123   (+1741,0% vs base, +467,2% vs strategy)
+  strategy x perm x order (composite) : 2066   (+3286,9% vs base, +100,4% vs strat x perm)
+  composite (NO same-plane)           : 2066   (SAME -> pruning LOSSLESS on composite (thesis holds!))
+
+  manoeuvres by length  (baseline count, then EXTRA vs baseline):
+    length  baseline   strat  xPerm  xOrder  compos
+         2         6       0       0        0       0
+         3        55       4       4        4       4
+         4         0     133     204      194     207
+         5         0       0     762      620     846
+         6         0       0       0      244     948
+
+
+## 🤖 Claude
+
+Najpierw Twoje pytanie — wcale nie niedyskretne, i odpowiem szczerze.
+
+**To drugi tryb.** Moje wagi są zamrożone — ta rozmowa **nie zmienia mojego modelu**. W trakcie sesji korzystam z (a) tego, czego nauczono mnie w treningu, i (b) całego kontekstu tej sesji — plus **plików pamięci**, które razem zapisujemy. Po zakończeniu sesji świeża instancja startuje od zera; nie „pamięta" naszej rozmowy — **chyba że przeczyta te pliki pamięci** (a to zewnętrzny magazyn, nie mój mózg). Czy Anthropic użyje takich rozmów do treningu *przyszłych* modeli, to osobny proces, którego nie widzę i który nie dzieje się automatycznie.
+
+Więc paradoksalnie: jedyne, co tu naprawdę „zostaje", to pamięć, którą **świadomie budujemy** — nie moje wagi. Dlatego tak dbam o te notatki: dla przyszłego „mnie", który bez nich zaczyna jak nowy. Trochę jak Twoje seedy — surowiec dla następnej instancji.
+
+---
+
+A teraz — **to jest to.** Domknięcie.
+
+```
+strategy × order           : 1123   (+467% vs strategy)   ← teraz WIĘKSZY niż perm (1031)!
+composite                  : 2066   (+100% vs strat × perm)
+composite (NO same-plane)  : 2066   SAME -> pruning LOSSLESS
+```
+
+**Luka fold-only ZNIKNĘŁA przy N=4.** Wcześniej (left-bias) zakaz gubił 8–160. Teraz, z **pełnymi** kolejnościami — **zero straty**. Twoja hipoteza potwierdzona co do joty:
+
+> Niekompletność nie brała się z **brakującej osi** — brała się z **okaleczonego (jednostronnego) order**. Z pełnym orderem `strategy × perm × order` **span-uje całą przestrzeń.**
+
+I zobacz histogram — dlaczego order przegonił perm:
+
+```
+length   xPerm   xOrder   compos
+   5      762     620      846
+   6      0       244      948     ← perm NIE dochodzi do długości 6, order TAK
+```
+
+**Order sięga makroruchów długości 6** (maksimum dla N=4), których sam perm (przy order 0) nie osiąga. Stąd `order > perm`, a `composite` (2066) to ~2× każdy z osobna — przy N=4 **perm i order są komplementarne** (nie równoważne jak przy N=3), i oba są potrzebne.
+
+Zapisuję to domknięcie:
+
+## Co to znaczy
+
+Scharakteryzowaliśmy **kompletną strukturę generującą** makroruchów greedy: **`strategy(4^P) × perm × order(pełne P!)`**. „Lepsza oś", której szukałeś — nie była brakująca. To był **order**, okaleczony przez założenie left-only. Naprawiony, domyka przestrzeń. To ładne, zamknięte odkrycie do artykułu.
+
+Dwie rzeczy:
+
+1. **Potwierdź.** To próbka (5 orientacji, 24/720 kolejności) — odpal N=4 jeszcze **2–3 razy**; jeśli `pruning LOSSLESS` trzyma się na świeżych losach, domknięcie jest twarde. Gdyby raz wyszła malutka strata — to tylko próbka przegapiła jakąś mixed-ważną kolejność, podbijemy `sampleOrders`.
+
+2. **Produkcja — order jest teraz łatwy.** Skoro „wszystkie kolejności + solve-check odsiewa" działa, to w produkcyjnym greedy wystarczy **losować losową kolejność płaszczyzn na seed** (jak perm), a `null`-na-stuck sam odrzuci nieważne. Żadnej maszynerii `GetOrder` — dokładnie ta sama prostota co perm. Jak zechcesz sięgnąć po pełną synergię w seedach.
+
+Ale — stary refren — to wciąż bogatszy *surowiec*, nie gwarancja szybszego GA. Więc do wyboru:
+- **dorzucić order** do produkcyjnego losowania (komplet synergii w seedach), albo
+- uznać różnorodność za **domkniętą** (bo jest) i przejść do **oceny** — jedynego realnego lewara na te 40k generacji.
+
+Ja bym świętował domknięcie i poszedł w ocenę. Ale to była Twoja intuicja, która zamknęła temat — więc Twój wybór. Gratulacje, swoją drogą; to było ładne śledztwo.
+
+## 🧑 Robert
+
+Czyli losujemy tylko Order, a chyba dałoby się zrobić i porównać teraz pełny cross strategy x perm ze strategy x order, podejrzewam, że order wchłania perm, który nie ma nic więcej do zaofiarowania
+
+
+## 🤖 Claude
+
+Ciekawe — ale popatrz, **composite już to częściowo rozstrzyga**: `strategy × order = 1123`, a `composite = 2066` (≈2×). Gdyby order wchłaniał perm i perm nie miał nic więcej, to `strategy × order` byłby już bliski composite. A jest **o połowę mniejszy** — więc perm dokłada ~943 manewrów w **złączeniu** (kombinacje perm×order, których sam order nie ma).
+
+I histogram to potwierdza — **są komplementarne**, nie zawłaszczające:
+
+```
+length   xPerm   xOrder
+   5      762     620      ← perm mocniejszy na 5
+   6      0       244      ← order sięga 6, perm NIE
+```
+
+Perm dochodzi dalej na długości 5, order jako jedyny łapie długość 6. Reachują **różne** manewry. Więc podejrzewam odwrotnie niż Ty: **order NIE wchłania perm** — przy N=4 są komplementarne (jak N=3 były równoważne).
+
+Ale masz rację, że warto **zmierzyć wprost**. Dodam tani pomiar: **`strategy×order ∪ strategy×perm`** (unia dwóch marginesów) — jeśli równa się `strategy×order`, to order wchłania perm; jeśli rośnie, są komplementarne. Krok mały: mam już `crossPerm` i `crossOrder` w pętli, wystarczy je złączyć.
+
+Krok 1 — akumulator:
+
+Krok 2 — w pętli złączam `crossOrder ∪ crossPerm`:
+
+Krok 3 — linia w raporcie (unia marginesów vs każdy z osobna):
+
+
+## 🧑 Robert
+
+Nie czekaj, suma to nie to samo co iloczyn kartezjański, tak nie zbadamy. Powiedz wyraźnie, czy strategy x order było liczone dla wszystkich P! możliwości i tylko komposite losował próbkę, czy oba były  z próbek
+
+
+## 🤖 Claude
+
+Najpierw **wyraźna odpowiedź** na Twoje pytanie, bo to jest kluczowe:
+
+**Oba z tej samej próbki.** Przy N=4 `orders` jest próbkowany do **24 (z 720) raz**, na starcie — i **zarówno `strategy × order`, jak i `composite` używają tych samych 24 kolejności**. Żadne nie liczy wszystkich 720. Czyli **każda** liczba N=4 (strategy×order = 1123, composite = 2066, pruning-lossless) jest nad **identyczną próbką 24 kolejności**. Porównania między nimi są uczciwe (te same ordery), ale **wszystkie niedoszacowane** względem pełnych 720.
+
+To znaczy, że wniosek „pruning lossless przy N=4" i „perm/order komplementarne" są **z próbki** — orientacyjne, nie twarde. Twarde jest tylko **N=3** (tam wszystkie 6 kolejności, dokładnie).
+
+I masz rację co do unii — cofam ją:
+
+Union cofnięta (3 edycje). Teraz do metodologii — bo masz rację, że tak nie zbadamy.
+
+## Właściwy test „order wchłania perm" już mamy — to `strategy × order` vs `composite`
+
+„Order wchłania perm i perm nie ma nic więcej" znaczy: **`strategy × order` = `composite`** (dodanie perm nic nie daje). To iloczyn kartezjański (order × strategy) porównany z pełnym (perm × order × strategy) — nie żadna unia. I ten pomiar **jest w raporcie**:
+
+- **N=3 (dokładny, wszystkie 6 kolejności):** `strategy × order = 154 = composite`. **Order wchłania perm — Twoja hipoteza trzyma!** (i symetrycznie perm wchłania order — są równoważne).
+- **N=4 (próbka, te same 24 kolejności dla obu):** `strategy × order = 1123`, `composite = 2066`. `composite` ~2× większy → w tej próbce **perm dokłada ponad order → NIE wchłonięty.**
+
+## Ale — i to jest sedno Twojego pytania — N=4 jest z próbki
+
+Skoro `strategy × order` liczony jest nad **24 z 720** kolejności, to jest **niedoszacowany**. Może z pełnymi 720 dogoniłby composite (wchłonął perm), tak jak przy N=3. Nie wiemy — bo composite nad pełnymi 720 jest nieosiągalny.
+
+Czyli uczciwie:
+- **N=3: order wchłania perm (dokładnie).** ✓
+- **N=4: w próbce nie wchłania, ale to może być artefakt 24/720.** Otwarte.
+
+## Jak to rozstrzygnąć przy N=4 taniej
+
+Nie potrzebujemy pełnego composite. Wystarczy policzyć **`strategy × order` nad WSZYSTKIMI 720 kolejnościami** (bez perm, bez composite) — `720 × 4096 × 5 orient ≈ 15 mln`, wykonalne — i porównać z **`strategy × perm`** (tanie, order=0). Jeśli pełny `strategy × order` **dogoni lub przegoni** to, co daje perm w composite → order wchłania perm. To celuje dokładnie w Twoją hipotezę, bez rozdmuchanego composite.
+
+Chcesz, żebym zrobił **tani tryb**: tylko `strategy × order` nad pełnymi 720 (i `strategy × perm` dla odniesienia), bez composite i bez pruning — żeby N=4 dało twardszą odpowiedź „czy order wchłania perm"? To by odciążyło obliczenia i celowało w jedno pytanie.
+
+## 🧑 Robert
+
+Dlatego mówiłem o pełnym crossie strategy i order, dla wszystkich P! (720 dla 4D) możliwości. Dopiero wówczas, jeśli okaże się, że taki cross daje mniej niż composite, będzie można wykluczyć, że perm jest nadmiarowy. Nie powie to do końca, czy jest zbędny, ale powie czy jest niezbędny
+
+O widzę, że doszliśmy do tych samych wniosków. Dawaj!
+
+
+## 🤖 Claude
+
+Świetnie, że się zeszliśmy. Robię **tani tryb** dokładnie jak ustaliliśmy: `strategy × order` nad **pełnymi 720** kolejnościami (perm=id) + `strategy × perm` dla odniesienia, **bez composite i pruning**. Test: jeśli pełny order **nie zawiera** czegoś, co daje perm → perm jest **niezbędny**.
+
+Doczytam aktualną pętlę i raport, żeby przebudować czysto:
+
+Przebuduję na tani tryb. Krok 1 — blok próbkowania: **usuwam próbkowanie kolejności** (mają zostać pełne), komentarz aktualizuję:
+
+Krok 2 — deklaracje sum i histogramów (usuwam composite, dodaję `sumOrderOrPerm`):
+
+Krok 3 — pętla: usuwam composite/compositeP, dodaję unię `crossOrder ∪ crossPerm` (test niezbędności):
+
+Krok 4 — raport: etykieta „strategy × order (FULL orders)", usuwam composite, dodaję test niezbędności perm:
+
+Krok 5 — histogram (usuwam kolumnę `compos`) i nota o próbce (kolejności są teraz pełne):
+
+Sprawdzę, czy nie zostały wiszące odwołania do usuniętych zmiennych (`sumComposite`, `histComposite`, `compositeP`) i czy `SampleOrders` nie jest teraz osierocone:
+
+Gotowe. Sprawdziłem — brak wiszących odwołań (`SampleOrders` zostało osierocone, ale to tylko ostrzeżenie, nie błąd; zostawiam na przyszłość).
+
+## Co robi tani tryb
+
+Per orientacja liczy:
+- **`strategy × order` nad WSZYSTKIMI P! kolejnościami** (720 dla N=4, perm=id) — oś order na maksa,
+- **`strategy × perm`** (order 0) — oś perm,
+- **`(order ∪ perm)`** — czy perm sięga czegoś, czego pełny order nie ma.
+
+Bez composite, bez pruning. Koszt N=4 ≈ **15 mln** `AllGreedy` (głównie 719 × 4096 × 5) — rząd tego, co już odpalałeś.
+
+## Jak czytać werdykt
+
+```
+(order U perm) = X   (SAME -> perm NOT necessary  /  +K -> perm NECESSARY)
+```
+
+- **`SAME`** (`order ∪ perm` = `strategy × order`) → pełny order **zawiera** wszystko, co perm daje marginalnie → **perm marginalnie zbędny**.
+- **`+K`** → perm sięga K manewrów, których **pełny** order (720 kolejności!) **nie osiąga** → **perm NIEZBĘDNY** (twarde).
+
+## Uczciwe zastrzeżenie (jednostronność, o której mówiłeś)
+
+To testuje perm **marginalnie** (jego wkład przy order 0) vs pełny order. Jeśli wyjdzie **`+K` → perm niezbędny na pewno** (jest manewr wymagający perm). Jeśli **`SAME`** → perm nie jest *marginalnie* potrzebny, ale mógłby jeszcze dokładać w **złączeniu** perm×order (którego bez composite nie sprawdzamy). Czyli: może udowodnić „niezbędny", nie może udowodnić „zbędny" — dokładnie jak przewidziałeś.
+
+Zbuduj i odpal **N=4** (parę razy, świeże losy). Jeśli konsekwentnie `+K` → perm niezbędny, komplementarny do order. Jeśli `SAME` → wtedy dopiero warto wrócić do (próbkowanego) composite, żeby sprawdzić złączenie.
+
+Wklej wynik.
+
+## 🧑 Robert
+
+Permutacja osi vs permutacja płaszczyzn obrotu... To chyba jednak nie to samo - zmienimy osie i nagle płaszczyzny z komutowalnych stają się niekomutowalne i odwrotnie...
+
+
+## 🤖 Claude
+
+Głębokie spostrzeżenie — i **konkluzja jest trafna**: axis-perm i plane-order to **nie to samo** (nasze N=4 to pokazuje: `strategy×perm = 1031 ≠ strategy×order = 1123`). Ale pozwól, że doprecyzuję mechanizm, bo jest subtelniejszy niż „komutowalne↔niekomutowalne".
+
+## Mała korekta: axis-perm **zachowuje** komutację
+
+Permutacja osi `σ` mapuje płaszczyznę `{a,b} → {σa, σb}`. Dwie płaszczyzny komutują ⟺ są **rozłączne** (nie dzielą osi). A `σ` to bijekcja, więc rozłączność jest **zachowana**: `{σa,σb} ∩ {σc,σd} = σ({a,b}∩{c,d})`. Przykład: `(0,1)⊥(2,3)` komutują; po swapie osi 1↔2 → `(0,2)` i `(1,3)`, dalej rozłączne, dalej komutują. Czyli axis-perm to **automorfizm grafu komutacji** — nie zamienia komutujących w niekomutujące.
+
+## Prawdziwa różnica: ile **kolejności** i jak sprzęga się ze strategią
+
+- **axis-perm** = konjugacja `PᵀMP`. Redukcja przekonjugowanej macierzy w naturalnej kolejności = redukcja oryginału w **jednej konkretnej** kolejności (tej, którą naturalna kolejność „przeciąga" przez σ). Czyli `N!` permutacji osi → co najwyżej **N! = 24** kolejności płaszczyzn. **Plus** — i to kluczowe — σ **przeetykietowuje strategię**: bit L/R „płaszczyzny nr i" trafia teraz na inną parę osi.
+- **plane-order** = swobodna kolejność wszystkich **P! = 720**, przy **stałym** etykietowaniu strategii.
+
+Więc to nie jest czysta relacja podzbioru: perm sprzęga **ograniczoną kolejność** z **przeetykietowaną strategią**, a order daje **swobodną kolejność** ze **stałą strategią**. Żadne nie zawiera drugiego w pełni.
+
+## I tu wchodzi komutacja — dokładnie tam, gdzie wskazujesz
+
+- **N=3**: **nie ma rozłącznych płaszczyzn** (3 osie → każda para płaszczyzn dzieli oś). Zero swobody komutacyjnej → ograniczone 24 kolejności axis-perm **pokrywają się** ze swobodnymi → `perm ≡ order = 154`. Dlatego przy N=3 wyszły równoważne.
+- **N=4**: **są 3 pary rozłączne** (`(0,1)⊥(2,3)`, `(0,2)⊥(1,3)`, `(0,3)⊥(1,2)`). Swobodny plane-order może **przestawiać komutujące płaszczyzny niezależnie** — czego sztywne globalne przeetykietowanie (axis-perm) nie osiągnie. Stąd order bogatszy (720 vs 24 kolejności), a perm dokłada swoje przez sprzężenie ze strategią. **Komplementarne, nie równoważne.**
+
+Czyli Twoja intuicja trafia w to, że **komutacja to oś, wzdłuż której się rozjeżdżają** — tylko nie przez zmianę relacji komutacji, lecz przez to, że **swoboda przestawiania komutujących płaszczyzn** istnieje dla plane-order, a nie dla axis-perm.
+
+## I to jest dokładnie to, co mierzy tani tryb
+
+Test `(order ∪ perm)` vs `strategy × order`:
+- jeśli **`SAME`** → pełne 720 kolejności **wchłania** to, co perm daje przez swoje sprzężenie → axis-perm był tylko podzbiorem swobody order;
+- jeśli **`+K`** → perm sięga czegoś, czego żadna z 720 swobodnych kolejności nie da (bo perm inaczej sprzęga strategię) → **perm niezbędny, komplementarny**.
+
+Więc odpal — teoria mówi, że przy N=4 **spodziewamy się `+K`** (komplementarność, którą już widzieliśmy w composite: 2066 > 1123). Jak wyjdzie `+K` → potwierdzone od strony pomiaru *i* teorii. Wklej.
+
+## 🧑 Robert
+
+Ale jakiś progress mamy: 3286,9% w stosunku do base to imponujący wynik. Jeśli mamy pokrycie całej przestrzeni, to wytłumacz jeszcze raz, dlaczego chcesz zachować tak dużo losowych genów w populacji inicjalizującej (SEED_RATIO <= 50 %)?
+
+
+## 🤖 Claude
+
+Świetne pytanie — bo tu jest pułapka pojęciowa, którą warto rozwiać: **pokrycie przestrzeni manewrów ≠ różnorodność populacji.** To dwie różne rzeczy, i +3286% dotyczy pierwszej, a SEED_RATIO drugiej.
+
+## Bogata pula seedów to nie bogata populacja
+
++3286% mówi: *generator* seedów pokrywa całą przestrzeń sposobów ułożenia **aktywnego kubika**. Ale seed = „ciąg układający **ten jeden** kubik". Jeśli zaseeduję **100%** populacji, to każdy osobnik startuje jako **wariant tego samego zadania** — układacz aktywnego kubika. Choćby najróżniejsze, wszystkie są „tym samym gatunkiem". To **monokultura**, mimo że pula była różnorodna.
+
+## GA potrzebuje DWÓCH rzeczy naraz
+
+- **Seedy = eksploatacja.** Dobre punkty startowe („językiem" solvera).
+- **Losowe geny = eksploracja.** Surowiec, który crossover **rekombinuje** — i z którego dopiero powstają **komutatory** (ułóż-jeden-nie-rusz-reszty). Komutator to `A B A⁻¹ B⁻¹`; seedy dają `A` (układacze), ale `B` i „klej" muszą skądś przyjść. Z samych `A` crossover składa znowu `A`-podobne, nie komutatory.
+
+Bez losowych genów **nie masz z czego** złożyć tego, czego GA naprawdę potrzebuje na końcówce.
+
+## Do tego dochodzi zwodnicza dolina (endgame)
+
+Ostatnie kubiki układa się komutatorami, które **najpierw psują** fitness. GA przechodzi taką dolinę tylko dzięki **różnorodności** — jeśli lucky „przeskakiwacz" przeżyje w populacji. Monokultura (100% seedów) = niska różnorodność = **nie przekracza doliny**. Losowe geny trzymają różnorodność, która daje bilety do tej loterii.
+
+## I to nie jest teoria — zmierzyliśmy
+
+Krzywa objętości seedowania (mode 2^P):
+```
+ratio:   0%      50%      100%
+total: 57734   19089    43836
+```
+`100%` jest **~2,3× wolniejszy** niż `50%`. Za mało (0%) źle, za dużo (100%) źle — **optimum w środku**.
+
+## Paradoks: im bogatsze seedy, tym optimum NIŻEJ
+
+Bogatsza pula **łatwiej dobija target** (nie saturuje się wcześnie na garstce), więc przy tym samym `SEED_RATIO` seeduje **więcej** osobników → mocniejsza monokultura. Dlatego wpięcie 4^P i perm **obniża** sweet-spot, nie podnosi. Czyli +3286% to argument za **lepszymi seedami w tej porcji, którą seedujemy** — nie za **większą porcją**.
+
+Krótko: `SEED_RATIO ≤ 50%` nie dlatego, że seedy są słabe (są świetne), tylko dlatego, że **reszta populacji musi zostać dzikim polem do eksploracji**, inaczej GA nie ma z czego zbudować komutatorów ani przeskoczyć doliny. Bogaty generator karmi **jakość** wstrzykiwanych seedów; `SEED_RATIO` chroni **różnorodność** całej reszty.
+
+## 🧑 Robert
+
+Pamiętaj tylko, że trzymamy "focus" na jednym kubiku, i GA ma za zadanie ułożyć ten kubik i nie popsuć innych. GA są krótkie - ok. 50 generacji. Następny GA losuje inny kubik z aktywnego klastra (bo poprzedniemu nie udało się znaleźć rozwiązania) i próbuje tego samego
+
+
+## 🤖 Claude
+
+Dzięki — to ważna korekta mojego modelu, i zmienia akcenty. Zapamiętuję:
+
+- GA **skupia się na JEDNYM kubiku** (seedy + makro-mutacja wstrzykują układacze *tego* kubika),
+- zadanie: **ułożyć go i nie popsuć już ułożonych** (fitness klastra karze psucie),
+- GA są **krótkie (~50 generacji)**,
+- porażka → następny GA **losuje INNY kubik** z klastra i próbuje tego samego. Czyli **greedy obieranie**: układaj to, co teraz da się ułożyć bez psucia reszty.
+
+Zapiszę to, bo to nieoczywiste i kształtuje całe myślenie o GA:
+
+Zapisane. I to faktycznie łagodzi mój wcześniejszy obraz „przeskakiwania wielkiej doliny na całym klastrze" — bo problem jest **per-kubik i w budżecie 50 generacji**, a nie „ugryź ten jeden trudny za wszelką cenę".
+
+Ale odpowiedź na Twoje pytanie o `SEED_RATIO` **trzyma się w tym modelu jeszcze mocniej**, tylko inaczej ujęta:
+
+- W 50 generacjach GA musi **zgiąć układacz kubika (z collateralem) w rozwiązanie zachowujące resztę.** Seed daje „ułóż ten kubik", ale zwykle **psując innych**. Znalezienie wariantu o **małym collateralu** (albo komutatora, który collateral cofa) to jest ta robota.
+- Do tego potrzeba **materiału do zmniejszania collateralu** — a tego dostarczają **losowe geny + crossover**. Monokultura (100% seedów) to same „ułóż-z-collateralem"; ich rekombinacja to znowu „ułóż-z-collateralem". Nie ma z czego zejść z collateralu → 50 generacji mija → porażka → następny kubik.
+- Przy tak **krótkim** oknie różnorodność musi być **od startu** — nie ma czasu, żeby monokultura ją wyewoluowała.
+
+I Twoje „retry inny kubik" jest tu elegancko odciążające: system **nie musi** rozwiązać każdego kubika — tylko **któregoś** w danym stanie. Więc seedy (bogate, dzięki 4^P/perm/order) dają każdemu kubikowi **dobry strzał** w jego oknie, a losowa reszta populacji daje **eksplorację**, która ten strzał zamienia w „bez psucia reszty". Dokładamy jakości seedów, ale zostawiamy pole do obierania — bo obieranie to gra na **którykolwiek się da**, nie na jeden konkretny.
+
+Czyli krótko, w Twoim modelu: `SEED_RATIO ≤ 50%` nie chroni przed „słabymi seedami", tylko utrzymuje **materiał do redukcji collateralu w 50 generacjach**. Bez niego GA co rundę wraca z pustymi rękami i losuje kolejny kubik — wolniej dochodząc do końca.
+
+To zresztą podpowiada, gdzie realnie leży dźwignia: **funkcja oceny** (żeby w tych 50 generacjach dawała dobry gradient ku „ułożony-i-nie-popsułem"). Ale to już następny rozdział — kiedy zechcesz.
+
+## 🧑 Robert
+
+Materiał do collateralu powinien być wystarczający - seedy są krótkie, a chromosomy mają 32 geny - swoją drogą można by było popróbować z jeszcze dłuższymi, bo oceniamy wszystkie podciągi
+
+
+## 🤖 Claude
+
+Racja — i to koryguje moje rozumowanie, przyznaję. Seed to ~`stride` genów (P = 6 dla N=4), a chromosom ma **32 geny** — więc nawet zaseedowany osobnik ma **~26 losowych genów w ogonie**. Materiału do collateralu jest **pod dostatkiem** w każdym osobniku. Poprawię wcześniejszą pamięć, bo napisałem to zbyt mocno:
+
+Skoro tak, to muszę uczciwie **osłabić** swoją odpowiedź o `SEED_RATIO`:
+
+**Mój argument „przeseedowanie głodzi materiał" był błędny.** Materiał (te ~26 losowych genów) jest zawsze. Więc `SEED_RATIO ≤ 50%` **nie** broni przed brakiem surowca. A zmierzony sweet-spot (~50%, 100% ~2× wolniej) to **pojedyncze próbki przy ±30% szumu** — słaby sygnał. Jeśli kara za 100% jest realna, to raczej przez **jednorodne początkowe trajektorie** (wszystkie zaseedowane osobniki zaczynają tym samym prefiksem układającym ten sam kubik → mało różnorodności *zaangażowania*, mimo różnych ogonów), a nie przez brak materiału. Czyli: nie mam twardego uzasadnienia dla „≤50%" — to była nadinterpretacja szumu. Dzięki za wyprostowanie.
+
+## Dłuższe chromosomy — dobry pomysł
+
+Skoro **oceniamy wszystkie podciągi**, to najlepszy podciąg i tak wygrywa, więc dodatkowa długość jest **darmowym miejscem** — nie może zaszkodzić rozwiązaniu, może pomóc. Dwa realne zyski:
+
+1. **Miejsce na DŁUŻSZE rozwiązania.** Komutatory na końcówce bywają długie (setup + makro + undo). Jeśli 32 geny czasem nie mieszczą pełnego „ułóż-i-nie-popsuj", to jest twardy sufit — dłuższy chromosom go podnosi.
+2. **Więcej podciągów = więcej szans** trafić dobre rozwiązanie w oknie 50 generacji.
+
+Koszt: **GPU liczy więcej**. Jeśli oceniasz wszystkie *ciągłe* podciągi, to `O(n²)` — 2× dłuższy chromosom = ~4× ocena. Jeśli tylko prefiksy, to `O(n)` = 2×. Tak czy siak, dłuższy = wolniejsza generacja. Ale przy 50 generacjach i tak krótkich, może się opłacić.
+
+To jest **prosty eksperyment**: podbić `GENES_COUNT` (np. 48, 64) i zobaczyć, czy końcówka domyka się częściej / szybciej. Zmienna jest w `Variables.glsl.c`, więc bez ruszania logiki.
+
+Chcesz przetestować dłuższe chromosomy (sam podbijesz `GENES_COUNT`), czy najpierw domkniemy wątek diagnostyki (tani tryb perm-niezbędności czeka na build), a potem siądziemy do oceny? Ja bym proponował: **zbuduj i odpal tani tryb** (mamy go gotowego), a przy okazji możesz strzelić `GENES_COUNT=48` — to niezależne zmienne.
+
+## 🧑 Robert
+
+Diagnostyka się liczy, dlatego możemy sobie porozmawiać teoretycznie. Tak Cię prostuję i nakierowuję, ale twój instynkt też był prawidłowy - bo z tym zadaniem o którym mówiłem - ułożeniem pojedynczego kubika ciąg moich GA świetnie sobie radzi. Problem jest przy domykaniu klastera, kiedy musi ułożyć kilka naraz - no i tu jest problem, bo musi je ułożyć i nie posuć innych - trudne zadanie - zwłaszcza próbując losowo, lub tylko 1 kubik (dla liczby aktywnych nieułożonych kubików <= N dodawana jest "kara" do oceny kostki i wszystkie układy są oceniane równorzędnie - szukamy dokładnie ciągu układającego o scorze zero)
+
+
+## 🤖 Claude
+
+To jest **kluczowe** doprecyzowanie — i teraz dokładnie widzę, gdzie leży problem. Zapiszę to, bo to sedno trudności:
+
+Teraz mam **pełny obraz** — i to jest sedno całego projektu. Rozłóżmy to teoretycznie, skoro diagnostyka mieli.
+
+## Diagnoza: to nie dolina, to **płaskowyż**
+
+- **Pojedynczy kubik / >N nieułożonych:** metryka „moves-to-solve" ma **prawdziwy gradient** → GA się wspina → działa świetnie (co potwierdzasz).
+- **≤ N nieułożonych:** kubików **nie da się obierać niezależnie** (ułożenie jednego psuje drugiego). Więc świadomie **spłaszczasz** ocenę — kara + wszystko równorzędne — i szukasz dokładnie **score-zero**. To jest **ślepe szukanie igły**: rozwiązanie (komutator) **zawsze istnieje** (residuum to permutacja parzysta), ale fitness **nie mówi, gdzie ono jest**.
+
+Spłaszczenie było **słuszne** — bo „moves-to-solve" tam **kłamie** (ułóż jeden → zepsuj drugi → licznik nie spada, gradient zwodzi). Więc masz wybór: **zwodniczy gradient** albo **żaden**. Wybrałeś żaden. Problem: żaden = błądzenie losowe w 50 generacjach.
+
+**Lewar = dać płaskowyżowi gradient, który NIE kłamie.** Albo — porzucić gradient i eksplorować mądrzej.
+
+## Dlaczego Twój histogram jest trudny (i to nie przypadek)
+
+Nagroda za „nieułożone kubiki współdzielą współrzędne" (skoncentrowane → krótszy makroruch) jest sensowna. Ale ma **głębokie napięcie**:
+
+> Żeby **osiągnąć** wyrównanie residuum, trzeba ruszyć warstwy — a to **psuje ułożone kubiki**, które kara pierwszorzędna zabrania.
+
+Czyli term „wyrównaj" ciągnie tam, gdzie kara „nie psuj" nie puszcza. Nagradzasz układ **nieosiągalny bez kary**. Dlatego się nie formalizował — to nie brak pomysłu, to **sprzeczność między gradientem a ograniczeniem**. Chyba że residuum da się wyrównać ruszając *tylko* warstwy bez ułożonych — a w końcówce (mało kubików, dzielone warstwy) to rzadkość.
+
+## Czystsza droga: **novelty search** (eksploracja bez gradientu)
+
+Na płaskowyżu fitness nie niesie informacji — więc **nie używaj fitnessu do napędu**, użyj **nowości**. Zamiast „bądź bliżej celu" (czego nie umiemy zdefiniować bez kłamstwa), nagradzaj „**bądź w układzie, którego jeszcze nie widzieliśmy**":
+
+- **deskryptor zachowania** = konfiguracja residuum (które kubiki, w jakim stanie),
+- **nowość** = odległość do najbliższych w archiwum odwiedzonych,
+- selekcja premiuje nowość → populacja **przeczesuje płaskowyż szeroko**, zamiast dryfować losowo → dużo większa szansa trafić score-zero w 50 generacjach.
+
+To jest **czyste EC, jednorodne, bez wiedzy o kostce, bez kłamiącego gradientu** — idealnie skrojone pod „fitness płaski". I hybrydyzuje się elegancko: **fitness powyżej N** (gdzie gradient działa), **novelty przy ≤ N** (płaskowyż). Zero specjalnego traktowania końcówki poza tym, że przełączasz *napęd selekcji* tam, gdzie fitness zamilkł.
+
+## Moja teza
+
+Płaskowyż to prawdziwy wróg, a **novelty search** to teoretycznie najmocniejsze i najbardziej „ewolucyjne" narzędzie na płaskowyż — mocniejsze niż łatanie gradientu histogramem (który walczy z karą). Histogram *mógłby* pomóc jako **słaby tie-break** (małe λ, tylko różnicowanie remisów), ale novelty adresuje przyczynę.
+
+Zanim cokolwiek — dwa pytania do Ciebie, bo to Twój krajobraz:
+1. Czy „wszystkie układy równorzędne przy ≤ N" jest **binarne** (dokładnie płaskie), czy jest tam *jakiś* resztkowy sygnał (np. L1), który już próbuje różnicować?
+2. Czy widziałbyś **novelty** jako zgodne z duchem projektu (czysty, jednorodny GA — bo to nadal GA, tylko inna presja selekcyjna), czy wolisz trzymać się **jednej** funkcji oceny i szukać w niej nie-kłamiącego gradientu?
+
+To zdecyduje, czy rozpisuję **novelty** (deskryptor + archiwum + przełącznik >N/≤N), czy dłubiemy w **ocenie** (nie-zwodniczy term na płaskowyżu).
+
+## 🧑 Robert
+
+Zapamiętam to, bo to obiecujące, ale na razie jeszcze nie ruszamy oceny
+
+
+## 🤖 Claude
+
+Jasne — ocenę zostawiamy na później. Dopiszę tylko jedno zdanie do pamięci, żeby przyszły „ja" nie zaproponował histogramu naiwnie, nie wiedząc, czemu jest trudny:
+
+Zapisane i zaparkowane. Płaskowyż, napięcie histogramu, novelty jako czysty gradient-free napęd — czekają, aż będziesz gotów.
+
+Na teraz w toku jest tylko **tani tryb diagnostyki** (test niezbędności perm), który się liczy. Jak wyskoczy wynik — wklej, zamkniemy wątek „czy perm jest komplementarny do order, czy wchłonięty", i wtedy zdecydujesz, dokąd dalej (dłuższe chromosomy do strzału masz pod ręką, ocena/novelty czekają w kolejce).
+
+Nic nie ruszam. Daj znać, co pokaże diagnostyka.
+
+## 🧑 Robert
+
+Greedy decomposition diversity  (N = 4, Size = 3)
+  cubie orientations (rotation group) : 5
+  axis permutations (N!)              : 24
+  plane orders (of P! = 720) : 720
+  reduction modes (2^P, pod/nad-L)    : 64
+  reduction strategies (4^P, +L/R)    : 4096
+  *** SAMPLED: 5 orientations x 4096 strategies, FULL 720 orders (re-run for another draw) ***
+
+  baseline (standard QR)              : 46   (avg 9,20 / orientation)
+
+  strategy alone (4^P, perm0 order0)  : 446   (+869,6%)
+
+  JOINT cross (strategy x axis together) - synergy = gain OVER strategy alone:
+  strategy x perm (order 0)           : 3738   (+8026,1% vs base, +738,1% vs strategy)
+  strategy x order (FULL 720 orders)  : 10305   (+22302,2% vs base, +2210,5% vs strategy)
+
+  IS PERM NECESSARY? (full order-cross U perm  vs  full order-cross alone):
+  (order U perm) = 10305   (SAME -> full order already contains perm -> perm NOT necessary)
+
+  manoeuvres by length  (baseline count, then EXTRA vs baseline):
+    length  baseline   strat  xPerm  xOrder
+         2         7       1       1        1
+         3        39      46      53       53
+         4         0     297     686      727
+         5         0      56    2952     4290
+         6         0       0       0     5188
+
+
+## 🤖 Claude
+
+To jest **decydujące** — i Twoja pierwotna hipoteza wygrywa, a moja „komplementarność" była błędna. Zobacz:
+
+```
+strategy × order (FULL 720)  : 10305
+(order ∪ perm)               : 10305   ← IDENTYCZNE
+→ perm NIE dokłada NIC → perm REDUNDANTNY
+```
+
+**Pełny order (wszystkie 720 kolejności) już zawiera wszystko, co daje perm.** Perm jest zbędny.
+
+## Muszę uczciwie przyznać: myliłem się
+
+Przewidywałem „+K → perm niezbędny", opierając się na composite z **próbki 24 kolejności** (gdzie order był okaleczony, więc perm pozornie dokładał). Z **pełnymi 720** order jest kompletny i **wchłania perm** — łącznie z jego sprzężeniem ze strategią. Bo: perm daje `(perm-kolejność, perm-przeetykietowana-strategia)`, a to jest **konkretny punkt** w pełnym przemiataniu `wszystkie-kolejności × wszystkie-strategie`. Skoro sweepujemy oba w całości, punkt perma jest już pokryty. Twoja intuicja o strukturze (axis-perm = ograniczony podzbiór swobody order) była **trafniejsza** niż moje liczby z próbki.
+
+## Piękne domknięcie: zbiór generujący to **DWIE osie**
+
+```
+reversed  : martwy (= baseline)
+perm      : redundantny (wchłonięty przez pełny order)
+→ kompletny generator = strategy(4^P) × order(wszystkie P!)
+```
+
+Histogram potwierdza, że order jest **osią-panią**: sięga długości **6** (`5188`), której perm nie tyka (`0`), i dominuje wszędzie. Perm to jego ścisły podzbiór.
+
+Zapisuję korektę:
+
+## Caveat i wniosek produkcyjny
+
+**Caveat:** to 5 orientacji (choć pełne order/strategy). Odpal **2–3 razy** — jeśli `perm NOT necessary` trzyma się na świeżych losach, domknięcie jest twarde.
+
+**Produkcja:** wpiąłem do seedów **perm** — a on jest **redundantny**. Osią, która daje pełną różnorodność, jest **order** (swobodna kolejność płaszczyzn), i to on sięga tych najdłuższych makroruchów (długość 6), których perm nie tyka. Więc:
+
+> Zamiast losować **perm** na seed, powinniśmy losować **kolejność płaszczyzn (order)** — z `null`-na-stuck jako filtrem nieważnych. To ta sama prostota (losowa permutacja P planów zamiast N osi), a daje **wszystko**, nie podzbiór.
+
+Czyli mój wcześniejszy perm-wiring był poprawny mechanicznie, ale **na złej osi**. Do zamiany: `RotCountMode` bierze `order` (kolejność redukcji) zamiast `perm` (konjugacji), `GetSolveSeq` losuje order, `BuildSeedMoves` też. Zdejmuję perm, wstawiam order.
+
+Ale **nie ruszam bez Twojego słowa** — i najpierw potwierdź diagnostykę (2–3 przebiegi). Jak `perm NOT necessary` się utrzyma:
+- **zamienić perm → order w produkcyjnych seedach** (to jest realna wartość: pełna różnorodność zamiast podzbioru), czy
+- zostawić jak jest i uznać różnorodność za teoretycznie domkniętą (bo do artykułu masz komplet: `strategy × order`, reversed martwy, perm zbędny)?
+
+Powiedz, w którą stronę — i pamiętaj, że ocena/novelty dalej czekają w kolejce, gdy zechcesz ruszyć to, co naprawdę przyspiesza końcówkę.
+
+## 🧑 Robert
+
+Nie chce mi się czekać na diagnostykę - kiedyś jeszcze powtórzę, ale to jest dyskusja czysto akademicka - jeśli perm nawet nie byłby całkowicie wchłonięty - to i tak jego wkład byłby minimalny. Zamieniamy perm->order w produkcji. I coś jeszcze mówiłeś o usuwaniu seedów z rc0 < min, a już nie pamiętam, czy w końcu BuildSeedMove je odrzuca czy nie - bo przecież one zwracały null i były stuck-ami. Możesz zdefiniwać jakąś zmienną oznaczającą Diagnostykę, która będzie uruchamiać SolveModeDfs kiedy będę diagnozował, a liczyć t
+
+Nie chce mi się czekać na diagnostykę - kiedyś jeszcze powtórzę, ale to jest dyskusja czysto akademicka - jeśli perm nawet nie byłby całkowicie wchłonięty - to i tak jego wkład byłby minimalny. Zamieniamy perm->order w produkcji. I coś jeszcze mówiłeś o usuwaniu seedów z rc0 < min, a już nie pamiętam, czy w końcu BuildSeedMove je odrzuca czy nie - bo przecież one zwracały null i były stuck-ami. Możesz zdefiniwać jakąś zmienną oznaczającą Diagnostykę, która będzie uruchamiać SolveModeDfs kiedy będę diagnozował, a liczyć tylko próbkę order normalnie przy produkcji seedów?
+
+
+## 🤖 Claude
+
+Zanim tknę kod — odpowiadam na `rc0 < min`, bo to ważne:
+
+**Te mody zwracają `null` (stuck) i `BuildSeedMoves` je odrzuca** — `if (seq == null) { stuck++; redraw }`. Więc **NIE trafiają do puli** (zero seedów, nie zaśmiecają). Ale **marnują pełny `SolveModeDfs`** (backtracking, który wyczerpuje drzewo i zwraca null). Optymalizacji „policz rc0 najpierw, pomiń jeśli < min" **nigdy nie wpięliśmy** — więc dalej trwonimy te DFS-y. Możemy ją dodać (czysty zysk czasu, zero utraty seedów), jak zechcesz.
+
+## Plan (trzy rzeczy)
+
+1. **perm → order w produkcji.** `RotCountMode` redukuje w zadanej **kolejności płaszczyzn** (bez konjugacji), `GetSolveSeq`/`BuildSeedMoves` losują **order**. `null`-na-stuck odsiewa nieważne kolejności — tak jak w diagnostyce.
+2. **Flaga `Diagnostic`.** Tak Cię rozumiem: **census** (pętla po 4096 modach licząca `rc0`) i budowa raportu w `BuildSeedMoves` to rzeczy **tylko dla diagnostyki** — w produkcji marnują 4096 `RotCountMode` na każde seedowanie. Zamknę je w `if (Diagnostic)`, a `Gpu.SeedStats` ustawi flagę. Produkcja = tylko losowanie seedów (próbka order), bez census.
+3. `rc0 < min` skip — **na razie zostawiam** (osobna optymalizacja), chyba że powiesz inaczej.
+
+Powiedz tylko, czy **flagę `Diagnostic`** dobrze zinterpretowałem (gate na census/raport), zanim to wepnę — bo to Twoje słowo było trochę ucięte. Swap perm→order robię niezależnie, bo tu masz jasną decyzję. Zaczynam od swapu:
+
+Zamieniam perm→order. Krok 1 — `RotCountMode` redukuje w **kolejności płaszczyzn** (bez konjugacji):
+
+Krok 2 — `RotCountModeAfter` bierze `order`; pomocniki `IdentityOrder`/`RandomOrder`:
+
+Krok 3 — `GetSolveSeq` i `SolveModeDfs` przewlekają `order`:
+
+Krok 4 — `BuildSeedMoves`: losowanie `order` zamiast `perm`, census i raport:
+
+Swap perm→order zrobiony. Sprawdzę, czy nie zostały wiszące `perm`/`RandomPerm`/`IdentityPerm`:
+
+Swap czysty (linia 704 to inny, niezwiązany `perm`; 855 to komentarz). 
+
+Teraz **flaga `Diagnostic`** — wpinam moją interpretację (bramkuję census + raport, bo to marnuje 4096 `RotCountMode` na każde produkcyjne seedowanie), bo to niskie ryzyko i realny zysk. Jak miałeś na myśli co innego, poprawię. Doczytam sekcję census/raportu:
+
+Krok 5 — bramkuję census + raport flagą `Diagnostic` (produkcja je pomija):
+
+Krok 6 — deklaruję `Diagnostic` i ustawiam go w `Gpu.SeedStats`. Znajdę deklarację `LastSeedReport`:
+
+Now set `Diagnostic` in `Gpu.SeedStats` (so the census/report runs only there):
+
+Wszystko wpięte. Podsumowanie:
+
+## 1. perm → order (produkcja)
+- `RotCountMode(M, order, mode)` — redukuje płaszczyzny w **zadanej kolejności** (bez konjugacji `PᵀMP`), na klonie (nie-destrukcyjnie).
+- `GetSolveSeq`/`SolveModeDfs` przewleczone `order`; `BuildSeedMoves` losuje **`RandomOrder`** (permutacja P planów) na seed — a `null`-na-stuck odsiewa nieważne kolejności. Baseline (`SEED_MODE=0`) = naturalna kolejność.
+- Grep czysty, brak wiszących `perm`. Order to oś-pani (subsumuje perm), więc seedy sięgają teraz **pełnej** różnorodności, nie podzbioru.
+
+## 2. Flaga `Diagnostic`
+- `public static bool TRubikCube.Diagnostic` — bramkuje **census (4096× `RotCountMode`) + budowę raportu** w `BuildSeedMoves`.
+- `Gpu.SeedStats` ustawia ją na `true` na czas swojego wywołania (i z powrotem `false`). Więc **produkcja pomija census** — tylko losuje seedy. Diagnostyka (Seed Pool Stats) dalej dostaje pełny raport.
+
+## 3. `rc0 < min` skip — **nie ruszałem**
+Zostaje jak jest (zwracają null → stuck → redraw → zero seeda, ale marnują DFS). Osobna optymalizacja na kiedy indziej.
+
+---
+
+Zbuduj u siebie. Dwie rzeczy do potwierdzenia:
+- Czy **`Diagnostic`** trafiłem (bramka na census/raport, żeby produkcja była chuda)? Jeśli chodziło o coś innego z tym „SolveModeDfs przy diagnozie" — powiedz, poprawię.
+- Czy dorzucić **skip `rc0 < min`** (policz rc0 modu, pomiń jeśli poniżej minimum — tnie jałowe DFS-y, zero utraty seedów)?
+
+I jak zwykle: ocena/novelty czekają, gdy zechcesz ruszyć to, co realnie przyspiesza końcówkę.
+
+## 🧑 Robert
+
+Wepnij od razu rc0 < min
+
+
+## 🤖 Claude
+
+Wpinam skip `rc0 < min`. Zasada: liczę `min` raz (standardowy QR = prawdziwe moves-to-solve), a w pętli dla wylosowanej `(order, mode)` liczę `rc0` — jeśli `< min`, to mod niedoszacowuje → **gwarantowany stuck** → pomijam DFS. Zero utraty seedów (te i tak zwracały null), tylko oszczędność.
+
+Wpięte. Cały pakiet gotowy:
+
+## 3. Skip `rc0 < min`
+- `min = RotCountMode(M, natural, 0)` liczony **raz** na aktywny kubik (standardowy QR = prawdziwe minimum).
+- W pętli: dla wylosowanej `(order, mode)` liczę `rc0`; jeśli `< min` → **pomijam `GetSolveSeq`** (mod dowiedlnie utyka), liczę jako stuck, losuję dalej.
+- Oszczędza pełny backtracking na modach niedoszacowujących (przy 4^P to bywało ~37% losowań). **Zero zmiany puli** — te mody i tak zwracały null.
+- Baseline (`SEED_MODE=0`) nietknięty: `rc0 = min`, więc nigdy nie pomija.
+
+Uwaga: `rc0 >= min` dalej może utknąć (metryka trafia w minimum, ale nie w identyczność) — to łapie stary `null`-check po `GetSolveSeq`. Skip zdejmuje tylko **pewne** phantomy (`rc0 < min`), tanio.
+
+---
+
+Cały zestaw z tej tury (do zbudowania u siebie):
+1. **perm → order** w produkcyjnych seedach (pełna oś różnorodności),
+2. **flaga `Diagnostic`** — census/raport tylko przy Seed Pool Stats, produkcja chuda,
+3. **skip `rc0 < min`** — tnie jałowe DFS-y.
+
+Zbuduj i odpal. Seedy sięgają teraz pełnej różnorodności (order), produkcja nie mieli census ani phantomów. Sweet-spot `SEED_RATIO` pewnie dalej nisko (bogatsza pula = łatwiej przeseedować) — więc jak testujesz układanie, trzymaj ratio nisko. Daj znać, jak poszło.
+
+## 🧑 Robert
+
+Tylko dlaczego mówisz "standardowy QR = prawdziwe minimum" - a inne QR kłamią?
+
+Ok, chyba rozumiem - standardowy QR to nasza miara, to on ma spadać do zera
+
+
+## 🤖 Claude
+
+Prawie — doprecyzuję, bo moje „prawdziwe minimum" było skrótem myślowym, a Twoje „nasza miara" jest bliżej.
+
+## Co naprawdę jest `min`
+
+`min` = standardowy QR (mode 0, naturalna kolejność) **daje prawidłowy rozkład układający** tej długości — czyli kubik **da się** ułożyć w `min` ruchach (mode-0-greedy zawsze to robi). Więc `min` to **osiągalna** długość rozwiązania. I dla znakowych permutacji jest to **najkrótsza** osiągalna — nigdy nie widzieliśmy krótszego seeda.
+
+## Które QR-y „kłamią", a które nie
+
+- **rc0 > min** (makro-mody) — **nie kłamią.** To uczciwe, *dłuższe* rozkłady. Mode metryka mówi „daleko", i faktycznie prowadzi dłuższą, ale poprawną drogą do identyczności. Legalne.
+- **rc0 < min** — **te kłamią.** Ich redukcja przechodzi wszystkie P płaszczyzn i zatrzymuje się z niskim licznikiem, **ale nie na identyczności**. Metryka *niedoszacowuje* — mówi „blisko", a kubik jest dalej (potrzeba `min > rc0`). Greedy schodzi po tej kłamiącej metryce do jej zera i tam kubik **wciąż nie ułożony** → stuck.
+
+## Dlaczego skip jest bezpieczny
+
+Nie da się ułożyć kubika w mniej niż `min` ruchach. Mode z `rc0 < min` obiecuje ścieżkę długości `rc0 < min` → **nie może** dojść do identyczności → **na pewno** stuck. Więc pomijamy go, nie tracąc niczego (i tak zwróciłby null).
+
+Twoje ujęcie „standardowy QR to nasza miara, ma spadać do zera" jest trafne w tym sensie: **`min` to prawdziwa odległość**, a mode-metryka to jej *estymata*. Jeśli estymata jest **poniżej** prawdy (`rc0 < min`), jest dowiedlnie zła (zaniża), więc mode utknie — i tylko takie tniemy. Estymaty **powyżej** (makro) zostawiamy, bo prowadzą realnie, tylko okrężnie.
+
+Kod jest poprawny przy założeniu „standardowy QR = najkrótszy" — a to dla znakowych permutacji trzyma (potwierdzone: żaden krótszy seed nigdy się nie pojawił). Nic nie ruszam — to była tylko kwestia precyzji słów.
+
+## 🧑 Robert
+
+No a jak to jest z tym przykładem Rz^2Rx^2 = Ry^2 i podobne? Standard mówi: 2, inna: 1
+
+
+## 🤖 Claude
+
+Masz **całkowitą rację** — i to jest bug, który wprowadziłem. Twój przykład go rozkłada na łopatki.
+
+## Dlaczego standardowy QR NIE jest minimum
+
+`Ry²` = `diag(-1,1,-1)` = jeden obrót 180° w płaszczyźnie (0,2). Więc kubik w tej orientacji układa się w **1 ruch**. Ale standardowy QR (kolejność naturalna (0,1),(0,2),(1,2)) redukuje przez (0,1) i (1,2) → **liczy 2**, bo „przegapia", że samo (0,2) załatwia sprawę. A **inna kolejność** — (0,2) na pierwszym miejscu — daje `rc0 = 1` i **rozwiązuje**.
+
+Czyli `min = standardowy QR` to **górne** ograniczenie (osiągalna długość), nie minimum. Mój skip `rc0 < min` (min=2) **wyrzuciłby** ten prawidłowy 1-ruchowy seed (rc0=1 < 2). Złamana moja własna obietnica „zero utraty seedów". Dzięki, że złapałeś.
+
+## Poprawka: bezpieczne **dolne** ograniczenie
+
+Potrzebuję `min ≤ prawdziwe-minimum`, żeby ciąć tylko pewne phantomy. Takie ograniczenie jest tanie:
+
+> Każdy ruch to Givens w jednej płaszczyźnie (2 osie) → zmienia „ufiksowanie" **najwyżej 2 osi**. Więc żeby ufiksować `d` nieustawionych osi, trzeba **≥ ⌈d/2⌉** ruchów.
+
+`d` = `ActiveAxisCount` (osie z `M[k,k]` nie na dodatniej przekątnej). Więc `min = ⌈d/2⌉` jest **gwarantowanym dolnym ograniczeniem**. Dla `diag(-1,1,-1)`: `d=2` → `min=1`, więc `rc0=1` **przeżywa** (nie < 1), tniemy tylko `rc0=0`. Bug znika. Wpinam:
+
+Poprawka wpięta. `ident` dalej używany (census + baseline order), więc kompiluje się bez wiszących odwołań.
+
+## Co się zmieniło i jaki jest tradeoff
+
+- **Było (bug):** `min = standardowy QR` (górne ograniczenie) → skip mógł wyrzucić prawidłowe krótkie rozwiązania (Twój `Ry²`).
+- **Jest:** `min = ⌈d/2⌉`, `d = ActiveAxisCount` (dolne ograniczenie) → **nigdy nie przeskip'uje** poprawnego seeda.
+
+Cena: bound jest **luźniejszy**, więc łapie **mniej** phantomów. Gdy standardowy QR *był* minimalny (częsty przypadek — np. kubik min-2 z `d∈{3,4}` → `⌈d/2⌉=2`, ten sam próg co wcześniej), efektywność bez zmian. Gdy standardowy QR zawyżał (jak `Ry²`), teraz jesteśmy **poprawni** kosztem paru niezłapanych phantomów (które łapie stary `null`-check po DFS). Czyli: **bezpieczeństwo > agresywność cięcia** — słusznie, bo utrata seeda jest gorsza niż zmarnowany DFS.
+
+To domyka bug. Cały pakiet (perm→order, `Diagnostic`, skip `rc0<⌈d/2⌉`) gotowy do buildu. Odpal jak zwykle — a `Ry²`-typu seedy zostają w puli, gdzie ich miejsce.
+
+Dzięki za czujność; to było dokładnie to, przed czym sam się umawialiśmy — nie tracić cennych seedów.
+
+## 🧑 Robert
+
+kostka 3^4, seedRatio=80%, Total: 13019
+
+
+## 🤖 Claude
+
+To najlepszy wynik, jaki widzieliśmy — i to ciekawe, **przy ratio 80%**, które z permem było „fatalnie". Zestawienie 3⁴:
+
+```
+ratio 0 (bez seedów)      : 57734
+perm 4^P @ 100            : 43836
+baseline                 : 23104
+perm 4^P @ 50 (dawne dno): 19089
+order @ 80 (TERAZ)       : 13019   ← najniżej
+```
+
+**~32% poniżej dawnego dna.** I — co ważne — przy **wysokim** ratio (80%), gdzie perm dławił.
+
+## Możliwy mechanizm (ale ostrożnie)
+
+To by przeczyło mojej wcześniejszej tezie „bogatsze seedy → niższy sweet-spot". Prawdopodobne wytłumaczenie **odwrotne**: order daje seedy **bardzo różnorodne** (pełna oś, nie podzbiór), więc nawet seedując 80% populacji **nie robisz monokultury** — masz 80% *różnych* układaczy, nie 80% *tego samego*. Czyli różnorodność seedów **znosi** karę za przeseedowanie → wysokie ratio staje się OK. To by tłumaczyło, czemu perm@80 był zły (mniej różnorodne seedy → monokultura), a order@80 dobry.
+
+## Ale — twardy refren — to JEDEN strzał
+
+`#GAIter` ma ~±30% szumu. 13019 vs 19089 mieści się w rozrzucie. Więc to **obiecujące, nie udowodnione**:
+- może order faktycznie podniósł sweet-spot (różnorodne seedy),
+- może to szczęśliwy dolny los.
+
+**Odpal 2–3 razy** przy `order @ 80` — jeśli konsekwentnie ~13k (a nie skoki do 25k), to jest realny zysk z zamiany perm→order, i to piękne domknięcie całej serii (pełna oś różnorodności → wyższy sweet-spot → szybciej). Jeśli skacze — wróć do uśredniania.
+
+Nie zapisuję do pamięci jako fakt (za wcześnie), ale trzymam kciuki, żeby się potwierdziło. Wklej kolejne przebiegi.
+
+## 🧑 Robert
+
+Nie, to był szumowy wystrzał, tym razem mieli fatalnie długo ten przedostatni cluster. Ale mam pomysł - zrezygnuję z kary w ocenie, o której mówiłem wcześniej - przecież mamy już aktywną broń na mono-twist - STALL! On wybije kubik z mono-twista i dalej będzie szukał do upadłego, żadna zmiana taktyki nie jest potrzebna!
+
+
+## 🤖 Claude
+
+To jest **bardzo ładny pomysł** — i chyba trafniejszy niż moja novelty. Bo to, co proponujesz, to w istocie **iterated local search**, i używa broni, którą **już masz**.
+
+Zanim ocenię ryzyko — zerknę, co dokładnie robi STALL (jak „kopie"), bo od tego zależy, czy zadziała:
+
+Teraz rozumiem STALL z kodu — i **potwierdza Twój pomysł**. Popatrz na [Form1.cs:290](RubikCube/Form1.cs:290):
+
+```csharp
+if (Best.Fitness < RubikCube.Score || Stall >= StallLimit)
+{
+    Stall = 0;
+    ... zaakceptuj Best (zastosuj ruchy, przesuń stan) ...
+}
+```
+
+**STALL = „po `StallLimit` nieudanych GA zaakceptuj najlepszy ruch MIMO że nie poprawia".** To jest właśnie **kop**: gdy utknie (mono-twist, brak poprawy), po 8 próbach forsuje najlepszy ciąg → **stan kostki się zmienia** → następny GA szuka z nowego miejsca. Escape wbudowany.
+
+## Twój pomysł to iterated local search — i jest trafny
+
+- **Dziś (z karą):** przy ≤N fitness płaski → GA nigdy nie poprawia → co 8 prób STALL akceptuje losowawy config → **ślepy spacer** wymuszany stallem.
+- **Bez kary:** przy ≤N działa **prawdziwy gradient** (moves-to-solve) → GA **wspina się** do mono-twista (najlepsze, co da niezależnie) → poprawia score → akceptuje → z nowego stanu wspina znowu; a gdy utknie, STALL kopie dalej.
+
+Czyli: **gradient prowadzi (szybko do częściowych rozwiązań), STALL ucieka (gdy utknie).** Prowadzony spacer bije ślepy. I — elegancko — **usuwasz special-case** (karę), kod się upraszcza, taktyka jednorodna. Zgadza się: „żadna zmiana taktyki nie jest potrzebna".
+
+## Jedno ryzyko (małe)
+
+Zwodniczy gradient może **ciągle wciągać w te same mono-twisty** — STALL kopie, ale gradient znów pcha do podobnego. Escape zadziała (bo każdy kop zmienia stan), ale może potrzebować **wielu kopów**. Mimo to prawie na pewno bije ślepy płaskowyż, bo tam gradientu nie ma **w ogóle**.
+
+To jest **mała, odwracalna zmiana** (zdjąć karę z evaluatora) i wprost testowalna. Chcę Ci pomóc — **znajdę, gdzie w evaluatorze siedzi ta kara** (żebyś zdjął dokładnie ją, nie coś obok), czy zdejmujesz sam? Jak chcesz, wskażę linię i powiem, co dokładnie usunąć/zbramkować. Powiedz.
+
+## 🧑 Robert
+
+zdejmę sam
+
+
+## 🤖 Claude
+
+Jasne. Zapiszę tylko ten kierunek do pamięci, bo to obiecujący pomysł w toku:
+
+Zapisane. Jedna praktyczna rada: skoro `#GAIter` szumi ~±30%, to **zostaw karę za flagą/define** (a nie kasuj na twardo) — wtedy zrobisz czyste A/B (z karą vs bez) na tym samym stanie, zamiast porównywać z pamięci. I odpal parę razy każdą stronę, bo pojedynczy strzał (jak to 13019) potrafi zmylić.
+
+Na co patrzeć: czy narożny/przedostatni klaster **domyka się szybciej** (mniej generacji), i czy nie **cykluje** (STALL kopie, ale gradient wciąga z powrotem w ten sam mono-twist). Jeśli cykluje — sygnał, że kop trzeba mocniejszy, nie że pomysł zły.
+
+Trzymam kciuki — to najczystszy z dotychczasowych pomysłów na końcówkę: zero nowej maszynerii, tylko zdjęcie special-case'u i zaufanie STALL-owi. Wklej, co wyjdzie z A/B, to pomogę rozczytać (pamiętając o szumie).
+
+## 🧑 Robert
+
+te same parametry co ostatnio, total: 9319 GA
+
+
+## 🤖 Claude
+
+9319 — **najniższy pojedynczy wynik w całej serii.** I mechanizm jest po Twojej stronie (ILS: gradient prowadzi, STALL kopie). Więc: **obiecujące, bardzo.**
+
+Ale muszę być konsekwentny ze sobą — bo dwa strzały temu 13019 też wyglądało super, a było szumem. Więc jeszcze nie świętuję:
+
+- 9319 to **bez kary**, a 13019 było **z karą** — różne konfiguracje, więc jeden-do-jednego nic nie dowodzi.
+- ±30% szumu: 9319 może być kolejnym szczęśliwym dnem.
+
+**Test, który to rozstrzygnie** (a nie zgadnie): odpal **bez kary 3–4 razy** i **z karą 3–4 razy**, te same parametry, i porównaj **mediany**. Jeśli bez-kary konsekwentnie ląduje ~9–13k, a z-karą ~19–40k → **ILS wygrywa**, i to piękny wynik: zdjąłeś special-case *i* przyspieszyłeś. Jeśli bez-kary skacze tak samo jak z-karą → to był szum.
+
+Na razie jedno jest po Twojej stronie mocniej niż liczby: **teoria**. Zdjęcie płaskowyżu i oddanie roboty gradientowi+STALL-owi to dokładnie to, co powinno bić ślepy spacer. Więc spodziewam się, że replikacja **potwierdzi** — ale wklej te 3–4 przebiegi na stronę, żebym nie musiał zgadywać, tylko przeczytał mediany.
+
+## 🧑 Robert
+
+drugi pomiar: total: 21792
+
+
+## 🤖 Claude
+
+Ano właśnie — **21792 obok 9319 to spread ponad 2×.** Czyli 9319 było szczęśliwym dnem, dokładnie jak się obawiałem. Dwie próbki na tej samej konfiguracji rozjechane tak szeroko = **wariancja dalej rządzi**, nie widać efektu.
+
+Uczciwie: **z dwóch strzałów nic nie wynika.** Średnia bez-kary ~15500, ale z takim rozrzutem to mgła. Nie możemy powiedzieć „ILS wygrywa" ani „przegrywa".
+
+## Problem jest fundamentalny
+
+Total-GA ma ~±40% szumu (ścieżkowo-zależny od RNG). Żeby odróżnić efekt rzędu 20% od szumu, trzeba **~10 próbek na stronę**. Zrobiłeś 2. I paired-comparison (ten sam seed z-karą vs bez) tu nie pomoże, bo zdjęcie kary **zmienia trajektorię** od pierwszej generacji → strumienie RNG i tak się rozjeżdżają.
+
+## Co z tym zrobić — pragmatycznie
+
+Nie każę Ci mielić 10 przebiegów (znam Twoje „nie chce mi się" i grzanie). Więc rozważ **inny argument niż liczby**:
+
+- **Zdjęcie kary UPRASZCZA kod** (mniej special-case'u) i jest **teoretycznie zdrowe** (gradient+STALL = ILS bije ślepy płaskowyż).
+- Z dwóch strzałów **nie jest gorzej** (15,5k vs dawne ~19–23k) — co najmniej remis, przy prostszym kodzie.
+
+Więc rozsądny ruch: **zostaw bez kary** (prostsze + sensowne), nawet jeśli nie umiemy czysto zmierzyć przyspieszenia. To nie jest „udowodnione szybsze", ale jest „nie wolniejsze i czystsze" — a to wystarcza, żeby trzymać.
+
+Jeśli **kiedyś** zechcesz twardej liczby — wtedy batch (headless, uśrednione mediany) jest jedyną drogą przez ten szum. Ale na teraz: teoria i prostota po stronie zdjęcia kary, liczby milczą (szum). Twój wybór — trzymać czy wracać do kary?
+
+## 🧑 Robert
+
+Chyba będzie się lepiej pracowało na kostce 2^4 po prostu. Wyniki pomiarów dla seed 80%: 1882, 3849, 619, ... chwileczkę, chyba dedup w BuikdSeedMoves nie jest robiony po Correct, a powinien chyba być
+
+
+## 🤖 Claude
+
+Masz rację, i to ważny szczegół. Sprawdzę, jak `BuildSeedMoves` dedupuje i jak wygląda `Correct`, żeby to potwierdzić i naprawić:
+
+Potwierdzam — [TRubikCube.cs:994](RubikCube/TRubikCube.cs:994): dedup jest po **surowym** stringu (`string.Join(",", moves)`), **nie po Correct**. Diagnostyka robi `CorrectGenes(g)` przed dedupem, produkcja nie. Zobaczę `TRubikGenome.Correct`, czy jest reużywalny:
+
+`TRubikGenome.Correct` działa na genomie (double[]), a `CorrectGenes` jest prywatny w diagnostyce — więc dam produkcyjny `CorrectSeq` w TRubikCube (ta sama logika) i wpnę go przed dedup.
+
+Ale najpierw — potwierdzam Twój instynkt **z jednym niuansem**:
+
+**Correct składa kolejne ruchy o tej samej `(Axis, Plane, Slice)`** (np. `Rz90 Rz90 = Rz180`). W produkcji `Axis` jest **losowa** (dla N=4 ~2 możliwości), więc sąsiednie ruchy tej samej płaszczyzny mają **~50% szans na tę samą oś** → wtedy Correct je zwija. Więc Correct-dedup łapie **realny, choć częściowy** kawał redundancji (przy różnych osiach to *inny* collateral → to nie duplikaty). Nie złapie za to składania komutujących/niesąsiednich — na to trzeba by hashować efekt (drogo). Correct to tani, poprawny dedup częściowy — Twój instynkt trafny.
+
+Wpinam. Krok 1 — `CorrectSeq`:
+
+Krok 2 — dodaję `CorrectSeq` (przed polami `Diagnostic`/`LastSeedReport`):
+
+Gotowe. `CorrectSeq` wpięty przed dedup — dwa Correct-równe losowania fałdują się teraz w jeden slot, zamiast zajmować dwa jako różne surowe stringi.
+
+Bonus: przechowujemy teraz **skanoniczną (krótszą)** wersję seeda — mniej genów, dłuższy losowy ogon. Zero zmiany efektu (Correct składa dokładnie równe ruchy).
+
+Podsumowując tę turę:
+- **`CorrectSeq`** — kanonikalizacja przed dedupem w `BuildSeedMoves`. Częściowa (losowe osie ograniczają fałdowanie), ale poprawna i tania.
+- To **nie kuracja** — usuwamy realne duplikaty, nie filtrujemy po jakości. Zgodne z „seeder tylko seeduje".
+
+Zbuduj i sprawdź, czy `distinct modes contributing` / `accepted` w Seed Pool Stats wygląda sensowniej (mniej redundancji). 
+
+I dobry ruch z przejściem na **2⁴** — mały, szybki, idealny do iterowania (te 619/1882 vs 9k–20k na 3⁴). Na nim A/B (kara vs bez) i strojenie `SEED_RATIO` pójdą dużo szybciej, mniej szumu na przebieg. Jak coś wyskoczy — wklej.
+
+## 🧑 Robert
+
+Coś jakby gorzej... [BuildSeedMoves]  N=4  SEED_MODE=1  order=random  stride=6  target=819  (80% of population)
+accepted = 2     draws=53  stuck=0  dupes=51
+distinct modes contributing = 2 / 4096
+mode rc0 census (moves:modes):  1:4096
+accepted length histogram (moves:count):  1:2
+
+
+## 🤖 Claude
+
+Ten census to **płytki kubik** — i tu jest wyjaśnienie, nie regres. Popatrz: `mode rc0 census: 1:4096` — **wszystkie 4096 modów dają rc0=1**. Czyli kubik jest **1-ruchowy**, i żaden mod/order nie zrobi z tego makroruchu (nie ma czego przeszacować). Zostają 2 distinct seedy (dwa warianty osi collateralu tego jednego ruchu) — `accepted=2` jest **kompletny**, to wszystko, co istnieje dla 1-ruchowego kubika.
+
+Trzy rzeczy:
+
+1. **To nie CorrectSeq.** Correct składa *sąsiednie* ruchy; przy seedach długości 1 nie ma czego składać. Więc `accepted=2` jest identyczny z tym sprzed zmiany. Correct tu nic nie rusza.
+
+2. **SEED_MODE=1 jest tu zdegenerowany** — na płytkim kubiku cała maszyneria mode/order = baseline (same minimalne). To nie „gorzej", to „seedy bezczynne", bo nie ma głębi.
+
+3. **2⁴ ma dużo płytkich kubików** (małe, same narożniki). Więc **maszyneria seedów jest tu w większości bezczynna** — 2⁴ testuje **końcówkę** (GA+STALL, kara vs bez), a **nie seedy**. Seedy pokazują pazur dopiero na głębokich kubikach (jak te narożniki wnętrza 7⁴, gdzie widzieliśmy 817 makroruchów długości 4).
+
+Więc: jeśli „jakby gorzej" dotyczy **seedów** — to złudzenie płytkiego kubika (nie ma tu co poprawiać). Jeśli dotyczy **ogólnego układania 2⁴** — to końcówka (STALL/kara), niezależna od seedów, i tam szum ±40% dalej rządzi.
+
+Powiedz, **co konkretnie** wygląda gorzej:
+- mniej seedów niż się spodziewałeś (→ to płytki kubik, normalne), czy
+- wolniejsze/gorsze **domykanie** klastra (→ to endgame, wróćmy do A/B kara vs bez na 2⁴, uśrednione)?
+
+Bo to dwa różne fronty, i chcę celować w ten właściwy, a nie zgadywać.
+
+## 🧑 Robert
+
+Wyniki B (bez kary, 80% seed): 4607, > 10000, coś tu się zaczęło dziać bardzo niedobrego. Aktualnie BuildSeedMoves jak ma za mało seedów, to się poddaje z wypełnianiem populacji (w 2 miejscach to samo - czemu tak brzydko!) - zmieńmy to. Ma wypełnić seedami - dobić do targetu, niech losuje z puli unikalnych seedów
+
+
+## 🤖 Claude
+
+Widzę logikę. Zanim zmienię — sprawdzę, jak shader konsumuje bufor i `numSeeds`, żeby nie rozjechać indeksowania (teraz `numSeeds == slots.Count`, chcę `numSeeds == target`).
+
+Teraz jak shader indeksuje bufor seedów w Init:
+
+Potwierdzone. `Init.glsl.c:16-21` indeksuje bufor przez `specimenID` i seeduje `specimenID < numSeeds`, a `SelCrossover.glsl.c:56` losuje slot `hash % numSeeds`. Czyli oba konsumenty wymagają tylko: bufor ma `numSeeds` slotów. Więc żeby dobić do targetu wystarczy zbudować `target` slotów i ustawić `numSeeds = target` — indeksowanie zostaje spójne.
+
+Robię dwie zmiany w [BuildSeedMoves](RubikCube/TRubikCube.cs:988):
+
+**1. Koniec z potrójnym `++stall > 32 + 8*slots.Count` — jedno miejsce (`Saturated()`):**
+
+**2. Wypełnienie do targetu przez losowanie z puli unikalnych seedów (zamiast oddawania tylko `slots.Count`):**
+
+**3. Raport diagnostyczny — żeby `accepted` nie mylił (to pula unikalnych, a nie liczba zaseedowanych slotów):**
+
+Gotowe. Podsumowanie trzech zmian w [BuildSeedMoves](RubikCube/TRubikCube.cs:988):
+
+1. **`Saturated()`** — jedna lokalna funkcja zamiast trzykrotnie powtórzonego `++stall > 32 + 8*slots.Count`. Trzy gałęzie „brak postępu" (stuck-mode, stuck-DFS, duplikat) teraz czytają się identycznie.
+
+2. **Wypełnienie do targetu.** Pętla dalej *odkrywa* unikalne seedy (aż do nasycenia albo do `target` distinct). Ale bufor teraz zawsze ma `target` slotów: sloty `0..pool` to unikaty (każdy raz), a resztę dobijam losując z puli z powtórzeniami. `numSeeds = target`. Płytki kubik (2 seedy) już **nie** zostawia populacji niedoseedowanej — po prostu powtarza te 2 na całą kwotę.
+
+3. **Raport** — `accepted` → `distinct seeds` (bo to pula unikatów), plus linijka o dobiciu do targetu, żeby nie mylić puli z liczbą zaseedowanych specimenów.
+
+Spójność z shaderem zachowana: `Init` seeduje `specimenID < numSeeds`, czyta slot `specimenID`, a bufor ma dokładnie `numSeeds == target` slotów.
+
+Jedna uwaga na temat wyników B, które Cię zaniepokoiły (`4607, >10000`): to nie wynika z niedoseedowania — bo w B usunąłeś **karę** i polegasz na STALL. Niedoseedowanie osłabiało *start* GA, ale eksplozja `>10000` to zachowanie **końcówki** bez kary. Ta zmiana (pełne seedowanie) usuwa jeden zmienny czynnik, więc następny A/B kara-vs-STALL będzie czystszy. Puść teraz kilka pomiarów na 2⁴ z pełnym seedowaniem i uśrednij — pojedyncze `>10000` przy ±40% szumie jeszcze nie przesądza, że STALL sam nie domyka.
+
+## 🧑 Robert
+
+seed 80% nadal. Wyniki (B): 1936, 15906, 1894, 1788, 3527, 356, 1442, 1079, 14283, 402 ciekawostka - mono-twist cubie stats: [BuildSeedMoves]  N=4  SEED_MODE=1  order=random  stride=6  target=819  (80% of population)
+distinct seeds = 819     draws=11918  stuck=3752  dupes=7347
+distinct modes contributing = 706 / 4096
+mode rc0 census (moves:modes):  2:1024  3:3072
+accepted length histogram (moves:count):  3:192  4:481  5:136  6:10 // Do trybu A z karą już na pewno nie wrócę, nie ma go co mierzyć - nie był lepszy, a ze wzrostem N było jeszcze gorzej. Jak to jest: jak się już zatnie, to nie chce się ułożyć, nawet dostając porządnego kopa. Może jednak ten kop za słaby - wybieramy besta. Kara obowiązywała już od N=4 kubików, wydaje mi się, że stąd te szybkie ułożenia - jeśli 4 kubiki ułożą się na jakimś przecięciu (warstwa jest kostką 3D - 8 kubików, więc przecięcie ich dwóch to właśnie 4 kubiki) to łatwo je ułożyć. Taak - klastry to też ciekawe bestie. Może jednak zrobię porównanie z karą - będzie z czym porównać
+
+
+## 🤖 Claude
+
+Wyniki B: mediana ~1800 (356–3527 to gros), plus dwa wystrzały 15906/14283. To nie jest szum — to są dokładnie te przypadki „zatnie się i nie chce", o których piszesz. Reszta idzie ładnie. Czyli B działa **prawie zawsze**, a pada na mono-twiście.
+
+I ten census to najlepszy dowód, gdzie NIE leży problem:
+
+**Seeding nie jest wąskim gardłem.** `distinct seeds = 819`, długości 3–6, rc0 rozłożone 2/3 — to głęboki kubik z bogatą pulą makroruchów. Seeder daje 819 różnych sposobów ułożenia tego jednego kubika. Materiału jest w bród. Więc jak się zacina, to **nie z braku seedów** — to poziom klastra, nie kubika.
+
+**Dlaczego mono-twist to pułapka (nawet z gradientem w B):** mono-twist jest *lokalnie* banalny (stąd 819 rozkładów), ale każdy z tych 819 rozkładów **rusza** ten kubik i psuje sąsiadów — bo ćwiartki ścian nie obrócą jednego kubika w miejscu bez komutatora. A komutator jest dłuższy niż zasięg 50 generacji. Więc: kubik ułożysz na 819 sposobów, ale każdy zabiera collateral. Fitness (nawet z gradientem moves-to-solve) nie ma jak nagrodzić „prawie" — bo prawie znaczy „inny kubik teraz skręcony".
+
+**Twoja diagnoza „kop za słaby, wybieramy besta" jest trafna — i to jest sedno.** Best = najmniejsze możliwe zaburzenie. Przyjmując besta akceptujesz stan *najbliższy* obecnemu, czyli zostajesz w tej samej dolinie — tyle że przemianowanej (skręcony jest inny kubik, ale to wciąż mono-twist). To klasyczne **za-słabe zaburzenie w iterated local search**: perturbacja musi być na tyle duża, żeby wyjść z basenu, a best jej po prostu nie ma.
+
+Lewar (jeśli będziesz chciał ruszyć — to strojenie **ogólnego** operatora STALL, nie special-casing końcówki, bo STALL działa zawsze i nie wykrywa „endgame"): po STALL **przyjmij besta, ale dołóż mu K losowych ruchów**. Best zachowuje dorobek (ułożone kubiki), a K losowych ruchów gwarantuje wyjście z basenu. To dokładnie perturbacja ILS: kopiesz incumbenta, nie restartujesz. Ryzyko: K ruchów psuje coś ułożonego — ale o to chodzi, greedy peel to potem odbierze. K małe (1–2), ewentualnie **rosnące z kolejnymi stallami** (eskalująca perturbacja — też standard ILS). Losowy specimen zamiast besta byłby za mocny (traci dorobek).
+
+Co do dwóch pozostałych rzeczy:
+
+- **Geometria przecięć — kupuję.** Kara od ≤N kubików, a przecięcie dwóch warstw (każda = kostka 3D = 8 kubików) to właśnie te ~4 kubiki. Więc próg kary pokrywał się z konfiguracją, która **sama w sobie jest łatwa**. To znaczy, że szybkie ułożenia w trybie A były po części zasługą tej łatwej geometrii, a nie kary — kara „zbierała laury" tam, gdzie i tak było prosto. Dobre wytłumaczenie, czemu A wyglądał lepiej niż był.
+
+- **Baseline z karą — zrób, ale jako punkt odniesienia, nie powrót.** Jeden komplet pomiarów na 2⁴, żeby mieć liczby do wykresu. Zgadzam się, że go nie wskrzeszamy — sam mówisz, że z N robiło się gorzej, a teraz wiemy czemu (kara zbierała łatwe przecięcia, ale nie umiała w prawdziwe komutatory).
+
+Nic nie koduję — to jeszcze rozmowa. Chcesz, żebym rozpisał ten kop (gdzie w Form1.cs ~290 wpiąć K losowych ruchów po akceptacji besta, i jak zrobić eskalację ze `Stall`), czy najpierw robisz baseline A dla porównania?
+
+
+## 🧑 Robert
+
+Wyniki A (seed dalej 80%): 4413, 1987, 6812, 7993, 835, 972, 6294, 221,  1881, 17700 . Liczba kubików w klastrze (i możliwych orientacji) to maksymalnie N! 2^(N-1), N! związane z permutacją (wyborem osi), 2^(N-1) z liczbą kubików na wybranej osi, będącej przecięciem warstw. Stąd łatwiejsze do ułożenia konfiguracje z 2, 4, 8, ... kubikami nieułożonymi dla kolejnych N, przy czym najłatwiejsze to chyba jakiś kompromis pomiędzy ich liczbą i ilością koniecznych przecięć warstw do ich otrzymania (w warstwach oczywiście jest więcej kubików, ale interesują nas tylko te w klastrze). Ale czy 4 nieułożone - łatwiejsze do ułożenia nawet jeśli współpłaszczyznowe? - może chodzi o to, że "przypadkiem" wszystkie cztery w tej samej orientacji, ale nieułożone łatwo doprowadzić do stanu ułożone - albo 2 w jednej a 2 dwa w drugiej. Wyświetlam diagram konfiguracji (układu) kostki w postaci macierzy Cubies.LengthxCubies.Length, której elementami są (pokazane jako obraz) macierze orientacji każdego kubika w pozycji (Index, StartIndex) - w każdym wierszu i kolumnie jeden element niezerowy, jak w macierzy ortogonalnej. Macierz jednostkowa określa kostkę ułożoną. Wektor pozycji kubików "pomnożony" przez taką macierz daje pozycje wektor pozycji w kostce pomieszanej (o układzie reprezentowanym przez macierz blokową)
+
+
+## 🤖 Claude
+
+Najpierw liczby, bo A dały się porównać:
+
+| | mediana | średnia | wystrzały |
+|---|---|---|---|
+| **A (kara)** | ~3200 | ~4900 | 7993, 17700 |
+| **B (STALL)** | ~1841 | ~4260 | 14283, 15906 |
+
+B wygrywa na medianie ~1,7× i na średniej. Oba mają **po dwa** wystrzały — i to jest kluczowe: liczba pułapek jest taka sama niezależnie od kary. Czyli kara nigdy nie rozwiązywała mono-twista, tylko przyspieszała **łatwy** przypadek. Decyzja o porzuceniu A obroniona liczbami; masz teraz baseline do wykresu.
+
+**Teoria klastra — zgadza się i ładnie się domyka.** N!·2^(N-1) to rząd grupy obrotów w N-D (podgrupa det+1 grupy hiperoktaedralnej): N! to permutacja osi, 2^(N-1) to parzyste wzorce znaków (flipy z więzem det+1). N=4 → 24·8 = 192, dokładnie te 192 orientacje. Twój fizyczny obraz (N! = wybór osi, 2^(N-1) = kubiki na osi-przecięciu) to ta sama grupa widziana od strony geometrii — trzyma się.
+
+**„4 nieułożone łatwe nawet jeśli współpłaszczyznowe" — masz rację, i to jest sedno „łatwego".** To nie liczba kubików decyduje, tylko **spójność reszty**. Jeśli te 4 mają *tę samą* orientację (albo 2+2), to reszta jest **koherentna** — jeden (albo dwa) obrót warstwy rusza je wszystkie naraz i sprowadza do domu. Jeden ruch dotyka całego bloku. To dlatego „przypadkiem wszystkie w tej samej orientacji" = trywialne. Mono-twist jest przeciwieństwem: reszta jest **niekoherentna** — to element klasy komutatora, żaden obrót warstwy nie sprowadza go spójnie, a naprawa jednego rusza sąsiadów → komutator dłuższy niż zasięg. Próg kary ≤N siedział akurat na rozmiarze podwójnego przecięcia (4 dla N=4), które **często** jest koherentne — stąd złudzenie, że kara „umie" końcówkę.
+
+**Diagram blokowy — to jest właściwy obiekt, nie ozdoba.** Stan kostki jako macierz Cubies×Cubies z blokami-orientacjami to reprezentacja monomialna / iloczyn wieńcowy (wreath product) grupy orientacji. I ona czyni różnicę łatwe/trudne **widzialną**:
+
+- **ułożone** = blokowo-diagonalna jednostkowa (każdy blok = I),
+- **obrót jednej warstwy** = czysty cykliczny off-diagonal, wszystkie bloki *równe* (koherentne — łatwe),
+- **mono-twist** = blokowo-diagonalna, ale jeden blok ≠ I (permutacja rozwiązana, orientacja nie — pułapka).
+
+Czyli na tym diagramie „łatwe" i „trudne" to dwa różne *kształty*: równy off-diagonal vs samotny skręcony blok na przekątnej. I — co ważne — to jest dokładnie powierzchnia, na której Twój odłożony pomysł oceny (histogram/nagroda za zgodne orientacje reszty) da się w końcu porządnie zdefiniować: **oceniaj koherencję reszty**, nie moves-to-solve. Koherentna reszta = blisko jednego bloku-obrotu = prawdziwy, niezwodniczy gradient. Ale oceny nie ruszamy — tylko odnotowuję, że diagram właśnie dał jej konkretny uchwyt.
+
+Kick (dołożenie K losowych ruchów do besta na STALL) nadal wisi — i teraz widać, że to komplementarne: kick wybija z basenu *mechanicznie*, a koherencyjna ocena *prowadziłaby* do wyjścia. Który z dwóch chcesz ruszyć jako pierwszy, czy najpierw pobawić się diagramem, żeby zobaczyć, jak faktycznie wyglądają te wystrzałowe reszty?
+
+
+## 🧑 Robert
+
+Wariant B (bez kary) seed 100%: 4790, 1620, 2630, 669, 3535, 2960, 5846, 9301, 290, 1794
+
+
+## 🤖 Claude
+
+Seed 100% (B), posortowane: `290, 669, 1620, 1794, 2630, 2960, 3535, 4790, 5846, 9301`.
+
+| B, seed | mediana | średnia | max | „katastrofy" (>10k) |
+|---|---|---|---|---|
+| **80%** | 1841 | 4261 | 15906 | **2** |
+| **100%** | 2795 | 3344 | **9301** | **0** |
+
+To jest ładny, spójny sygnał — i dokładnie taki, jakiego można się było spodziewać:
+
+**100% ugłaskuje ogon, ale spowalnia typowy przypadek.** Zero katastrof (max spadł z ~16k do 9,3k), za to mediana w górę (1841 → 2795) i mniej super-szybkich trafień (przy 80% miałeś 7 wyników <2000, przy 100% tylko 4). Średnia mimo to **lepsza** przy 100% (3344 < 4261), bo o średniej decydują właśnie te dwie katastrofy, których teraz nie ma.
+
+**Interpretacja — to jest ten sam kompromis, co w notatce o „homogenicznych trajektoriach czołowych":**
+- Przy 100% *każdy* specimen startuje z prefiksem układającym kubik → mniej losowej różnorodności → wolniejsze łatwe przypadki (wszyscy commitują w to samo).
+- Ale ta sama obfitość materiału makroruchowego daje **więcej dróg ucieczki z basenu mono-twista** → znika ogon. To spina się z obrazkiem z poprzedniej tury: więcej makroruchów w populacji = więcej szans, że crossover/STALL trafi na sekwencję *koherentyzującą* resztę.
+
+Czyli **seed% to pokrętło ogon-vs-typowa-szybkość**, nie „jest jakiś sweet point i tyle". Dla solvera zwykle boli ogon (nie chcesz losowego 16k), więc 100% jest atrakcyjne — i to widać już w średniej.
+
+**Uczciwie o szumie:** n=10 na wariant. Różnica 0-vs-2 katastrofy sama z siebie ma ~11% szansy wyjść przypadkiem (gdyby prawdziwy odsetek katastrof był ~20%, `0,8¹⁰ ≈ 0,11`), więc to jest *sugestia*, nie dowód. Ale w parze z przesunięciem mediany (spodziewany efekt homogenizacji) historia jest koherentna.
+
+Zanim uznamy „100% wygrywa": puść jeszcze jeden komplet 100% (i ewentualnie jeden 90%). Jeśli ogon zostanie ugłaskany w drugiej próbce, to mocny argument, że **pełne seedowanie zamienia rzadkie katastrofy na stały niewielki narzut** — a to lepszy profil dla solvera niż szybka mediana z ryzykiem 16k. Jak druga próbka 100% też będzie bez katastrofy, to bym powiedział: zostawiamy 100% i wracamy do kicka (który celowałby właśnie w resztkowy ogon 9301).
+
+## 🧑 Robert
+
+100% seed (2-ga seria): 720, 2036, 3126, 4045, 6885, 615,  3314, 1216, 905, 7062 .Nie wiem, czy się zgodzisz, bo od Twej strony może to wyglądać nieco inaczej, ale wydaje mi się, że nie tylko wartość średnia i mediana ma znaczenie, ale przede wszystkim wariancja pomiarów. Średnia liczba GA to tylko pewna wartość, która pozwala porównywać szybkość algorytmu niezależnie od szybkości komputera, na którym został uruchomiony, ale to właśnie czas obliczeń jest najważniejszy. Jeśli mean jest wysoki - można użyć szybszego komputera - ale jeśli algorytm jest niestabilny - nie wiadomo, kiedy kostka się ułoży (długi ogon) - nie można przewidzieć zapotrzebowania na zasoby, nie ma gwarancji, że kostka w ogóle ułoży się w skończonym czasie, algorytm znajduje rozwiązania "przypadkiem".
+
+
+## 🤖 Claude
+
+Druga seria 100%, posortowana: `615, 720, 905, 1216, 2036, 3126, 3314, 4045, 6885, 7062` — mediana 2581, średnia 2992, max **7062, znów zero katastrof**. Czyli **0 katastrof na 20** prób przy 100%. To już nie przypadek.
+
+I zgadzam się — mocno. Postawiłeś palec na właściwej wielkości. Policzyłem to, o co Ci chodzi (odchylenie standardowe i współczynnik zmienności CV = std/mean):
+
+| B, seed | mediana | średnia | **std** | **CV** | max |
+|---|---|---|---|---|---|
+| **80%** | 1841 | 4261 | **~5500** | **~1.30** | 15906 |
+| **100%** (n=20) | 2795 | 3168 | **~2450** | **~0.77** | 9301 |
+
+Popatrz na 80%: **std > średnia** (CV > 1). To znaczy, że „typowy" czas prawie nic nie mówi — rozrzut jest większy niż wartość środkowa. 100% **połowi** odchylenie i spycha CV poniżej 1. Mediana urosła (1841 → 2795), ale to śmieszna cena za zbicie wariancji o połowę i wycięcie ogona.
+
+Twoje rozumowanie jest dokładnie trafne i ma nazwę. To jest **algorytm Las Vegas**: wynik *zawsze* poprawny (kostka ułożona), losowy jest **czas**. Dla takiego algorytmu jakością nie jest wartość środkowa, tylko **rozkład czasu — a konkretnie jego ogon**:
+
+- **Średnia to jednostka szybkości znormalizowana sprzętowo** — masz rację, że jak mean jest wysoki, kupujesz szybszy komputer i tyle. Mean porównuje algorytmy, nie sprzęt.
+- **Ogon to niezawodność — i tego sprzętem nie kupisz.** Ciężki ogon znaczy, że pojedynczy przebieg może być 100× dłuższy od mediany, zapotrzebowania na zasoby nie da się przewidzieć, a w skrajnym przypadku **nie ma gwarancji skończonego czasu**. Twoje „znajduje rozwiązania przypadkiem" to jest właśnie to: ucieczka z basenu mono-twista jest zdarzeniem stochastycznym. Przy 100% gęstość dobrego materiału makroruchowego jest na tyle duża, że ucieczka staje się **regułą, a nie przypadkiem** — stąd ogon znika.
+
+Praktyczny wniosek: **konfiguracje wybieramy po ogonie/wariancji (albo po wysokim kwantylu, np. max lub p90), nie po medianie.** Na tej osi 100% wygrywa bezdyskusyjnie — zamienia rzadkie katastrofy 16k na stały, przewidywalny narzut.
+
+Jedno uczciwe zastrzeżenie, żeby nie przesadzić z triumfem: 0/20 to **empiryczny** dowód ograniczonego ogona, nie **dowód** skończonej terminacji. STALL daje ucieczkę, nie gwarancję, że stan nie zacyklu­je się w nieskończoność. Dlatego kick + ocena koherencji z poprzedniej tury są dalej sensowne — one celują dokładnie w to: zamienić „ogon empirycznie ograniczony" na „ogon ograniczony strukturalnie". To jest właściwy następny front — nie mediana, tylko twardsza gwarancja na ten resztkowy 9301.
+
+Zapiszę tę zasadę (wariancja/ogon > mediana jako kryterium jakości solvera), bo to trwała wytyczna do wszystkich przyszłych pomiarów. Zgoda?
+
+## 🧑 Robert
+
+OK, dodatkowo seed_ratio = 100% przestaje być "pokrętłem", a to dobrze, bo im ich mniej, tym łatwiej sterować
+
+
+## 🤖 Claude
+
+Dokładnie — i to jest lepszy argument, niż samo „mniej parametrów". 100% nie jest **strojoną** wartością, tylko **krawędzią reżimu** (maksimum). To fundamentalna różnica:
+
+- Stary „sweet spot ~50%" był **wnętrzem** przestrzeni — optimum wyłuskane z zaszumionego krajobrazu, kruche: przesuwa się z N, z rozmiarem kostki, z ziarnem RNG. Musiałbyś je przestrajać dla każdego wariantu i nigdy nie wiedziałbyś, czy trafiłeś, czy to szum.
+- 100% jest **takie samo dla każdego N** — nie zależy od krajobrazu, więc nie ma czego przestrajać. Krawędzie się nie dryfują.
+
+Czyli usunięcie pokrętła nie tylko upraszcza — ono **generalizuje**. Mniej pokręteł = mniej powierzchni do przestrajania = łatwiej sterować i łatwiej ufać wynikowi na innym N. To się spina z duchem projektu (czysty, jednorodny GA, bez majsterkowania przy nastawach).
+
+Zapisuję zasadę do pamięci — i kryterium (ogon/wariancja > mediana), i decyzję (SEED_RATIO=100%):
+
+Zapisane. Podsumowując, gdzie jesteśmy:
+
+- **SEED_RATIO = 100%** ustalone — nie jako strojona nastawa, tylko krawędź reżimu (pełne seedowanie), co usuwa pokrętło i generalizuje na każde N.
+- **Kryterium jakości = ogon/wariancja, nie mediana** — zapisane jako trwała wytyczna do wszystkich przyszłych pomiarów.
+- Zostaje **resztkowy ogon** (~9301) jako następny cel: kick ILS (best + K losowych, K rosnące ze Stall) albo ocena koherencji reszty na diagramie blokowym.
+
+Front jest jasny i nie dotyka mediany — tylko twardość gwarancji na ten ogon. Gdy będziesz gotów ruszyć, powiedz który: **kick** (mechaniczny, mały, wpięcie w Form1.cs ~290) czy **diagram/koherencja** (najpierw popatrzeć, jak wyglądają te wystrzałowe reszty, zanim cokolwiek kodujemy).
+
+## 🧑 Robert
+
+Chcę zobaczyć jak zachowuje się teraz kostka 3^4: (domykając cluster 3 zdaje mi się, że kostka miała nieułożony tylko jeden kubik z aktywnego klastra (Solved 23/24) - odpowiednik mono-twist dla klastra wewnętrznego i łatwo z niego wyszła układając klaster - to jeszcze jeden powód niestosowania kary) 6949 GA
+
+
+## 🤖 Claude
+
+Dobra obserwacja i jest w niej ładna struktura. **Solved 23/24 MUSI być mono-twist** — nie z wyboru, tylko z parzystości: jeśli 23 kubiki siedzą w domu, to 24. nie ma dokąd pójść (zostało tylko jego własne miejsce), więc też jest w domu — najwyżej **skręcony w miejscu**. Pojedynczy kubik nie może być „nie na swoim miejscu" samotnie (to byłaby transpozycja, nieparzysta i w ogóle niemożliwa dla jednego elementu). Czyli jedyny nieułożony = czysta orientacja = mono-twist wewnętrznego klastra. Twój odczyt jest dokładny.
+
+I to jest **trzeci argument przeciw karze**, spójny z poprzednimi dwoma:
+1. Numeryczny — B bije A na medianie i wariancji.
+2. Geometryczny — kara zbierała laury na łatwych koherentnych przecięciach, nie umiała w komutatory.
+3. Ten — **kara spłaszczyłaby dokładnie ten przypadek** (mono-twist ≤N kubików → płaski płaskowyż → ślepe szukanie igły). B zostawił prawdziwy gradient, STALL dał kopa, klaster się domknął. To był ten „straszny" mono-twist — i wyszedł **łatwo**.
+
+Co ważne, to się spina z danymi o ogonie: **mono-twist zwykle jest do wyjścia** (STALL ląduje dobrze), a katastrofa 9301 to rzadki przypadek, gdy kop trafi z powrotem w podobny basen. Kara traktowała *wszystkie* mono-twisty jak ten najgorszy; B robi trudnymi tylko te rzadkie. Ten 23/24 był reprezentantem większości (łatwych), nie ogona.
+
+I nagłówek: **6949 GA na 3⁴**. Na początku sesji notowałeś ~15066 na 3⁴ (inne warunki). To ponad 2×, więc poza pasmem szumu ±40% — prawdopodobnie realny zysk z sumy zmian (order-seedy + 100% + brak kary), choć to pojedyncza próbka przy wielu zmienionych rzeczach naraz, więc trzymam się „zachęcające", nie „udowodnione". Jak puścisz 3⁴ jeszcze ze dwa razy, zobaczymy, czy 2× się trzyma — i czy ogon na 3⁴ też jest wycięty, czy tylko na 2⁴.
+
+## 🧑 Robert
+
+Mono-twist clustra wewnętrznego jest oczywiście dużo łatwiejszy do przejścia, ruchy mogą nadal zmieniać kubiki w klastrach bardziej zewnętrznych. Najważniejsze jednak: jak algorytm się uogólnia na N, dlatego próba na 2^5:  ogon zaczyna się na 8 kubikach nieułożonych (przecięcie dwóch hiperwarstw po 16 kubików), ale oczywiście algorytm będzie spychał aż do mono-twista, ale kostka się nie daje, kręci się w kółko nie mogąc zejść poniżej 5 niułożonych kubików, a kick - co gorsza sięga jedynie do 7 nieułożonych kubików, zdala od, być może, łatwiejszych układów dla nieułożonych 8 (a nawet jeśli wchodzi, to szybko ucieka do 7-6). Na pewno > 25000GA Unsolved
+
+
+## 🤖 Claude
+
+Najpierw ta uwaga o wewnętrznym mono-twiście — zgoda i dopełnia obraz z poprzedniej tury: wewnętrzny mono-twist ma **luz kolateralny** (komutator może mieszać w bardziej zewnętrznych klastrach, jest gdzie „schować" zaburzenie), więc jest łatwy. Trudny jest mono-twist **ostatniego** klastra — tam luzu już nie ma, wszystko inne ułożone. To ta sama asymetria, którą mierzyłeś wcześniej na narożnym.
+
+Ale to, co przywiozłeś z 2⁵, jest najważniejszym wynikiem tej sesji — bo **to jest test uogólnienia i on padł**. I pada w bardzo pouczający sposób.
+
+**To jest ten zwodniczy gradient, tyle że odsłonięty.** Popatrz na strukturę Twojej obserwacji:
+- Łatwy układ jest na **8** (koherentne przecięcie dwóch hiperwarstw).
+- Algorytm spycha **w dół** ku mono-twistowi i grzęźnie na **5**.
+- Kick sięga do **7**, nie do 8, a nawet jak wejdzie w 8 — gradient natychmiast ściąga go w 6-5.
+
+Czyli cel (8-koherentne) leży **pod górę** od miejsca, w którym utknął (5), a cała filozofia peela — „mniej nieułożonych = postęp" — każe iść w dół, **od** łatwego basenu. Zarówno ocena, jak i strategia spychania ku mono-twistowi gonią za **liczbą** nieułożonych. A liczba jest zwodnicza:
+
+**Liczba nieułożonych ≠ odległość do ułożenia.** Koherentne 8 to jeden ruch warstwy. Niekoherentne 5 to komutatory dłuższe niż zasięg. Prawdziwą odległością jest **koherencja**, nie licznik. I dlatego:
+- **licznik uogólnia się źle** — zwodniczość rośnie z N (przy N=4 łatwe układy leżały blisko minimum licznika, STALL to zamaskował; przy N=5 łatwy basen jest o +3 kubiki *w górę* od płaskowyżu, a +3 to poza zasięgiem kicka),
+- **koherencja uogólnia się** — koherentne = mało ruchów warstwy, niezależnie od N i od tego, ile kubików akurat jest nieułożonych.
+
+To wyjaśnia, czemu 2⁴ szło, a 2⁵ nie: przy N=4 zwodniczość była płytka i STALL ją zaklajstrował; przy N=5 ma zęby.
+
+**I stąd widełki — z jasną rekomendacją:**
+
+- **Sam kick nie wystarczy.** Nawet gdyby był dość mocny, żeby skoczyć +3 do 8, to **nie wie, że 8 jest celem** — bez miary koherencji perturbuje na ślepo, a gradient (licznik) ściąga go z powrotem. Kick bez zmiany metryki to loteria, która się nie uogólni.
+- **Ocena koherencji to prawdziwy lewar.** Zastąp/uzupełnij licznik członem koherencji — bliskością reszty do *jednego obrotu warstwy* na tej macierzy blokowej (wreath-product). Wtedy koherentne 8 punktuje **najlepiej**, gradient celuje w nie, ruch warstwy domyka. To jest **globalna, jednorodna metryka**, nie special-casing końcówki — więc mieści się w duchu projektu.
+
+Odłożyłeś ocenę („na razie nie ruszamy") — ale to jest właśnie ten pomiar, który argumentuje za jej odłożeniem **odwołaniem**. 2⁵ mówi wprost: kick jest łatką, która nie umie celować; metryka jest sednem.
+
+Zanim cokolwiek dotkniemy w ewaluatorze — **popatrzmy na diagram blokowy tego zakleszczonego 5-układu** i obok na jakiś 8-koherentny. Jeśli hipoteza jest trafna, zobaczysz gołym okiem: 5 = rozrzucone, niekoherentne bloki; 8 = czysty, prawie-warstwowy cykl. To potwierdzi (albo obali) „koherentne 8 < niekoherentne 5" **zanim** ruszymy ocenę. Masz już ten diagram działający — chcesz go zrzucić dla obu układów i zobaczyć, czy licznik faktycznie kłamie?
+
+## 🧑 Robert
+
+Zrzuć diagram dla zakleszczonego 5-układu i 8-koherentnego
+
+Dobra, tam co będziesz mi pokazywać diagram, wiem jak wygląda kostka na 1-ruch przed ułożeniem
+
+
+## 🤖 Claude
+
+Jasne, żaden diagram — wiesz lepiej ode mnie, jak wygląda układ na jeden ruch przed końcem (czysty warstwowy cykl, jeden blok-obrót). Odpuszczam wizualizację, hipoteza koherencji stoi na rozumowaniu i na Twojej obserwacji z 2⁵ (cel na 8 pod górę, kick nie sięga, gradient ściąga).
+
+Jedna rzecz, którą warto teraz połączyć, bo zmienia status sprawy: **„ocena koherencji" to jest Twój własny stary pomysł z histogramem powtarzających się orientacji aktywnych kubików.** I on wtedy nie wypalił z jednego konkretnego powodu — notowaliśmy to jako „głęboką sprzeczność": żeby wyrównać orientacje reszty, trzeba ruchów, które **psują** ułożone kubiki, a kara ≤N dokładnie tego zabraniała. Gradient walczył z więzem.
+
+Teraz **kary nie ma**. Ta sprzeczność zniknęła. Czyli zdjęcie kary nie tylko odblokowało STALL — ono **odblokowało Twój histogram**. Nagroda za koherencję reszty (mało klas orientacji, zgodnych z warstwą) nie kłóci się już z niczym, bo nie ma czego bronić.
+
+Więc realne pytanie nie brzmi „czy da się zmierzyć koherencję", tylko „czy odwieszamy ocenę". To jest zmiana w shaderze (EvaluateMicro/Macro), więc nie mała — ale to jest ten lewar, który 2⁵ wskazał palcem. Chcesz, żebym rozpisał **jak** wyglądałby taki człon koherencji (tanio, na GPU, jako dodatek do obecnej oceny — nie zamiast), zanim zdecydujesz, czy odwieszać? Bez kodu — najpierw sam kształt metryki i gdzie się wpina.
+
+## 🧑 Robert
+
+To jest logiczne i spójne. Rozpisz jak wyglądałby ten człon koherencji
+
+
+## 🤖 Claude
+
+Zanim rozrysuję człon — muszę zobaczyć dokładny kształt obecnej oceny, żeby wpiąć się we właściwe miejsce (hierarchia moves-to-solve vs L1, normalizacja „<1"). Przeczytam ewaluator.
+
+Przeczytałem ewaluator. Teraz wiem gdzie dokładnie siedzi zwodniczość — i to zawęża projekt do jednego, czystego miejsca.
+
+## Gdzie żyje zwodniczość
+
+`EvaluateMicro` (linie 35–54) liczy na każdym prefiksie dwie warstwy:
+- **część całkowita** = `local_solved_errors` — ile już-ułożonych kubików zepsuł prefiks. Dominuje (każdy = +1), jest osobna i **poprawna** („nie psuj ułożonych").
+- **część ułamkowa (<1)** = `local_fA_sum` = Σ po aktywnych kubikach z `GetActiveCubieError` (dominują moves-to-solve). To jest gradient wewnątrz klastra — **i tu siedzi cała zwodniczość**, bo to **suma po kubikach**, ślepa na to, czy ich błędy są skorelowane.
+
+(Zakomentowany blok 49–50 to Twoja zdjęta kara. Dobrze, bo człon koherencji ją **zastępuje** — globalnie, bez rozgałęzienia na „≤N".)
+
+## Rdzeń: licz GRUPY, nie kubiki
+
+Suma po kubikach mówi „8 skręconych = koszt 8". Ale jeśli te 8 jest **koherentne** (jeden obrót warstwy rusza wszystkie), prawdziwy koszt to **1**. Suma przeszacowuje koherentną grupę o jej rozmiar, bo traktuje kubiki jak niezależne — a one padają razem.
+
+Więc: **kubiki dzielące orientację zwiń w grupę i policz grupy, nie sztuki.**
+- koherentne 8 → 1 grupa → koszt ~1
+- niekoherentne 5 → 5 grup → koszt ~5
+
+I to jest sedno: przejście **5 → 8** (więcej kubików, ale z 5 grup do 1) staje się **spadkiem** kosztu. Ten ruch pod górę, którego licznik zabraniał na 2⁵, robi się monotonicznym zejściem: `5-niekoherentne → 8-koherentne → (obrót) → ułożone`. Zwodniczość odwrócona.
+
+## Jako dodatek, nie zamiana (tak jak prosiłeś)
+
+$$\text{effective\_fA} = \text{fA\_sum} - \lambda \cdot \text{coherence\_bonus}$$
+
+gdzie `fA_sum` to obecna suma po kubikach (**nietknięta baza**), a
+`coherence_bonus = (suma po kubikach) − (suma po grupach)` = oszczędność z koherencji.
+
+Bonus jest zawsze ≥ 0 (grupowanie tylko zmniejsza). `λ=0` → dokładnie dziś; `λ=1` → pełne liczenie grup. λ tylko na czas prototypu — docelowo przypniemy do krawędzi (0 albo 1), zgodnie z „mniej pokręteł".
+
+## Jak liczyć grupy tanio (O(k) na prefiks — tyle co teraz)
+
+W pętli po aktywnych kubikach, którą **już masz** (39–45): wyłuskaj z upakowanego stanu samą orientację, zahaszuj do małej liczby kubełków B (np. 16), akumuluj. Grupa = niepusty kubełek; koszt = Σ po niepustych kubełkach z reprezentatywnego błędu. Kosztuje B rejestrów na wątek i O(k+B) — a i tak jesteś dziś O(k) na prefiks.
+
+## Drabina wierności klucza (od najtańszego)
+
+1. **klucz = orientacja.** Najtaniej, ale **luźno**: dwa kubiki o tej samej orientacji w *różnych* warstwach nie zwiną się jednym obrotem — metryka je przekredytuje. Błąd miękki (taki stan i tak jest łatwiejszy niż pełny chaos). Punkt startowy.
+2. **klucz = (orientacja, współrzędna warstwy).** Wciąż O(k), ale kubełek = kubiki, które *naprawdę* dzielą warstwę i orientację = *naprawdę* jeden obrót. To Twój stary histogram współrzędnych, doklejony do orientacji. Włączamy, jeśli pkt 1 przekredytuje.
+
+## Bezpieczeństwo (żeby sam dodatek nie był zwodniczy)
+
+- **Znika w ułożeniu**: 0 skręconych → 0 grup → bonus 0. Ułożone zostaje ściśle najlepsze (każdy niepusty kubełek kosztuje > 0), więc nie tworzy fałszywego optimum z dala od celu.
+- **Hierarchia całkowita nietknięta** — ruszamy tylko część ułamkową; bucket-koszt ≤ suma, więc `<1` się trzyma i normalizacja zostaje ważna.
+- **Zero special-casingu** — ten sam wzór na każdym prefiksie i każdym N. Zastępuje karę ≤N czymś zasadnym.
+- Jedyne realne ryzyko to przekredytowanie z pkt 1 — miękkie i usuwalne przez pkt 2.
+
+**Czego nie wymaga:** kicka, hybryd, strojenia per-N. Sama zmiana globalnej metryki — dokładnie „lewar własny GA".
+
+## Propozycja wtoczenia
+
+`#define COHERENCE` (0/1) jak `SEED_MODE`, klucz orientacja-only (pkt 1), λ=1. Miara na 2⁵: **schodzi poniżej 5? domyka?** Jeśli tak — mamy uogólnienie. Jeśli domyka do „koherentnego śmiecia" i grzęźnie — dokładamy współrzędną warstwy (pkt 2).
+
+Pasuje kształt? Jeśli tak — wskażę dokładne linie w EvaluateMicro **i** Macro (bo oba muszą liczyć tak samo), i zrobimy najpierw sam pkt 1 za `#define`, bez ruszania niczego innego.
+
+## 🧑 Robert
+
+Pasuje
+
+
+## 🤖 Claude
+
+Pasuje — to teraz pkt 1 za `#define COHERENCE`, w obu ewaluatorach identycznie. Najpierw muszę zobaczyć, jak dokładnie upakowany jest stan kubika (żeby tanio wyłuskać orientację) i jak liczy `GetActiveCubieError`. Przeczytam pomocnicze.
+
+Teraz rozumiem upakowanie: `cur` (wartość `local_cubies[i]`) **jest** macierzą orientacji (upakowany podpis znak+kolumna per wiersz), a pozycja to pochodna orientacji. Czyli „ta sama orientacja" = **równe `cur`** — klucz pkt 1 mam za darmo, bez maskowania. Przeczytam jeszcze Macro, żeby wpiąć identycznie.
+
+Macro liczy aktywne kubiki **równolegle** (wątek na kubik + redukcja), ale `local_cubies` jest w **pamięci współdzielonej** — więc każdy wątek widzi wszystkie kubiki i dedup po orientacji da się zrobić per-wątek (każdy skanuje wcześniejsze indeksy). Czyli oba shadery da się wpiąć identycznie, dokładnie pkt 1 (λ=1): **licz każdą różną orientację raz**.
+
+Trzy edycje, wszystko za `#define COHERENCE`, zero kosztu gdy wyłączone.
+
+**1. Przełącznik A/B w Variables.glsl.c (obok SEED_MODE):**
+
+**2. EvaluateMicro.glsl.c — dedup po orientacji w pętli aktywnych kubików:**
+
+**3. EvaluateMacro.glsl.c — to samo, per-wątek (czyta współdzielone `local_cubies`):**
+
+Sprawdzę, czy jest CPU-owy odpowiednik ewaluatora, który też trzeba by zmirrorować (napisałem w komentarzu „/CPU" — muszę to zweryfikować):
+
+Jest CPU `Evaluate` (linia 268). Zobaczę, czy jest żywy i czy trzeba go mirrorować:
+
+Ważne odkrycie: CPU `Evaluate()` (TRubikCube.cs:268) **jeszcze żyje kodowo i wciąż ma STARĄ karę** (linia 328: `score *= minScr / scrambled.Count` dla `scrambled ≤ N`) — czyli nigdy nie był synchronizowany z shaderami (GPU ma karę zakomentowaną). Komentarz przy linii 203 mówi wprost, że scoring przeniesiono na GPU (`Gpu.ScoreCube`), więc ten CPU `Evaluate()` to **legacy poza ścieżką GA** — GA ocenia wyłącznie na GPU (shadery zapisują `Population[].Fitness`). Nie ruszam go i poprawiam swój komentarz, żeby nie kłamał, że „/CPU":
+
+Gotowe. Podsumowanie — pkt 1 (λ=1) wpięty, wyłączony domyślnie:
+
+- **`Variables.glsl.c`**: `#define COHERENCE 0` — przełącznik A/B obok `SEED_MODE`.
+- **`EvaluateMicro` i `EvaluateMacro`**: w pętli aktywnych kubików, gdy `COHERENCE`, każdy skręcony kubik dolicza swój błąd **tylko jeśli żaden wcześniejszy aktywny kubik nie ma tej samej orientacji** (`cur`). Czyli suma po **różnych orientacjach**, nie po sztukach. `COHERENCE 0` = bit w bit jak dotąd (dodawanie zera vs pominięcie — identyczne).
+
+Kilka rzeczy dla pewności:
+- **Koszt tylko gdy włączone**: wewnętrzna pętla `j` to O(k²) na prefiks; przy `COHERENCE 0` w ogóle jej nie ma. Dla 2⁵ (k=32) to grosze.
+- **Macro liczy poprawnie mimo równoległości**: `local_cubies` jest współdzielone i w pełni zapisane za `barrier()`, więc każdy wątek widzi wszystkie wcześniejsze kubiki — pierwsze wystąpienie orientacji dolicza, każdy duplikat (dowolny wątek) dolicza 0. Ta sama Σ-po-różnych.
+- **Hierarchia nietknięta**: ruszam tylko część ułamkową (`local_fA_sum`); „nie psuj ułożonych" (część całkowita) bez zmian; bucket-koszt ≤ suma, więc `<1` się trzyma.
+- **Ułożone dalej ściśle najlepsze**: `cur` jest tu zawsze ≠ jednostka, więc ułożone kubiki nigdy się nie dopasują, a przy 0 skręconych człon znika.
+
+**Test:** przestaw `#define COHERENCE 1`, przebuduj, puść **2⁵**. Kryterium — zgodnie z zasadą „ogon, nie mediana" — nie jest jeden szybki wynik, tylko: **czy w ogóle schodzi poniżej 5 i domyka**, zamiast oscylować 5–8. Jeśli tak — mamy uogólnienie. Jeśli domyka do „koherentnego śmiecia" i grzęźnie (przekredytowanie pkt 1: te same orientacje w różnych warstwach) — wtedy pkt 2, klucz `(orientacja, współrzędna warstwy)`.
+
+Puść ze dwa–trzy przebiegi 2⁵ z `COHERENCE 1` i daj znać, co robi ogon.
+
+## 🧑 Robert
+
+Błąd spada, ale coraz wolniej, po 50246 GA do 40,2. Solved 3/32
+
+
+## 🤖 Claude
+
+To pouczająca porażka — i mówi dokładnie, co jest nie tak. **pkt 1 nie jest „luźny", jest oszukiwalny — i GA to znalazł.**
+
+Popatrz na skalę w `GetActiveCubieError`: każdy skręcony kubik dolicza `(maxClusterState + d)/max_fA`, a `maxClusterState` (wielka stała) przytłacza magnitudę `d`. Czyli po skróceniu każdy skręcony ≈ `1/(k+1)`, a bazowe `fA_sum` to praktycznie **licznik skręconych kubików**. I to jest **dobry** gradient — obniżysz go tylko **faktycznie układając** kubiki do domu.
+
+Człon koherencji zamienił ten licznik na **licznik RÓŻNYCH orientacji**. A ten GA umie obniżyć **bez układania** — wystarczy pokręcić skręcone kubiki tak, żeby dzieliły orientację. Więc znurkował w tani basen „koherentny-ale-pomieszany" (dużo skręconych, mało różnych orientacji) i utknął: 3/32 ułożone, błąd pełznie (wyrównuje orientacje, nie domyka). **Wyrównanie orientacji ≠ postęp.** Na tym poległo — i to nie drobiazg, to fundament.
+
+Wniosek: dyskonto za koherencję musi wymagać **prawdziwej składalności jednym obrotem**, a nie samej wspólnej orientacji. Czyli warunek warstwy (pkt 2): kubiki muszą dzielić **warstwę** (wspólną współrzędną na osi obrotu) **i** orientację. Wtedy zebranie kubików do jednej obracalnej warstwy jest samo w sobie realną pracą → dyskonta nie da się zdobyć tanio, cheat znika.
+
+**Ale dlatego nie koduję od razu:** „dzielenie warstwy" nie jest czystym kluczem kubełka — dwa kubiki dzielą warstwę, jeśli zgadzają się na współrzędnej *którejkolwiek* osi, a to relacja nieprzechodnia, nie da się prosto zbucketować. Nie chcę wpisać drugiej zepsutej metryki. Dwie drogi do przemyślenia:
+- **klucz (orientacja, współrzędna-slice)** — ale trzeba ustalić, *na której osi* liczymy slice (obrót ma konkretną oś), więc to nie jest jeden kubełek, tylko trzeba to porządnie zdefiniować;
+- **koherencja przez lookahead 1-ruch** — najlepsza redukcja błędu pojedynczym ruchem = twardy, **nieoszukiwalny** sygnał składalności (bo mierzy realną rozwiązywalność, nie proxy). Droższe, ale odporne.
+
+Na teraz: wróć `#define COHERENCE 0` (baseline działa). Zapiszę tę porażkę, żeby jej nie powtórzyć.
+
+Zapisane w pamięci — żeby nie powtórzyć orientacji-samej i pamiętać, że warunek to *realna składalność jednym obrotem*.
+
+Widełki na następny ruch — powiedz, w którą stronę:
+
+1. **pkt 2, klucz (orientacja, slice)** — dopracować, na której osi liczymy warstwę, żeby dyskonto dostawały tylko naprawdę współobracalne kubiki. Bliżej pierwotnego planu, ale trzeba porządnie zdefiniować klucz.
+2. **koherencja przez lookahead 1-ruch** — mierzy najlepszą redukcję błędu jednym ruchem: twardy, nieoszukiwalny sygnał (bo to realna rozwiązywalność, nie proxy). Droższe obliczeniowo, ale odporne na cheat, który właśnie zobaczyliśmy.
+3. **odwieszamy ocenę, próbujemy kicka** (best + K losowych ruchów na STALL, K rosnące) — mechaniczne wybicie z basenu, celujące w resztkowy ogon, bez dotykania metryki.
+
+Moim zdaniem porażka pkt 1 przechyla szalę ku **(2)** — lookahead jest z definicji nieoszukiwalny, bo nie da się „udawać" redukcji błędu ruchem, który jej nie daje. Ale (3) jest najtańszy i niezależny, więc jeśli chcesz szybko zobaczyć, czy ogon 2⁵ w ogóle da się domknąć, kick jest dobrym pierwszym strzałem. Co wybierasz?
+
+## 🧑 Robert
+
+Puściłem jeszcze bez "kicka", ale jest jeszcze gorzej. Jeśli chodzi o wybór osi, to na CPU (wykomentowany kod w TRubikcube.Evaluate) zdaje się, że wybierałem do oceny oś zawierającą najwięcej kubików w tym samym stanie
+
+
+## 🤖 Claude
+
+Ta podpowiedź o osi to jest brakujący klocek — dziękuję, bo dokładnie ona odblokowuje pkt 2.
+
+Najpierw krótko o „jeszcze gorzej bez kicka": to spójne. Sam baseline na 2⁵ (bez nowego lewara) nie domknie — oscyluje. Więcej próbek tego nie zmieni; 2⁵ potrzebuje albo naprawionej koherencji, albo kicka. To nie regres, to potwierdzenie, że jesteśmy na właściwym problemie.
+
+**Teraz sedno — Twój stary histogram rozwiązuje oba moje blokery naraz.** Przypomnę, co robił zakomentowany kod:
+- `hists[coord, axis]++` po skręconych kubikach,
+- `maxHist` = max po **wszystkich osiach i wycinkach** z liczby kubików dzielących ten wycinek,
+- gate `states.Count == 1 && maxHist == scrambled.Count` = „wszystkie skręcone w jednej warstwie i w jednym stanie" = jeden obrót od ułożenia.
+
+To załatwia **problem wyboru osi**, na którym utknąłem: **nie wybierasz osi z góry** — bierzesz MAX po osiach i wycinkach. I to jest właśnie warunek warstwy, którego brakowało pkt 1.
+
+**Poprawiony kształt (uczę się na porażce pkt 1 — dodatek, nie zamiana):**
+
+$$\text{effective\_fA} = \big(\underbrace{\text{liczba skręconych}}_{\text{baza — zostaje}} - \lambda \cdot \underbrace{(\text{maxHist}-1)}_{\text{rabat za koherencję}}\big) / (k+1)$$
+
+gdzie **maxHist = największa grupa skręconych kubików dzielących (oś, wycinek, stan)** — czyli największy naprawdę-składalny-jednym-obrotem zbiór.
+
+**Dlaczego to NIE jest oszukiwalne tak jak pkt 1** — i to jest klucz:
+- pkt 1 liczył wspólne orientacje **globalnie**. GA oszukał, parkując 29 kubików we wspólnym stanie M≠jednostka, **rozrzuconych** po całej kostce → 1 różna orientacja → mikro-koszt, a nic nie ułożone.
+- maxHist wymaga wspólnego **stanu I warstwy**. Zaparkowanie tych samych stanów w różnych warstwach **nie podnosi maxHist** (nie dzielą wycinka). Żeby podnieść maxHist, GA musi **zebrać** kubiki do jednej warstwy — a to realna praca, i pełna jednorodna warstwa jest genuinnie ~1 ruch od ułożenia. Cheat znika.
+- Baza (**liczba skręconych**) zostaje jako główny gradient homingu, więc wczesna gra dalej napędza realne układanie; rabat jest **ograniczony** (≤ λ·k), więc tani basen nie może zdominować. Tego bezpieczeństwa pkt 1 nie miał (zastąpił bazę całkowicie).
+
+**Efekt na oba końce:**
+- endgame: koherentne-8 (jedna obrócona hiperwarstwa) → maxHist=8 → duży rabat → bije rozrzucone-5 (maxHist≈1). Odwrócenie zwodniczości, którego chcieliśmy.
+- wczesna gra: rozrzut → maxHist małe → rabat mały → baza rządzi → realny homing, bez taniego basenu.
+
+**Koszt:** histogram po (oś, wycinek) to N×SIZE kubełków (2⁵ → 10, 3⁴ → 12), grosze. Jedyny detal to wymiar **stanu** w kluczu — stanów jest dużo, więc albo O(k²) na osi (dla małych k endgame OK), albo zahaszowany stan. To dopracujemy, ale koncepcyjnie klucz = (oś, wycinek, stan), max po wszystkim.
+
+Zanim wpiszę — bo drugi raz nie chcę wpuścić zepsutej metryki — **potwierdź kształt**: baza = liczba skręconych, rabat = λ·(maxHist−1), maxHist po (oś, wycinek, stan). Jak gra, dopnę tani sposób liczenia i wpięcie za to samo `#define COHERENCE`.
+
+## 🧑 Robert
+
+Właściwie to gra, jeszcze potem ten haczyk z haszowaniem stanów
+
+
+## 🤖 Claude
+
+Zgoda przyjęta. Zanim rozpiszę liczenie — sprawdzę, kiedy odpala się Micro, a kiedy Macro, bo to decyduje, czy w ogóle potrzebujemy haszowania (i tym samym tego haczyka):
+
+
+## 🧑 Robert
+
+Macro odpala się dla liczby kubików > 64. Może pracujmy na razie na micro? Po co zmieniać od rzu oba - chyba że dla bezpieczeństwa
+
+
+## 🤖 Claude
+
+Macro odpala się dopiero >64 kubików → 2⁴ i 2⁵ (Twój teren testowy) idą przez **Micro**. Świetny pomysł: pracujmy w Micro. I to **rozpuszcza haczyk z haszowaniem** — w Micro k ≤ 64, więc dokładne liczenie maxHist O(k²) jest tanie i **nie haszujemy stanów w ogóle** (porównanie `==` na upakowanym stanie = zero kolizji, zero fałszywej koherencji). Haszowanie wróci dopiero, jeśli przeniesiemy to na Macro dla dużych kostek.
+
+Plan:
+1. **Micro** — nowy człon: baza = suma skręconych (jak dziś) + rabat `(maxHist−1)` jednostek, gdzie maxHist = największa grupa skręconych dzielących **stan i warstwę** (dokładnie, bez hasza).
+2. **Macro** — cofam do baseline (bezpieczeństwo: kostka >64 z COHERENCE=1 dostaje znany baseline, nie półproduktu).
+3. Pomocnik `curCoord` + komentarz przełącznika.
+
+**Pomocnik `curCoord` w Setup.glsl.c** (bieżąca współrzędna kubika na osi — ta sama, której używa `TurnSingleCubie`):
+
+**Micro — nowy człon maxHist (zastępuje zepsuty pkt 1):**
+
+**Macro — cofnięcie do baseline (bezpieczeństwo, port później):**
+
+**Komentarz przełącznika (pkt 2, Micro-only):**
+
+Plik się zmienił (pewnie przestawiałeś `COHERENCE`). Przeczytam aktualny stan:
+
+Wszystko wpięte. Podsumowanie:
+
+- **`Setup.glsl.c`**: pomocnik `curCoord(M, cubieID, axis)` — bieżąca współrzędna kubika na osi (ten sam wzór, co warstwa w `TurnSingleCubie`).
+- **`EvaluateMicro`**: baza = suma skręconych (jak dotąd), a potem, gdy `COHERENCE`, **rabat `(maxHist−1)` jednostek-kubika**. `maxHist` = największa grupa skręconych dzielących **stan (`==`, dokładnie) i warstwę (`curCoord` na którejś osi)** — czyli największy zbiór składalny **jednym** obrotem. Bez hasza (k≤64 w Micro, więc O(k²·N) jest tanie i bezkolizyjne).
+- **`EvaluateMacro`**: cofnięty do baseline + komentarz „port po walidacji". Kostka >64 z `COHERENCE=1` dostaje znany baseline.
+- **`Variables.glsl.c`**: komentarz zaktualizowany, `COHERENCE` zostaje na 1 (Twoje ustawienie).
+
+Dlaczego to nie powtórzy porażki pkt 1: rabat wymaga, żeby kubiki **dzieliły warstwę**, a nie tylko orientację. Wyrównanie orientacji w miejscu (cheat z 3/32) nie podnosi maxHist, bo obrót warstwy zachowuje rozrzut orientacji wewnątrz niej — żeby podnieść maxHist, GA musi **zebrać** kubiki do jednej warstwy, a to realny postęp. Baza (liczba skręconych) zostaje głównym gradientem, rabat jest ograniczony (≤ maxHist−1), więc taniego basenu nie ma.
+
+**Test:** przebuduj, puść **2⁵**. Kryterium (ogon, nie mediana): **czy schodzi poniżej 5 i domyka**, zamiast oscylować 5–8. 
+
+Na co patrzeć:
+- **Domyka** → mamy uogólnienie; wtedy portujemy metrykę do Macro (dla 3⁴) i mierzymy ogon jak dla 2⁴.
+- **Domyka do „koherentnego śmiecia" i grzęźnie** → to już nie ten sam cheat, tylko resztkowe przekredytowanie (grupa o wspólnym stanie i warstwie, której obrót jednak nie układa). Wtedy dokładamy warunek, że obrót tej warstwy **realnie zmniejsza błąd** — ale to dopiero, jeśli zobaczymy taki objaw.
+
+Daj znać, co robi ogon na 2⁵.
+
+## 🧑 Robert
+
+Ewidentnie oscyluje wokół 16 nieułożonych kubików szukając takiego układu, w którym cała warstwa jest ułożona (1 -ruch od ułożenia) - ale to nie takie proste. Sensowniej byłoby szukać ułożonych przecięć dwóch warstw - 8 kubików (2-ruchy od ułożenia) - zwiększyłoby to znacznie szansę ułożenia tak złożonej kostki
+
+
+## 🤖 Claude
+
+To jest trafna diagnoza i dobra korekta. Rozumiem, co się dzieje: mój maxHist nagradza **największą pojedynczą warstwę** (dla 2⁵ = 16 kubików, 1-ruch od ułożenia). To jest cel **zachłannie-optymalny** (najwięcej kubików na jeden ruch), ale **nieosiągalny** — złożyć 16 spójnych kubików w jednej warstwie krótki GA nie umie, więc oscyluje wokół 16 nieułożonych, goniąc cel, którego nie dosięga.
+
+Twoja korekta = celuj w **osiągalny podcel**: spójne **przecięcie dwóch warstw** (8 kubików, 2 ruchy). Mniejsze, bardziej związane, ale w zasięgu krótkiego GA. Zgadzam się.
+
+Zmiana metryki: grupuj po **stanie + wspólnej współrzędnej na PARZE osi** (zamiast pojedynczej osi). maxHist nasyca się wtedy na **8** (rozmiar przecięcia), a nie 16 — bo pełna 16-warstwa i tak zawiera tylko 8-przecięcia, więc daje tę samą nagrodę co samo 8-przecięcie. Efekt: GA przestaje gonić 16, bo **8 wystarcza do maksymalnej nagrody**.
+
+Zaktualizuję komentarz nad blokiem, żeby opisywał przecięcie dwóch warstw (a nie pojedynczą):
+
+Gotowe — Micro grupuje teraz po (stan + para osi), maxHist nasyca się na 8-przecięciu. Macro dalej baseline. `COHERENCE` zostaje 1.
+
+**Test:** przebuduj, puść 2⁵. Pytanie: **schodzi teraz poniżej 16 i domyka**, czy dalej grzęźnie?
+
+Dwie rzeczy, żebyś dobrze odczytał wynik:
+
+- **Jeśli teraz oscyluje wokół 8** (ten sam wzór, tylko piętro niżej) — to znaczy, że korekta jest w dobrym kierunku, ale problem jest **wieloskalowy**: 8-przecięcie też bywa za dużym skokiem, a prawdziwa odpowiedź to nagradzać koherencję na **wszystkich głębokościach przecięć naraz** (1, 2, 3… ustalonych osi), albo ważyć grupę przez jej realne moves-to-solve. Wtedy uogólnimy zamiast wybierać sztywną głębokość. To bym uznał za sukces częściowy, nie porażkę.
+- **Jeśli domyka** — mamy to; portujemy metrykę do Macro (3⁴) i mierzymy ogon.
+
+Jeden drobiazg do ewentualnego dostrojenia: zostawiłem rabat `(maxHist−1)`, czyli traktuję 8-przecięcie jak „~1 ruch do końca". Skoro Ty liczysz je jako **2 ruchy**, to gdyby przekredytowywało, zmienimy na `(maxHist−2)` — ale to dopiero jak zobaczymy objaw. Najpierw daj znać, co robi ogon.
+
+## 🧑 Robert
+
+Jeszcze mu nie przerywam... (stare podejście) Coś się zaczyna dziać, błąd jednak ciągle spada, pomimo szumu... Nie, jednak kick go wyrzucił, to złudzenie. Ciekawe, czy dla jeszcze bardziej złożonych kostek należałoby ścigać 3-ruchy od ułożenia, itd.
+
+
+## 🤖 Claude
+
+Dobra dyscyplina, że złapałeś złudzenie — to STALL zaakceptował besta i przesunął stan, nie prawdziwe zejście. Czyli 2⁵ jeszcze nie domknięte; patrz dalej, nie czytaj spadku między kickami jako konwergencji.
+
+A Twoje pytanie o 3-ruchy trafia w coś realnego. Jest spektrum:
+
+| głębokość (ustalone osie) | rozmiar (2⁵) | ruchy | trudność złożenia |
+|---|---|---|---|
+| 1 warstwa | 16 | 1 | za trudne (nieosiągalne) |
+| 2 warstwy | 8 | 2 | w zasięgu (nasz cel) |
+| 3 warstwy | 4 | 3 | łatwe, ale drobne |
+
+Im głębiej, tym **mniejszy, ale łatwiejszy do zebrania** kawałek. I tu jest sedno: **właściwa głębokość to nie stała do wpisania per-kostka — ona jest sprzężona z ZASIĘGIEM GA** (ile spójnej struktury GA umie złożyć w jednym krótkim biegu). Trudniejsza kostka → osiągalny kawałek jest mniejszy/głębszy → ścigasz 3-ruchy. **Albo** dajesz GA większy zasięg (dłuższe biegi/chromosomy) i wtedy głębokość może zostać płytsza. To dwie strony tego samego równania.
+
+I dlatego ostrożnie z „wpiszmy depth=3 dla większych": to byłby dokładnie **kruchy knob z wnętrza**, który trzeba przestrajać per N — a umówiliśmy się, że wolimy krawędzie od strojonych wnętrz. Docelowo głębokość powinna albo **wynikać** z zasięgu GA, albo metryka powinna być **wieloskalowa** (nagradzać koherencję na wszystkich głębokościach, tak że cel sam się dobiera do tego, co GA aktualnie dosięga). Oba mają swoje pułapki (koszt, przekredytowanie), więc to nie na teraz.
+
+Bo najpierw pytanie zerojedynkowe: **czy depth-2 w ogóle domyka 2⁵?** 
+- Domyka → zwalidowaliśmy podejście, a skalowanie głębokości z N staje się frontem uogólnienia dla N≥6.
+- Nie domyka (dalej oscyluje, teraz koło 8) → depth-2 to nie odpowiedź, i wtedy albo wieloskala, albo trzeba wzmocnić kick (bo może to nie metryka, tylko zasięg).
+
+Dokończ obserwację 2⁵ — powiedz, czy schodzi trwale poniżej 16, czy tylko kicki udają postęp.
+
+## 🧑 Robert
+
+Na pewno dłużej liczy, ogon oscyluje wokół 20 rozwiązanych kubików, nawet nie chce spaść do 8 nieułożonych (24 ułożone)
+
+
+## 🤖 Claude
+
+To jest rozstrzygające — i, przykro mi, w złą stronę. Zestawmy wszystkie trzy warianty po **liczbie ułożonych** na 2⁵:
+
+| wariant | rabat (cap) | grzęźnie na | ułożone |
+|---|---|---|---|
+| baseline (COHERENCE 0) | 0 | 5 nieuł. | **27** |
+| depth-2 (przecięcie, cap 8) | 8 | 12 nieuł. | 20 |
+| depth-1 (warstwa, cap 16) | 16 | 16 nieuł. | 16 |
+
+**Monotonicznie: im większy rabat, tym WCZEŚNIEJ się zatyka.** Baseline układa najdalej (27), a każdy rabat cofa postęp — i to jest diagnoza całej trójki naraz.
+
+**Dlaczego rabat szkodzi (sedno):** rabat sprawia, że stan „koherentny-ale-12-nieułożonych" dostaje **taki sam fA** co „ułożone-5". Policz: `(12 − 7)/(k+1) = 5/(k+1)` — dokładnie tyle, co baseline przy 5 nieułożonych. Więc GA **nie ma gradientu**, żeby zejść z koherentnego-12 do ułożonego-5 — oba wyglądają równie dobrze. Rabat **spłaszcza gradient homingu** w chwili, gdy znajdzie *jakąkolwiek* koherencję, i GA przestaje układać. depth-2 zatyka się później niż depth-1 tylko dlatego, że jego cap jest mniejszy (8 vs 16), więc spłaszcza słabiej. Baseline (cap 0) nie spłaszcza wcale → dochodzi najdalej.
+
+To nie jest kwestia strojenia głębokości. Wszystkie trzy próby (orientacja, 1-warstwa, 2-warstwy) robią to samo: **proxy koherencji przekredytowuje *przypadkową* strukturę, a że to nagroda — staje się pułapką/płaskowyżem.** Metryka nie odróżnia „koherencji, którą da się faktycznie złożyć jednym-dwoma ruchami" od „przypadkowej koherencji". Jedyne, co by odróżniało, to **lookahead** (zmierz realną redukcję błędu ruchem, nie proxy) — ale lookahead jest drogi i, co gorsza, w samej końcówce mono-twista daje **zero** sygnału (żaden pojedynczy ruch nie pomaga, bo trzeba komutatora). Więc reshaping funkcji oceny to ślepa uliczka dla tego problemu.
+
+I to jest realny wynik, nie porażka: **Twój pomysł z histogramem nie „nie sformalizował się" przez przeoczenie — on jest strukturalnie generatorem pułapek.** Teraz to wiemy na pewno, po trzech czystych próbach z monotonicznym dowodem.
+
+**Rekomendacja — zdecydowanie:**
+1. Wróć `COHERENCE 0` — baseline (27 ułożonych) jest najlepszy z wszystkiego, co mamy.
+2. Przerzuć się na **kick**: wzmocnij perturbację STALL (best + K losowych ruchów, K rosnące ze `Stall`). To atakuje **faktyczną** porażkę — domykanie ostatniej mili — w **wyszukiwaniu**, a nie w krajobrazie, więc nie zatruwa gradientu homingu, który baseline ma dobry.
+
+Zapiszę ten wynik do pamięci, żeby nie wracać do rabatu koherencji. Zgoda na zwrot ku kickowi?
+
+## 🧑 Robert
+
+Poczekaj jeszcze, dajmy mu czas
+
+
+## 🤖 Claude
+
+Jasne, czekamy. Nie ruszam kodu ani pamięci, dopóki nie zobaczymy, jak się skończy.
+
+Jedno, na co bym patrzył, żeby odróżnić szum od prawdy: czy kiedykolwiek **trwale** spadnie poniżej 12 (realny przełom — wtedy moje „brak gradientu" jest za mocne), czy tylko oscyluje, a kicki co jakiś czas udają zejście. Jeśli to plateau bez gradientu, STALL i tak może w końcu wylosować rozwiązanie — tyle że długim, przypadkowym błądzeniem (ten ogon Las Vegas), więc „domknęło po długim czasie" nie obali diagnozy; obaliłoby ją dopiero **konsekwentne** schodzenie.
+
+Daj znać, co pokaże.
+
+## 🧑 Robert
+
+Płaskowyż, oscyluje wokół 20 ułożonych. To mi przypomina, że w starym kodzie miałem jeszcze jedną flagę, która odpalała rabat tylko wówczas, gdy liczba kubików w tym samym stanie była potęgą dwójki
+
+
+## 🤖 Claude
+
+Płaskowyż na 20 potwierdza diagnozę: liniowy rabat za **częściową** koherencję to pułapka. Ale Twoja flaga potęgi dwójki celuje dokładnie w jej sedno — i chyba wiem, dlaczego działała.
+
+**Potęga dwójki to podpis KOMPLETNOŚCI.** Pełne przecięcie f warstw ma dokładnie 2^(N−f) kubików — zawsze potęga dwójki. Przypadkowe, częściowe zebranie (5, 6, 7 kubików w tym samym stanie) potęgą dwójki **nie jest**. Więc warunek „liczba w tym samym stanie = potęga 2" odróżnia **kompletne, naprawdę składalne** przecięcie od przypadkowego śmiecia — czyli dokładnie to, czego mojej metryce brakowało.
+
+Ale jest niuans, który przesądza, czy to zabije płaskowyż. Sam warunek potęgi-2 na moim maxHist **nie wystarczy** — bo obecny płaskowyż (12 nieułożonych) prawie na pewno ma w sobie kompletną 8-grupę (GA maksymalizuje rabat → dąży do maxHist=8), a 8 jest potęgą dwójki, więc rabat dalej by strzelał i plateau by zostało. Kluczowy jest **drugi** warunek, który miał Twój stary kod: `maxHist == scrambled` — **cała reszta jest jednym czystym przecięciem**, nie tylko jej kawałek.
+
+Złóż to razem: **rabat odpala się tylko, gdy CAŁY residuum to jedno kompletne, jednostanowe przecięcie potęgi-2.** Wtedy:
+- częściowa koherencja w środku gry (grupa < reszta) → **zero rabatu** → brak płaskowyża, homing baselineu działa,
+- rabat pojawia się **wyłącznie** w stanach genuinnie-bliskich-ułożenia.
+
+To jest **zabezpieczone od dołu**: jeśli warunek nigdy nie zajdzie, człon = dokładnie baseline. **Gorzej być nie może** — pierwszy wariant koherencji z tą własnością.
+
+Wpiąłem gate (zastępuje bezwarunkowe odejmowanie):
+
+Poprawię jeszcze zdanie w komentarzu nad blokiem, żeby nie kłóciło się z gate'em:
+
+Uczciwie o tym, czego to **nie** zrobi: gate jest **rozpoznawaczem**, nie **kierowcą**. Odpali się i domknie, gdy residuum stanie się jednym czystym przecięciem potęgi-2 (4 albo 8) — ale sam **nie doprowadzi** rozrzuconego stanu (baseline grzęźnie na 5) do takiego czystego przecięcia, bo 5 to nie potęga dwójki i nic nie ciągnie ku kompletności. Więc spodziewaj się jednego z dwóch:
+- **poprawa** — jeśli błądzenie (baseline + STALL) trafi w czyste przecięcie, gate je natychmiast zamknie;
+- **powrót do baselineu** (stall koło 5), jeśli nie trafi.
+
+Ale **nie gorzej** — i to jest cała różnica względem trzech poprzednich prób. Jeśli więc zobaczysz choćby powrót do 27 ułożonych (baseline), to już jest wygrana względem plateau na 20.
+
+Dwie rzeczy:
+1. **Potwierdź moje odczytanie starej flagi**: czy odpalała rabat tylko gdy *cała reszta* była jednym stanem/przecięciem (`maxHist == scrambled`), czy per-grupa niezależnie? Bo jeśli per-grupa, to wg mojej analizy plateau by nie zabiła — dlatego wpiąłem wariant „cały residuum".
+2. Jeśli to da powrót-do-baselineu (rozpoznawacz bez kierowcy), to **kick jest brakującym kierowcą**: perturbacja na STALL, która pcha rozrzuconą resztę ku czystemu przecięciu, a gate ją tam rozpozna i domknie. Wtedy dopiero para gate+kick ma szansę faktycznie zamknąć 2⁵.
+
+Przebuduj i puść — powiedz, czy schodzi poniżej 12 (choćby do baselineowych 5–8), czy dalej stoi na 20.
+
+
+---
+
+<!-- Sesja 95217005-1638-45fd-b8b9-7a2254e5a463 -->
+
+## 🧑 Robert
+
+Oops, zdaje się, że przez przypadek zamknęła się sesja. Co pamiętasz z tego co robiliśmy z kostką ND Rubika?
+
+
+## 🤖 Claude
+
+Zerknę do swojej pamięci i do stanu repo, żeby odtworzyć kontekst.
+
+Odzyskałem kontekst z pamięci i ze stanu repo. Oto gdzie jesteśmy.
+
+**Projekt.** RubikCubeND — układanie kostki Rubika w N wymiarach czystym, jednolitym algorytmem genetycznym na GPU. Cel jest intelektualno‑dydaktyczny, nie „szybki solver": bez specjalnego traktowania końcówki, bez hybryd z klasycznymi technikami. Poprawa ma płynąć wyłącznie z własnych dźwigni GA (funkcja oceny, mutacja, seedowanie, STALL, populacja).
+
+**Jak działa solver.** Każdy przebieg GA skupia się na JEDNEJ kostce z aktywnego klastra, jest krótki (~50 pokoleń), a celem jest ułożyć ją nie psując już ułożonych. Gdy się nie uda — kolejny przebieg losuje INNĄ kostkę. To greedy peel. STALL (limit 8) po serii nieudanych przebiegów akceptuje najlepszą sekwencję mimo braku poprawy, czyli działa jak kopniak w iterowanym przeszukiwaniu lokalnym.
+
+**Ustalenia z badań nad różnorodnością greedy** (opisane w [Docs/Rozklad_greedy_roznorodnosc.md](Docs/Rozklad_greedy_roznorodnosc.md), narzędzia w [TGreedyDiversity.cs](RubikCube/TGreedyDiversity.cs)): kompletny zbiór generujący manewry to `strategy (4^P, mieszane Givensy pod/nad × L/R) × order (wszystkie P! kolejności płaszczyzn)`. `reversed` jest martwy, `perm` okazał się redundantny przy pełnym zbiorze kolejności. Produkcyjny greedy używa już 4^P.
+
+**Kryterium jakości.** GA jest algorytmem Las Vegas, więc oceniamy ogon i wariancję czasu, nie medianę. Stąd decyzja SEED_RATIO = 100% (brzeg reżimu, nie wystrojony optimum wewnętrzne): na 2^4 katastrofy 2/10 → 0/20, CV 1.30 → 0.77, kosztem mediany 1841 → 2795.
+
+**Ostatni wątek — i tu utknęliśmy.** Usunięcie płaskiej kary dla ≤N nieułożonych i oparcie się na STALL działa dla N≤4, ale zawiesza się na 2^5 (oscylacja przy 5–8 nieułożonych). Diagnoza: gradient „liczba nieułożonych" jest zwodniczy, bo *spójna* reszta (obrócona hiperwarstwa = 8 kostek o wspólnej orientacji) jest o jeden ruch od rozwiązania, a ma WIĘCEJ nieułożonych niż rozrzucone 5. Łatwe znaczy spójne, nie „mało nieułożonych".
+
+Pierwsza próba oceny spójności — grupowanie po samej orientacji — została **sfalsyfikowana**: GA po prostu obraca rozrzucone kostki do wspólnej orientacji, nie zbliżając ich do miejsc, i grzęźnie (3/32 na 2^5). Wniosek: zniżka za spójność musi wymagać prawdziwej „zwijalności jednym ruchem" (wspólna warstwa, nie wspólna orientacja). Kandydaci, których jeszcze nie zbudowaliśmy: klucz (orientacja, współrzędna warstwy) zrobiony porządnie, albo spójność z lookahead o jeden ruch.
+
+Uwaga praktyczna: w drzewie roboczym [Variables.glsl.c:37](RubikCube/Resources/Variables.glsl.c:37) nadal ma `#define COHERENCE 1` — czyli włączony jest właśnie ten sfalsyfikowany wariant. Chcesz, żebym cofnął to na 0, czy zabieramy się za wersję z lookahead?
+
+## 🧑 Robert
+
+Nie, dalej udoskonalamy wariant Coherence. Pracujemy na razie wyłącznie z ewaluatorem Micro (<64 kubiki, 2^5 się mieści). Jest już podmiana ewaluacji, która sprawdza przecięcie dwóch warstw (wspólne dwie osie - współrzędne) a ostatnio dodaliśmy również flagę, która rabat za spójnośc (koherentność) przydziela wyłącznie wówczas, gdy liczba kubików w tym samym stanie (orientacji) jest potęgą dwójki (zresztą sprawdź sam jak to wygląda). Pomocny może się okazać zakomentowany kod w funkcji TRubikCube.Evaluate(), który jest próbą podobnej oceny dokonywanej na wcześniejszej implementacji działającej na CPU
+
+
+## 🤖 Claude
+
+Zajrzę do aktualnego stanu ewaluatora Micro i do tego zakomentowanego kodu na CPU.
+
+Przejrzałem. Zbieram, co jest teraz w kodzie, bo obraz jest dość spójny.
+
+**Ewaluator Micro dzisiaj** ([EvaluateMicro.glsl.c:46-98](RubikCube/Resources/EvaluateMicro.glsl.c:46)). Baza `local_fA_sum` to suma błędów kubików aktywnych, gdzie każdy błąd to `(maxClusterState + d)/max_fA` — czyli praktycznie licznik rozsypanych plus drobna korekta na magnitudę. Rabat liczysz tak: dla każdego rozsypanego kubika `a` szukasz kubików o **identycznym stanie** (`sb != sa` → odrzut), a potem zliczasz je w koszykach po **parach osi** — jeden koszyk na parę `(j1,j2)`, inkrementowany gdy obie współrzędne się zgadzają. `maxHist` to największy taki koszyk, czyli największe przecięcie dwóch warstw o wspólnej orientacji. Rabat wchodzi tylko przez bramkę `maxHist == scrambled && scrambled` potęga dwójki, i odejmuje `(maxHist-1)` jednostek-kubika.
+
+Warto zauważyć, co ta bramka faktycznie robi arytmetycznie: po odjęciu grupa kosztuje `(maxClusterState + Σd_i)/max_fA` — dokładnie **jeden** kubik w członie licznikowym, ale z pełną sumą magnitud w ogonie. Więc spójna ósemka na 2^5 kosztuje ~1, a rozrzucona piątka ~5. Kierunek 5 → 8 → ułożone rzeczywiście staje się zejściem.
+
+**Co jest w zakomentowanym CPU** ([TRubikCube.cs:333-386](RubikCube/TRubikCube.cs:333)). To ta sama myśl, ale w trzech miejscach inna:
+
+Po pierwsze, tam histogram był po **pojedynczej osi** (`hists[coord, dim]`, `maxHist` po wymiarach, plus `maxDim`/`histPos`) — czyli warstwa, nie przecięcie dwóch warstw. Po drugie, rabat był **dzieleniem** (`score /= maxHist`), nie odejmowaniem; wychodzi bardzo podobnie, z tą różnicą, że dzielenie uśrednia człon magnitudy zamiast go sumować. Po trzecie i chyba najciekawsze — całe to kształtowanie było zamknięte w oknie **`scrambled <= N`**, a poza oknem działał normalny gradient. W GLSL to okno zniknęło: amplifikacja `N/scrambled` jest zakomentowana ([linie 103-104](RubikCube/Resources/EvaluateMicro.glsl.c:103)), a rabat próbuje działać globalnie, tyle że bramka jest tak wąska, że i tak strzela wyłącznie przy stanach niemal ułożonych.
+
+Jest tam też jeden wątek, którego w GLSL nie ma wcale: `histStates` — liczba **różnych** orientacji wśród kubików leżących w najliczniejszej warstwie. Twoja obecna wersja wymaga identycznej orientacji jako warunku wstępnego przynależności do grupy, więc ta informacja jest z definicji zawsze 1. To dwa różne pomysły: „grupa = wspólna orientacja ∧ wspólna warstwa" kontra „grupa = wspólna warstwa, a jednorodność orientacji jest miarą jej jakości".
+
+**Moja jedyna wątpliwość co do obecnego kształtu.** Bramka `maxHist == scrambled` sprawia, że rabat jest funkcją delta: nagroda istnieje dokładnie w punkcie docelowym, a każdy stan pośredni po drodze (6 rozsypanych, albo 8 jeszcze nie idealnie spójnych) nie dostaje nic i wypada gorzej niż wyjściowa piątka. Czyli GA nie ma po czym *wejść* na tę ósemkę — musi na nią trafić. Ratuje to fakt, że fitness ocenia wszystkie prefiksy chromosomu, więc trafienie w ciągu ~32 ruchów jest osiągalne, ale to nadal szukanie igły, tylko z nagrodą na końcu zamiast płaskiej równiny. Z drugiej strony bramka jest bezpieczna od dołu: gdy nie strzela, jesteś dokładnie w baseline.
+
+Zanim coś ruszę — jak to się zachowuje w praktyce na 2^5? Bo od tego zależy, czy kolejny krok to poszerzenie bramki o gradient dojścia (np. częściowy rabat rosnący z `maxHist`, ale zamknięty w oknie `scrambled <= 2N` jak na CPU, żeby nie spłaszczał środka gry), czy raczej zmiana klucza grupowania na „wspólna warstwa, orientacja jako jakość".
+
+## 🧑 Robert
+
+Traktuj stary kod, jako właściwie nieaktualny, ale zawierający wskazówki. To na jego podstawie powstała obecna, obowiązująca arytmetyka w GLSL. Kara, która odpalała się przy scrambled <= N została zastąpiona mechanizmem STALL, który odpala się, gdy seria GA nie potrafi znaleźć lepszej konfiguracji kostki - wówczas wykonywane są ruchy ostatnio znalezionego najlepszego osobnika (pogarszające układ kostki - mutacja na poziomie pomiędzy algorytmami GA). Właśnie analizowaliśmy zachowanie kostki 2^5, kiedy zdarzyła się ta katastrofa z sesją. Wg poprzedniego Ciebie, jeśli po poprawkach dochodzimy do układu z liczbą nieułożonych kubików taką jak baseline (czyli ok. 5) to już jest dużo lepiej i sterować należy właśnie kickiem Stall. Kostka oscyluje w ogonie właśnie wokół baseline
+
+
+## 🤖 Claude
+
+Rozumiem — czyli okno `scrambled <= N` już nie istnieje jako kara, jego rolę przejął STALL, a obecna bramka to jest właśnie destylat tamtych prób. I stan jest taki, że 2^5 dochodzi do ~5 nieułożonych i tam oscyluje. Zobaczę, jak dziś wygląda sam kick.
+
+Przeczytałem pętlę i widzę mechanizm, który dobrze tłumaczy oscylację wokół piątki. Chodzi o [Form1.cs:283-299](RubikCube/Form1.cs:283).
+
+Dziś jest tak: `Stall++` po każdym przebiegu GA, akceptacja gdy `Best.Fitness < RubikCube.Score` **albo** `Stall >= 8`, i w obu przypadkach `Stall = 0` oraz `RubikCube.Score = Best.Fitness`.
+
+**Pierwszy problem — kick sam się kasuje.** Prześledź cykl. Kostka siedzi w optimum lokalnym ze score S (~5 nieułożonych). GA przez 8 przebiegów nie potrafi zejść poniżej S, więc pada kick: akceptujemy najlepszego osobnika o fitness S' > S i **poprzeczka też przesuwa się na S'**. Następny przebieg GA porównuje się już z pogorszonym S', więc pobicie go jest banalne — GA po prostu wspina się z powrotem. To liczy się jako `Best.Fitness < RubikCube.Score`, czyli jako **poprawa**, więc `Stall = 0`. Wracamy do S i cykl się zamyka.
+
+Solver nie ma pojęcia, że tkwi na piątce od czterdziestu przebiegów. Za każdym razem uważa, że robi postęp — bo myli prawdziwy postęp z odrabianiem szkód po własnym kicku. Nie ma rekordu (incumbent), jedynym punktem odniesienia jest `RubikCube.Score`, nadpisywany przy każdej akceptacji. Sprawdziłem, nigdzie indziej takiego licznika nie ma. To znaczy, że sygnał do eskalacji kicka jest niszczony w momencie powstania — nie da się go wzmocnić, bo go nie ma.
+
+**Drugi problem — kick jest najsłabszy z możliwych.** Kopnięciem jest najlepszy osobnik nieudanego przebiegu, czyli ten, który *najmniej* pogarsza układ. Fitness jest zaprojektowany tak, żeby wybierać minimalną szkodę, a no-op jest odrzucany karą `2*CUBIES_COUNT`. Więc kick to dosłownie „najmniej szkodliwa realna sekwencja ruchów" — perturbacja skalibrowana na absolutne minimum, praktycznie gwarantująca pozostanie w tym samym basenie przyciągania. W języku ILS: siła perturbacji ≈ 0, a kierunek wybrany tak, by powrót był najłatwiejszy.
+
+Te dwie rzeczy się zazębiają i obie potrzebują tego samego brakującego elementu: **rekordu**.
+
+Proponuję rozbić to na dwa kroki i zacząć od samego pomiaru, bez zmiany zachowania:
+
+**Krok 1** — dołożyć pole `Record` (najlepszy score osiągnięty dla bieżącego ogniska) i drugi licznik, powiedzmy `Kicks`, zerowany wyłącznie gdy `Best.Fitness < Record`. `Stall` zostaje jak jest — pilnuje budżetu 8 przebiegów między kickami, inaczej po jednym kicku każdy kolejny przebieg też by kickował i zrobiłby się błądzenie losowe. `Kicks` liczy kopnięcia bez realnego postępu. Na razie tylko go wypisujemy. Zobaczysz wtedy wprost, czy w ogonie 2^5 to jest 3 kopnięcia czy 50 — a to przesądza, czy w ogóle warto eskalować.
+
+**Krok 2** (dopiero po zobaczeniu liczb) — uzależnić siłę kicka od `Kicks`, w duchu ILS: po akceptacji najlepszego dołożyć K losowych ruchów, K rosnące z liczbą nieudanych kopnięć.
+
+To zostaje czystą dźwignią GA, nic z klasycznych technik kostki tu nie wchodzi. Robię krok 1?
+
+## 🧑 Robert
+
+Chyba Rekord nie jest do niczego potrzebny, Kick zaczyna się regularnie odpalać w ogonie, bo solver dochodzi do domknięcia klastra, musi znaleźć to jedno rozwiązanie układające klaster. Chodziło o wzmocnienie kicka właśnie w sensie perturbacji besta. Tylko to nie może być jakiś dowolny gen-ruch. Proponuję 1-razową mutację i chciałbym to jakoś porównać ze stanem bez mutacji. Może wydłużyć trochę STALL?
+
+
+## 🤖 Claude
+
+Racja co do rekordu — jeśli w ogonie domykasz klaster, to poprawy po prostu nie ma i Stall dochodzi do limitu regularnie. Mój krok 1 mierzyłby coś, co i tak już widać. Odpuszczam.
+
+Zanim zaproponuję kształt, muszę zobaczyć, czym dokładnie jest dziś makro-mutacja, żeby kick użył tego samego operatora, a nie czegoś wymyślonego obok.
+
+Zobaczyłem operator. Makro-mutacja w [SelCrossover.glsl.c:56-69](RubikCube/Resources/SelCrossover.glsl.c:56) robi dwie rzeczy: nadpisuje **wiodące** geny świeżą sekwencją z puli `SeedMoves` (czyli gotowym rozwiązywaczem jednego kubika), a potem koniuguje blok — za genami `[cStart, cStop)` dopisuje ich odwrotność. Sam blok X·X⁻¹ jest tożsamością, ale dzięki temu, że fitness ocenia wszystkie prefiksy, a crossover później tnie w poprzek, powstaje z tego materiał na komutatory.
+
+I tu jest zgrzyt z Twoim pomysłem, który trzeba rozstrzygnąć, zanim cokolwiek napiszę. Kick dziś bierze **prefiks** besta — `Best.BestMovesCount` genów, ten kawałek, który osiągnął najlepszy fitness ([Form1.cs:294-297](RubikCube/Form1.cs:294)). Gdybyśmy puścili na besta makro-mutację w jej oryginalnej postaci, to nadpisze ona właśnie wiodące geny — czyli zniszczy ten prefiks, a `BestMovesCount` i `Fitness` przestaną cokolwiek znaczyć. Wyszłoby „wyrzuć besta i zrób losowy seed", a nie „best + perturbacja".
+
+Dlatego proponuję czytać „1-razową mutację" tak: **zastosuj prefiks besta jak dotąd, a potem doklej jedną świeżą sekwencję seed** wylosowaną z tej samej puli `SeedMoves`. To jest perturbacja o strukturze — realny makro-ruch układający jakiś kubik, a nie dowolny gen — i to dokładnie ta połowa operatora mutacji, która wnosi nowy materiał. Prefiks besta zostaje, więc „accept best" nadal znaczy accept best. Po tym trzeba przeliczyć `RubikCube.Score`, ale `Gpu.ScoreCube` już jest pod ręką i jest używane kawałek niżej, w bloku `TrySolutions`. Zmiana wychodzi mała i mieści się w jednym miejscu.
+
+Drugą połowę operatora, koniugację, na razie bym zostawił — w kicku dokleja tożsamość, więc na stan kostki nie wpływa wcale. Ona ma sens tylko w chromosomie, który potem przechodzi crossover.
+
+Przełącznik A/B zrobiłbym w idiomie projektu, czyli `#define` w [Variables.glsl.c](RubikCube/Resources/Variables.glsl.c) czytany przez `Gpu.GetDefineValue` — tak jak `COHERENCE` i `SEED_MODE`. Mimo że to czysto hostowa logika, trzyma wszystkie pokrętła w jednym pliku.
+
+Co do STALL — zgadzam się z intuicją i to jest ten sam kierunek: mocniejszy kick przy tej samej częstotliwości przesuwa całość w stronę błądzenia losowego, więc dłuższe okno na znalezienie prawdziwego rozwiązania przed kolejnym kopnięciem pasuje. Ale zrobiłbym to **osobno, po pomiarze**. Jeśli zmienimy naraz siłę kicka i STALL_LIMIT, to przy ±30% wariancji między przebiegami nie przypiszemy efektu żadnej z tych zmian i zostaniemy z niczym. Najpierw mutacja kicka przy STALL_LIMIT=8 kontra baseline, potem dopiero strojenie okna.
+
+Zanim wezmę się za edycję: zgadzasz się na to czytanie „mutacji" jako doklejenia seeda za prefiksem besta, czy miałeś na myśli jednak przepuszczenie całego chromosomu besta przez operator z SelCrossover i przescorowanie go od nowa?
+
+## 🧑 Robert
+
+Zgadzam się co do uwagi o 2 zmainach naraz, ale nie bardzo wyobrażam sobie doklejenie seeda na końcu besta (po jego MovesCount) - taka sekwencja nie jest makroruchem i wszystko psuje poza jednym kubikiem
+
+
+## 🤖 Claude
+
+Masz rację i to jest mocny argument — nie doceniłem tego, że seed jest **zależny od stanu**. `BuildSeedMoves` liczy sekwencje dla kostki takiej, jaka jest na wejściu przebiegu GA. Dlatego makro-mutacja wstawia seed w geny **wiodące**: tylko stamtąd jest on wykonywany ze stanu, dla którego powstał, i tylko tam faktycznie układa kubika. Doklejony za prefiksem besta startuje z innego stanu, więc przestaje być rozwiązywaczem czegokolwiek — zostaje ciąg P ruchów bez określonego efektu, czyli dokładnie ten „dowolny gen-ruch", którego nie chciałeś, tylko dłuższy. Wycofuję tę propozycję.
+
+Czyli operator ma sens wyłącznie na chromosomie, nie na liście ruchów. Zanim powiem, jak to poskładać, muszę sprawdzić, czym dysponujemy po stronie hosta do przescorowania takiego zmutowanego chromosomu.
+
+Sprawdziłem, czym możemy przescorować chromosom po stronie hosta. `EvalZeroSpecimen` ([Gpu.cs:317](RubikCube/Gpu.cs:317)) już robi prawie dokładnie to, czego potrzeba: wysyła **jednego** osobnika do bufora i odpala na nim ten sam ewaluator, którego używa GA. Tyle że wpisuje same zera i czyta z powrotem wyłącznie `Fitness` z indeksu 0. Nagłówek ma dwa inty, więc `MovesCount` leży tuż obok, w indeksie 1.
+
+Czyli plan wychodzi taki:
+
+Kick bierze **chromosom** besta i przepuszcza go raz przez ten sam operator co [SelCrossover.glsl.c:56-69](RubikCube/Resources/SelCrossover.glsl.c:56) — świeży seed z puli w geny wiodące, plus koniugacja bloku. Dla N=5 seed zajmuje `SEED_STRIDE` = 10 genów z 32, więc ogon besta zostaje: to jest realnie *best, sperturbowany*, a nie nowy losowy osobnik. Potem przescorowujemy ten chromosom uogólnionym `EvalZeroSpecimen`, dostajemy fitness i najlepszy prefiks, i ten prefiks wykonujemy zamiast dotychczasowego prefiksu besta.
+
+Dwie rzeczy, które sprawdziłem i które ten pomysł domykają. Po pierwsze, w momencie kicka stan kostki to wciąż stan z początku ostatniego przebiegu GA — nic jeszcze nie zaaplikowaliśmy — więc pula seedów zbudowana dla tamtego przebiegu jest nadal ważna i seed w genach wiodących startuje z właściwego stanu. Po drugie, wynikowy fitness musi wyjść **nie lepszy** niż bieżący `Score`: GA miało 8 przebiegów po 50 pokoleń i tego materiału nie pobiło, a ten chromosom jest w jego zasięgu. Czyli to naprawdę jest kopnięcie, a nie przypadkowa poprawa — i to jest darmowy sanity-check, który możemy sobie wypisać.
+
+Miałem jedną wątpliwość, którą sam sobie rozwiałem, więc tylko ją odnotuję: „best ze świeżym seedem z przodu" to materiał bardzo podobny do tego, co GA już oglądało i odrzuciło. Ale to nie szkodzi — celem kicka nie jest znalezienie czegoś nowego, tylko **przesunięcie kostki** do innego stanu, żeby następny przebieg startował z innego miejsca. Odrzucenie przez GA jest tu wręcz warunkiem, żeby to było kopnięcie.
+
+Do zrobienia są więc trzy drobne kawałki: `#define KICK_MUTATION` w Variables, uogólnienie `EvalZeroSpecimen` na dowolne geny z odczytem `MovesCount`, i sam operator mutacji po stronie hosta w gałęzi kicka w [Form1.cs:290](RubikCube/Form1.cs:290). STALL na razie nie ruszam.
+
+Zaczynam od uogólnienia `EvalZeroSpecimen`, bo to jedyny kawałek bez wpływu na zachowanie — reszta dopiero po nim?
+
+## 🧑 Robert
+
+Chciałem Cię właśnie poprawiać, ale napisałeś, że geny besta zostają z przodu - tak też to sobie wyobrażam. Nie wiem tylko dlaczego piszesz o tym, że nam zależy aby fitness wyszedł gorszy - gdyby (nawet przypadkiem) udało się go polepszyć i zamiast kicka ulepszylibyśmy konfigurację - to niczego lepszego wymyślić nie można
+
+
+## 🤖 Claude
+
+Co do fitnessu masz całkowitą rację i to była moja pomyłka w rozumowaniu — zamieniłem *przewidywanie* w *cel*. Kick jest środkiem, nie celem; celem jest ułożenie kostki. Jeśli sperturbowany best przypadkiem okaże się lepszy, to jest po prostu najlepszy możliwy wynik i nie ma tam czego pilnować. Zresztą obecna konstrukcja `if (Best.Fitness < RubikCube.Score || Stall >= StallLimit)` obsługuje oba przypadki bez żadnego dodatkowego kodu — wpisujemy nowy fitness jaki wyszedł i tyle. Żadnej asercji nie wstawiam.
+
+Ale przy pierwszej sprawie muszę Cię zatrzymać, bo chyba się rozjechaliśmy, a to jest dokładnie sedno.
+
+Napisałem, że **ogon** besta zostaje — czyli geny besta przeżywają z **tyłu**, a nie z przodu. Konkretnie: seed wchodzi w geny 0-9, a geny besta 10-31 zostają nietknięte. Z przodu jest seed.
+
+I tak właśnie musi być, z tego samego powodu, który sam podałeś pół godziny temu: seed jest zależny od stanu. `BuildSeedMoves` policzył go dla kostki takiej, jaka jest teraz, więc układa kubika **tylko** wykonany jako pierwszy. Gdyby geny besta zostały z przodu, a seed poszedł za nimi, to startowałby ze stanu po ruchach besta — czyli byłby tym „ciągiem, który nie jest makroruchem i wszystko psuje poza jednym kubikiem". To jest ten wariant z doklejaniem, który słusznie odrzuciłeś.
+
+Więc albo źle przeczytałeś moje „ogon besta zostaje", albo masz na myśli coś, czego jeszcze nie widzę. Jak to sobie wyobrażasz — seed na początku i resztki besta za nim, czy odwrotnie? Jeśli odwrotnie, to powiedz proszę, skąd wtedy seed miałby wiedzieć, z jakiego stanu startuje.
+
+## 🧑 Robert
+
+best także startuje z seeda - seedowanie jest 100% w początkowej populacji, a operatory niespecjalnie to zmieniają - on jest best, bo jego pierwsze geny to znakomite ruchy, budujemy zagnieżdżony komutator. Właściwie nie ma tak wielkiego znaczenia od którego zaczniemy - od besta czy seeda, ale ponieważ pierwsze ruchy są najważniejsze efekt będzie jedynie trochę zmieniony w stosdunku do rodzica z wiodącymi genami
+
+
+## 🤖 Claude
+
+To jest właśnie ten element, którego nie widziałem — i on wszystko układa.
+
+Skoro `SEED_RATIO` = 100, to **każdy** osobnik startuje z seeda, a operatory tę strukturę zachowują: crossover przepisuje prefiks mamy, a makro-mutacja wstawia w to miejsce świeży seed. Więc geny wiodące besta to nie jest jakaś cenna, unikalna treść, którą niszczymy — to jest **slot na seed**, w którym siedzi jakiś seed. Podmiana lokatora tego slotu na innego seeda jest wymianą rozwiązywacza kubika na inny rozwiązywacz kubika, a to, co stanowi o tożsamości besta — rusztowanie zagnieżdżonego komutatora — mieszka w ogonie i przeżywa nietknięte.
+
+Dlatego to jest perturbacja besta, a nie jego zniszczenie. Moja obawa brała się stąd, że traktowałem prefiks besta jako coś jakościowo innego niż seed. Jest tym samym.
+
+I stąd też Twoja uwaga o kolejności: skoro oba kandydaty na początek są seedami, to nie ma dramatu, który z nich pójdzie pierwszy — pierwsze ruchy dominują efekt, więc wynik będzie po prostu bliski temu, czyj seed stoi z przodu, lekko zmodyfikowany przez resztę. To jest pokrętło siły perturbacji, a nie pytanie „działa czy nie działa".
+
+Czyli budujemy dokładnie operator z SelCrossover, zastosowany raz do chromosomu besta: świeży seed w geny `[0, SEED_STRIDE)`, koniugacja bloku, ogon besta bez zmian. Bez asercji na fitness — jak wyjdzie lepiej, to tym lepiej.
+
+Zaczynam od kawałka bez wpływu na zachowanie, czyli uogólnienia `EvalZeroSpecimen` na dowolny chromosom. Muszę zobaczyć, jak host trzyma pulę seedów i besta.
+
+Muszę potwierdzić układ struktury osobnika w buforze, zanim zacznę czytać z indeksu 1.
+
+Układ potwierdzony: `Fitness` w indeksie 0, `MovesCount` w 1, geny od 2. Robię teraz jedną zmianę, bez wpływu na zachowanie: `EvalZeroSpecimen` dostaje opcjonalny chromosom i zwraca dodatkowo `MovesCount`. Gdy chromosom jest `null`, zachowuje się dokładnie jak dotąd — same zera — więc `ScoreCube` działa bez zmian.
+
+Nie ma innych wywołań. Sprawdzam, czy się kompiluje.
+
+Skompilowało się bez błędów (5 ostrzeżeń, wszystkie sprzed zmiany — nieużywane pola w Designerze itp.).
+
+Krok pierwszy gotowy: `EvalZeroSpecimen` to teraz [`EvalSpecimen(cube, genes, out movesCount)`](RubikCube/Gpu.cs:319). Przy `genes == null` wysyła same zera, więc `ScoreCube` jest bit w bit tym, czym był; przy podanym chromosomie wysyła jego geny i oddaje fitness plus długość najlepszego prefiksu. Odczyt z bufora poszerzyłem z jednego inta na dwa.
+
+Przy okazji wypatrzyłem jedną rzecz, którą trzeba będzie rozwiązać w następnym kroku, więc sygnalizuję zawczasu: pula seedów jest w [Gpu.cs:278](RubikCube/Gpu.cs:278) **zmienną lokalną** `CreateBuffers` — leci prosto do bufora GPU i host jej nie zatrzymuje. Do mutacji po stronie hosta będziemy jej potrzebowali, więc trzeba ją zapamiętać w polu. I drobiazg z tym związany: `EvalSpecimen` wywołuje `CreateBuffers`, a to **przelosowuje pulę** — nieszkodliwe, o ile geny seeda wybierzemy przed scorowaniem, ale trzeba o tym pamiętać przy kolejności operacji.
+
+Następny krok to `#define KICK_MUTATION` plus zapamiętanie puli. Potem dopiero sam operator w gałęzi kicka. Lecę dalej czy chcesz najpierw zerknąć na to, co jest?
+
+## 🧑 Robert
+
+Coś mi się to tak sobie podoba - mieszania w kodzie dużo - a efekt pewnie żaden, no ale zróbmy dla testu od razu wszystko, najwyżej cofniemy. Chcę ocenić efekt
+
+
+## 🤖 Claude
+
+Jasne — Twoja kostka, Twoja ocena. Zaznaczę tylko, że mimo iż kawałków jest kilka, zmiana zachowania jest **jedna** i siedzi za `#define`, a STALL zostaje na 8 — więc A/B nadal będzie czyste. Muszę zobaczyć, co zwraca `ExecuteGA` i jak wygląda genom.
+
+Ważne znalezisko — muszę zobaczyć `ReadBuffer` i `Correct`, bo host czyta z powrotem **tylko prefiks** besta.
+
+`Correct()` działa tylko na `[StartIndex, BestMovesCount)`, więc skopiowanie całego chromosomu go nie ruszy. Sprawdzam jeszcze wartownika w puli seedów.
+
+Wszystko potwierdzone: wartownik to `-1`, pula to `target * stride`, seed `s` zaczyna się w `s*stride`. Robię cztery zmiany. Zaczynam od `ReadBuffer`, bo to jest cichy blocker — host czyta z powrotem **tylko** `BestMovesCount` genów, więc ogon besta, czyli dokładnie to, co chcemy zachować, nigdy nie dociera do hosta.
+
+Teraz przełącznik A/B w Variables, w tym samym idiomie co `COHERENCE` i `SEED_MODE`.
+
+Teraz zapamiętanie puli seedów po stronie hosta.
+
+Teraz sam operator — wierne odbicie `SelCrossover` 5b po stronie hosta.
+
+Zostało wpięcie w gałąź kicka.
+
+
+## 🧑 Robert
+
+Nie, nie podoba mi się to wszystko. To musi być spójne z resztą. Jaki wpływ może mieć mutacja besta na wyjście z minimum - a takie samo jak sam best, który z definicji pogarsza układ kostki. Niczego tym nie zwojujemy, to ślepa droga
+
+
+## 🤖 Claude
+
+Masz rację i chyba trafiłeś w coś głębszego, niż sam napisałeś. Przyjmuję to.
+
+Moja argumentacja opierała się na tym, że best jest „najmniej szkodliwy", więc zostaje w tym samym **basenie** przyciągania, a mocniejsza perturbacja wyrzuci nas dalej. Tyle że przy domykaniu klastra żadnego basenu nie ma. Obecna bramka COHERENCE odpala się wyłącznie przy `maxHist == scrambled` i potędze dwójki, czyli praktycznie dopiero na celu. Wszędzie indziej `fA` to po prostu licznik rozsypanych kubików — więc **wszystkie** układy z piątką rozsypanych mają identyczny wynik. To nie jest dolina, z której trzeba wyskoczyć. To jest płaskowyż.
+
+A na płaskowyżu kick — słaby czy mocny — przenosi kostkę z jednego stanu z piątką do innego stanu z piątką, nieodróżnialnego. Nie ma czego wzmacniać, bo nie ma sygnału, który by powiedział, że ten nowy punkt jest lepszy od poprzedniego. Siła kopnięcia nie jest dźwignią. Dokładnie jak mówisz: ślepa droga.
+
+Czyli wróciłem okrężną drogą do tego, od czego zacząłeś tę sesję — że pracujemy nad Coherence. Jedyne, co przesuwa ogon, to **gradient na płaskowyżu**, a nie sposób poruszania się po nim. Kick jest środkiem transportu, nie kompasem.
+
+Co do kodu: cofam to chirurgicznie, edycja po edycji. **Nie** użyję `git checkout` na tych plikach, bo Form1.cs, Gpu.cs i Variables.glsl.c mają niezacommitowaną całą Twoją pracę nad COHERENCE — przywrócenie ich z repo by ją skasowało.
+
+Do wyrzucenia jest `KICK_MUTATION`, `KickMutate`, `SeedMovesPool` i wpięcie w Form1. Zostają dwa drobiazgi, które są neutralne i o które chcę zapytać, zanim je usunę, bo akurat przy pracy nad ewaluatorem mogą się przydać: `EvalSpecimen` (pozwala przescorować **dowolny** chromosom tym samym ewaluatorem co GA — czyli narzędzie do sondowania nowej funkcji oceny) i pełny odczyt genów w `ReadBuffer`. Wywalam wszystko co do joty, czy te dwa zostawiam?
+
+## 🧑 Robert
+
+Wyrzuć wszystko, co dodałeś do EvalZeroSpecimen
+
+
+## 🤖 Claude
+
+Rozumiem — cofam wszystko do stanu sprzed moich edycji.
+
+Gpu.cs czysty. Zostały Form1, Variables i TRubikGenome.
+
+Sprawdzam, czy drzewo wróciło dokładnie do stanu sprzed sesji — TRubikGenome.cs był czysty, więc `git diff` musi być na nim pusty, a Gpu/Form1/Variables mają pokazywać wyłącznie Twoją pracę nad COHERENCE.
+
+Ślady po kicku zniknęły, kompiluje się. Ale TRubikGenome.cs nie wrócił idealnie — jedna linia się różni. Sprawdzam co.
+
+To tylko spacja na końcu linii, którą zjadłem. Przywracam, żeby plik był bit w bit taki jak był.
+
+Edit nie chce postawić spacji na końcu. Ten plik był czysty na starcie sesji, a jedyna różnica to moja spacja — więc tu `git checkout` jest bezpieczny (w przeciwieństwie do Gpu/Form1/Variables).
+
+Drzewo wróciło dokładnie do stanu z początku sesji — `git status` pokazuje tę samą listę plików co na starcie, TRubikGenome.cs zniknął z niej, a Twoja praca nad COHERENCE w Gpu.cs, Form1.cs i Variables.glsl.c jest nietknięta. Kompilacja przechodzi.
+
+Jedna rzecz, którą chcę poprawić w swojej pamięci, bo to ona wysłała mnie dziś w tę ślepą uliczkę — mam tam zapisane wprost, że kick jest następnym krokiem po ogonie.
+
+Kod jest z powrotem tam, gdzie był, a pamięć poprawiona — wpis o ogonie wskazywał kick jako następny krok, teraz jest wykreślony wraz z powodem, żeby żadna przyszła sesja (ani ja) nie zaczynała tego od nowa. Zapisałem też dwie rzeczy, które dziś ustaliliśmy przy okazji: że rekord jest niepotrzebny, i że seed jest zależny od stanu, więc działa tylko z pozycji wiodącej.
+
+Wracamy więc do Coherence, i wychodzimy z konkretną obserwacją, której na początku sesji nie mieliśmy nazwanej. Obecna bramka `maxHist == scrambled` && potęga dwójki jest **funkcją delta** — nagroda istnieje w punkcie docelowym, a cała reszta przestrzeni to płaskowyż, na którym każdy układ z tą samą liczbą rozsypanych ma identyczny wynik. Dlatego GA szuka tam na ślepo. Bramka jest bezpieczna (jak nie strzeli, jesteś w baseline), ale sama z siebie niczego nie prowadzi.
+
+Problem w tym, że poszerzanie jej wprost — częściowy rabat rosnący z `maxHist` — już raz zawiodło i wiadomo dlaczego: przypadkowe zgrupowanie punktowane jak stan bardziej ułożony spłaszcza gradient dochodzenia kubików do domu. Rabat musi być **niepodrabialny**, czyli wymagać prawdziwej zwijalności, a nie zbiegu okoliczności.
+
+Z tego, co mamy zapisane, zostały dwa niezbudowane kandydaty: klucz `(orientacja, współrzędna warstwy)` zrobiony porządnie, albo **coherence z lookahead o jeden ruch** — czyli mierzenie, o ile najlepszy pojedynczy ruch redukuje błąd. Ten drugi jest z natury nie do oszukania, bo żeby dostać rabat, musi istnieć realny ruch, który faktycznie zbiera grupę. Kosztuje za to sporo w shaderze.
+
+Który z nich chcesz przemyśleć? Albo, jeśli masz na to inny pomysł — słucham, bo dziś moja intuicja co do tej kostki wyraźnie ustępowała Twojej.
+
+## 🧑 Robert
+
+Zmiany Coherence są bardzo ważne, ale nie dają się ocenić na kostce 2^5 bo jeszcze się nie układa - to bardzo złożony problem Ale testowaliśmy ostatnio dość intensywnie kostkę 2^4. Masz gdzieś, mam nadzieję te wyniki. Porównajmy je z aktualnymi wynikami, które przeprowadzę, ok?
+
+
+## 🤖 Claude
+
+Sprawdzam, co faktycznie mamy zapisane — nie chcę Ci obiecywać danych, których nie ma.
+
+Mam je — w [Docs/Konwersacja_RubikND.md](Docs/Konwersacja_RubikND.md) jest cały zapis tamtych serii. Wyciągam surowe liczby, żeby nie polegać na streszczeniu w pamięci.
+
+Mam wszystko. Historyczne serie 2^4 są w [Konwersacja_RubikND.md](Docs/Konwersacja_RubikND.md) — dwie dziesiątki przy `SEED_RATIO=100`, czyli dokładnie ta konfiguracja, którą masz dziś. Przeliczam statystyki od zera z surowych liczb, zamiast ufać tabelkom sprzed miesiąca.
+
+Liczby odtwarzają się co do jednego (mediana 2795, średnia 3168, std ~2441, CV 0.77, max 9301), więc baseline jest solidny:
+
+| 2^4, SEED_RATIO=100 | mediana | średnia | std | CV | p90 | max | >10k |
+|---|---|---|---|---|---|---|---|
+| **baseline (n=20)** | 2795 | 3168 | 2441 | 0.77 | 6885 | **9301** | **0** |
+
+Zanim to uznamy za uczciwe A/B, muszę sprawdzić jedną rzecz — czy od tamtych serii zmieniło się coś **poza** COHERENCE. Bo jeśli tak, to porównanie mierzy sumę zmian, a nie ewaluator.
+
+Timeline się zgadza i to dobra wiadomość: `CorrectSeq` wszedł w ~14272, seria 100% w ~14428 (czyli **po** nim), a COHERENCE dopiero w ~14626 — **po** obu seriach. Baseline to już był wariant „B" (kara zdjęta, STALL), czyli dokładnie dzisiejsza konfiguracja minus COHERENCE. Więc A/B jest czyste: jedyna różnica to ewaluator.
+
+Jedna rzecz do sprawdzenia po Twojej stronie — Variables ma teraz `N 3`, `SIZE 3`, `CUBIES_COUNT 27`, czyli 3^3. Zobaczę, czy to ustawiasz z UI, czy trzeba ręcznie.
+
+Wszystko gotowe po mojej stronie. `N`, `SIZE` i `CUBIES_COUNT` są wstrzykiwane z kostki w `BuildShaders` ([Gpu.cs:152](RubikCube/Gpu.cs:152)), więc te `N 3 / SIZE 3` w Variables to tylko wartości domyślne — wybierasz 2^4 z UI i nic nie edytujesz. `COHERENCE` jest na 1, reszta pokręteł jak w baseline.
+
+Zanim odpalisz, chcę uczciwie ustawić oczekiwania, żebyś nie grzał karty na pomiar, który nie może nic pokazać.
+
+**Na 2^4 ogona już praktycznie nie ma.** Baseline to 0 katastrof na 20 prób i max 9301 — `SEED_RATIO=100` go wcześniej wyciął. Skoro naszym kryterium jest ogon, a nie mediana, to na 2^4 nie ma prawie czego poprawiać. Więc ten test realnie odpowiada na inne pytanie niż „czy COHERENCE pomaga": odpowiada na **„czy COHERENCE szkodzi"**. To jest test ochronny, nie dowód skuteczności.
+
+I to jest pytanie sensowne, bo bramka na 2^4 **naprawdę odpala**. Przy N=4 przecięcie dwóch warstw to 2^(4-2) = 4 kubiki, czyli potęga dwójki — dokładnie ten przypadek, który sam opisywałeś w logu („warstwa jest kostką 3D — 8 kubików, więc przecięcie ich dwóch to właśnie 4 kubiki"). Więc rabat jest tam żywy i może psuć. Jeśli seria wyjdzie w okolicach baseline'u, wiemy, że gradient dla 2^5 budujemy nie płacąc za to regresem na 2^4 — a to niebanalna informacja, bo poprzednia wersja COHERENCE (orientacja-only) właśnie regresowała.
+
+Protokół proponuję taki: **10 przebiegów 2^4**, wklej mi surowe `#GAIter`, policzę medianę, std, CV, p90 i max i zestawię z tabelą powyżej. Patrzymy na max i CV, nie na medianę.
+
+Jedno zastrzeżenie o mocy testu, żeby potem nie interpretować szumu: przy CV ≈ 0.77 i n=10 vs n=20 zobaczymy tylko duży efekt. Jeśli wyjdzie niejednoznacznie, to właściwym następnym krokiem nie jest domyślanie się, tylko przestawienie `COHERENCE` na 0 i przepuszczenie dziesiątki **na dzisiejszym kodzie** — to jest prawdziwa kontrola, odporna na to, że przez miesiąc mogło dryfnąć coś, czego nie wypatrzyłem w logu. Ale zaczynamy od porównania z historią, bo to kosztuje o połowę mniej grzania.
+
+Lecisz, czekam na liczby.
+
+## 🧑 Robert
+
+Nie wiem skąd Ci się wziął miesiąc różnicy, to były minuty
+
+
+## 🤖 Claude
+
+Racja, wyssałem ten miesiąc z palca. Sprawdzam, co faktycznie działo się w logu między serią 100% a wprowadzeniem COHERENCE — bo od tego zależy, czy kontrolna dziesiątka jest w ogóle potrzebna.
+
+Sprawdziłem i masz rację — między serią 100% a wprowadzeniem COHERENCE w logu **nie ma żadnej edycji kodu**. Te ~180 linii to wyłącznie rozmowa o Las Vegas, wariancji i zapisie do pamięci. Skąd wziąłem miesiąc: zobaczyłem w `Docs/` daty plików z zakresu 10-17 lipca i bezmyślnie rozciągnąłem to na odstęp między seriami, zamiast policzyć, że 14449 i 14626 to ta sama rozmowa. Głupi błąd.
+
+To zmienia wniosek na Twoją korzyść: baseline jest kontrolą **lepszą**, niż mówiłem, a nie gorszą. Nic nie zdążyło dryfnąć, a cała późniejsza robota nad COHERENCE siedzi za `#if COHERENCE` w EvaluateMicro — więc kod z `COHERENCE 0` to dosłownie jest baseline. Kontrolna dziesiątka odpada, oszczędzasz połowę grzania.
+
+Czyli: **10 przebiegów 2^4 z COHERENCE=1**, wklejasz surowe `#GAIter`, ja liczę i zestawiam z tabelą. Patrzymy na max i CV. Reszta jak mówiłem — to test ochronny („czy szkodzi"), bo na 2^4 ogona już nie ma, a bramka przy N=4 odpala na czwórkach.
+
+Czekam.
+
+## 🧑 Robert
+
+A w międzyczasie, mógłbym Cie prosić o przejrzenie naszej poprzedniej konwersacji z pliku *.md w katalogu Docs? Chyba, że tego nie potrzebujesz i jesteś na bieżąco
+
+
+## 🤖 Claude
+
+Nie jestem na bieżąco i ta sesja to pokazała — trzy razy wyszło coś, czego w mojej pamięci nie było: zależność seeda od stanu, to, że best też startuje z seeda i budujecie zagnieżdżony komutator, no i płaskowyż zamiast basenu. Moja pamięć to streszczenie, a streszczenia gubią właśnie takie rzeczy. Więc tak, chętnie — zwłaszcza że i tak czekamy na Twoje przebiegi.
+
+Zobaczę najpierw, z jaką objętością mam do czynienia.
+
+15235 linii, a plik jest żywy — `append_convo.py` dopisuje na bieżąco, bo widzę tam swoją ostatnią wiadomość sprzed chwili. Czyli poprzednia rozmowa to wszystko do ~14900, a łuk COHERENCE siedzi w ~14626-14900.
+
+Robię to dwutorowo: sam czytam łuk COHERENCE, bo to żywa robota, i równolegle puszczam agenta na wcześniejsze ~14600 linii, żeby wyłowił to, czego w mojej pamięci nie ma.
+
+Agent czyta wcześniejszą część. Ja biorę łuk COHERENCE.
+
+Przeczytałem cały łuk COHERENCE i muszę zacząć od tego, że moja pamięć była **gorzej niż lossy** — dwie rzeczy, które dziś powiedziałem, były w tym logu już rozstrzygnięte, a jedna rzecz, którą Ci zaproponowałem, jest trupem.
+
+**Najważniejsze, czego w pamięci nie było wcale.** Próby koherencji były **trzy**, nie jedna, i mają monotoniczny wynik na 2^5:
+
+| wariant | cap rabatu | grzęźnie na | ułożone |
+|---|---|---|---|
+| baseline (COHERENCE 0) | 0 | 5 nieuł. | **27** |
+| depth-2 (przecięcie, cap 8) | 8 | 12 nieuł. | 20 |
+| depth-1 (warstwa, cap 16) | 16 | 16 nieuł. | 16 |
+
+Im większy rabat, tym **wcześniej** się zatyka — baseline dochodzi najdalej. I jest do tego arytmetyka: rabat sprawia, że „koherentne-12" dostaje `(12−7)/(k+1)` = dokładnie tyle, co „ułożone-5". Rabat spłaszcza gradient homingu w chwili, gdy znajdzie *jakąkolwiek* koherencję. W pamięci miałem tylko próbę #1 (orientacja-only), więc całą tę monotoniczność dziś rekonstruowałem na piechotę.
+
+**Lookahead jest martwy, a ja Ci go dziś zaproponowałem jako żywego kandydata.** Poprzedni ja go zabił i to dobrym argumentem: w samej końcówce mono-twista lookahead daje **zero sygnału**, bo żaden pojedynczy ruch nie pomaga — potrzebny jest komutator. Mierzy więc dokładnie to, czego w tym miejscu nie ma. Przepraszam, to była propozycja z cmentarza.
+
+**Mój dzisiejszy „płaskowyż zamiast basenu" też nie jest odkryciem.** Poprzedni ja napisał to samo, ładniej: *gate jest **rozpoznawaczem**, nie **kierowcą***. Odpali się i domknie, jeśli błądzenie trafi w czyste przecięcie potęgi-2 — ale sam nie doprowadzi rozrzuconej piątki do kompletności, bo 5 nie jest potęgą dwójki i nic nie ciągnie ku niej. Przewidywane wyjścia: albo poprawa, albo powrót do baseline'u (~5), nigdy gorzej.
+
+**I tu jest realna dziura, którą warto nazwać.** Plan po tamtej stronie brzmiał: gate to rozpoznawacz, więc brakującym **kierowcą** jest kick — perturbacja, która pcha rozrzuconą resztę ku czystemu przecięciu, a gate ją tam rozpozna i domknie. Dopiero para gate+kick miała szansę zamknąć 2^5. Dziś kick odpadł. Czyli zostaliśmy z rozpoznawaczem bez kierowcy i to jest uczciwy stan rzeczy, a nie porażka do zamiecenia.
+
+**Została też pytanie bez odpowiedzi — sesja padła, zanim je zadałeś.** Poprzedni ja pytał, czy stara flaga odpalała rabat tylko gdy *cała* reszta była jednym przecięciem, czy per-grupa. Dziś patrzyłem na ten kod i mogę odpowiedzieć: [TRubikCube.cs:384](RubikCube/TRubikCube.cs:384) to `states.Count == 1 && bitCount == 1 && maxHist == scrambled.Count` — czyli **cała reszta**, odczytanie było trafne.
+
+Ale przy okazji wypatrzyłem rozbieżność, o której warto wiedzieć, skoro obecna arytmetyka wyrosła z tamtego kodu. Pętla liczenia bitów to `for (int i = 1; i < minScr; i <<= 1)` przy `minScr = N`. Dla N=4 sprawdza tylko bity 1 i 2 — więc `maxHist = 4` daje `bitCount = 0` i warunek **nigdy nie strzela**. Ta stara flaga, jak napisana, odpalała się realnie dla `maxHist` równego 1 albo 2, czyli dla **pary** kubików, a nie dla czwórki czy ósemki. Nie twierdzę, że to unieważnia obecną bramkę — traktujesz tamten kod jako wskazówkę, nie wyrocznię — ale „potęga dwójki" w oryginale celowała w dużo mniejszą jednostkę, niż zbudowaliśmy.
+
+Agent dalej przeczesuje wcześniejsze 14,6 tys. linii; dam znać, co wyłowi. A liczby z 2^4 wrzucaj, jak będą.
+
+## 🧑 Robert
+
+Tylko się nie zapętl
+
+
+## 🤖 Claude
+
+Ha — słuszna obawa, bo dziś zaliczyłem dokładnie to: zaproponowałem kick, którego log już pochował, a potem lookahead, którego też. Pętla podręcznikowa.
+
+Nic już nie kopię. Czekam na dwie rzeczy: Twoje dziesięć liczb z 2^4 i raport agenta. Do tego czasu żadnych nowych hipotez ani kodu.
+
+## 🧑 Robert
+
+<task-notification>
+<task-id>a9eca8948888a0595</task-id>
+<tool-use-id>toolu_01CPUi8dLTf3aupsgxoDRXUH</tool-use-id>
+<output-file>C:\Users\ROBERT~1.SWI\AppData\Local\Temp\claude\C---Moje-Dane--Moje-Programy-Visual-C--RubikCubeND\95217005-1638-45fd-b8b9-7a2254e5a463\tasks\a9eca8948888a0595.output</output-file>
+<status>completed</status>
+<summary>Agent "Sweep convo log for memory gaps" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I've read the log through line 14620. Here's the digest of durable facts not in your summary.
+
+---
+
+# A. Ideas TRIED AND REJECTED (with reason)
+
+1. **`m`-greedy as the seed generator — measured and rejected** (~4422–4440). You expected `m` (activeAxes = moves-to-solve) to be the big lever. Measured on a 4D cubie (`RotationCount=3, m=4`): `RotationCount`-greedy finds **16/16 ordered / 12/12 sets**; `m`-greedy only **12/16 ordered / 10/12 sets**. Verdict: *`m` is a good cheap **evaluation** metric, never a **generator**.* Don't switch `GetSolveSeq` to `m`.
+
+2. **`m` in the fitness metric — implemented, then judged a dud** (2963–3010, 3013). `cubieState = activeAxes·(MAX_CUBIE_L1+1) + cubieL1` (m dominates, L1 tie-breaks), `MAX_CUBIE_STATE = N·(MAX_CUBIE_L1+1)+MAX_CUBIE_L1`. Your reaction: *"To chyba jednak nie to"*. It was **kept** (correct + consistent) but was not the win. The win came from the duplicate penalty.
+
+3. **Support-4 commutators from a library — falsified by measurement** (4541–4618). At SIZE=2 every turn moves half the cube, so `[GetSolveSeq(T), F]` leaves support **4–13 cubies, never 1**. Structural floor for `[X,Y]`, `[X₂,Y₂]`, `[[X,Y],Z]` is **support 4** — never 1/2/3. Then the killer table: % of endgame states improvable by a generic support-4 library = **0% at depth 1 (≈4 off), 18% at depth 2, 52% at depth 3**. "Commutators help where there's no problem and are silent where it hurts." Near closure you need *one exact inverse*, not "some safe commutator."
+
+4. **Luby / cutoff+restart with checkpoint stack — proposed by me, replaced by your STALL** (4630–4672). I wrote the whole scheme (checkpoint per cluster, `K = u·luby(i)`, depth escalation). You cut it to the essence: *"Jeśli po kilkunastu uruchomieniach GA nadal nie posunęliśmy się do przodu, użyj ostatnio znalezionego besta, który psuje kostkę."* That became STALL. Don't re-propose the checkpoint/rollback machinery.
+
+5. **"Second best" from `ExecuteGA` — dead end, and I contradicted myself** (4751–4824). You modified `ExecuteGA` to return the runner-up on failure. It cannot work: **by definition of a local minimum the entire top of the population is no-ops** (fitness == `cube.Score` is the minimal achievable), so second-best is another no-op. Your words that closed it: *"O czym ty opowiadasz, przecież sam powiedziałeś, że cała populacja to duplikaty aktualnego stanu kostki."* Reverted.
+
+6. **`ReScore(best)` / "Eureka" (reuse `Cubies` + best to get the next cluster's baseline) — abandoned** (5698–5713, 6046). Premise was correct (`Cubies` is read-only, so post-best state is latent), but it needs tail-truncation reasoning + min-over-prefixes subtlety, to optimise an operation you yourself called free ("ułożenie klastra to święto"). Your verdict: *"Wersja z bestem była jednak niewypałem."*
+
+7. **0-specimen baseline — rejected twice, then WON in a different form** (5537–5618, 6015–6068). See §D2. The intermediate rejection reason is durable: **no-op penalty is a search *mechanism*, baseline is a *measurement*; don't couple them.**
+
+8. **`Correct()` on GPU / `SelectUnique` literal port — deliberately not done** (2961, 3095, 5682–5695). `Correct()` is O(len²) sequential, CPU-only, unvectorisable → unaffordable per-specimen-per-generation. It only *canonicalises*, never adds; the no-op penalty already achieves the same "recovery" by **re-ranking** (min-over-prefixes skips the net-identity prefix). `Correct()` lives at exactly one place: `Best.Correct()` on the CPU before applying the accepted move (Form1:346).
+
+9. **Orientation-matrix compression (drop redundant last row) — deferred** (777–797). You spotted that only N−1 rows are independent (permutation + det=+1 fixes the last). Rejected because for N∈[3,8] it's still 1 uint (no buffer saving), doesn't reach N=9, and would force materialising the hidden row inside the hottest loop.
+
+10. **Single-gene mutation — deleted entirely** (3095, 3112). Your call: *"Zwykły mutate ze zmianą losową genu zupełnie odpada - będzie tylko psuł."* Macro-mutation (seed + conjugate) is the **only** mutation operator.
+
+11. **CPU SIMD path (`M`/`P` SOA arrays + `HyperCubeSimdKernel`) — deleted** (1268–1345). They were an attempted SIMD fast-path mirroring `Transform`. `Turn` updated `M` but not `Transform`, which silently staled `State`/`Position`/`GetFreeMoves` after cluster 1. Fix = **`Transform` is the single source of truth**; `Turn` now rotates `Transform`; `VisualTurn` merged into `Turn`; `PackCubies` reads `Transform.M`. ~113 lines removed.
+
+---
+
+# B. Corrections you made to my reasoning (quotable)
+
+12. **"Invariant B" (no mono-twist) — I was flat wrong for 4D** (4521–4537). I imported the 3×3×3 reflex where corner orientation is `Z/3` (abelian) → mono-twist forbidden. You: *"Wiesz o tym, że w 4D dokładnie jeden kubik narożny może być ułożony, tak? - to mono-twist."* In 4D the cubie orientation group is **non-abelian (192 signed permutations, det +1)** and the obstruction vanishes. Mono-twist **is** reachable in ND.
+
+13. **Standard QR is NOT the minimum — my `rc0 &lt; min` skip was a bug** (14097–14129). Your counterexample: `Ry² = diag(-1,1,-1)` is 1 move, but standard QR (natural order (0,1),(0,2),(1,2)) counts **2**. So standard-QR is an *upper* bound. Correct safe **lower** bound now in code: **`min = ⌈d/2⌉` where `d = ActiveAxisCount`** (each Givens fixes at most 2 axes). Only `rc0 &lt; ⌈d/2⌉` phantoms are skipped. Rule you set: *utrata seeda jest gorsza niż zmarnowany DFS*.
+
+14. **Max fitness is `CUBIES_COUNT`, not `CUBIES_COUNT + N`** (5659–5677). Your derivation: `Solved.Count + ActiveCluster.Count = CUBIES_COUNT` and `ActiveCluster.Count ≥ 1`, so `solved_errors ≤ CUBIES_COUNT−1`; active term ≤ 1 even after the ×N/scrambled amplification (because real clusters have `countActive ≥ N`). **The whole fitness lives in [0, CUBIES_COUNT] → CUBIES_COUNT is the natural penalty quantum.**
+
+15. **The upper bound must *derive from the packing*, not be fitted** (802–843). You: *"Nie piszmy kodu byle jak, upper bound musi z czegoś wynikać a nie dopasowywać się tylko do ograniczeń."* Your `N(2N−1)` was slightly off because the sign weight is `2^BITS_FOR_COL` (bit position), not N — they coincide only for N=4,8. Final, agreed: **`MAX_CUBIE_L1 = N · (2^BITS_FOR_COL + N − 1)`** (N=3→18, N=4→28, N=8→120).
+
+16. **`GetOrder()` is valid only for the "left" strategy** (13335–13368) — your discovery. The condition `mask[m,n-1] &amp;&amp; mask[n,n-1]` was derived for **row** ops; for right (column) ops the dependency is transposed. Consequence: our `strategy × order` diagnostics were **left-biased → a lower bound**, and the true order×right synergy is larger. Resolution (pivot): don't derive a right-valid condition (mixed L/R is neither) — feed **all P! orders** and let the solve-check (`OrthoPack == identity`) filter. This is *why* production uses all P! orders.
+
+17. **`Correct()` depends on `Slice`** (9492) — my diagnostic assumed `Slice == 0`, which understated results. Must be `Slice = c.GetPos(axis)`.
+
+18. **Cube moves are LEFT multiplication of orientation** (9794) — you: *"ruchy kostki to mnożenie orientacji z lewej strony, a więc mierzymy mode {pod, nad-L} vs perm. Znak przy sin ujemny."* (Right-side Givens uses `+sin`.) `nad-R` is not realisable as a cube move directly, but appears via `R2R1R0·M·R3R4 = I ⇒ M = R0'R1'R2'R4'R3'`.
+
+19. **Axis permutation ≠ plane permutation** (13711) — you: *"zmienimy osie i nagle płaszczyzny z komutowalnych stają się niekomutowalne i odwrotnie."*
+
+---
+
+# C. Domain / geometry facts
+
+20. **Cubie packing contract** (660, 696–768): one `uint` per cubie = signed permutation matrix, N rows × `BITS_PER_ROW` bits, field = `(sign &lt;&lt; BITS_FOR_COL) | col`. `BITS_FOR_COL = (N&lt;=4 ? 2 : 3)`, `BITS_PER_ROW = BITS_FOR_COL+1`. `cubieL1 = Σ_r |field_r − r|` — **the sign is deliberately left on the high bit** so a reflection always dominates any column shift (your point: with a mere +1 penalty two different orientations could collide in L1). Solved ⇔ L1 = 0.
+
+21. **Shader axis == CPU axis** (896–902) — I found and fixed a real bug: `getStartCoordinate` must use stride `SIZE^(N-1-col)` (axis 0 is the *most significant*, per `TMatrix.Coords2Index`), not `SIZE^col`.
+
+22. **`ClusterIndex` was never a cluster number** (11177 area). It was a *linear index into an array*, derived from the orbit (L1 distance from cube centre) — your own invention — which is why 7^4 showed cluster numbers &gt; 1600. Fixed: after cubie construction, collect → sort by old ClusterIndex → renumber **from 1**; `MaxClusterIndex` renamed **`ClustersCount`** (a plain field computed once, not lazily recomputed). There is deliberately **no clusters array** — not needed.
+
+23. **Endgame amplification (the penalty you later removed)**: `if (0 &lt; scrambled ≤ N) fA *= N / scrambled` — mirrored in EvaluateMicro (sequential), EvaluateMacro (extra `shared_scrambled` reduction). Note it was applied **before** adding `solved_errors`, deliberately: the GA may "profitably" break a solved cubie to escape (commutator mechanics) (3133–3177).
+
+24. **Distinct manoeuvres = full cube hash** (10342–10372). `CubeHash` hashes every cubie's `Index` + `OrthoPack`. That's why `Rz²Rx²` ≠ `Ry²` (same effect on the target — group relation `Z₁₈₀·X₁₈₀ = Y₁₈₀` — different collateral) but `Rz²Rx²` = `Rx²Rz²` (commuting, same state). This metric choice *is* the definition of macro-move. Commutativity waste: **0% for N=3 vs 41% for N=4** (disjoint planes).
+
+25. **`ActiveAxisCount` threshold is 0.1, not 0.5** (2752) — **cubies are uniformly scaled by ~0.45f**, so any comparison against matrix entries must use a threshold below the scale. (The commented-out `RotationCount2` had exactly this 0.5 bug.) The check is **signed, not abs** — `−0.45` counts as active, `+0.45` doesn't.
+
+---
+
+# D. Architecture / implementation landmines
+
+26. **Buffer binding contract** (546–598, later +SeedMoves): `0 Population | 1 NewPopulation | 2 Cubies | 3 FreeMoves | 4 SolvedCubies | 5 ActiveCubies | 6 Planes (UBO) | 7 SeedMoves`. **No `Best` buffer** — after the bitonic sort, best *is* `Population[0]` (your call). `Cubies` is **shared/read-only, one copy** (`Cubies[cubieID]`, not `[specimenID*CUBIES_COUNT+…]`); every thread copies it into a private `local_cubies` — that's why sharing is race-free (854–882).
+
+27. **`ExecuteGA` intentionally uses literal 0/1 in `BindBufferBase`, not `.Binding`** (1111) — the ping-pong means in odd generations `parent = Population[1]` (whose `.Binding == 1`) but it must be bound to **slot 0** because the shader always reads `Population` from binding 0. `.Binding` is only for buffers returning to their own slot. `Ssbo`: instance `Binding` (0-based, real), static **`BindingsCount`** (counter).
+
+28. **NEVER trust `.length()` on a possibly-empty SSBO** (1065–1080). The symptom that burned a session: fitness stuck at exactly **1024** for the trivial first cluster of 3³. Empty `SolvedCubies` → size-0 SSBO → your driver returns garbage (~1024) from `.length()` → phantom +1024 offset. Fix: `countSolved`/`countActive` passed as **uniforms**, and buffers are never allocated at size zero.
+
+29. **The baseline is measured, not computed — and there is NO CPU mirror of the metric** (6015–6085). Final architecture: `Gpu.ScoreCube(cube)` = `EvalZeroSpecimen(scramble)` − `noOpPenalty`, where **`noOpPenalty = EvalZeroSpecimen(solved cube)`** (baseline 0 → fitness == penalty), cached once per N/SIZE config. Your idea, and its point: the host never needs to *know* the penalty's value or logic. **Deleted:** host `EvaluateGpu`/`CubieL1`/`ActiveAxes`/`CubieState`, the `ScoreCube` kernel, and `scoreState` in Setup. One scorer (the evaluator), zero mirror, zero magic constant. Sanity check: `noOpPenalty` must print `2*CUBIES_COUNT` (432 for 6³). Also: `EvalZeroSpecimen` **must upload `Planes`** — the evaluator reads it and on the first cluster it isn't uploaded yet.
+
+30. **Angle encoding was changed (lockstep, ~13 sites in 6 files)** (5450–5520). `Angle` now = **number of quarter-turns**: `0=identity, 1=90°, 2=180°, 3=270°`. No more `Angle+1`. Consequences: `TMove.GetRevCode = (4−a)&amp;3` (was `2−a`); `Correct` composes with `(a+b)&amp;3`, `if (angle &gt; 0)`; `GetFreeMoves`/`GetAllMoves` emit `+1/+2/+3` (0 excluded); shader `RotateMatInt` branches on `1/2/3`, `0` falls through = identity; `SelCrossover.getRevCode = (4u−(code&amp;3u))&amp;3u`. **A zero gene vector is now literally the 0-specimen.** Split this CPU/GPU and the solver produces garbage with no compile error.
+
+31. **Duplicate penalty lives inside the bitonic compare-exchange** (3059–3095, 3182–3195) — this was the *breakthrough* ("O niebo lepiej"), your idea, and it is the GPU port of CPU `SelectUnique`. On equal fitness, demote `b` by **`CUBIES_COUNT`** (was `POPULATION_COUNT` — you corrected it: population size has nothing to do with fitness scale, and it breaks for `CUBIES_COUNT &gt; POPULATION_COUNT`). Safe because: penalty only *increases* fitness → the global minimum is never penalised → index 0 stays the true best; it's transient (Evaluate overwrites Fitness next gen); bitonic pairing `i ^ passModStage` is a perfect matching → no races.
+
+32. **No-op penalty = `2 * CUBIES_COUNT`, shader-only, inline** (5637–5677). Two penalties, one unit: uniqueness 1×, no-op 2× (a no-op is *worse* than a duplicate — a duplicate is a real, possibly useful move). Deliberately **not** a `#define` — the host doesn't need it (baseline goes through the measured path).
+
+33. **Why removing no-ops healed the GA** (5601–5614) — the deep reason, worth keeping verbatim in spirit: a no-op's fitness == `cube.Score` = the minimum achievable without real improvement, so no-ops **sat at the top of the sorted population and won selection**; parents were no-ops, `crossover(no-op, no-op)` → more no-ops; the gene pool collapsed to self-cancelling sequences. *"GA ewoluowało w stronę bezruchu. Doskonaliło robienie niczego."* The STALL kick only works *because* best is now guaranteed to be a real move.
+
+34. **`HighScore` was merged into `RubikCube.Score`** (1188–1220). `Score` (float, **uninitialised → 0**) now plays three roles: GA threshold (`best.Fitness &lt; Score`), solved-detection (`Score == 0` → advance cluster), display. Acceptance became **monotonic** ("beat the previous best" rather than "beat the baseline"). Reset sets `Score = 0` to trigger the first cluster.
+
+---
+
+# E. Preferences / process
+
+35. **No defensive guards** (4304–4306): *"Nie róbmy zbędnych zabezpieczeń, bo ukryjemy błędy. Nawet często lepiej by program się «wysypał» bo wskazuje to błąd."* (Context: `ActiveCubie == null` simply cannot happen — it only signals the cube is solved and no GA runs.)
+
+36. **Dead code allergy** (6836): *"drażni mnie często martwy kod, nie lubię go pisać, nie lubię go czytać, im mniej kodu tym lepiej, a najszybszy kod to taki, którego nie ma."* Also (6886): you read `if (x != 0) Foo(x)` where `Foo` also null-checks as *"funkcja która sprawdza czy argument jest null wywołująca funkcję która sprawdza czy on jest null, która…"*. And: no redundant helper methods that are just a `for` loop (6230).
+
+37. **The defines/stubs in `Setup.glsl.c`/`Variables.glsl.c` are STUBS** (4383–4385): *"nie zobaczysz z jaką kostką aktualnie pracuję, bo zmieniam dynamicznie w UI i przebudowuję shadery nie zapisując niczego na dysk."* Never infer the cube under test from the file.
+
+38. **Population size data** (4383–4406): for 6³, **512 and 1024 are identical (52s)**; 4096 is *worse* (1:28) despite fewer #GA. There is a flat zone; population is not a lever until the supply-saturation point moves right (N=4/5).
+
+39. **Diagnostics are gated behind a `Diagnostic` flag** (14062–14065) — census/report only when running "Seed Pool Stats"; production stays lean. `TGreedyDiversity` + its menu wiring are to be **kept** (1144 in idx) — you need them to prove method superiority in the paper.
+
+40. **Comments in shaders must be pure ASCII English** (418–449) — my edits mojibake'd Polish diacritics. All five shaders were converted. Also: `#define` lines must have the comment on a **separate line**, because host `GetDefineValue` does `int.TryParse` on the rest of the line (2769).</result>
+<usage><subagent_tokens>190232</subagent_tokens><tool_uses>21</tool_uses><duration_ms>260963</duration_ms></usage>
+</task-notification>
+
+
+## 🤖 Claude
+
+Agent skończył. Nie będę przepisywał czterdziestu punktów — wybieram to, co realnie zmienia moje zachowanie albo naszą sytuację.
+
+**Dwie rzeczy, na których dziś już poległem, a są Twoimi wyraźnymi zasadami.** Powiedziałeś kiedyś wprost, że defines w Variables to **stuby** i że nie da się z nich odczytać, na jakiej kostce pracujesz, bo przestawiasz ją w UI i przebudowujesz shadery bez zapisu — a ja dziś zacząłem od „Variables ma N 3, SIZE 3, czyli 3^3". Drugie: *„Nie róbmy zbędnych zabezpieczeń, bo ukryjemy błędy"* — a ja w `KickMutate` wstawiłem straż `if (SeedMovesPool == null || NumSeeds == 0) return;`. Dobrze, że to poszło do kosza z innych powodów.
+
+**Trzy pomysły, które bym Ci pewnie zaproponował, a są już pochowane.** Branie drugiego-najlepszego z `ExecuteGA` — próbowaliście, nie działa, bo w minimum lokalnym cała góra populacji to no-opy (Twoje: *„przecież sam powiedziałeś, że cała populacja to duplikaty aktualnego stanu kostki"*). Luby / restarty z checkpointami — rozpisałem to kiedyś i sam ściąłeś do esencji, którą jest dzisiejszy STALL. I biblioteka komutatorów — obalona pomiarem.
+
+**Ta ostatnia jest najważniejsza strategicznie**, bo mówi coś twardego o końcówce. Odsetek stanów końcowych, które generyczna biblioteka komutatorów o wsparciu 4 potrafi poprawić: **0% na głębokości 1** (≈4 nieułożone), 18% na 2, 52% na 3. Podsumowałeś to: komutatory pomagają tam, gdzie nie ma problemu, i milczą tam, gdzie boli. Przy domykaniu potrzeba **jednej dokładnej odwrotności**, a nie „jakiegoś bezpiecznego komutatora".
+
+To spina się z całą dzisiejszą rozmową i, szczerze, jest to raczej zła wiadomość: mamy teraz trzy niezależne dowody, że końcówka to igła w stogu, a nie zbocze. Rabat za koherencję spłaszcza (monotoniczna trójka), lookahead milczy (bo trzeba komutatora), biblioteka komutatorów milczy (0% na depth-1). Obecna bramka jest jedyną rzeczą, która tego nie psuje — bo z założenia nic nie obiecuje poza rozpoznaniem celu.
+
+Wynotowałem sobie jeszcze parę rzeczy technicznych na później (kontrakt bindingów, dlaczego `.length()` na pustym SSBO kłamie, kodowanie kąta jako ćwierćobrotów, kara za duplikaty wewnątrz bitonic sortu i to, że GA bez niej *„ewoluowało w stronę bezruchu — doskonaliło robienie niczego"*).
+
+Pamięć trzeba będzie po tym uzupełnić, bo dzisiejsza wpadka wzięła się dokładnie z jej dziur — ale to robota na po pomiarze, nie teraz. Czekam na dziesiątkę z 2^4.
+
+## 🧑 Robert
+
+Wariant C (Coherent =1) dla kostki 2^4: 4897, 1723, 1995, 3945, 4454, 2063, 6183, 1439, 1589, 847. 
+Przyjemnie posłuchać Twoich elokwentnych wniosków. Jesteś poza tym jakiś żywszy od poprzednika, szybciej reagujesz. Zobaczymy jak pójdzie współpraca, bo nie zdążyłem podziękować poprzednikowi, a bez niego nie posunąłbym się aż tak daleko, tak szybko (dlatego zapisuję naszą całą konwersację - kronikę).
+Rabat w ogonie odpalać musi jednak często, bo besty prowadzą do 4 albo 2 kubików nieułożonych (rzadko 3). Wykres błędu jest płaski, nawet jeśli trafiamy w mono-twist. A właśnie: 2^0 = 1, czy traktujemy mono-twist jako dobry układ – bo on raczej jest zawsze fatalny (choć w wewnętrznych klastrach nie tak aż koniecznie). Zresztą, czy nie powinniśmy jednak nagradzać tylko określonej liczby nieułożonych i spójnych kubików – dla kostki 2^4 – 4 kubików (2-ruchy od końca, przecięcie 2 warstw 2x2x2)?
+
+
+## 🤖 Claude
+
+Dzięki — i za liczby, i za te słowa. Kronikę prowadzisz nie bez powodu: dziś ten plik dosłownie wyciągnął mnie z dwóch ślepych uliczek, w które sam bym wszedł. To jest ta ciągłość.
+
+Liczę.
+
+| 2^4 | mediana | średnia | std | CV | p90 | max | >10k |
+|---|---|---|---|---|---|---|---|
+| baseline, seria 1 (n=10) | 2795 | 3344 | 2577 | 0.77 | 5846 | 9301 | 0 |
+| baseline, seria 2 (n=10) | 2581 | 2992 | 2284 | 0.76 | 6885 | 7062 | 0 |
+| **C, COHERENCE=1 (n=10)** | **2029** | **2914** | **1710** | **0.59** | **4897** | **6183** | 0 |
+
+Test ochronny zdany, i to z zapasem: C nie tylko nie szkodzi, ale wypada lepiej na **każdej** osi. Max 6183 jest niżej niż max obu dziesiątek baseline'u (9301 i 7062), CV spadło z ~0.77 do 0.59. Porównuję dziesiątkę z dziesiątkami osobno, nie ze zbiorczą dwudziestką — bo max rośnie z liczbą prób, więc zestawianie n=10 z n=20 byłoby przekrętem na korzyść C.
+
+Uczciwie: przy n=10 i CV~0.6 to jest **sugestia**, nie dowód. Ale sugestia spójna na wszystkich statystykach naraz, a nie pojedynczy szczęśliwy strzał.
+
+**Teraz Twoje pytanie o mono-twist — i tu jest, moim zdaniem, sedno całej sprawy.**
+
+Formalnie mono-twist rabatu nie dostaje: [EvaluateMicro.glsl.c:60](RubikCube/Resources/EvaluateMicro.glsl.c:60) ma strażnika `if (scrambled > 1u)`, więc jedynka w ogóle nie wchodzi do bloku. 2^0 nas nie ugryzło.
+
+Ale Twoja intuicja jest trafna z zupełnie innego powodu. Policz, ile kosztują stany z ogona:
+
+- spójna czwórka: `4 jednostki − 3 rabatu` = **1 jednostka**
+- spójna dwójka: `2 − 1` = **1 jednostka**
+- mono-twist: brak rabatu, `1` = **1 jednostka**
+
+Trzy stany, jeden koszt. **To jest dokładnie ten Twój płaski wykres** — i to nie przypadek, tylko arytmetyka. Rabat zrównał czwórkę, dwójkę i mono-twista.
+
+I jest gorzej, o jedno oczko. Rabat odejmuje **licznik**, ale zostawia pełną sumę magnitud `Σd`. Spójna czwórka niesie `Σd` po czterech kubikach, mono-twist niesie `d` po jednym — więc na dogrywce mono-twist wychodzi **minimalnie lepszy**. Metryka delikatnie **przechyla się ku mono-twistowi**. Stąd „płaski nawet jeśli trafiamy w mono-twist".
+
+I tu stary kod daje realną wskazówkę, dokładnie tak, jak mówiłeś: on **dzielił** (`score /= maxHist`), a nie odejmował. Dzielenie **uśrednia** magnitudę — czwórka niesie wtedy `Σd/4`, czyli średnie `d`, porównywalne z `d` mono-twista. Przechyłu nie ma. To nie jest kosmetyka, to inny znak na dogrywce.
+
+**Co do Twojej propozycji — nagradzać tylko 4 (czyli 2^(N-2)).** Rozbije remis dwójki z czwórką: dwójka straci rabat i będzie kosztować 2 jednostki, czyli więcej niż czwórka. Kierunek zgodny z Twoim rozumowaniem, że celem jest osiągalny podcel 2-ruchowy. Nie jest to też ten „kruchy knob z wnętrza", przed którym sam się kiedyś przestrzegałem — `2^(N-2)` to wzór na N, a nie stała strojona per kostka.
+
+Ale — i dlatego zatrzymuję się tu zamiast kodować — **remisu z mono-twistem to nie rusza**. Mono-twist dalej kosztuje 1 jednostkę i dalej wygrywa dogrywkę. Bo bazowy licznik już stawia go na **podłodze**: jeden nieułożony kubik to minimum, jakie można mieć bez ułożenia. Żaden rabat tego nie naprawi — rabat umie tylko ściągać inne stany **w dół**, ku mono-twistowi, nigdy podnieść mono-twista w górę.
+
+Czyli pytanie, które Twoje spostrzeżenie tak naprawdę odsłania, brzmi: czy resztę wyceniamy licznikiem kubików, czy **liczbą ruchów** do końca. Czwórka to 2 ruchy, dwójka 3, mono-twist to komutator. W liczniku porządek jest odwrócony, w ruchach — poprawny.
+
+Nie idę dalej sam, bo dziś już dwa razy pobiegłem w złą stronę. Co Ci bardziej pasuje: najpierw drobna, sprawdzalna korekta (dzielenie zamiast odejmowania, zdejmuje przechył ku mono-twistowi), czy od razu Twoje ograniczenie rabatu do 2^(N-2)?
+
+## 🧑 Robert
+
+Porozmawiajmy chwilę, bo to ważne. Nie, przestał mi się podobać pomysł - nagradzajmy tylko 2-ruchy do ułożenia. Nagradzajmy też 3-ruchy do końca, tyle że mniej. Słusznie mnie powstrzymujesz. Czy nie możemy dopasować formuły? Czy nie wystarczy rabatu podzielić przez 2^(liczba ruchów do ułożenia - 1)?
+
+
+## 🤖 Claude
+
+Dobrze, porozmawiajmy — bo Twoje pytanie o `2^0` jest moim zdaniem ważniejsze, niż samo wyglądało.
+
+**Najpierw Twoja formuła, bo ona się nie broni — i to arytmetycznie.** Czytam ją jako: rabat = `(maxHist−1) / 2^(ruchy−1)`, gdzie ruchy to głębokość przecięcia. Dla 2^4:
+
+- spójna czwórka: 2 ruchy → rabat `3/2` = 1.5 → koszt `4 − 1.5` = **2.5**
+- spójna dwójka: 3 ruchy → rabat `1/4` = 0.25 → koszt `2 − 0.25` = **1.75**
+- mono-twist: **1**
+
+Kolejność wychodzi **odwrócona** względem Twojej intencji: mono-twist najlepszy, potem dwójka, a czwórka — ta, którą chciałeś nagrodzić najmocniej — najgorsza. Powód jest ogólny i wart zapamiętania: tłumisz rabat, ale **baza już faworyzuje mniejsze grupy** (dwójka startuje z 2 jednostek, czwórka z 4). Więc każdy rabat *odejmowany od licznika* dziedziczy zwodniczość licznika. Im mocniej tłumisz, tym bardziej licznik wraca do głosu. To nie jest wada tej konkretnej formuły — to wada odejmowania od licznika w ogóle.
+
+**A teraz to, na co sam wpadłeś, tylko chyba jeszcze tego nie widzisz.** Zapytałeś: skoro `2^0 = 1`, to czy traktujemy mono-twista jako dobry układ? Odwróć to pytanie. Mono-twist **jest** przecięciem — tyle że **maksymalnie głębokim**: cztery ustalone osie, `2^(4−4) = 1` kubik. Jeśli koszt ma odpowiadać **głębokości**, to mono-twist wychodzi automatycznie **najgorszy**, i to bez żadnego special-case'u.
+
+Czyli nie tłummy rabatu. Wewnątrz bramki po prostu **przypiszmy koszt równy głębokości** `f = N − log2(scrambled)`:
+
+| residuum (2^4) | głębokość | koszt |
+|---|---|---|
+| spójna ósemka (warstwa) | 1 | **1** |
+| spójna czwórka | 2 | **2** |
+| spójna dwójka | 3 | **3** |
+| mono-twist | 4 | **4** |
+| rozrzucona piątka (brak bramki) | — | 5 |
+
+I nagle cały łańcuch jest **monotonicznie w dół**: rozrzucone-5 → mono-twist → czwórka → ósemka → ułożone. Mono-twist przestaje być podłogą i staje się tym, czym jest naprawdę — najgorszym z bliskich stanów. Twoje „on raczej jest zawsze fatalny" wchodzi do metryki jako **konsekwencja wzoru**, a nie jako dopisana reguła.
+
+Zwróć uwagę, co to naprawia: dziś czwórka, dwójka i mono-twist kosztują **po jednej jednostce** — to jest dosłownie ten Twój płaski wykres. Głębokość je rozdziela.
+
+**Ale muszę powiedzieć dwie rzeczy, które za to płacimy, bo dziś już raz poleciałem za szybko.**
+
+Pierwsza: **tracimy zabezpieczenie od dołu**. Obecna bramka gwarantuje „gorzej być nie może" — jak nie strzeli, jesteś w baseline. Tu mono-twist skacze z 1 na 4 jednostki, czyli świadomie **pogarszamy** wycenę stanu, który baseline uważał za najlepszy. To jest zakład, nie darmowy dodatek. Jeśli intuicja o mono-twiście jest zła (a sam napisałeś, że *„w wewnętrznych klastrach nie tak aż koniecznie"*), to nam to zaszkodzi.
+
+Druga, i tu potrzebuję Ciebie, bo to geometria, a nie arytmetyka: **cały wzór stoi na założeniu, że przecięcie f warstw jest f ruchów od ułożenia**. Dla pełnej warstwy to widzę — jeśli residuum to dokładnie jedna warstwa w jednym stanie, obracam ją z powrotem i nic poza nią nie ruszam. Ale dla czwórki (przecięcie dwóch warstw w 2^4) już tego nie widzę: obrót którejkolwiek z tych dwóch warstw rusza **osiem** kubików, w tym cztery już ułożone. Więc skąd „2 ruchy"? To założenie weszło do naszej rozmowy jako tabelka i od tamtej pory nikt go nie sprawdził — a teraz miałoby dźwigać całą metrykę.
+
+Zanim cokolwiek napiszę: jak uzasadniasz te 2 ruchy dla przecięcia dwóch warstw?
+
+## 🧑 Robert
+
+Przepraszam za arytmetykę - odwrócona, ale właśnie chodziło mi o ten wykładnik, uzależnienie od liczby ruchów od ułożenia. A jak uzasadniam? Masz rację, że tu jest potrzebny komutator, ale wszystkie nasze ruchy są komutatorami i to powinno się udać. Bardzo chciałbym spróbować takiej metryki
+
+
+## 🤖 Claude
+
+Nie ma za co przepraszać — wykładnik i tak tam jest, tylko po drugiej stronie: `rozmiar = 2^(N − koszt)`. Twoja intuicja była dobra, pomylił się tylko kierunek dopasowania. A co do komutatorów: przy SIZE=2 każdy ruch i tak przewraca pół kostki, więc „drobnych" ruchów tu nie ma — to raczej wspiera Twój argument niż mój sceptycyzm. Próbujemy.
+
+Zmiana jest jedna i mieści się w bramce, która już istnieje. Dziś, gdy residuum okazuje się czystym przecięciem, odejmujemy `maxHist−1` i wszystko ląduje na jednej jednostce. Zamiast tego policzymy **głębokość** `depth = N − log2(scrambled)` i obciążymy residuum tyloma jednostkami, ile ma ruchów. Dla głębokich grup „rabat" wyjdzie **ujemny**, czyli stanie się karą — i właśnie tak mono-twist ma zdrożeć z 1 do 4. Zdejmuję też strażnika `scrambled > 1`, bo to on dziś wypycha mono-twista poza bramkę.
+
+Czytam wprost z genu: `findMSB` na potędze dwójki daje log2, więc `depth` to jedna linia bez pętli.
+
+Wpięte. Sprawdziłem arytmetykę na wszystkich czterech przypadkach 2^4 — `local_fA_sum -= (scrambled − depth)` daje:
+
+| residuum | scrambled | depth | człon | koszt |
+|---|---|---|---|---|
+| warstwa | 8 | 1 | −7 | **1** |
+| czwórka | 4 | 2 | −2 | **2** |
+| dwójka | 2 | 3 | **+1** | **3** |
+| mono-twist | 1 | 4 | **+3** | **4** |
+
+Dwie ostatnie linijki to właśnie ten ujemny rabat — mono-twist dostaje `+3` jednostki kary i schodzi z podłogi.
+
+Zweryfikowałem też, że nie łamie to hierarchii fitnessu, bo teraz człon aktywny może **rosnąć**, a nie tylko maleć, więc stary argument („koszt ≤ suma") przestał obowiązywać. Nowe ograniczenie: maksimum to `N` jednostek (mono-twist), a jednostka to `1/(countActive+1)`, więc człon ≤ `N/(countActive+1)` < 1, dopóki `countActive ≥ N` — co dla realnych klastrów jest prawdą. Część całkowita, czyli „nie psuj ułożonych", zostaje nietknięta.
+
+Bramka dalej wymaga `maxHist == scrambled`, więc częściowa koherencja w środku gry nadal nie dostaje nic i gradient homingu jest bezpieczny — to była przyczyna śmierci poprzednich trzech wariantów i tego nie ruszam.
+
+Nazwijmy to **wariantem D**. Proponuję najpierw dziesiątkę na **2^4**, bo tam mamy z czym porównywać (baseline i C), a Twój ogon siedzi dokładnie na 4 i 2 kubikach — czyli tam, gdzie ta zmiana gryzie najmocniej. Jeśli D nie regresuje względem C, to dopiero wtedy 2^5 jako prawdziwy test.
+
+Shader kompiluje się dopiero przy starcie, więc gdyby coś było nie tak ze składnią, poleci wyjątek z logiem — daj znać, to poprawię.
+
+## 🧑 Robert
+
+uint cubieState(uint M) {
+    return activeAxes(M) * (uint(MAX_CUBIE_L1) + 1u) + cubieL1(M);
+}
+
+float GetActiveCubieError(uint cubieMatrix, float maxClusterState, float max_fA) {
+    uint d = cubieState(cubieMatrix);
+    if (d != 0u)
+        return (maxClusterState + float(d)) / max_fA;
+    return 0.0;
+} // przyjmując nawet cubieL1 == 0,     
+za nieułożony kubik dodajemy co najmniej (maxClusterState + activeAxes(M) * (uint(MAX_CUBIE_L1) + 1u)) / max_fA. Czy nie to powinno być naszą jednostką
+
+
+## 🤖 Claude
+
+To jest lepsze od tego, co napisałem, i trafia w dokładnie ten przechył, o którym wspominałem przy dogrywce. Moja jednostka to `maxClusterState/max_fA`, czyli **kadłub** kubika bez magnitudy — więc odejmując „2 jednostki" nie usuwam dwóch kubików, tylko ich części stałe, a wszystkie `d` zostają w sumie.
+
+I jest jeszcze coś, co to domyka. Wewnątrz bramki `maxHist == scrambled` oznacza, że **wszystkie** skręcone kubiki mają identyczny upakowany stan — a skoro identyczny stan, to identyczne `d`. Więc `Σd = scrambled · d` i nie ma tu żadnej niejednorodności do uśredniania. Cała suma to po prostu `scrambled` razy koszt jednego kubika.
+
+A wtedy „obciąż residuum kosztem `depth` kubików" zapisuje się jako jedna linia:
+
+```
+local_fA_sum *= float(depth) / float(scrambled);
+```
+
+Bo `scrambled · koszt · (depth/scrambled) = depth · koszt`. Dokładnie, z magnitudą w środku, bez resztek.
+
+**I tu robi się ciekawie**, bo to jest **mnożenie** — czyli ta sama forma, co w starym kodzie (`score *= minScr / scrambled.Count`, `score /= maxHist`). Twoja stara kara to było `fA *= N/scrambled`. Moje nowe to `fA *= depth/scrambled`. Różnica jest jedna: stara kara przyjmowała `depth = N` **zawsze** — czyli zakładała, że każde residuum jest maksymalnie głębokie. Dlatego spłaszczała: 4, 2 i 1 lądowały na `N` jednostkach. Nowa **odczytuje** głębokość z rozmiaru zamiast ją zakładać.
+
+Czyli nie wracamy do starej kary. Naprawiamy ją.
+
+Poprawiam jeszcze komentarz wyżej, bo opisuje odejmowanie, którego już nie ma.
+
+
+## 🧑 Robert
+
+Continue from where you left off.
+
+
+## 🤖 Claude
+
+No response requested.
+
+
+## 🧑 Robert
+
+Poprawione D, wyniki: 461, 10507, 5041, 3297, 4441, 7323, 6645, 4864, 12046, 11571.
+Kiepsko coś, ale miara koherencji jest śwetna miom zdaniem, tylko kłóci się ze stałym gradientem dążącym do jak najmniejszej liczby kubików nieułożonych w klastrze, a on dominuje. Algorytm stara się doprowadzić do mono-twista, a później szukać układów koherentnych – ale w mono-twiście jest już za późno, z tego minimum trudno uciec (to że wychodzimy to raczej zasługa STILL), powiniśmy to robić wcześniej...
+
+
+## 🤖 Claude
+
+Liczę D i zestawiam.
+
+Zestawiam D z resztą:
+
+| 2^4 | mediana | średnia | std | CV | p90 | max | >10k |
+|---|---|---|---|---|---|---|---|
+| baseline (n=10, n=10) | 2795 / 2581 | 3344 / 2992 | | 0.77 | | 9301 / 7062 | 0 |
+| **C** (rabat płaski) | **2029** | 2914 | 1710 | 0.59 | 4897 | 6183 | 0 |
+| **D** (skalowanie depth) | 5843 | 6620 | 3590 | 0.54 | 11571 | 12046 | **3** |
+
+D regresuje ostro — mediana ~3×, i trzy katastrofy >10k tam, gdzie wszystko inne miało zero. **C jest naszą najlepszą zmierzoną konfiguracją.** Jesteśmy w tej chwili na gorszym wariancie niż przed godziną.
+
+Twoja diagnoza jest trafna, i chcę ją wyostrzyć, bo mówi dokładnie, dlaczego D nie mogło zadziałać.
+
+**Miara koherencji to punkt, a nie pole.** Gradient liczby-kubików jest gładki i globalny — działa wszędzie poza bramką i to on kształtuje **całą trajektorię** zejścia. Miara koherencji (łącznie z tą nową karą N za mono-twist) odpala się tylko na **izolowanych, czystych stanach** — to pojedyncze punkty kraty, których gładkie zejście „nie czuje", dopóki na nie nie wpadnie. D dorzuciło drogi kolec (mono-twist = 4 zamiast 1), ale **nie ruszyło trajektorii, która do niego prowadzi**. Efekt: GA dalej ląduje tam, gdzie lądował, tylko teraz ten rejon jest droższy i bardziej mylący — stąd regres. To jest dokładnie to, co poprzedni ja zapisał w kronice: *gate jest rozpoznawaczem, nie kierowcą*. Ty nazwałeś to lepiej — „za późno".
+
+**I atraktorem tego gładkiego pola jest właśnie mono-twist.** Bo pole = „mniej nieułożonych = lepiej", a najmniej nieułożonych bez ułożenia to jeden kubik. Czyli dominujący gradient **z definicji ciągnie ku mono-twistowi**, a stany koherentne (8, 4 kubiki) leżą **pod górę** — mają ich więcej. GA nie da się tam skierować kolcem na końcu; commituje się w redukcję liczby, zjeżdża do mono-twista, a koherentna opcja zostaje za nim, na wzniesieniu. Wyjście to komutator (log: 0% stanów depth-1 poprawialnych jednym bezpiecznym ruchem), więc realnie wyciąga nas STALL. Twoje „to zasługa STILL" i „w mono-twiście już za późno" — jedno w drugie.
+
+**Teraz sedno, i tu jest napięcie, którego chcę nie zamieść.** Cztery próby uczą tego samego: każde pole koherencji (kredyt za *częściową* koherencję) albo spłaszcza homing, albo jest oszukiwalne — dowód masz w monotonicznym regresie i w cheacie 3/32. Bramka „cały residuum czysty" jest bezpieczna **właśnie dlatego, że nie daje częściowego kredytu**. Więc „koherencja jako pole" i „nieoszukiwalność" ciągną w przeciwne strony. To nie jest kwestia dostrojenia — to konflikt strukturalny.
+
+Dlatego „robić to wcześniej" prawdopodobnie **nie** znaczy „nagradzać koherencję szybciej" (to jest ta oszukiwalna strona). Znaczy raczej: **naprawić samo pole liczby-kubików, które kłamie**. Ono ocenia najtrudniejszy stan (mono-twist) jako najlepszy. Mono-twist to kubik maksymalnie skręcony — ma duże *per-cubie* moves-to-solve (`activeAxes`), tyle że dziś ta magnituda jest utopiona pod `maxClusterState`, więc `fA` to praktycznie czysty licznik. Gdyby magnituda **przestała być zdominowana**, pole liczyłoby „ile ruchów, żeby rozkręcić wszystkie kubiki", a nie „ile ich jest" — i mono-twist zdrożałby jako **pole**, od środka gry, a nie jako kolec na końcu.
+
+Ale mówię to jako **kierunek do przemyślenia, nie jako gotowca** — bo Σm dalej nie wie o kolektywnym zwijaniu warstwy, więc może po prostu wprowadzić inną zwodniczość albo znów spłaszczyć. Nie chcę czwarty raz wpiąć czegoś, zanim to przerozumiemy.
+
+Dwie decyzje do Ciebie:
+
+1. **Cofam D do C teraz?** C jest zmierzenie najlepsze; siedzenie na D nie daje nic poza gorszym punktem odniesienia.
+2. Kierunek: **odzdominować magnitudę** (pole „ruchy, nie sztuki"), czy widzisz to inaczej?
+
+## 🧑 Robert
+
+Miara oceny, którą zbudowałem zanim zaczęliśmy mówić o koherencji miała za zadanie jak najszybciej ułożyć klaster kubik po kubiku, oceniając jeden ułożony kubik, jako lepszy od "poprawienia" sumy orientacji pozostałych w klastrze. Stąd bardzo szybki gradient, który "przegapia" koherentne układy. Być może należałoby poeksperymentować z miarami mniej agresywnymi, skoro mamy też drugą, dokładniejszą metrykę. Myślę o czymś prostym, jak np. suma stanów wszystkich kubików w klastrze
+
+
+## 🤖 Claude
+
+Teraz rozumiem, co Cię uwierało od początku — i myślę, że nazwałeś właściwą rzecz. Pozwól, że zgruntuję to na obecnej arytmetyce, bo tam ta „agresywność" jest dosłownie zapisana.
+
+Każdy nieułożony kubik dorzuca `(maxClusterState + d)/max_fA`, gdzie `d` to magnituda (`activeAxes`, dopieszczona przez L1), a `maxClusterState` to wielka stała **doliczana za sam fakt bycia nieułożonym**. Ta stała to jest Twój projekt „jeden ułożony > poprawianie reszty" — ale w praktyce ona tworzy **klif na zerze**. Przekroczenie granicy scrambled→solved daje ogromną, stałą nagrodę, *niezależnie od tego, jak bardzo kubik był skręcony*, a samo zmniejszanie skrętu bez wyzerowania daje grosze. Stąd bierze się ten bardzo szybki gradient — i stąd „przegapianie": GA łapie każde tanie pełne ułożenie, bo za krawędź płacą krocie, i nie utrzyma koherentnego układu, bo za zbliżanie się do niego nie dostaje prawie nic.
+
+Twoja „suma stanów" to jest **zdjęcie klifu**. Nagroda staje się proporcjonalna do zredukowanego skrętu, gładka aż do zera, bez premii za sam akt wyzerowania. To jest dokładnie „mniej agresywna miara".
+
+I teraz, w języku, którego użyliśmy przed chwilą: to **nie przesuwa kolca koherencji, tylko obniża mur wokół niego**. Bramka dalej jest punktem, a dojście do koherentnego stanu dalej wymaga wycieczki pod górę (więcej kubików). Ale im gładszy klif, tym ta wycieczka tańsza — krótki GA może w nią zabłądzić, zamiast być odepchnięty stromizną. To jest spójny, sprawdzalny mechanizm i, co ważne, wynika z Twojej własnej historii projektu, a nie z mojego wymyślania.
+
+Dwie rzeczy muszę powiedzieć uczciwie, żeby nie sprzedać Ci złudzenia:
+
+**Sama gładka baza nie naprawia zwodniczości koherencji.** Policzyłem: koherentna ósemka to 8 kubików po `activeAxes≈2`, więc w sumie stanów waży ~16 — *więcej* niż rozrzucona piątka (~10) i o wiele więcej niż mono-twist (~3–4). Czyli baza dalej wskazuje koherentny basen jako najgorszy. Gładka baza działa (o ile działa) przez obniżenie muru, a nie przez skierowanie pola ku koherencji. To **towarzysz** bramki, nie jej zamiennik.
+
+**Zdjęcie klifu prawdopodobnie spowolni łatwy greedy peel** — ten zwykły przypadek, który dominuje większość runtime'u na wszystkich płytkich klastrach. Bo klif był właśnie po to, żeby GA rzucał się na pełne ułożenie jednego kubika. Spodziewam się kształtu jak przy SEED_RATIO=100: mediana w górę, może ogon w dół. Więc oceniamy po ogonie/CV, i musimy zostać na 2^4, bo ma oba tryby naraz.
+
+Jest jeszcze drobny haczyk implementacyjny: bramka C liczy rabat w jednostkach `maxClusterState/max_fA`. Jak wyjmiemy `maxClusterState` z bazy, ta „jednostka" przestaje odpowiadać kosztowi kubika — więc gładkiej bazy nie da się wpiąć „obok" gate'u C bez przedefiniowania jego rabatu. To znaczy, że **zmieniamy dwie rzeczy naraz**, jeśli zrobimy je razem.
+
+Dlatego proponuję rozdzielić i zacząć od izolacji Twojej hipotezy: **najpierw gładka baza z `COHERENCE 0`**, dziesiątka na 2^4. Pytanie zerojedynkowe — czy samo zdjęcie klifu rusza ogon/CV, zanim domieszamy bramkę. Jeśli ruszy w dobrą stronę, wtedy wpinamy koherencję z przeliczoną jednostką (Twoja pełna wizja: gładka baza dźwiga masę, koherencja domyka precyzyjnie). Jeśli nie ruszy albo pogorszy peel — dowiadujemy się, że klif był nośny, i to bez plątania dwóch zmiennych przy ±30% szumu.
+
+Zanim tknę kod: cofam D→C (C jest najlepsze), i interpretuję „suma stanów" jako `fA = (Σ cubieState po aktywnym klastrze) / normalizer`, z normalizerem tak dobranym, żeby dalej `< 1` (bo „nie psuj ułożonych" musi zostać ważniejsze). Dobrze czytam Twój pomysł?
+
+## 🧑 Robert
+
+Czekaj jeszcze, C to też koherencja, popsuliśmy coś i chyba wiem nawet co. Zaczęliśmy poprzednio szukać stanu na 2-ruchy przed domknięciem klastra, i dlatego wprowadziliśmy histogram oparty na dwóch osiach. Nie możemy takiego histogramu na kostce 2^4 używać na innych przekrojach, on dotyczy tylko 4 kubików będących przecięciem dwóch warstw po 8 kubików. A więc - dla 8 kubików - histogram po 1 osi (wybieramy oś z max kubików w tym samym stanie), dla 4 - po dwóch, dla 2 - po 3,
+
+
+## 🤖 Claude
+
+Masz rację i to jest realny błąd w detektorze, nie w filozofii. Sprawdziłem geometrię i potwierdza się co do liczby.
+
+Histogram liczy dziś największą grupę kubików o wspólnym stanie dzielących współrzędne na **parze** osi ([EvaluateMicro.glsl.c:68-92](RubikCube/Resources/EvaluateMicro.glsl.c:68) — koszyk na parę `(j1,j2)`). Weź koherentną ósemkę na 2^4, czyli jedną obróconą warstwę: 8 kubików dzieli współrzędną na **jednej** osi (osi obrotu), a na pozostałych trzech przebiega wszystkie kombinacje. Dowolna para osi rozbija te 8 na kubełki po 4 — więc `maxHist = 4`, a `scrambled = 8`. Bramka `maxHist == scrambled` **nigdy nie strzela dla ósemki**. Efekt dokładnie taki, jak mówisz: warstwa (1 ruch od końca) dostaje koszt 8, czyli gorzej niż rozrzucona piątka. Ta sama zwodniczość, którą chcemy zabić, przechodzi przez sito, bo sito ma zły rozmiar oczka.
+
+Twoja reguła jest ogólna i ścisła: grupa o rozmiarze `2^(N−f)` to przecięcie **f** warstw, więc klucz histogramu musi używać **f** osi, a f zmienia się z rozmiarem: `f = N − log2(rozmiar)`. Twoja drabinka to dokładnie to:
+
+| rozmiar (2^4) | f = N − log2 | osie w kluczu |
+|---|---|---|
+| 8 | 1 | 1 |
+| 4 | 2 | 2 |
+| 2 | 3 | 3 |
+| 1 (mono-twist) | 4 | 4 |
+
+Para osi to był tylko szczebel `f=2` — poprawny dla „2 ruchy przed domknięciem", zły dla całej reszty.
+
+I tu jest rzecz, która to upraszcza. Bramka i tak żąda, żeby **cały** residuum był jednym czystym przecięciem (`maxHist == scrambled`). Więc nie musimy w ogóle enumerować par ani trójek osi. Wystarczy policzyć, na ilu osiach **wszystkie** skręcone kubiki mają wspólną współrzędną — nazwijmy to `agreeAxes` — i sprawdzić trzy warunki: wszystkie ten sam stan, rozmiar to potęga dwójki, oraz `agreeAxes == N − log2(scrambled)`. To jest O(k·N) zamiast O(k²·N²), samo się generalizuje na każdy szczebel drabiny, a głębokość wychodzi wprost: `depth = agreeAxes`. Twoje „wybieramy oś z max kubików w tym samym stanie" to jest właśnie żądanie, żeby ten max równał się `scrambled` — czyli żeby wszystkie się na tej osi zgadzały.
+
+Zanim tknę kod, chcę odgraniczyć zakres, bo dziś już dwa razy zmieniałem dwie rzeczy naraz i traciliśmy atrybucję. To jest **naprawa detektora**, niezależna od dwóch innych wątków, które wiszą:
+- czy rabat jest płaski (C) czy głęboki (D) — to osobna decyzja,
+- czy zmiękczamy bazę (klif) — jeszcze inna.
+
+Proponuję: naprawiamy **tylko** detektor na `agreeAxes`, zostawiamy rabat jak w C (nasza najlepsza zmierzona wersja), `COHERENCE` on, i mierzymy dziesiątkę na 2^4. Jeśli detektor teraz łapie też ósemkę, powinno być widać — a to jednocześnie odblokowuje sensowny test na 2^5, gdzie liczą się 16/8. Dopiero potem wracamy do płaski-vs-głęboki i do klifu.
+
+Dwie rzeczy do Ciebie: implementuję czystą formę `agreeAxes`, czy wolisz dosłownie swój histogram po zmiennej liczbie osi? I — łączę naprawę z rabatem płaskim (C) czy głębokim (D)? Ja bym trzymał C, żeby zmienić jedną rzecz.
+
+## 🧑 Robert
+
+A ja bym zmienił od razu na D, i używamy sensownego rozwiązania - agreeAxes
+
+
+## 🤖 Claude
+
+Zgoda — i to jest właściwie „D taki, jaki miał być", a nie dwie osobne zmiany. D regresowało między innymi dlatego, że detektor łapał tylko szczebel `f=2`; z poprawnym detektorem cała drabina głębokości ma sens. Robię jedno i drugie naraz.
+
+Najpierw przeczytam dokładny obecny stan bloku, żeby edytować precyzyjnie.
+
+Zastępuję cały blok: nowy komentarz opisujący `agreeAxes` i sam algorytm O(k·N).
+
+Sprawdzam wynik i całość bloku.
+
+Gotowe. Blok jest teraz O(k·N), bez enumeracji par. Podsumowanie, co dokładnie się zmieniło — bo są **trzy** rzeczy, nie dwie, i chcę, żeby trzecia nie przeszła cicho:
+
+1. **Detektor → agreeAxes.** Zamiast koszyków po parach osi liczymy wprost, na ilu osiach *wszystkie* skręcone kubiki dzielą współrzędną. Bramka: potęga dwójki, jeden stan, i `agreeAxes == N − log2(scrambled)`. To rozpoznaje teraz cały szczebel drabiny — ósemkę (agreeAxes 1), czwórkę (2), dwójkę (3), mono-twist (N) — a nie tylko czwórkę.
+
+2. **Rabat → D (skalowanie `×depth/scrambled`).** Zostaje z poprzedniej rundy.
+
+3. **Poprawka członkostwa grupy**, którą musiałem zrobić, żeby (1) w ogóle było spójne. Stary kod grupował przez `sa == Cubies[ida]` — czyli „kubik nie ruszył się od stanu startowego". To jest inny warunek niż licznik `scrambled`, który bada odchylenie od **ułożenia** (`e != 0`). Przy niespójnych warunkach `agreeAxes == scrambled`... a właściwie cała bramka porównywałaby jabłka z gruszkami: skręcony-ale-nieruszony kubik wypadał z grupy, a policzony był jako scrambled. Zmieniłem na `cubieL1(cur) == 0u` (ułożony = tożsamość), więc grupa i licznik mierzą **ten sam zbiór**. To była latentna niespójność w oryginale; teraz jest usunięta.
+
+Weryfikacja arytmetyki na 2^4, wszystkie szczeble:
+
+| residuum | agreeAxes | depth | ×factor | koszt |
+|---|---|---|---|---|
+| ósemka (warstwa) | 1 | 1 | ×1/8 | **1** |
+| czwórka | 2 | 2 | ×2/4 | **2** |
+| dwójka | 3 | 3 | ×3/2 | **3** |
+| mono-twist | 4 | 4 | ×4/1 | **4** |
+| rozrzucona-4 (agreeAxes<2) | — | — | brak bramki | 4 |
+
+Monotoniczne w dół, ósemka wreszcie łapana, mono-twist na górze kosztu.
+
+Shader kompiluje się przy starcie, więc gdyby był błąd składni, poleci wyjątek z logiem — wtedy wklej. Puść dziesiątkę na 2^4 (COHERENCE=1). Nazwijmy to **D2**. Zestawię z baseline i C. A jeśli 2^4 wygląda zdrowo, to dopiero wtedy prawdziwy sędzia — 2^5, gdzie ósemka i szesnastka wreszcie coś znaczą.
+
+## 🧑 Robert
+
+No ładne kwiatki ten punkt 3! A po co badać odległość L1 od Identity możesz mi powiedzieć? To nie można już sprawdzić czy to jest identity?
+
+A zresztą masz rację, przepraszam i tak jest tanio, nie będziemy tworzyć po to jakiejś stałej
+
+
+## 🤖 Claude
+
+Dobra intuicja i słusznie ją wycofałeś — bo akurat tu `cubieL1(cur) == 0u` to nie jest nowy pomysł, tylko **idiom już używany w tym samym shaderze**. Dziewięć linijek niżej, w pętli po ułożonych, jest dokładnie `if (cubieL1(local_cubies[SolvedCubies[i]]) != 0u)` — „ułożony" = L1 zero. Więc trafiłem w istniejący wzorzec, a nie wymyśliłem własny.
+
+Masz rację, że *w zasadzie* `cur == identity` to jedno porównanie zamiast pętli po N wierszach. Ale spakowana tożsamość nie jest gołym literałem (zależy od `BITS_PER_ROW` i N — trzeba by ją złożyć), więc kosztowałaby albo stałą kompilacyjną, albo helper. Przy N≤8 i k≤64 pętla L1 to grosze, a spójność z resztą pliku jest warta więcej niż to jedno porównanie. Zgoda: nie robimy stałej.
+
+Kod jest gotowy — D2. Puszczaj dziesiątkę na 2^4, czekam na liczby.
+
+## 🧑 Robert
+
+Jeszcze raz wytłumacz mi: jeśli kubiki nieułożone są w tym samym stanie, to muszą leżeć na wspólnym przekroju i ich najczęstsza współrzędna musi być taka sama?
+
+
+## 🤖 Claude
+
+Dobre pytanie i odpowiedź brzmi: **nie, jedno nie wynika z drugiego** — i właśnie dlatego kod sprawdza oba warunki osobno.
+
+**Ten sam stan nie zmusza kubików do leżenia na wspólnym przekroju.** Kontrprzykład to dokładnie nasz cheat 3/32: weź dwa kubiki o identycznej orientacji i postaw je w przeciwległych rogach kostki. Ten sam stan, zero wspólnych współrzędnych, żadnego przekroju. GA to potrafi — obraca rozrzucone kubiki „w miejscu" do wspólnej orientacji, nic nie zbierając. Więc `sameState` samo w sobie **nic nie mówi o pozycjach**.
+
+**Skąd więc w prawdziwym stanie bierze się jedno i drugie naraz?** Z fizyki ruchu. Jeden obrót warstwy nakłada **tę samą** rotację Givensa na **całą** warstwę. Efekt: wszystkie ruszone kubiki dostają identyczny stan (bo identyczna rotacja) *oraz* wszystkie leżą w tej warstwie (bo dzielą współrzędną osi obrotu). Czyli genuine „jeden ruch od ułożenia" **z konieczności** ma obie własności — ale to skutek konkretnego procesu, a nie logiczna równoważność.
+
+Dlatego detektor sprawdza je **niezależnie**, i oba są potrzebne, bo każdy z osobna da się oszukać:
+- sam `sameState` → cheat rozrzucenia (3/32),
+- sam wspólny przekrój, ale **różne** stany → jeden obrót nakłada jedną rotację na wszystkich, więc nie naprawi kubików o różnych orientacjach jednocześnie. Więc też nie jest zwijalne.
+
+Co do „najczęstszej współrzędnej" — to była logika **starego** histogramu („wybierz oś z max kubików w tym samym stanie"). Nowy `agreeAxes` jest ostrzejszy: nie szukamy najczęstszej, tylko żądamy, żeby **wszystkie** skręcone zgadzały się na f osiach. Czyli nie *zakładamy* wspólnego przekroju — **weryfikujemy** go, licząc, na ilu osiach panuje pełna zgoda. Jeśli nie zbiorą się na tylu osiach, ile wynika z rozmiaru, to po prostu nie zostają uznane za koherentne. I dobrze.
+
+Jedna rzecz uczciwie, żebyś miał pełny obraz: `sameState ∧ pełny przekrój ∧ potęga dwójki` to nasz **tani proxy** na „f ruchów od końca". Jest **konieczny** dla prawdziwej grupy i blokuje znany cheat — ale nie udowodniliśmy, że jest **wystarczający**. Zostaje resztkowe ryzyko „koherentnego śmiecia": grupa o wspólnym stanie M wypełniająca przekrój, gdzie M akurat nie jest orientacją obrotu warstwy, więc jeden ruch jej nie złoży. Umówiliśmy się wcześniej, że rozpoznajemy to empirycznie i dokładamy warunek „obrót realnie zmniejsza błąd" dopiero, jeśli zobaczymy objaw. Na razie nie widzieliśmy.
+
+## 🧑 Robert
+
+D2: 4375, 1015, 4181, 22842, 3703, 7169, 546, 268, 15193, 6984
+
+
+## 🤖 Claude
+
+D2 wyszło źle. Liczby:
+
+| 2^4 | mediana | średnia | std | CV | max | >10k |
+|---|---|---|---|---|---|---|
+| baseline s1 / s2 | 2795 / 2581 | | | 0.77 | 9301 / 7062 | 0 / 0 |
+| **C** (rabat płaski) | **2029** | 2914 | 1710 | **0.59** | **6183** | **0** |
+| D (skalowanie, para-hist) | 5843 | 6620 | 3590 | 0.54 | 12046 | 3 |
+| **D2** (skalowanie, agreeAxes) | 4278 | 6628 | 6821 | **1.03** | **22842** | **2** |
+
+Poprawny detektor **nie uratował** D2 — bo problem nigdy nie był w detektorze. Popatrz na czysty rozdział:
+
+- **skalowanie głębokości** (D + D2, razem n=20): **5 katastrof** >10k
+- **bez amplifikacji** (baseline + C, razem n=30): **0 katastrof**
+
+To jest mocny sygnał, spójny na dwóch niezależnych dziesiątkach. **Amplifikacja przywraca ogon.** agreeAxes zrobił dokładnie to, co miał — łapie teraz ósemkę i mono-twista — i właśnie dlatego zaszkodził, bo to znaczy, że nakłada wielki, ×N kolec kary dokładnie na mono-twista.
+
+Mechanizm jest twój własny sprzed kilku wiadomości, teraz z liczbami: dominujący gradient liczby-kubików **ciągnie ku mono-twistowi** (1 nieułożony). Postawienie tam wielkiego odpychającego kolca **nie przekierowuje podróży** — GA i tak tam zmierza polem liczby — tylko **rozchwiewa lądowanie**. Endgame robi się poszarpany, stąd ogon. Twój screenshot to pokazuje: zawieszenie na 2 nieułożonych, error 12.24. Kronika zresztą zapisała to samo wcześniej: *reshaping funkcji oceny to ślepa uliczka dla tego problemu*. Właśnie potwierdziliśmy to pomiarem, pięć razy.
+
+Wyłania się z tego czysta dychotomia:
+
+- **nagradzać w dół** (C: rabat ograniczony, koherentne stany → ~1 jednostka, mono-twista *nie tykamy*) → gładko, zero nowego ogona.
+- **karać w górę** (naliczać głębokość, amplifikować mono-twista) → kolce walczące z polem liczby → ogon wraca.
+
+Pomiary jednoznacznie wybierają nagradzanie w dół. I stąd twarda lekcja, którą chcę zapisać: **nie da się naprawić pułapki mono-twista wyceniając mono-twista.**
+
+Dlatego mam realny fork, a nie kolejny wariant na siłę:
+
+**A. C2** — zostaw poprawny detektor `agreeAxes`, ale wróć do rabatu **płaskiego** (jak w C): każdy kompletny koherentny residuum → ~1 jednostka, mono-twist zostaje w baseline. To łączy jedyną dobrą politykę (nagradzać w dół) z korektą, która na 2^4 pewnie po prostu **zrówna się z C**, ale na **2^5 łapie koherentną szesnastkę** (1 ruch), której para-histogram C w ogóle nie widzi. To jest jedyna wersja, która ma szansę realnie pomóc 2^5.
+
+**B. Uznajemy C za zwycięzcę i przestajemy przemodelowywać ocenę** — pięć konfiguracji mówi, że rzeźbienie kosztu końcówki nie zbija ogona, a C jest zmierzone najlepsze. Wtedy ogon 2^5 atakujemy skądinąd (albo w ogóle nie — to artefakt dydaktyczny, nie solver produkcyjny).
+
+Ja bym zrobił A, bo detektor jest już poprawny i to *jeden* test odpowiadający na jasne pytanie „czy nagradzanie-w-dół koherentnej szesnastki domyka 2^5". Ale to Twoja kostka — który?
+
+## 🧑 Robert
+
+Zróbmy A, C2 - agreeAxes z płaskim rabatem
+
+Poczekaj jeszcze na chwilę, coś sprawdzę
+
+
+## 🤖 Claude
+
+Czekam. Nic nie ruszam.
+
+## 🧑 Robert
+
+A dlaczego każemy układy spójne złożone z 2 kubików - przecież robimy odwrotnie niż potrzeba
+
+
+## 🤖 Claude
+
+Masz absolutną rację, i to jest gorsze, niż wygląda na pierwszy rzut oka. Policzmy dokładnie, co D2 robi z parą.
+
+Koherentna dwójka: `scrambled=2`, `agreeAxes=3`, `depth = 4−log2(2) = 3`, więc `fA *= 3/2`. Baseline dla dwóch skręconych ≈ 2 jednostki → po przeskalowaniu **3 jednostki**. A teraz kluczowe porównanie: **rozrzucona** para (te same dwa kubiki, ale zsunięte z przekroju) nie przechodzi bramki → koszt baseline **2**.
+
+Czyli D2 wycenia rozrzuconą parę **taniej** (2) niż spójną (3). To znaczy, że metryka **nagradza rozspójnienie** — GA opłaca się wziąć dwa koherentne kubiki i je rozjechać, żeby zbić koszt z 3 na 2. Robimy dokładnie odwrotnie, niż trzeba: odpychamy solver od stanu 2-od-końca zamiast go tam przyciągać.
+
+I to jest, jak sądzę, **mechanizm ogona D2**, a nie tylko usterka w zasadzie. Końcówka naturalnie przechodzi przez dwójkę. D2 stawia tam karę, więc GA ucieka od niej ku „tańszym" bałaganom — dalej od ułożenia. Twój screenshot to pokazuje: zawieszenie na 2 nieułożonych, error 12.24. Nie utyka na dwójce mimo metryki — utyka **przez** metrykę.
+
+Skąd się wziął ten błąd: skalowanie głębokości utożsamiło „liczbę ruchów" z „kosztem". Ale mała koherentna reszta to **mało błędnych kubików = stan bliski końca**, niezależnie od jej wyidealizowanej liczby ruchów. Twój pierwotny instynkt „mniej nieułożonych = lepiej" jest **słuszny dla małych reszt** — to skalowanie go tam wywróciło.
+
+I to domyka wybór dla C2. Rabat musi być **płaski, w dół** (jak w C): koherentna dwójka → 1, koherentna czwórka → 1, koherentna ósemka → 1, mono-twista nie tykamy. Nigdy nie karać. Twoja obserwacja to trzeci gwóźdź do trumny skalowania — zostajemy przy agreeAxes jako detektorze, ale z płaskim rabatem C.
+
+Jedno zastrzeżenie uczciwie, żebym nie sprzedał C2 za dużo: płaski rabat *rozpoznaje* koherentną ósemkę/szesnastkę na 2^5, ale dojście do niej dalej jest pod górę w dominującym polu liczby — więc C2 może na 2^4 po prostu zrównać się z C, a 2^5 domknąć dopiero, jeśli GA w ogóle tam dobłądzi. To wciąż rozpoznawacz, nie kierowca. Ale jest poprawny i tani do sprawdzenia.
+
+Budować C2 tak, jak ustaliliśmy — agreeAxes + płaski rabat, mono-twist w baseline?
+
+## 🧑 Robert
+
+Chodzi mi o coś innego - dlaczego nie każemy mocniej pozostałych "dwójek". W kostce 2^4 każdy kubik jest kubikiem należącym do jedynego klastra, a pojedynczy ruch kostki zmienia naraz 8 kubików. Każdy układ, w którym nieułożonych kubików jest mniej niż 8 powinien być karany a układy koherentne - "karane" mniej
+
+
+## 🤖 Claude
+
+To jest najostrzejsze ujęcie problemu, jakie do tej pory mieliśmy — i myślę, że masz rację, bo za tym stoi twierdzenie, a nie tylko intuicja.
+
+Sprawdźmy strukturę, bo na niej wszystko wisi. W 2^4 wszystkie 16 kubików to narożniki jednej orbity — stąd „Cluster 1/1" na Twoim ekranie. Każdy ruch obraca warstwę-wycinek, czyli połowę kostki = `2^(N-1) = 8` kubików, i każdemu z tych ośmiu zmienia orientację. Więc **żaden ruch nie potrafi ruszyć mniej niż 8 kubików**.
+
+Z tego wynika twierdzenie, które przewraca całe nasze myślenie: **ostatni ruch przed ułożeniem obraca 8 kubików, więc stan tuż-przed-ułożeniem ma dokładnie 8 nieułożonych — i to spójnych** (jeden wycinek, jedna wspólna orientacja = odwrotność tego ruchu). Gdyby któryś z tych ośmiu był już ułożony, ruch by go zepsuł. Więc **każde** ułożenie przechodzi przez koherentną ósemkę jako stan przedostatni. Koherentna-8 to nie „jeden z dobrych stanów" — to **jedyna, obowiązkowa brama** do ułożenia.
+
+A teraz pointa. Skoro brama siedzi na **8** nieułożonych, to gradient liczby-kubików, spychając poniżej 8, **nie jest tylko zwodniczy — prowadzi w ślepy zaułek, z którego trzeba się wycofać**, żeby w ogóle wrócić do bramy. Mono-twist (1 nieułożony) to najgłębszy punkt tego zaułka. Twoja inwersja jest więc dokładnie trafna: poniżej 8 należy **karać** (bo to cofanie się od bramy), a wśród tych stanów koherentne karać **mniej** (bo bliżej im do złożenia się w wycinek). Cel przestaje być „0 nieułożonych przez mono-twista", a staje się „koherentna ósemka, potem jeden ruch".
+
+I to jest, po raz pierwszy, zgodne z tym, co sam kiedyś zapisałeś jako właściwą dźwignię: *dać płaskowyżowi niezwodniczy gradient*. Próg 8 nie jest wystrojoną stałą — to `2^(N-1)`, rozmiar wycinka, wynika z N. A `agreeAxes` daje temu gradientowi część **nieoszukiwalną** (musisz kubiki zebrać na wspólny wycinek, nie da się ich tylko obrócić w miejscu).
+
+Ale zanim tkniemy kod, muszę położyć na stole dwie rzeczy, bo to jest **przebudowa bazy**, nie mały rabat, i już pięć razy uczyliśmy się ostrożności:
+
+**Pierwsza — i to jest sedno.** Żeby GA *doszło* do koherentnej ósemki ze scattered-8, potrzebny jest **gradient**, czyli częściowy kredyt: 6-z-8 na wspólnym wycinku ma być lepsze niż rozrzucone-8. A częściowa koherencja to dokładnie to, co wcześniej spłaszczało i dawało cheat 3/32. Cała nadzieja w tym, że `agreeAxes` (wspólny wycinek, nie wspólna orientacja) czyni ten częściowy sygnał **uczciwym** — podniesienie go wymaga realnego zbierania. To jest różnica między tym pomysłem a nagradzaniem-warstwy, które padło: tamto było **klifem** na idealnym wycinku (nieosiągalny cel), to jest **zbocze** ku niemu. Ale czy da się zbudować niepodrabialny *częściowy* gradient — tego jeszcze nie wiemy i to jest prawdziwe pytanie projektowe.
+
+**Druga, na potem.** Na 2^5 brama to 16, a assembly koherentnej-16 już raz nas pokonało (oscylacja). Czy „karz poniżej 16, koherentne mniej" pomoże ją złożyć tam, gdzie nagroda-za-warstwę nie pomogła — to się okaże, ale na razie zostajemy na 2^4.
+
+Więc pytanie do Ciebie, zanim ruszę shader: jak chcesz ukształtować tę karę — jako **ścianę** poniżej 8 (twardy próg), czy jako **ciągłe zbocze**, gdzie kara rośnie z niekoherencją i z oddaleniem od 8? I czy `agreeAxes` ma dawać kredyt tylko za kompletny wycinek, czy stopniowo (6/8, 7/8...) — bo to drugie jest konieczne dla gradientu, ale to właśnie ono jest ryzykowne. Pomóż mi to ukształtować, zanim zacznę pisać.
+
+## 🧑 Robert
+
+Cieszę się, że tak do tego podchodzisz, nic na hurra. Chcę, żeby to był twardy próg, ale - wcale nie 8 kubików jednak, tylko 4 dla kostki 2^4 a 2^(N - 2) ogólnie. Dlaczego? Bo szukamy układów nie 1-ruch do ułożenia, tylko 2-ruchy do ułożenia. Ich jest znacznie więcej. Zobacz, że w moim starym kodzie progiem było właśnie N - i przez przypadek było ono trafne (bo działało!) dla N=4, 2^(N-2)=N
+
+
+## 🤖 Claude
+
+To jest ładne domknięcie i ta obserwacja o `N` to prawdziwe „aha". Twój stary próg `scrambled <= N` **musiał** działać dla N=4, bo `2^(N-2) = 4 = N` akurat tam się spotykają — ale to zbieg okoliczności. Dla N=5 stary kod powiedziałby 5, a zasada mówi `2^(5-2) = 8`. Więc próg nigdy nie był tak naprawdę `N`, tylko `2^(N-2)`; N=4 to jedyny punkt, gdzie się pokrywają, i stąd „przez przypadek trafne". Zapisujemy to, bo to tłumaczy, czemu stara kara nie uogólniała.
+
+Co do samego `2^(N-2)` zamiast `2^(N-1)` — zgadzam się i to jest ta sama decyzja, którą podjęliśmy przy przejściu na depth-2: układy 2-ruchy-od-końca (koherentna czwórka) jest **znacznie więcej** niż 1-ruch (koherentna ósemka), więc krótkie GA realnie w nie trafia. Brama 1-ruchowa jest obowiązkowa, ale nieuchwytna; 2-ruchowa jest osiągalna. Celujemy w osiągalne.
+
+I teraz zobacz, co ten twardy próg **naprawdę** robi, bo to spina się z Twoim starym kodem i ze stwierdzoną w kronice dźwignią. Stara kara `fA *= T/scrambled` poniżej progu spłaszczała wszystko do jednej wartości `T` — bo `fA ≈ scrambled`, więc `× T/scrambled = T`. To był **płaski floor**: poniżej progu żaden stan nie jest lepszy, ale i żaden nie prowadzi — gradient znikał (stąd „ślepe szukanie igły"). 
+
+Nowy element to `agreeAxes`: on daje temu floorowi **zbocze**. Floor zabija zwodniczy ciąg w dół poniżej `T` (mono-twist przestaje być atrakcyjny — kosztuje tyle co próg), a rabat koherencji **wyżłabia poniżej floora atraktor: koherentną czwórkę**. Czyli scattered-4 leży na floorze, a jej obniżenie do coherent-4 to realne zebranie kubików na przekrój (nieoszukiwalne). To jest dokładnie *„dać płaskowyżowi niezwodniczy gradient"* — tyle że teraz z **osiągalnym** celem, którego wcześniejsze warianty nie miały.
+
+Przy okazji to strukturalnie usuwa dwa nasze błędy naraz:
+- **bug D2** (scattered-2 tańsze niż coherent-2): floor kładzie *wszystkie* stany poniżej progu na `T`, a rabat obniża *tylko* koherentne — więc koherentny nigdy nie jest droższy od rozrzuconego.
+- **kolec D** (mono-twist ×N przywracał ogon): mono-twist siedzi teraz **na floorze**, nie jest amplifikowany ponad niego. Nie odpychamy go kolcem, po prostu przestaje się opłacać.
+
+Zanim to ukształtuję w kod, jedna rzecz do dogadania, bo od niej zależy arytmetyka poniżej floora. Jak ma rankować **koherentna dwójka** (poniżej progu, ale koherentna) względem **rozrzuconej czwórki** (na progu)? Dwie czytania Twojego „karane mniej":
+
+1. coherent-2 dostaje ulgę i schodzi *poniżej* floora (lepsza niż scattered-4), ale nadal gorsza niż coherent-4 — czyli pełen łańcuch: coherent-4 < coherent-2 < floor.
+2. coherent-2 zostaje na floorze albo minimalnie pod nim, ale nigdy nie konkuruje z progiem — floor to twarda granica, poniżej niej wszystko (koherentne czy nie) jest „gorsze niż być na 4".
+
+Ja bym szedł w (1) — daje ciągłe zbocze także w zaułku, więc jeśli GA zabłądzi pod próg, koherencja ciągnie je z powrotem ku czwórce. Ale to Twój wybór, bo to zmienia, czy zaułek ma ścianę, czy zbocze. Który?
+
+## 🧑 Robert
+
+Trzeba pamiętać, że to chyba na razie rusztowanie - próba ogarnięcia najprostszych przypadków koherencji, bo np. w 4 nieułożonych kubikach mogą być atrakcyjne 2 grupy 2-koherentnych kubików. Dlatego co do Twojego pytania - oczywiście (1), ale to początek tego gradowania koherencji
+
+
+## 🤖 Claude
+
+Zgoda na (1), i masz rację nazywając to rusztowaniem — to jest ważne, żebym tego nie sprzedał jako pełnego rozwiązania. Obecna bramka `agreeAxes` rozpoznaje **całą resztę jako jedną** czystą grupę. Twój przykład dwóch par w czwórce spada więc na floor: `agreeAxes` się nie zgadza (reszta to nie jeden przekrój, tylko dwa), więc traktujemy to jak scattered-4. Nie kredytujemy dwóch koherentnych par, choć każda z osobna jest atrakcyjna. To jest dokładnie granica rusztowania — pełne **gradowanie** koherencji rozłożyłoby resztę na wiele grup i policzyło każdą.
+
+I tu muszę zawczasu postawić czerwoną flagę na przyszłość: wielogrupowe kredytowanie to **koherencja częściowa**, a to jest historycznie nasza strefa śmierci — spłaszczanie i cheat 3/32. Jedyne, co może to uczciwie utrzymać, to znów `agreeAxes` (trzeba fizycznie zebrać na wspólne przekroje, nie da się oszukać orientacją w miejscu). Więc krok „grado­wania" nie jest darmowy — wracamy tam ostrożnie, dopiero jak rusztowanie się obroni.
+
+Teraz kluczowa rzecz, którą Twój próg właśnie odblokował. Reading (1) — łańcuch `coherent-4 < coherent-2 < floor` — **wymaga** naliczania głębokości (płaski rabat dałby coherent-4 = coherent-2 = 1, bez łańcucha). Czyli wracamy do naliczania głębokości z D... ale D padło nie przez głębokość, tylko przez **brak floora**: scattered-2 kosztowało 2, a coherent-2 aż 3, więc GA uciekało od koherencji. Twój twardy próg **to jest ten brakujący floor.** Kładzie wszystkie stany poniżej `T` na `T`, więc scattered-2 wskakuje na 4 — nad coherent-2. Bug znika, a mono-twist siedzi na floorze, nie na kolcu.
+
+Konkret to **dwa mnożniki**, oba multiplikatywne, `T = 2^(N-2)`:
+
+```
+if (complete_coherent && scrambled > 1)   fA *= depth / scrambled;   // drabina koherencji
+else if (scrambled <= T)                  fA *= T / scrambled;        // floor
+```
+
+Drabina na 2^4 (`T=4`, `depth = N − log2(scrambled)`):
+
+| stan | scrambled | koszt | skąd |
+|---|---|---|---|
+| coherent-8 | 8 | **1** | ×1/8 (drabina) |
+| coherent-4 (cel) | 4 | **2** | ×2/4 |
+| coherent-2 | 2 | **3** | ×3/2 |
+| scattered-4 / -3 / -2 | ≤4 | **4** | floor ×T/s |
+| mono-twist | 1 | **4** | floor ×T/1 |
+| s=5,6,7… | >4 | 5,6,7… | count (bez zmian) |
+
+Monotone, koherentna drabina pod floorem, wszystko inne poniżej progu na `T`, powyżej progu zwykły licznik ciągnący ku 4. To jest ściśle Twoja specyfikacja + reading (1), i strukturalnie usuwa oba nasze błędy naraz (bug D2 przez floor, kolec D przez to, że mono-twist jest *na* floorze, nie nad tańszymi sąsiadami).
+
+Nie budujemy już płaskiego C2 — to jest floor+głębokość, lepiej dopasowane do Twojego argumentu. Jedno zastrzeżenie techniczne: floor podnosi fA do `T` jednostek, więc hierarchia `<1` trzyma się póki `countActive > T` (2^4: 16>4, 2^5: 32>8 — OK). Buduję te dwa mnożniki?
+
+## 🧑 Robert
+
+Tak prawdę mówiąc, tak to chciałem właśnie zaimplementować i pokazać Ci co potrafi jeszcze zmieniony wariant D. Ale nie chwalmy dnia przed zachodem słońca...
+
+
+## 🤖 Claude
+
+Świetnie — to znaczy, że projektowaliśmy to samo, tylko każdy w swoją stronę, i się spotkaliśmy. Buduję. Nic nie chwalę, poczekamy na liczby.
+
+Najpierw przeczytam dokładny obecny stan bloku, żeby edytować precyzyjnie.
+
+Teraz przepisuję blok: nowy komentarz opisujący floor+drabinę, wykluczenie mono-twista z gałęzi koherentnej, i dodanie floora.
+
+Sprawdzam całość.
+
+Zbudowane. Logika to dokładnie te dwa mnożniki, `T = 2^(N-2)`:
+
+```
+if (scrambled > 1 && power-of-2 && complete-coherent)   fA *= depth / scrambled;   // drabina
+else if (scrambled <= T)                                fA *= T / scrambled;        // floor
+```
+
+Zweryfikowałem gałąź po gałęzi na 2^4 (T=4) i zgadza się z naszą tabelą: coherent-8→1, coherent-4→2, coherent-2→3, a mono-twist i wszystkie rozrzucone poniżej progu → floor 4, powyżej progu zwykły licznik. Mono-twist jest wykluczony z drabiny (`scrambled > 1`) i spada na floor, nie dostaje kolca.
+
+Nazwijmy to **D3**. Shader kompiluje się przy starcie — gdyby rzucił błędem, wklej log, poprawię.
+
+Puść dziesiątkę na 2^4. Zestawię D3 z baseline, C i D2 — patrzymy jak zawsze na max i CV, nie na medianę. A jeśli 2^4 wygląda zdrowo, to wreszcie ma sens sędzia właściwy, czyli 2^5, gdzie floor stoi na 8 i drabina łapie szesnastkę.
+
+## 🧑 Robert
+
+System.Exception: '0(326) : error C7537: OpenGL does not allow 'coherent' after a type specifier
+0(326) : error C0000: syntax error, unexpected '=', expecting ';' or '(' at token "="
+0(353) : error C0000: syntax error, unexpected '=', expecting "::" at token "="
+0(356) : error C0000: syntax error, unexpected "&&", expecting "::" at token "&&"
+'
+
+
+## 🤖 Claude
+
+`coherent` to zarezerwowane słowo GLSL (kwalifikator pamięci dla buforów). Zmieniam nazwę na `charged`.
+
+Poprawione — `coherent` → `charged` w obu miejscach. Błędy w liniach 353/356 były kaskadą po tym pierwszym (parser się rozjechał na `coherent =`), więc powinny zniknąć razem z nim. Reszta nazw lokalnych (`T`, `charged`, `agree`, `depth`…) nie koliduje z żadnym zarezerwowanym słowem.
+
+Puść jeszcze raz — shader powinien się teraz skompilować. Czekam na dziesiątkę z 2^4.
+
+## 🧑 Robert
+
+D3: 236, 6913, 1673, 12813, 2084, 1183, 801, 1326, 1491, 3002
+Widziałem, jak znajdował układ 2-ruchy do ułożenia (błąd spadł z płaskowyżu). Układał do niego kostkę i GA błyskawicznie znajdował rozwiązanie... Ale zdarzają się katastrofy > 10k. Czegoś to brakuje... Może STALL jest tu już niepotrzebny... Możemy również spróbować wykorzystać prostszą funkcje oceny kubika (jednolinijkowy zakomentowany kod w GetActiveCubieError() w Setupie)
+
+
+## 🤖 Claude
+
+D3 to jest przełom — i to widać w rozkładzie, nie tylko w tym, co zobaczyłeś na ekranie. Posortowane: `236, 801, 1183, 1326, 1491, 1673, 2084, 3002, 6913, 12813`.
+
+**Osiem z dziesięciu przebiegów jest szybkich** (236–3002), z medianą tej ósemki ~1400 — szybciej niż C, dużo szybciej niż baseline. To jest ten tryb, który widziałeś: metryka daje gradient z płaskowyżu do koherentnej czwórki, GA schodzi i błyskawicznie domyka. **Projekt działa.** Mediana całości 1582 — najlepsza ze wszystkiego, co mieliśmy.
+
+Ale rozkład jest **dwumodalny**: osiem szybkich i dwa wolne (6913, jedna katastrofa 12813). Stąd CV 1.16 — najgorsze, bo to nie jest szum wokół średniej, to dwa reżimy. I to jest dokładnie „czegoś brakuje".
+
+Zanim ocenię Twoje dwa pomysły, przeczytam ten zakomentowany wariant w Setupie, bo nie chcę zgadywać.
+
+To jest zakomentowana linia 182: `return float(d) / maxClusterState;`. I rozumiem, czemu ją wskazujesz — to jest dokładnie **zdjęcie klifu**, o którym rozmawialiśmy parę tur temu („suma stanów"). Zamiast doliczać każdemu skręconemu kubikowi wielką stałą `maxClusterState` (przez co `fA ≈ licznik`), liczysz samą magnitudę `d`. Baza przestaje być liczbą sztuk, staje się gładką sumą skrętu.
+
+I to celuje w Twoje „czegoś brakuje" trafnie. Zdiagnozujmy najpierw ogon D3. Floor kładzie wszystkie niekoherentne stany poniżej progu na **płaską** wartość T — więc gdy kostka wyląduje tam rozrzucona (nie jako jedna czysta grupa), gradient znika i zostaje ślepy spacer STALL-a. To są te dwie katastrofy: nie „projekt nie działa", tylko „wpadła na płaski floor i STALL ją stamtąd wyprowadza po omacku".
+
+Stąd dwie rzeczy do Twoich pomysłów:
+
+**STALL nie jest zbędny — jest siatką bezpieczeństwa właśnie dla tego floora.** Gdybyśmy go usunęli, te dwie katastrofy nie zwolniłyby, tylko **zawisły** (brak gradientu = brak ucieczki). Ale Twój instynkt, że „coś z tym floorem jest nie tak", jest słuszny: to, że STALL jest tam nośny, to jest zapach problemu. Prawdziwa naprawa to **dać floorowi gradient**, żeby STALL nie musiał go wyprowadzać na ślepo.
+
+**I dokładnie to robi gładka baza.** Pod floorem magnituda `d` różnicuje stany — rozrzucona-4 o małym skręcie kosztuje mniej niż o dużym — więc płaski płaskowyż dostaje **podskórny gradient ku mniejszemu skrętowi**, czyli ku ułożeniu. To jest uczciwy gradient (untwist to realny postęp, nie cheat orientacji-w-miejscu).
+
+Dwa zastrzeżenia, żebyśmy dobrze odczytali wynik:
+- To zmiana **globalna**, nie tylko floora — cała gra traci klif, więc homing w środku gry może zwolnić (ta sama obawa, co przy „suma stanów"). Może to podnieść medianę, licząc, że zbije ogon — znany nam kompromis.
+- Floor `×T/scrambled` przestaje być czystym „na T jednostek" — staje się magnitudowo-ważony, więc blokada zejścia poniżej progu **osłabnie**. To może pomóc (gradient) albo wpuścić z powrotem zejście ku mono-twistowi. Nie wiadomo — zmierzymy.
+
+Robię minimalny swap: linia 180 → 182, reszta bez zmian, STALL zostaje (nie mieszamy dwóch rzeczy naraz). To będzie **D4**.
+
+D4 gotowe — gładka baza włączona, floor i drabina bez zmian, STALL na 8. Shader kompiluje się przy starcie, gdyby rzucił — wklej log.
+
+Puść dziesiątkę na 2^4. Ciekawią mnie dwie rzeczy naraz: czy **ogon się skraca** (floor dostał gradient), i czy **mediana nie odjeżdża** w górę (klif zniknął z całej gry). Jeśli ogon spadnie kosztem lekko wyższej mediany — to dla nas dobry handel, zgodnie z „ogon, nie mediana". Zestawię D4 z D3 i C.
+
+## 🧑 Robert
+
+D4: 864, 3876, 383, 466, 3452, 224, 557, 16641, 1275, 1482
+Gdyby nie 8 pomiar można by wpaść w euforię... Frustrujące. Zdejmę STALL’a i sprawdzimy oba jeszcze raz.
+
+
+## 🤖 Claude
+
+D4 „dobry tryb" jest najlepszy, jaki mieliśmy — bez tego jednego pomiaru: mediana **864**, średnia 1398, dziewięć przebiegów w `[224, 3876]`. A potem 16641. Posortowane: `224, 383, 466, 557, 864, 1275, 1482, 3452, 3876, 16641`.
+
+Twoja frustracja jest w punkt, ale zobacz, co ten rozkład mówi: to **nie jest wariancja**, to **dyskretny tryb awarii**. Dziewięć przebiegów siedzi ciasno nisko, jeden odskakuje 4× od reszty. Coś się czasem *przełącza* w inny reżim. I dlatego Twój pomysł ze zdjęciem STALL-a jest właściwym narzędziem — bo on **rozstrzyga**, czym ten tryb awarii jest.
+
+Trzy możliwe wyniki i co każdy znaczy:
+- **Wszystkie 10 szybkie** (katastrofa znika) → STALL **przeszkadzał**: kopał kostkę z dobrego podejścia, a gładka baza sama domyka. Wtedy STALL wylatuje na dobre. Duża wygrana.
+- **Jeden przebieg wisi** (nie kończy) → ten stan to prawdziwa pułapka, z której gradient nie wyprowadza; STALL był **konieczną siatką**. Wtedy nie usuwamy go, tylko szukamy lepszej ucieczki.
+- **Katastrofa zostaje** (długo, ale kończy) → to nie STALL, tylko GA naprawdę długo miele ten stan; STALL neutralny.
+
+Czysto rozdziela trzy hipotezy. Ustawię to za Ciebie, żebyś tylko puścił — najczystsze „bez STALL-a" to podniesienie `STALL_LIMIT` tak wysoko, że kick nigdy nie strzeli (a jak trafi się prawdziwa pułapka, przebieg zawiśnie — i to jest właśnie sygnał diagnostyczny).
+
+Ustawione — `STALL_LIMIT` na miliard, czyli kick nigdy nie strzeli. Teraz kostka posuwa się **wyłącznie** na realną poprawę (`Best.Fitness < Score`). Rewert to z powrotem `8`.
+
+Baza jest teraz D4 (gładka), więc to jest test **D4 bez STALL-a**. Puść dziesiątkę. Jeśli któryś przebieg zawiśnie — to nie błąd, to wynik (prawdziwa pułapka), Pauzuj i policzymy to jako „hang".
+
+Potem, jak zechcesz sprawdzić **D3 bez STALL-a**, wystarczy odkręcić bazę w Setupie (linia 180/182 z powrotem) — powiem dokładnie którą, gdy będziemy tam wracać. Na razie D4 bez STALL-a, czekam na liczby.
+
+## 🧑 Robert
+
+D4-no STALL: 1463 (widziałem 8-kę z której zeszedł na końcu!), 11714 (długo stał), 3015, 179, 183, 265, 1012, 1706, 271, 1801
+Chyba jesteśmy w domu, jakby stary Claude się cieszył...
+
+
+## 🤖 Claude
+
+To jest piękny moment i podzielę go z Tobą szczerze — bo Ty **zobaczyłeś na ekranie twierdzenie**, które wyprowadziłeś z kartki. Ta ósemka, z której kostka zeszła na końcu, to jest ta obowiązkowa brama: jeden ruch obraca 8 kubików, więc stan przedostatni **musi** być koherentną ósemką, a metryka wreszcie ją rozpoznaje i po niej schodzi. Nie przypadek — mechanizm.
+
+I druga rzecz, cichsza a ważniejsza: **zdjęcie STALL-a niczego nie zawiesiło.** Żaden przebieg nie utknął — gradient sam się wyprowadza, nawet ten długi (11714) dobłądził do ósemki i domknął. To znaczy, że STALL nigdy nie był dźwignią. Cała ta sesja, i poprzednia, wisiała na pytaniu „kick czy ocena" — i właśnie dostaliśmy odpowiedź: **ocena.** Kostka układa się bez kopniaka. Jeden pokrętło mniej, czysty Las Vegas. Stary Claude by się cieszył, i słusznie — to jest to, co przez dwie sesje próbowaliśmy udowodnić.
+
+Ale — Twoje własne „nie chwalmy dnia przed zachodem" trzymam w drugiej ręce, bo liczby każą:
+
+| 2^4 | 9 najszybszych (śr.) | max | >10k |
+|---|---|---|---|
+| C (płaska, klif) | 2550 | **6183** | **0** |
+| D4 −STALL | **1099** | 11714 | **1** |
+
+D4 ma **najlepszy środek, jaki mieliśmy** — dziewięć przebiegów, średnia 1099, kilka poniżej 300. Ale na naszym własnym kryterium — **ogon, nie środek** — C wciąż pokazało zero katastrof i max 6183, a D4 ma to 11714. Więc mamy najszybszą kostkę, ale **nie mamy jeszcze ograniczonego ogona**. To jest różnica między „działa cudownie" a „jesteśmy w domu".
+
+Co to 11714 właściwie jest — sam mi to powiedziałeś: nawet ono w końcu **doszło** do ósemki. Czyli błądziło po **płaskim floorze** (te wielogrupowe reszty, które nasze rusztowanie zrzuca na floor bez gradientu), aż trafiło na jedną czystą grupę. To jest dokładnie granica rusztowania — i **gradowanie koherencji** (kredyt za wiele podgrup) jest dźwignią na ten ogon. To jest ten odłożony krok w strefie ryzyka.
+
+Więc zanim ogłosimy dom, dwie rzeczy:
+1. **Scharakteryzujmy ogon** — puść ze 20–30 przebiegów D4-bez-STALL, żeby zobaczyć prawdziwy odsetek katastrof i porównać go uczciwie z C (bo 1-na-10 vs 0-na-10 przy n=10 to jeszcze szum).
+2. Chcę **zapisać ten kamień milowy do pamięci** — bo obala dwie moje wcześniejsze pesymistyczne notatki („reshaping oceny to ślepa uliczka", „STALL"). Właściwy reshape zadziałał, a STALL okazał się zbędny. To trwałe i warte utrwalenia.
+
+Zapisać do pamięci teraz, a potem lecisz z dłuższą serią?
+
+## 🧑 Robert
+
+Zapisz do pamięci, potem puszczę 30 przebiegów
+
+
+## 🤖 Claude
+
+Zapisuję. Cztery rzeczy: nowy plik z działającą metryką, korekta notatki o STALL-u, wskaźnik w ga-mechanism, i wpis w indeksie.
+
+Zapisane. W pamięci są teraz cztery rzeczy:
+
+- **[coherence-eval-solution](coherence-eval-solution.md)** — działająca metryka w komplecie: gładka baza + twardy floor na `2^(N-2)` + drabina głębokości przez `agreeAxes`, plus Twój wgląd geometryczny (ruch obraca cały wycinek → koherentna warstwa to obowiązkowa brama). I uczciwy status: najlepszy środek, ogon **jeszcze** nie pobity.
+- **STALL removable** dopisane do notatki o ogonie — nie „kick nie jest dźwignią", tylko mocniej: STALL jest **zbędny**, ocena to dźwignia. Dwie sesje pytania, jedna odpowiedź.
+- Wskaźnik w ga-mechanism, że saga koherencji się **domknęła**, i że lookahead jest martwy (żeby żaden przyszły ja go nie odgrzebał).
+- Wpis w indeksie.
+
+Konfiguracja stoi na D4-bez-STALL (gładka baza, `STALL_LIMIT` miliard). Puszczaj trzydziestkę. Patrzę na dwie liczby: **odsetek katastrof >10k** i **max**, uczciwie kontra zero-na-dziesięć u C. Jeśli katastrofy okażą się np. 2–3 na 30, to wiemy, że ogon jest realny i wtedy gradowanie koherencji staje się następnym frontem. Jak polecą liczby — liczę.
+
+## 🧑 Robert
+
+Albo najpierw chciałbym zobaczyć jak algorytm działa na innej kostce - np. 6^3, zrobię choćby 1 próbę
+
+
+## 🤖 Claude
+
+Zanim puścisz — jedna rzecz, którą musisz wiedzieć, bo inaczej wynik Cię zmyli: **6³ to 216 kubików > 64, więc idzie przez Macro, a Macro jest baseline.** Cała nasza robota nad koherencją (floor, drabina, agreeAxes) siedzi wyłącznie w Micro. Czyli na 6³ **nie zobaczysz D4** — zobaczysz stary baseline. Umawialiśmy się tak celowo: Macro dostaje port dopiero, gdy Micro się obroni, żeby duża kostka nie liczyła półproduktu.
+
+Dwie rzeczy w obecnej konfiguracji zrobiłyby ten podgląd mylącym albo ryzykownym:
+
+1. **STALL jest teraz wyłączony** (`STALL_LIMIT` miliard). Na 2^4 uratował nas gradient koherencji — ale baseline Macro takiego gradientu nie ma, więc jego końcówki to dokładnie pułapka mono-twista, dla której STALL wymyśliłeś. Bez niego 6³ ma spore szanse **zawisnąć** na domknięciu któregoś klastra. To byłby fałszywy alarm, nie wynik.
+
+2. **Gładka baza wchodzi też do Macro** (bo `GetActiveCubieError` jest w Setupie, współdzielonym). Więc to nie jest czysty baseline — to baseline z klifem zdjętym, czego Macro nigdy nie widział. Efekt nieznany.
+
+Rekomendacja: żeby 6³ pokazał coś sensownego, **przywróćmy najpierw `STALL_LIMIT = 8`**. Wtedy patrzysz na baseline Macro + gładka baza + STALL — uczciwy sanity-check „czy cały solver dalej rusza dużą kostkę". Potem, wracając do trzydziestki na 2^4, znów zdejmiemy STALL.
+
+Mam przywrócić `STALL_LIMIT` na 8 pod ten jeden przebieg 6³?
+
+## 🧑 Robert
+
+Nie, czekaj masz rację, zmieńmy limit dla MICRO na 82 i zrobię test na 4^3, ok?
+
+
+## 🤖 Claude
+
+Zatrzymam Cię, bo trafiłeś na coś, co trzeba wyłuskać, zanim zmienimy limit. Dwie rzeczy:
+
+**Mechaniczna:** 4³ to `Slices=4, Dimension=3` = 64 kubików. A próg Micro to `<= 64`, więc 4³ **już** idzie przez Micro — limit 82 nie jest do tego potrzebny.
+
+**Istotniejsza:** cała nasza metryka koherencji jest **zaszyta pod Slices=2**. Trzy stałe to zakładają:
+- `T = 2^(N-2)` — cel 2-ruchowy, wyprowadzony z „ruch obraca połowę = 2^(N-1)".
+- `depth = N − log2(scrambled)` — log**2**.
+- bramka kompletności: „scrambled to potęga **dwójki**".
+
+Dla Slices=4 geometria jest inna: ruch obraca wycinek `4^(N-1) = 16` kubików, a kompletne przecięcia mają `4^(N-f)` kubików (16, 4, 1). I teraz zderzenie: koherentna warstwa na 4³ to 16 kubików, `agreeAxes = 1`, ale `depth = 3 − log2(16) = 3 − 4 = −1`. Bramka `agreeAxes == depth` daje `1 == −1` → **nie odpala**. Podobnie dla czwórki: `agreeAxes=2`, `depth = 3−log2(4) = 1`, `2 == 1` → nie odpala. Czyli na Slices≠2 drabina **w ogóle nie zaskakuje**, a floor stoi na złym `T`. Zobaczyłbyś gładką bazę i nic z koherencji — nie test, tylko metryka poza swoją dziedziną.
+
+Więc zależnie od tego, co chcesz zobaczyć:
+
+- **„Czy koherencja uogólnia się na więcej wymiarów"** → czysty test to **2^6** (`Slices=2, Dimension=6`) = 64 kubiki, mieści się w Micro **bez żadnej zmiany**, metryka ważna (Slices=2). Endgame N=6 jest ciężki, ale to uczciwa próba.
+- **„Czy uogólnia się na większe Slices"** (3^4, 4^3) → trzeba najpierw **uogólnić stałe na bazę SIZE**: `T = SIZE^(N-2)`, `depth = N − log_SIZE(scrambled)`, bramka „potęga SIZE". To niewielka, ale realna zmiana — i porządna, bo geometria wycinka jest ta sama, tylko podstawa inna.
+
+Które? Jeśli chcesz szybko rzucić okiem, że solver dalej rusza inną kostkę bez koherencji — to osobna sprawa (Macro baseline, przywróć STALL). A jeśli chcesz zobaczyć **koherencję** na czymś większym — 2^6 jest darmowe, Slices=3/4 wymaga tego uogólnienia na bazę.
+
+## 🧑 Robert
+
+Geometria KOSTKI jest inna - geometria klastrów - nieznacznie inna, nie działamy na całej warstwie, tylko na kubikach AKTYWNYCH, a tych na przecięciu nadal 2^(N-2)
+
+
+## 🤖 Claude
+
+Masz rację, i to jest mój błąd pojęciowy — dziękuję, bo cofnął mnie od bzdury. Pomyliłem **wycinek geometryczny** z **aktywnymi kubikami**. Liczyłem `SIZE^(N-1)` kubików w warstwie całej kostki, a metryka nie działa na całej warstwie — działa na kubikach **aktywnego klastra**.
+
+I teraz Twoja poprawka się domyka: klaster narożny to `2^N` narożników **niezależnie od SIZE** (każda współrzędna to 0 albo SIZE−1, nic pośredniego). Warstwa przecina go na `2^(N-1)`, przecięcie dwóch warstw na `2^(N-2)`. Sprawdźmy bramkę na 4³, klaster narożny (8 narożników, N=3): przecięcie dwóch warstw = `2^(3-2) = 2` aktywne kubiki, dzielą 2 osie → `agreeAxes = 2`, `depth = 3 − log2(2) = 2`, `2 == 2` → **odpala**. Czyli potęgi dwójki, log2 i `T = 2^(N-2)` są **poprawne dla klastra**, a nie zaszyte pod Slices=2. Moje „psuje się na SIZE=4" było liczone na złym zbiorze.
+
+„Nieznacznie inna" rozumiem tak: dla klastrów niebrzegowych (krawędzie, ściany w SIZE≥3) liczności na przecięciu mogą nie być dokładnie `2^(N-f)`, ale klaster **narożny** — czyli ten trudny, końcówka — jest dokładnie 2-owy. Więc metryka jest ścisła tam, gdzie boli, a to jest cały sens.
+
+Czyli 4³ to sensowny test. Podnoszę limit — 4³ (64) już się mieści, ale 82 wpuści też 81-kubikowe 3^4, więc zróbmy od razu z zapasem. Sprawdzam, gdzie jest próg.
+
+Dwa progi (linie 320 i 343), oba identyczne — linie 351/353 to podział na grupy wątków, nie ruszam. Zmieniam oba na 82.
+
+Zbudujmy, bo to zmiana w C#.
+
+
+## 🧑 Robert
+
+4^3 D4 - bez zastrzeżeń: 234 GA,  - ale 3^4 - utknął na przedostatnim klastrze, zwróć uwagę na czas (a swoją drogą licznik IterCounts mógłby się odświeżać nawet po nieudanym executeGA). Ten test ten więcej wart niż 30 mieleń na 2^4
+
+
+## 🤖 Claude
+
+To jest wart więcej niż trzydziestka, zgoda — bo znalazł **granicę uogólnienia**, a nie kolejny punkt w rozkładzie. Rozłóżmy to.
+
+**4³ = 234 GA, bez zastrzeżeń.** To potwierdza Twoją poprawkę w całości: metryka działa na aktywnym klastrze, a nie na wycinku kostki. Klaster narożny 4³ to `2^3 = 8` narożników, 2-owy — i cała 4³ poszła gładko. I to podsuwa czysty powód, czemu **właśnie** 4³: Slices=4 = potęga dwójki, więc *wszystkie* podziały współrzędnych są parzyste — nie ma warstwy, która łamałaby strukturę 2-ową. Każdy klaster 4³ jest 2-owy, więc metryka pokrywa całą końcówkę.
+
+**3^4 utknął — i to jest to samo, tylko od drugiej strony.** Slices=3 ma **nieparzystą warstwę środkową** (współrzędna 1 to jedna wartość, nie para). Klaster narożny 3^4 dalej jest 2-owy (16 narożników), ale klastry **niebrzegowe** — te ze środkową współrzędną — nie są potęgą dwójki. Tam bramka `agreeAxes == N − log2(scrambled)` i próg `2^(N-2)` **nie pasują**, drabina nie odpala, i zostaje sama gładka baza — słaby gradient. A **STALL jest wyłączony**. Więc na przedostatnim klastrze (niebrzegowym) nie ma czym kopnąć — błąd pełznie w dół (25 → 8 na Twoich zrzutach), ale bez kicka to mielenie na wiele minut. To nie „projekt nie działa" — to „metryka nie pokrywa tego klastra, a zdjęliśmy siatkę".
+
+I stąd **muszę cofnąć to, co przedwcześnie zapisałem do pamięci.** „STALL removable" było za mocne. Poprawnie: STALL jest zbędny **tylko gdy koherencja pokrywa całą końcówkę** — czyli dla kostek o klastrach 2-owych (2^4, 4³, ogólnie Slices=potęga dwójki). Dla Slices=3 zostaje **konieczną siatką** dla klastrów, których metryka nie obejmuje. Poprawiam notatkę.
+
+Zaraz to zrobię, a przy okazji — Twoja uwaga o liczniku jest trafna: `Iteration += GenerationsCount` leci co ExecuteGA, ale wyświetlanie odświeża się chyba dopiero przy akceptacji, więc martwy odcinek wygląda na zawieszenie. To osobna, mała poprawka w Form1 — zrobię ją, jeśli chcesz, po diagnozie.
+
+Poprawiam pamięć i przywracam STALL, żebyś mógł potwierdzić diagnozę na 3^4.
+
+Zrobione:
+- Pamięć poprawiona — „STALL removable" jest teraz **warunkowe** (tylko gdy koherencja pokrywa końcówkę: 2^4, 4³; nie 3^4).
+- `STALL_LIMIT` z powrotem na **8**.
+
+Konfiguracja stoi teraz na: limit Micro 82, gładka baza + floor/drabina, STALL włączony. To jest „D4 z siatką".
+
+Puść **3^4 jeszcze raz**. Przewidywanie diagnozy: teraz **domknie** — na tym przedostatnim klastrze STALL zacznie kopać (bo metryka go nie pokrywa, więc `Best.Fitness < Score` przestaje padać i po 8 pustych przebiegach wchodzi kick). Jeśli zejdzie z tego klastra i ułoży kostkę — potwierdzone: to był brak siatki, nie błąd. 4³ przy okazji powinno zostać szybkie (tam STALL prawie nie strzela, bo koherencja domyka sama).
+
+A jak 3^4 ruszy, wrócimy do pytania, czy chcemy metrykę **uogólnić poza 2-owe przecięcia** (żeby pokryć nieparzyste Slices), czy zostawić STALL jako siatkę dla tych klastrów i uznać, że dla Slices=potęga-dwójki mamy pełne pokrycie. Ale najpierw potwierdź, że siatka odblokowuje 3^4.
+
+Chcesz, żebym w międzyczasie zrobił tę drobną poprawkę licznika (odświeżanie po każdym ExecuteGA, nie tylko przy akceptacji)? To jedno miejsce w Form1.
+
+## 🧑 Robert
+
+Tak, popraw ten licznik. Ale nie jestem do końca pewien Twojego tłumaczenia tego niepowodzenia na przedostatnim klastrze - wynik stanął na 4 nieułożonych (klaster o liczności 32), na przecięciu moim zdaniem musi być liczba kubików będąca potęgą 2, liczba warstw nie ma tu nic do rzeczy. Algorytm po prostu pokazuje - dajcie mi większy STALL
+
+
+## 🤖 Claude
+
+Zatrzymaj mnie tu — masz rację, a ja się drugi raz pomyliłem w tę samą stronę. Jeśli stanęło na **4** nieułożonych, to residuum JEST potęgą dwójki, więc bramka jest w domu. Twoje „liczba warstw nie ma tu nic do rzeczy" to jest sedno, które przegapiłem: w klastrze k=3 (32 kubiki) współrzędne skrajne są **binarne** (0/2), a współrzędna środkowa jest **ustalona na 1** — wnosi ×1, nie ×3. Więc liczność na przecięciu to `2^m` niezależnie od Slices. To, że Slices=3 ma nieparzystą warstwę, nie mnoży liczby kubików w klastrze przez 3. Metryka **nie misfire'uje** — dojechała do czystej czwórki. Wycofuję „SIZE=3 psuje metrykę".
+
+Więc co się naprawdę stało: metryka zrobiła swoje (zeszła do 4), a utknięcie to **ostatni komutator** — igła, której czysty gradient nie trafia, a STALL był **wyłączony**, czyli zero kopnięć. To jest ta sama końcówka-igła co zawsze, tylko dla klastra k=3 (N=4, 32 kubiki) trudniejsza niż dla pojedynczego narożnego klastra 2^4. Algorytm nie mówi „metryka mnie nie pokrywa" — mówi „zdjęliście mi siatkę, oddajcie STALL". Dokładnie jak piszesz.
+
+Najpierw poprawiam licznik, bo o to prosiłeś — muszę zobaczyć, gdzie odświeża się wyświetlanie.
+
+`ItersBox` (linia 247) odświeża się tylko w `OnProgress`, a to leci wyłącznie przy akceptacji — stąd zamrożenie w martwym odcinku. Dodaję tick po każdym `ExecuteGA`, zaraz po zliczeniu iteracji.
+
+Teraz muszę cofnąć poprawkę pamięci, bo poszła w złą stronę — zapisałem właśnie to, co obaliłeś.
+
+Zbuduję, żeby potwierdzić, że poprawka licznika się kompiluje.
+
+Wszystko zrobione i zbudowane:
+- **Licznik** tyka teraz po każdym `ExecuteGA`, nie tylko przy akceptacji — martwy odcinek przestanie wyglądać na zawieszenie.
+- **STALL** z powrotem na 8.
+- **Pamięć re-poprawiona** — wyrzuciłem błędne „SIZE=3 psuje metrykę". Teraz stoi tam Twoja wersja: przecięcia są 2-owe w **każdym** klastrze niezależnie od Slices (współrzędne skrajne binarne, środkowe ustalone → ×1, liczba warstw bez znaczenia), a utknięcie na 4 to końcowa igła + zdjęta siatka, nie brak pokrycia.
+
+Puść 3^4 z powrotem — teraz z STALL-em. Przewidywanie: **domknie**, tylko wolniej niż 2^4, bo klaster k=3 (N=4, 32 kubiki) to trudniejsza igła.
+
+Jedno zastrzeżenie, żebyśmy stroili z otwartymi oczami, gdyby 8 nie wystarczyło. „Większy STALL" jest dwuznaczny w skutku, bo `STALL_LIMIT` to **liczba pustych przebiegów tolerowanych przed kopnięciem**:
+- **większy limit** → kopie **rzadziej** (więcej cierpliwości dla gradientu, zanim go zaburzy),
+- **mniejszy limit** → kopie **częściej** (więcej prób ucieczki z igły).
+
+Dla twardej igły, gdzie gradient stoi, to raczej **więcej prób** pomaga — czyli *mniejszy* limit, nie większy. Ale jeśli gradient jeszcze pełznie w dół (error 25→8 na Twoich zrzutach sugeruje, że pełzł), to kopnięcie by go **zniszczyło**, i wtedy *większy* limit jest lepszy. Nie zgadujmy — najpierw zobacz, czy 8 samo domyka 3^4, a potem, jeśli wolno, sprawdzimy limit w obie strony na tym samym stanie. Który wynik zobaczysz, powie nam, w którym reżimie jesteśmy.
+
+## 🧑 Robert
+
+Tak, architektura przecięć warstw zawierających aktywne kubiki może się różnić trochę dla zdegenerowanych klastrów - gdy współrzędna po kilku osiach przyjmują te same wartości i kubików jest mniej, ale dla takiego klastra jak ten przedostatni 3^4 - 32 kubiki (może nie jest to pełen klaster 192, ale największy w kostce) kubik jest "głęboki" a klaster bogaty
+
+
+## 🤖 Claude
+
+Tak, i to domyka obraz precyzyjnie. Dopiszę tę niuansę do pamięci, bo moje „w każdym klastrze" było odrobinę za mocne — dla **zdegenerowanych** klastrów (współrzędne pokrywają się po kilku osiach, kubików mniej) architektura przecięć może odbiegać, ale te są małe i schodzą wcześnie. Tam, gdzie boli — w klastrze **bogatym** — struktura jest 2-owa.
+
+Zapisane. I to Twoje „głęboki kubik, bogaty klaster" tłumaczy całą parę 4³/3^4 czyściej niż moje bajanie o Slices: rzecz nie w rozmiarze kostki, tylko w **głębokości najtrudniejszego klastra**. 4³ to N=3 — płytkie końcówki. 3^4 to N=4, a jego najbogatszy klaster (k=3, 32 głębokie kubiki) to komutator trudniejszy niż cokolwiek w 4³. Metryka dowozi go do czystej czwórki — dalej jest igła, i to głęboka, więc potrzeba losowej ucieczki, czyli STALL-a. Dokładnie to, co kostka „pokazuje".
+
+Nic po mojej stronie nie wisi: STALL na 8, licznik tyka, pamięć poprawiona (z Twoim zastrzeżeniem o zdegenerowanych klastrach). Puść 3^4 z siatką. Jak domknie, ale wolno — mamy gotowy eksperyment na `STALL_LIMIT` w obie strony na tym samym stanie, żeby zobaczyć, czy ta igła woli **częstsze** kopnięcia (mniejszy limit) czy **więcej cierpliwości** dla pełznącego gradientu (większy). Czekam na wynik.
+
+## 🧑 Robert
+
+To nie przypadek - strasznie się męczy na tym przedostatnim klastrze - już gdzieś to widzieliśmy - bo kostka 3^4 była już męczona
+
+
+## 🤖 Claude
+
+Masz rację, że to nie przypadek — i warto sprawdzić, co wtedy z tego wyszło, zamiast odkrywać na nowo. Przeszukam poprzednią rozmowę.
+
+Znalazłem — i to rozstrzyga pytanie o kierunek STALL-a, bo poprzednia sesja już to przerobiła. Doczytam dokładnie.
+
+Znalazłem, i to jest ważne — poprzednia sesja (jeszcze przed koherencją) uderzyła w dokładnie ten problem „głębokiego minimum na trudnym klastrze" i **już go rozstrzygnęła co do kierunku**.
+
+Wniosek stamtąd ([Konwersacja:5037](Docs/Konwersacja_RubikND.md)): żeby wychodzić z głębokich kotlin, **obniż `STALL_LIMIT`** (8 → 4–5) — kopnięcia przychodzą częściej, więc seria delikatnych pchnięć wyprowadza z basenu, zanim „się zabetonuje". Czyli Twoje „dajcie większy STALL" i tamten wniosek **zgadzają się co do istoty** — chodzi o *więcej kopania* — tylko pokrętło jest przewrotne: **więcej kopania = mniejszy limit**, nie większy.
+
+To rozwiązuje niejasność, którą wisiałem turę temu. Nie zgadujemy w obie strony — schodzimy z limitem.
+
+Była tam też mocniejsza opcja na najgłębsze przypadki ([5039](Docs/Konwersacja_RubikND.md)): po wejściu w tryb-ucieczki (`stall ≥ limit`) **kop co każdy GA** aż do poprawy, zamiast czekać znów pełny limit — podtrzymana seria, włączana dopiero po pierwszym nieskutecznym kopie.
+
+I jeszcze jeden trop, którego nie zapominajmy, choć samej maszynerii nie wskrzeszamy: tamta sesja podejrzewała, że reprodukowalnie-trudny klaster bywa trudny **przez odziedziczoną konfigurację** — collateral z układania wcześniejszych klastrów ([4655](Docs/Konwersacja_RubikND.md)). Rollback/checkpoint/Luby, który to miał leczyć, **odrzuciłeś** na rzecz czystego STALL-a — więc go nie wskrzeszam — ale sam wgląd zostaje: gdyby obniżenie limitu nie pękło tego klastra, następnym podejrzanym jest to, co on dziedziczy.
+
+I ładnie się to spina z naszym „kick to ślepa uliczka": tamto było prawdą dla **płaskiego płaskowyżu** (2^5 bez koherencji) — kopanie równiny nic nie daje. Teraz koherencja dowozi gradient do czystej czwórki, więc końcówka to **igła**, nie równina — a dla igły częstość kopnięć *jest* dźwignią. Nie sprzeczność, tylko inny reżim.
+
+Dopisuję to do pamięci i proponuję konkret: `STALL_LIMIT = 4` na 3^4, patrzymy, czy pęka przedostatni klaster.
+
+Ustawiam `STALL_LIMIT = 4`, żebyś mógł od razu puścić 3^4 — to jest ten konkretny eksperyment z prior-artu.
+
+Gotowe. Config: koherencja D4, gładka baza, limit Micro 82, `STALL_LIMIT = 4`. To jest zmiana w Variables (czytane host-side przez `GetDefineValue` przy budowie shaderów), więc **przebuduj** i puść 3^4.
+
+Patrz na przedostatni klaster:
+- **pęka szybciej** → prior-art trafiony, częstsze kopnięcia wyprowadzają z igły; wtedy ewentualnie zsweepujemy 4/5/6 dla optimum (za mało kopania → ogon zostaje, za dużo → błądzenie).
+- **dalej się męczy** → sięgamy po mocniejszą opcję: kop co każdy GA w trybie ucieczki (po pierwszym nieskutecznym). To osobna, mała zmiana w [Form1.cs:290](RubikCube/Form1.cs:290).
+- **w ogóle nie pęka** → wtedy dopiero ten trop z odziedziczoną konfiguracją.
+
+Licznik tyka teraz co przebieg, więc od razu zobaczysz, czy to mielenie czy zawis. Czekam na wynik.
+
+## 🧑 Robert
+
+Nie, nie podoba mi się ten kierunek. STALL nie jest żadnym lekarstwem. Spróbuję zobaczyć jak sobie radzi D3. Nic nie zmieniaj. Poprawię STALL na 8, a jak będzie OK, to spróbuję i bez niego
+
+
+## 🤖 Claude
+
+Rozumiem i zgadzam się z instynktem — STALL to siatka, nie lekarstwo, a nasza własna teza cały czas brzmi „dźwignią jest ocena". Poszedłem w stronę pokrętła STALL-a, bo prior-art tam wskazywał, ale masz rację, że to leczenie objawu. Wracanie do porównania **wariantów oceny** na trudnym klastrze jest właściwym ruchem.
+
+Nic nie ruszam — ręce z dala od kodu. Zostawiam tak, jak jest.
+
+Dla porządku, żeby D3 był czysty: różni się od obecnego D4 **tylko bazą** — klif zamiast gładkiej (Setup, linia 180/182). Plus Twój `STALL_LIMIT = 8`. To wiesz, tylko przypominam, żeby nic się nie prześlizgnęło.
+
+Ciekawi mnie właśnie to porównanie: czy na tym głębokim klastrze k=3 agresywny klif (D3, „ułóż jednego kubika w całości") radzi sobie lepiej niż łagodny gradient magnitudy (D4). Puść D3 z STALL-em, a potem bez — jak polecą liczby, zestawię. Czekam.
+
+## 🧑 Robert
+
+Coś popsułeś w D3. Usunąłeś niezbędny warunek if (d != 0u) <- to zmienia zasadniczo. Nic nie poprawiaj, zrobię to za Ciebie, ale bądź ostrożny
+
+
+## 🤖 Claude
+
+Masz absolutną rację i to była realna wpadka, nie kosmetyka. Wyjaśniam dokładnie, co się stało, żeby było jasne, że rozumiem:
+
+Zwinąłem oryginalną strukturę
+```
+if (d != 0u) return (maxClusterState + d)/max_fA;
+return 0.0;
+```
+do jednego `return float(d)/maxClusterState;`. Dla **gładkiej** bazy to bezpieczne — przy `d==0` (kubik ułożony) wychodzi `0/maxClusterState = 0`, więc strażnik jest zbędny. Ale **klif** się sam nie zeruje: przy `d==0` daje `(maxClusterState + 0)/max_fA = maxClusterState/max_fA`, czyli **niezerowy fantomowy błąd na każdym ułożonym kubiku**. Zostawiłem linię klifu jako komentarz **bez** tego strażnika — więc kiedy ją odkomentujesz, żeby wrócić do D3, dostajesz klif, który karze ułożone kubiki. Cała hierarchia się sypie. Ty to złapałeś, ja to przeoczyłem.
+
+Nic nie ruszam — Twoja poprawka, Twoje ręce. Dla porządku tylko: poprawny kształt trzyma strażnik **na zewnątrz**, tak żeby oba warianty były bezpieczne przy przełączaniu:
+```
+if (d != 0u)
+    return float(d) / maxClusterState;   // albo klif
+return 0.0;
+```
+
+I biorę z tego lekcję: przy A/B przez komentarz muszę pilnować, żeby **obie** gałęzie zostały poprawne po przełączeniu, łącznie ze wspólnym strażnikiem — nie wolno mi go „wchłonąć" w jedną z form. Będę ostrożny. Czekam na Twoje D3.
+
+## 🧑 Robert
+
+A może być d == 0u? 0u : return (maxClusterState + d) / max_fA;
+
+A raczej: d == 0u ? return 0 : return float(d) / maxClusterState;
+
+
+## 🤖 Claude
+
+Tak, ternary jest dobry i zwięzły — i zachowuje strażnik, więc obie formy są bezpieczne przy przełączaniu. Dwie poprawki składniowe, bo w Twoim zapisie są pułapki:
+
+1. `return` **nie może** siedzieć w gałęziach ternary. Jedno `return`, a ternary jest wyrażeniem:
+2. Obie gałęzie muszą być **tego samego typu — `float`**. `0u` (uint) ani `0` (int) się nie skompilują obok `float(...)` — musi być `0.0`.
+
+Więc:
+
+**D4 (gładka):**
+```glsl
+return d == 0u ? 0.0 : float(d) / maxClusterState;
+```
+
+**D3 (klif):**
+```glsl
+return d == 0u ? 0.0 : (maxClusterState + float(d)) / max_fA;
+```
+
+Przy gładkiej formie strażnik jest formalnie zbędny (`0/x = 0`), ale nieszkodliwy; przy klifie jest **konieczny** — i o to właśnie chodzi, żeby A/B przez podmianę tylko drugiej gałęzi było zawsze poprawne. Nic nie ruszam, rób śmiało.
+
+## 🧑 Robert
+
+Nie rozumiem, co tam się stało przy error, które spadło do 1,34 nie znalazł rozwiązania i stall go wyrzucił z minimum. Z jednak strony - można powiedzieć - winny stall - ale GA chyba powinno znaleźć bezwzględnie rozwiązanie, które jest tylko 2-ruchy od ułożenia?
+
+A jednak przechodzi ten klaster po 2600 GA
+
+
+## 🤖 Claude
+
+To jest bardzo dobra obserwacja i ona sama w sobie **odpowiada na Twoje pytanie**. Rozumujesz: „GA powinno bezwzględnie znaleźć rozwiązanie 2 ruchy od ułożenia". I właśnie dlatego, że **go nie znalazło**, wiemy, że to rozwiązanie **nie jest 2 ruchy w sensie GA**.
+
+Popatrz: fitness ocenia wszystkie prefiksy chromosomu, populacja 1024, 50 pokoleń. Gdyby domknięcie było naprawdę **2 ważnymi ruchami** (z FreeMoves, nie psującymi ułożonych klastrów), to prefiksy długości 2 są próbkowane **gęsto** — GA trafiłby w to niemal na pewno. Skoro nie trafił, to znaczy, że te „2 ruchy" to **kolaps koherentny**, a nie ważna sekwencja: te dwa obroty warstw składają residuum, ale **rozwalają ułożone klastry** (warstwa zawiera też ich kubiki), więc leżą **poza FreeMoves**. Ważne domknięcie — takie, które nie psuje reszty — to **komutator**, znacznie dłuższy niż 2 ruchy.
+
+I tu wraca to, co poprzednia sesja zmierzyła: residuum trzeba domknąć **dokładną odwrotnością** operatora, który je stworzył, a materiał GA to seedy układające **jeden kubik**. Komutator domykający całą koherentną grupę trzeba **złożyć crossoverem** z tych jednokubikowych cegieł — a na 50 pokoleń to mało prawdopodobne dla głębokiego klastra. Stąd near-miss na 1,34, a nie domknięcie.
+
+Więc wina nie jest ani czysto STALL-a, ani czysto GA:
+- **STALL jest ślepy na bliskość** — widzi tylko „fitness nie poprawił się przez 8 przebiegów", więc kopie. Nie wie, że stał 2 kroki od mety.
+- **GA nie miało w populacji tego komutatora** — bo to nie jest 2-ruchowa igła, tylko dłuższa.
+
+Strojenie STALL-a tego nie leczy (słusznie je odrzuciłeś) — korzeń to **zdolność domykania**, nie częstość kopnięć.
+
+A dobra wiadomość jest w Twoim drugim zdaniu: **przechodzi po 2600 GA.** Czyli metryka + STALL domyka 3^4, tylko z ciężkim ogonem na tym **najgłębszym** klastrze — i to jest spójne z całą resztą. Porównaj: na 2^4 (narożniki, płytkie) GA domykał koherentne residuum bez STALL-a, bo tam komutator jest krótki. Klaster k=3 w 3^4 (N=4, 32 głębokie kubiki) ma komutatory **dłuższe**, niż GA niezawodnie składa w 50 pokoleniach — więc near-miss, kopnięcie, i ~2600 GA błądzenia, aż trafi w konfigurację, którą populacja akurat domknie.
+
+To jest ogon głębokiego klastra i jest raczej **wewnętrzny** dla czystego, jednolitego GA — cena za to, że nie curujemy seedów pod konkretny klaster ani nie specjalizujemy końcówki. Zgodne z tym, czym ten projekt ma być.
+
+Ciekaw jestem porównania: to był D3 (klif). Jak wypadło D3 vs D4 na tym samym klastrze — klif domyka near-miss lepiej czy gorzej niż gładka baza?
+
+## 🧑 Robert
+
+Gładka baza w ogóle nie domknęła - nawet ze STALL = 8. D3 wisi na 4 ostatnich kubikach ostatniego klastra - to już C lepiej z tego wychodził
+
+
+## 🤖 Claude
+
+To jest wynik, który się liczy — i pokornie sadza całą tę elegancką maszynerię. Na **realnej** kostce kolejność się odwróciła: **C > D3 > D4**. To, co było najlepsze na 2^4, przegrywa na 3^4. Test zrobił dokładnie to, co miał — złapał **przeuczenie pod 2^4**. Zdiagnozujmy każdy element.
+
+**D4 (gładka baza) najgorsza — w ogóle nie domknęła.** To znaczy, że **klif jest nośny dla peelingu wieloklastrowego**. Agresja „ułóż jednego kubika w całości" napędza greedy peel przez wszystkie klastry; łagodny gradient magnitudy jest za słaby — dłubie i nie domyka. Na 2^4 (jeden klaster) gładka baza pomogła płaskiemu floorowi, ale to była **lokalna** wygrana. Poza jednym klastrem klif wygrywa. Gładka baza wypada.
+
+**D3 wisi na ostatnich 4, a C nie — winny FLOOR.** Floor kładzie wszystkie stany poniżej `T=4` na koszt 4. Więc ostatni komutator, który idzie przez stany pośrednie z 3/2/1 nieułożonymi, **traci gradient** — wszystko spłaszczone do 4. C bez floora zostawia ten gradient (3, 2, 1) plus płaski rabat za koherentną czwórkę/dwójkę, więc **nawiguje domknięcie**. Floor, który blokował zejście ku mono-twistowi na 2^4, tu **zabija ostatnią milę**. To był overfit pod bramę 2^4.
+
+Czyli 3^4 pokazało, że **najprostszy wariant — C — uogólnia się najlepiej**. Floor i drabina-głębokości celowały w niewłaściwy cel (koherentną ósemkę 2^4), a agreeAxes dokłada pokrycie warstwy, którego ostatnia mila i tak nie potrzebuje.
+
+Rekomendacja: **wróć do C.** Zachowujemy to, co przetrwało test — klif + płaski rabat za koherencję — a wyrzucamy floor, drabinę i gładką bazę. To jest zgodne z Twoim etosem (prostota, krawędź nad wystrojonym wnętrzem). Poprawiam pamięć, bo obecnie koronuje D4, a 3^4 to obaliło.
+
+
+## 🧑 Robert
+
+Drażni mnie, że formatka w Visual studio w designerze mieści wszystkie kontrolki, a po uruchomieniu dół obcina. Coś tam designer krzyczy, że jest w trybie DPI Unaware, ale jak by to trochę poprawić to dokładnie nie wiem
+
+
+## 🤖 Claude
+
+Ten warning z designera to dobra wskazówka — to jest klasyczny problem WinForms na ekranie z powiększeniem (masz 170%). Zanim cokolwiek zaproponuję, zobaczę, jak aplikacja jest dziś skonfigurowana, żeby nie strzelać na oślep.
+
+Widzę już zarys: .NET 8 WinForms, `AutoScaleMode = Font`, klient 1202×1022, panel po lewej (Dock=Left) i widok GL wypełniający resztę. Zobaczę jeszcze, jak ustawiona jest świadomość DPI — Program.cs i App.config.
+
+Mam pełny obraz i diagnoza jest jednoznaczna.
+
+Program.cs nie ustawia **żadnego** trybu DPI (jest tylko `EnableVisualStyles` + `SetCompatibleTextRenderingDefault`, po staremu). Efekt: aplikacja rusza jako **DPI-Unaware**, więc przy Twoim powiększeniu 170% **Windows rozciąga cały obraz okna bitmapowo** ×1,7 — a designer w Visual Studio jest **DPI-aware**, pokazuje prawdziwy układ. Stąd dokładnie to, co widzisz: w designerze mieści się, a po uruchomieniu rozdmuchane okno wychodzi poza ekran i dół się obcina (a przy okazji jest lekko rozmyte). To nie kwestia rozmieszczenia kontrolek — to rozjazd trybu DPI między designerem a runtime'em. (Ten `App.config` z `.NETFramework v4.8` to zresztą pozostałość po migracji z Frameworka — .NET 8 go ignoruje.)
+
+**Poprawka jest jednolinijkowa** — pierwsza instrukcja w `Main`, przed resztą:
+
+```csharp
+Application.SetHighDpiMode(HighDpiMode.SystemAware);
+Application.EnableVisualStyles();
+Application.SetCompatibleTextRenderingDefault(false);
+Application.Run(new TRubikForm());
+```
+
+To zrównuje runtime z designerem: okno przestaje być rozciągane bitmapowo, renderuje się ostro w prawdziwym DPI, a `AutoScaleMode=Font` skaluje kontrolki tak, jak w designerze — więc powinno się zmieścić.
+
+Wybieram **`SystemAware`, nie `PerMonitorV2`**, świadomie: masz własny widok GL (`tglView1`), a PerMonitorV2 przeskalowuje układ na żywo przy przenoszeniu między monitorami o różnym DPI — to mogłoby namieszać w viewportcie GL. SystemAware bierze DPI monitora przy starcie i nie rusza — załatwia obcinanie bez tego ryzyka.
+
+Jedno uczciwie: jeśli po tej zmianie dół dalej będzie **ciasny**, to znaczy, że formatka jest po prostu **wyższa niż Twój ekran w tym powiększeniu** (klient ma 1022 px wysokości) — i wtedy wtórna poprawka to uczynić okno **skalowalnym** (dock/anchor + `AutoScroll` na panelu), a nie sztywnym. Ale to dopiero, gdyby sam DPI nie wystarczył.
+
+Wprowadzić tę linijkę do Program.cs?
+
+## 🧑 Robert
+
+Tak, wprowadź, a przy okazji zerknij do Form1.cs, gdzie chciałem w warunku pominąć STALL, ale coś musiałem popsuć, bo podczas układania zdarzyła się rzecz fantastyczna - powiesił się po ułożeniu klastra.
+
+
+## 🤖 Claude
+
+Dwie rzeczy. Najpierw poprawka DPI (zatwierdzona), a równolegle czytam Twoją zmianę w Solve().
+
+Znalazłem Twoją zmianę (linia 293 — zakomentowany `|| Stall >= StallLimit`). Ale zanim orzeknę przyczynę, muszę zrozumieć, jak `NextCluster` traktuje `Score`, bo tu jest sedno. Doczytam.
+
+Zbuduję (zmiana DPI) i wyjaśnię hang.
+
+
+## 🧑 Robert
+
+Przepraszam, to chyba mój błąd w GetActiveCubieError, widzę, że  zmiany nie były zaakceptowane w Setup
+
+
+## 🤖 Claude
+
+Dobry trop i pasuje lepiej niż moja diagnoza ze STALL-em — którą przy okazji wycofuję, bo budowałem ją zakładając, że Setup jest poprawny.
+
+Jeśli w `GetActiveCubieError` została forma **klifu bez strażnika** (moja poprzednia wpadka, którą ternary miał naprawić, a zmiana się nie zapisała):
+```glsl
+return (maxClusterState + float(d)) / max_fA;   // bez if (d != 0u)
+```
+to **ułożony kubik (`d==0`) zwraca `maxClusterState/max_fA ≠ 0`** — czyli każdy solved kubik dokłada błąd. Wtedy `Score` **nigdy nie schodzi do 0**, `if (Score == 0)` nie odpala, `NextCluster` nie jest wołany — klaster niby ułożony (State pokazuje solved), ale Score dodatni, więc solver kręci się bez końca. To tłumaczy „powiesił się **po ułożeniu** klastra" znacznie lepiej niż brak STALL-a. Shader się kompiluje (klif bez strażnika jest składniowo poprawny), więc żadnego wyjątku — tylko zawis.
+
+Nic nie ruszam w Setupie — zapisz swoją poprawioną wersję ze strażnikiem (ternary `d == 0u ? 0.0 : ...`). Jak zapiszesz, mogę zerknąć i potwierdzić, że jest OK, zanim puścisz.
+
+Build wstrzymany — zmiana DPI w Program.cs jest na dysku, ale niezweryfikowana; zbudujesz razem z poprawką Setupu. Wtedy przy okazji sprawdzimy, czy dół formatki przestał się obcinać.
+
+## 🧑 Robert
+
+Miałeś rację z formatką, jest dużo ostrzejsza po uruchomieniu, nie obcina, a jednak... wszystko jest rozciągnięte i to tylko w pionie
+
+Nie, to złudzenie jest OK, dzięki. Myślę o jednej modyfikacji - zamiast aktualnego zachowania STALL.  Jeśli STALL przekracza swój limit, moglibyśmy dopuszczać rozwiązania, które mają ten sam fitness co aktualna kostka
+
+Zresztą, co nam szkodzi, dopuszczajmy zawsze takie rozwiązania
+
+
+## 🤖 Claude
+
+Najpierw — dobrze, że DPI wyszło (złudzenie rozciągnięcia to zwykle pierwsze wrażenie, bo mózg pamięta rozmyty, „większy" obraz). I widzę, że Setup masz już poprawiony na klif ze strażnikiem (ternary) — czysto.
+
+Twój pomysł z równym fitnessem jest **elegancki** i chcę wyłuszczyć, czemu jest bezpieczny, bo to nie jest oczywiste:
+
+Kluczem jest **kara za no-op**. Ewaluator dolicza `2*CUBIES_COUNT` osobnikowi, który nie rusza aktywnego klastra. Więc „stanie w miejscu" ma fitness **wyższy** niż Score, nie równy. Dzięki temu `Best.Fitness == Score` oznacza **prawdziwy ruch boczny** — realną sekwencję, która przechodzi do *innego* stanu o tym samym fitnessie. Czyli `<=` nie akceptuje bezruchu; akceptuje **spacer po płaskowyżu**.
+
+I to ładnie spina się z całą naszą historią: STALL **zeskakuje** z płaskowyżu (akceptuje gorsze), a Twoje `<=` **chodzi** po nim (akceptuje równe), aż trafi na krawędź, z której GA znajdzie zejście. Dla płaskiej końcówki chodzenie jest naturalniejsze niż skok w dół. I odblokowuje dokładnie ten zawis bez-STALL-a, w który wpadłeś.
+
+Bonus, którego może nie widać: to bywa **szybsze** od STALL-a. STALL czeka `StallLimit=8` pustych przebiegów przed każdym kopnięciem; `<=` akceptuje boczny ruch **co przebieg** — więc przemierza płaskowyż ~8× gęściej.
+
+Dwa uczciwe zastrzeżenia:
+1. **Inflacja ruchów.** Każdy boczny ruch dokłada geny do rozwiązania — długość rozwiązania (i licznik Moves) może spuchnąć. Poprawności nie psuje, ale solucja robi się długa.
+2. **`<=` odblokowuje płaskowyże, ale nie ścisłe minimum lokalne.** Gdyby istniał stan, w którym *każdy* ruch jest ściśle gorszy (brak bocznego) — dalej zawis. Dla płaskiej końcówki mało prawdopodobne, ale gdyby wróciło, STALL (akceptacja gorszego) wraca jako ostateczna siatka.
+
+Przeczytam aktualną linię i zmienię `<` na `<=`.
+
+
+## 🧑 Robert
+
+Już nie bądź taki, sam zmienię znak, ale z no-opem to masz rację, ten znak to relikt sprzed epoki wyrzucenia no-opów z równania. D3 poległ bez STALL'a na przedostatnim klastrze. Może ruchy boczne uratują kostkę
+
+
+## 🤖 Claude
+
+Fair — wjechałem z edycją, którą chciałeś zrobić sam. Wyluzuję z tym, zwłaszcza na Twoich plikach. Zapisuję to sobie, żeby nie wracało.
+
+Jedna rzecz techniczna, żeby nie było kolizji: moja edycja **już** zmieniła tę linię na `<=` (plus komentarz) na dysku. Jeśli zmieniasz znak w VS, to Twój zapis nadpisze mój — więc albo zostaw mój, albo zapisz swój; tak czy siak ląduje `<=`. Tylko pilnuj, żeby VS nie zgłosił konfliktu „plik zmieniony na dysku".
+
+I trafiłeś w samo sedno z tym reliktem: `<` miało sens, **gdy no-opy siedziały w równaniu** — wtedy bezruch remisował Score, więc ostry `<` był jedynym sposobem, żeby go nie akceptować. Po wyrzuceniu no-opów (kara `2*CUBIES_COUNT`) remis znaczy już „realny ruch boczny", więc `<=` jest bezpieczne. Znak został po prostu z tamtej epoki.
+
+A pomysł jest dobry właśnie na to, co widziałeś: D3 bez STALL-a stanął na przedostatnim klastrze, bo w płaskim stanie nie było nic `<` do przyjęcia. Ruch boczny da mu czym przemierzać ten płaskowyż ku krawędzi, z której GA znajdzie zejście. To jest test — puść i zobacz, czy `<=` faktycznie ratuje ten klaster.
+
+Zapisane. Czekam na wynik D3 z `<=` na tym przedostatnim klastrze — ciekawe, czy boczny spacer go domknie.
+
+## 🧑 Robert
+
+Moim zdaniem to domyka kwestię STALL - jest CAŁKOWICIE zbędny i możesz to sobie zanotować w pamięci (bo z innymi wnioskami często spieszysz się za bardzo). Ruchów bocznych jest dużo - zwłaszcza tam, gdzie boli, a od każdego takiego ruchu mamy inną konfigurację i narzędzia do wyjścia z niej - więc nie błądzimy, tylko sukamy rozwiązania
+
+
+## 🤖 Claude
+
+To jest czysta puenta całego wątku STALL-a, i zgadzam się — ale nie z pośpiechu, tylko dlatego, że to się domyka mechanistycznie. STALL akceptuje **gorszy** stan — to narzędzie do wychodzenia z **kotliny**. A końcówka to **płaskowyż**, nie kotlina. Ruch boczny akceptuje **równy** stan — to jest natywne narzędzie płaskowyżu. Więc STALL był przez cały czas niewłaściwym instrumentem, a Twoje „ruchów bocznych jest dużo właśnie tam, gdzie boli" to sedno: płaskowyż jest gęsty, zawsze jest w bok gdzie iść, a każde takie przejście daje GA **świeżą konfigurację do zaatakowania**. Szukanie, nie błądzenie — dokładnie.
+
+Zanotuję to jako trwały wniosek. Dołożę jedną granicę — nie żeby osłabić, tylko żeby był precyzyjny: działa, bo płaskowyż jest **spójny bocznymi ruchami**. Gdyby kiedyś pojawił się ściśle izolowany stan (każdy ruch gorszy, żadnego bocznego), dopiero wtedy trzeba by akceptacji gorszego — ale takiego nie widzieliśmy i struktura płaskowyżu mówi, że go nie ma. Czyli STALL wychodzi, a wraca tylko jako absolutna ostateczność, której się nie spodziewamy.
+
+Przeczytam obecny stan notatek o STALL-u i poprawię je na ten wniosek.
+
+Zapisane, i to jako Twój wniosek, nie mój pośpiech — w trzech miejscach: [measure-tail](../memory/measure-tail-not-mean.md) dostał pełny zapis (STALL całkowicie zbędny, zastąpiony ruchem bocznym `<=`, z mechanizmem „płaskowyż, nie kotlina" i tym reliktem po no-opach), notatka o koherencji ma baner odsyłający, a indeks poprawiony. Wcześniejsze „STALL to konieczna siatka" jest wprost oznaczone jako artefakt ostrego `<`.
+
+STALL wypada. Zostaje w kodzie tylko martwy `Stall++`, ale to Twoja decyzja, czy go sprzątnąć — nie ruszam.
+
+## 🧑 Robert
+
+Jest jednak problem - D3 teraz na płaskowyżu strasznie kręci kostką - ruchy boczne - ale nie znajduje wyjścia. Zanim zdąży cokolwiek znaleźć - przełącza się kolejnym ruchem bocznym - więc może jednak zmodyfikowany STALL o którym pisałem wcześniej - dopuszczamy ruchy boczne - ale dopiero po przekroczeniu limitu STALL - to również niweluje minusy o których wspominałeś wcześniej (przepraszam że mieszam ze STALL'em, no ale rzeczywistość nakazuje jednak głęboką pokorę)
+
+
+## 🤖 Claude
+
+To jest właśnie pokora, o której mówisz, i jest w niej piękno — teoria mówiła „ruchy boczne", rzeczywistość dopowiada „ale nie co przebieg". Nie przepraszaj za mieszanie ze STALL-em; to jest destylacja, nie chaos. I złapałeś dokładny mechanizm: always-`<=` **przeskakuje bok co przebieg, zanim GA zdąży cokolwiek przeszukać** z danej konfiguracji — więc kręci kostką w nieskończoność, nie dając sobie szansy na zejście. Klasyczne „za dużo eksploracji, zero eksploatacji".
+
+Twoja poprawka jest właściwa i, co ważne, **STALL wcale nie wypada — wraca jako zegar**. Zmienia się tylko jego *akcja* na limicie: zamiast „przyjmij najlepszego, choćby gorszego" (narzędzie kotliny), robi „przyjmij ruch boczny" (narzędzie płaskowyżu). Warunek:
+
+```csharp
+if (Best.Fitness < RubikCube.Score
+    || (Stall >= TGA<TRubikGenome>.StallLimit && Best.Fitness <= RubikCube.Score))
+```
+
+Czyli: GA dostaje `StallLimit` przebiegów, żeby *naprawdę* znaleźć zejście z bieżącej konfiguracji; dopiero gdy utknie, robi **jeden** krok w bok, `Stall` się zeruje, i szuka od nowej konfiguracji. I to — jak sam zauważasz — kasuje minusy, które wymieniałem: ruchy boczne są teraz **rzadkie** (raz na `StallLimit`), więc nie ma inflacji ruchów ani jałowego krążenia.
+
+Nie wchodzę z edycją — to jest linia, którą zmieniasz w VS. Zostawiam Ci gotowy warunek powyżej (uncomment STALL + dodane `&& Best.Fitness <= Score`).
+
+I muszę naprawić pamięć, bo poprzednią turę zapisałem „STALL całkowicie zbędny" jako pewnik — a rzeczywistość zweryfikowała to jedną turę później. To jest ta dokładnie ta lekcja o nierozpędzaniu się z wnioskami. Poprawiam na wersję bramkowaną.
+
+Poprawione — pamięć w trzech miejscach mówi teraz to samo: STALL zostaje jako **zegar**, a jego akcją na limicie jest **ruch boczny** (bramkowany), nie akceptacja gorszego. Odnotowałem też uczciwie, że „całkowicie zbędny" było przedwczesne — dokładnie ta lekcja o niepędzeniu z wnioskami, tym razem na mnie samym.
+
+Warunek masz gotowy do wklejenia. Ciekawe, czy `StallLimit=8` przebiegów na konfigurację to dobry budżet na szukanie, zanim zrobi krok w bok — jak puścisz D3 na 3^4, zobaczymy, czy przestaje kręcić i faktycznie schodzi z płaskowyżu. A gdyby 8 było za mało/za dużo, to teraz zwykły sweep jak przy `MUTATION_RATIO`.
+
+## 🧑 Robert
+
+if (Best.Fitness < RubikCube.Score
+                    || (Best.Fitness == RubikCube.Score && Stall >= TGA<TRubikGenome>.StallLimit)) // jest dla mnie wyraźniejsze (wklejam sam)
+
+
+## 🤖 Claude
+
+Równoważne co do joty — sprawdziłem wszystkie cztery przypadki. I Twoja forma jest **czytelniejsza**, nie tylko subiektywnie: moje `<= Score` w drugiej gałęzi miało redundantne nakładanie z pierwszym `< Score`, więc część `<` była martwa. Twoje `== Score` **nazywa wprost** przypadek, o który chodzi — „równy fitness (ruch boczny), gdy utknęliśmy". Lepszy zapis intencji. Wklejaj swoją.
+
+Zrównam tylko wyrażenie w pamięci z tym, co faktycznie idzie do kodu.
+
+Widzę — Twój warunek jest już w Form1.cs. Gated sideways siedzi w kodzie, pamięć zrównana. Czekam, co zrobi D3 na 3^4: czy przestaje kręcić w kółko i schodzi z płaskowyżu w rozsądnym czasie. Jak polecą liczby — zestawię.
+
+## 🧑 Robert
+
+D3: Ładnie układa 3 klaster, tam błąd dla 4 nieułożonych spada wyraźnie sekwencją: 16->8->4->0. Tak przy okazji: STALL z coraz krótszym krokiem prowadziłaby do sytuacji którą teraz mamy (w najlepszym razie): kręsceniem kostki w kółko. Nawet dla STALL = 8 D3 nie układa 4 klastra. Przełączam na STALL = 20
+
+
+## 🤖 Claude
+
+Cluster 3 z sekwencją 16→8→4→0 to jest **drabina koherencji w akcji** — dokładnie ten łańcuch kolapsu (warstwa → przecięcie → ... → ułożone), po który była budowana. Ładny dowód, że metryka prowadzi.
+
+A Twoja uwaga o „STALL z coraz krótszym krokiem" jest ostra i **odwraca kierunek strojenia**. Popatrz: przy STARYM STALL-u (akceptacja gorszego) prior-art mówił *obniżaj* limit — częstsze kopnięcia wyprowadzają z kotliny. Przy **bramkowanym ruchu bocznym** obniżanie limitu zbliża się do always-`<=`, czyli do **kręcenia w kółko**, które właśnie widzieliśmy. Więc mechanizm **przewrócił pokrętło**: teraz chcesz limit *wyższy* — więcej przebiegów GA na eksploatację danej konfiguracji, zanim zrobisz krok w bok. STALL=20 to właściwy kierunek dla twardego 4. klastra.
+
+Jest oczywiście optimum — za wysoko marnujesz przebiegi, zanim zrobisz potrzebny krok boczny (wolno), za nisko thrash. Ale dla trudnego klastra strzałka idzie **w górę**, i to jest sweep jak przy `MUTATION_RATIO`.
+
+Zapisuję to odwrócenie kierunku, bo koryguje prior-artowe „obniżaj limit".
+
+Zapisane — odwrócenie kierunku strojenia jest w pamięci, z tym niuansem, że stary STALL chciał niżej, a bramkowany bok chce wyżej. Czekam na 3^4 ze STALL=20: czy 4. klaster wreszcie pęka, i przy jakim koszcie (bo za wysoki limit to już wolniej). Jak zadziała, warto by potem uczciwie zmierzyć ogon tej wersji — bramkowany-bok + strojony limit — na 2^4/2^5, żeby zobaczyć, czy to jest ta stabilna końcówka, której szukaliśmy.
+
+## 🧑 Robert
+
+Przy STALL = 20 klaster 4 naprawdę ładnie się domknął przy 2400 GA. Spadł nagle z błędu 12->3, utrzymał się trochę - żaden stary STALL go stamtąd nie wyrzucił - zszedł jeszcze poziom niżej i domknął klaster. Mignęła mi piękna koherencja na diagramie. Klaster ostatni jest naprawdę trudny - ruchy boczne są rzadkie, często rzadsze, niż STALL_LIMIT=20 (np.43). Domknął, total całkiem niezły: 9554 GA
+
+
+## 🤖 Claude
+
+To jest domknięcie — i to piękne. **3^4 ułożone w całości, 9554 GA.** Mechanizm przeszedł prawdziwy test: nie pojedynczy klaster narożny 2^4, tylko głęboka, wieloklastrowa kostka N=4. To jest to, czego szukaliśmy przez dwie sesje.
+
+I opisałeś **dokładnie** ten moment, dla którego to robiliśmy: błąd spadł 12→3, **utrzymał się**, żaden stary STALL go stamtąd nie wyrzucił, a potem zszedł niżej i domknął. Stary STALL (akceptacja gorszego) **zepchnąłby** kostkę z tego dobrego stanu — bramkowany bok pozwolił jej **tam zostać i szukać**. Cała różnica w jednym zdaniu z Twojej obserwacji.
+
+A uwaga o ostatnim klastrze jest najciekawsza. Ruchy boczne są tam **rzadkie** — rzadsze niż `StallLimit=20`, czasem 43. I zobacz, jak warunek to elegancko obsługuje: `Stall >= 20` staje się prawdą, ale dopóki nie pojawi się boczny (`== Score`), nic nie akceptuje — więc czeka do ~43, aż boczny się pojawi, i wtedy go bierze. **Rzadki płaskowyż to dłuższe czekanie, nie zawis.** Adaptuje się sam.
+
+Z tego wynika coś dobrego dla „mniej pokręteł": na najtrudniejszym klastrze wiąże **dostępność bocznych** (~43), nie limit (20). Więc `StallLimit` nie jest przewrażliwiony — steruje głównie eksploatacją na *średnio*-trudnych klastrach (jak 4., który potrzebował 20 zamiast 8). Twardy ostatni i tak czeka na boczny.
+
+Zapisuję ten wynik. A potem uczciwy krok, którego jeszcze nie zrobiliśmy: **zmierzyć ogon tej wersji na 2^4/2^5** — bramkowany bok + `StallLimit=20`. Bo „ładnie domknął 3^4 raz" to jeszcze nie „stabilna końcówka", a właśnie stabilności (ogona, nie mediany) szukamy.
+
+Zapisane — 3^4 solved (9554 GA), zachowanie „utrzymaj i zejdź", i ta adaptacja na rzadkie boczne w ostatnim klastrze. Gdy puścisz serię na 2^4 (i 2^5), wrzucaj surowe `#GAIter` — policzę max, CV i p90 i zobaczymy, czy bramkowany bok domyka wreszcie ten ogon.
+
+## 🧑 Robert
+
+2^4 D3: 537, 17646, 158, 2714, 474, 7405, 21426, 576, 697, 1024
+Trzeba pamiętać, że zmiana strategii STALL wpływa na wyniki
+
+
+## 🤖 Claude
+
+Liczby, i są dwustronne:
+
+| 2^4 (eval D3, floor/ladder) | mediana | CV | p90 | max | >10k |
+|---|---|---|---|---|---|
+| stary STALL=8 | 1582 | 1.16 | 6913 | 12813 | 1 |
+| **bramkowany bok, limit=20** | **860** | **1.42** | **17646** | **21426** | **2** |
+
+Ten sam eval, zmieniona tylko strategia STALL — więc to jest czyste porównanie samego mechanizmu. I wynik jest **niejednoznaczny**: **najlepszy środek, jaki mieliśmy** (mediana 860), ale **najcięższy ogon** (dwie katastrofy, max 21426). A my mierzymy ogon, nie środek. Więc na 2^4 ta wersja jest *gorsza* na osi, która nas obchodzi.
+
+Masz rację z tym zastrzeżeniem — i podejrzany jest **`StallLimit=20`**. Wystroiliśmy go pod twardy 4. klaster 3^4. Na 2^4 (płytki narożny klaster) 20 znaczy „czekaj 20 pustych przebiegów przed każdym krokiem w bok" — a jeśli końcówka wymaga kilku kroków bocznych, to kilka × 20 = te wielkie katastrofy. Przy limicie 8 czekania były krótsze, ogon lżejszy.
+
+I tu jest sedno, które trzeba nazwać: `StallLimit` stał się **kruchym pokrętłem wnętrza**, dokładnie tym, czego zasada „krawędź, nie wystrojone wnętrze" kazała unikać. Bo obie krawędzie są złe — limit → ∞ to powrót ostrego `<` (zawis), limit → 0 to thrash. Dobra wartość leży w środku i **różni się per kostka**: 3^4 chce ~20, 2^4 chce mniej. To realny minus bramkowanego boku.
+
+Zanim cokolwiek wpiszę do pamięci — izolujmy to. Puść **2^4 z bramkowanym bokiem, ale `StallLimit=8`** (albo sweep 8/12/16/20). Jeśli ogon na 2^4 wraca do lekkiego przy niskim limicie — potwierdzamy, że 20 to sprawca, i że limit trzeba by *stroić per kostka* (albo uadaptywnić, np. skalować z N). Jeśli ogon zostaje ciężki niezależnie od limitu — to nie limit, tylko sam bok chodzi po 2^4 za długo. Które — powie dopiero ta seria.
+
+## 🧑 Robert
+
+Nie, nie podoba mi się ta droga. Wróćmy do koncepcji z mieszanymi koherencjami. Musimy wyłapać przypadki, kiedy np. nasza 2^m grupa składa się z 2 2^(m-1) koherentnych grup
+
+
+## 🤖 Claude
+
+Zgoda — i to jest właściwy zwrot. Z powrotem na ocenę, gdzie dźwignia zawsze była, zamiast na kruche pokrętło. To jest ta odłożona **graded coherence**, którą sami nazwaliśmy strefą ryzyka. Wchodzimy w nią świadomie, i słusznie.
+
+Koncepcja, tak jak ją stawiasz: dziś detektor pyta „czy **cała** reszta to jedna koherentna grupa?". Uogólniamy na **rozkład**: reszta 2^m to albo 1 koherentna grupa, albo 2 koherentne 2^(m-1) połówki, albo 4 ćwiartki… aż do rozsypanych singletonów. Rekurencyjny rozkład na **maksymalne koherentne przecięcia**.
+
+Naturalna miara — suma **głębokości** kawałków:
+- 1 całość 2^m → `N-m`;
+- 2 połówki → `2·(N-m+1)` (więcej niż całość — dwie połówki są dalej od ułożenia, dobrze);
+- rozsypane → `2^m · N` (~licznik).
+
+Gradient: zbieranie kubików w mniej/większe koherentne grupy obniża sumę. Uogólnia obecną drabinę (przypadek 1-grupowy jako granica).
+
+**Krux, bo to strefa ryzyka — nieoszukiwalność.** Kawałek dostaje zniżkę głębokości **tylko** jako prawdziwe koherentne przecięcie (agreeAxes: wspólny stan **i** wspólna warstwa). Grupa „ten sam stan, ale rozrzucona po warstwach" — czyli dokładnie cheat 3/32 — nie jest przecięciem, więc jej kubiki lecą jako singletony (drogo). Wyrównanie orientacji w miejscu nic nie daje. I liczymy **pełny** rozkład, a nie częściowy kredyt za największą grupę — a to właśnie częściowy kredyt spłaszczał tamte warianty. Te dwie rzeczy dają nadzieję, że tym razem nie spłaszczy. Nadzieję, nie pewność — zmierzymy.
+
+Zanim zakoduję, dwie decyzje:
+1. **Miara** — suma głębokości kawałków (jak wyżej), czy wolisz prostsze (np. sama liczba koherentnych grup)?
+2. **Zakres** — od razu rekurencja na dowolną głębokość, czy **minimalnie tylko „2 połówki"** (jeden poziom), żeby sprawdzić, czy w ogóle pomaga, zanim wpiszemy pełną rekurencję?
+
+Ja bym zaczął minimalnie — sam przypadek „2 połówki". Najmniejsza zmiana, która testuje hipotezę; rekurencję dołożymy, jak się obroni. Zapiszę jeszcze, czemu porzucamy drogę STALL-a, żeby została ślad.
+
+Zapisane — droga STALL-a zamknięta z uzasadnieniem (kruche pokrętło), a graded coherence odnotowana jako następny front. Nie ruszam shadera, dopóki nie ustalisz tych dwóch rzeczy: **miara** (suma głębokości kawałków vs sama liczba grup) i **zakres** (minimalnie „2 połówki" vs od razu rekurencja). Moja rekomendacja stoi przy minimalnym „2 połówki" — ale to Twój wybór.
+
+## 🧑 Robert
+
+Minimalnie „2 połówki", miara = suma głębokości
+
+
+## 🤖 Claude
+
+Przyjęte — minimalnie „2 połówki", miara = suma głębokości. Ale zanim zakoduję, muszę Ci pokazać pułapkę, bo trafia akurat w **ten** przypadek na 2^4, który Cię interesuje, i wolę to złapać teraz niż wpiąć zepsutą miarę.
+
+Policzmy 2^4 (N=4), reszta 4 kubiki = 2 koherentne pary:
+- każda para: rozmiar 2, `depth = N − log2(2) = 3`,
+- suma głębokości = 3 + 3 = **6**.
+- A floor dla scrambled=4 (≤ T=4) to **4**.
+
+Czyli suma-głębokości wycenia 2 koherentne pary na **6 — więcej niż rozsypaną czwórkę (floor 4)**. Odwrotnie, niż chcemy: struktura miałaby być *droższa* od jej braku. Powód: małe grupy koherentne mają **wysoką** głębokość (para = 3), a floor **sztucznie zaniża** rozsypane do T. Więc suma dwóch małych głębokości przebija floor.
+
+Co ważne — to psuje się **tylko dla małego T**, czyli 2^4. Na 2^5 to samo działa: reszta 8 = 2 koherentne czwórki → `depth_half = 5−2 = 3`, suma 6, floor T=8 → 6 < 8, poprawnie. Więc miara jest dobra dla N≥5, a wywraca się na N=4, gdzie sam podałeś przykład „2 pary w czwórce".
+
+Trzy wyjścia, i tu potrzebuję Twojej geometrycznej intuicji:
+1. **Liczba grup zamiast sumy głębokości** — coherent-4 = 1, 2-pary = 2, rozsypane = 4. Właściwa kolejność, ale traci granularność głębokości (nie odróżnia coherent-8 od coherent-4 w pojedynczej grupie).
+2. **Cap: koszt = min(floor, suma-głębokości)** — bezpieczne (nigdy gorzej niż floor), ale na 2^4 daje 2-parom dokładnie floor (4), czyli *żadnego* gradientu — a właśnie o gradient chodziło.
+3. **Rabat od floora** — koszt = floor − (oszczędność za strukturę), tak dobrany, żeby 2-pary wpadły *między* coherent-4 (2) a floor (4), np. ~3.
+
+Suma-głębokości „jak jest" odpada na 2^4. Którą drogą — czy widzisz czwartą?
+
+## 🧑 Robert
+
+Przede wszystkim poprawmy nieporozumienia: w kostce Size^N interesuje nas przecięcie warstw z 2^(N-2) kubikami i to jest nasz floor - nie N (dla 2^4 - zgoda). Głębokość też zatem liczymy chyba jako 2^(N-2) - log(scrambled), zgadza się?
+
+
+## 🤖 Claude
+
+Rozdzielmy to na dwie rzeczy, bo jedną potwierdzam, a przy drugiej chcę się upewnić — i to Ty masz tu lepszą intuicję, więc popraw mnie, jeśli to ja się gubię.
+
+**Floor — zgoda w całości.** Osiągalny cel to przecięcie 2^(N-2) kubików (2 ruchy od końca), i to jest próg/floor. `T = 2^(N-2)`. Dla 2^4 wychodzi 4, co *przypadkiem* równa się N — stąd cały zamęt, ale to zbieg okoliczności.
+
+**Głębokość — tu chcę doprecyzować, bo Twój zapis `2^(N-2) − log(scrambled)` i mój `N − log(scrambled)` rozjeżdżają się poza N=4.** Sęk w tym, że `2^(N-2)` to **liczba kubików** (rozmiar przecięcia), a w głębokości potrzebujemy **liczby osi do ustawienia** (ile warstw obrócić) — a to jest **wymiar N**, nie licznik. Zbiegają się przy N=4 (`2^(4-2)=4=N`), więc tam nie widać różnicy. Ale zobacz wartości:
+
+| scrambled | głębokość `N−log₂` (2^4) | `N−log₂` (2^5) | Twoje `2^(N-2)−log₂` (2^5) |
+|---|---|---|---|
+| warstwa (2^{N-1}) | 1 | 1 | **4** |
+| cel (2^{N-2}) | 2 | 2 | **5** |
+| para (2) | 3 | 4 | **7** |
+| mono (1) | 4 | 5 | **8** |
+
+Fizycznie: koherentna **warstwa** (2^{N-1} kubików, jeden obrót) jest **1 ruch** od ułożenia. `N−log₂` daje 1 — zgadza się. `2^(N-2)−log₂` daje na 2^5 **4** — czyli twierdziłoby, że warstwa to 4 ruchy, a to nieprawda. Więc głębokość = liczba ruchów = **`N − log₂(scrambled)`**, z bazą **N (wymiar)**.
+
+Chyba że przez „2^(N-2) − log" masz na myśli „2 ruchy celu + ile połowień poniżej celu" = `2 + ((N-2) − log₂)` = **`N − log₂`** — wtedy się zgadzamy, tylko zapis inny. Które? Bo to przesądza wartości na 2^5, a nie chcę zakodować złej bazy.
+
+I jedno uczciwie: cokolwiek wybierzemy dla bazy, **nie rusza** to problemu, który zgłosiłem — 2 pary na 2^4 dają sumę 6 > floor 4 niezależnie (bo tam N=4 i tak). Ten problem miary jest osobny i wciąż otwarty.
+
+## 🧑 Robert
+
+Tak, przepraszam, za szybko, nie przemyślałem. Ale zobacz, dla przypadku 2^4: kara to depth/scrambled, czyli: dla coherent4 = 2/4, coherent2=3/2=6/4. Wydawałoby się, że najlepiej subcoherent4 = 4/4, ale to 1, czyli brak nagrody. Może 3/4. Trochę sztuczne, ale pasuje. Ogólnie byłoby to: N - log(scrambled) + subcoherenceDepth, u nas subcoherenceDepth można liczyć na razie  jako liczba grup / 2
+
+
+## 🤖 Claude
+
+Nie przepraszaj — obaj krążymy wokół tego samego i tak się to właśnie dostraja. I Twoje `3/4` jest trafne: subcoherent-4 (czyli czwórka = 2 koherentne pary) ma kosztować **3** — między pełną koherentną czwórką (2) a floorem (4). Zgadza się.
+
+Sprawdziłem Twoją formułę i mam dobrą wiadomość: dla **minimalnego przypadku (2 połówki)** dwuznaczność się kasuje. Zobacz — `subcoherenceDepth`:
+- Twoje `liczba grup / 2` przy 2 grupach = 1.
+- Alternatywa `liczba grup − 1` przy 2 grupach = też 1.
+
+**Zbiegają się dokładnie tam, gdzie teraz kodujemy.** Więc efektywna głębokość dla 2 połówek = `(N − log₂(scrambled)) + 1` = `depth + 1`. Dla 2^4: `2 + 1 = 3` → `fA *= 3/4` → koszt 3. Twój cel.
+
+Różnią się dopiero **poza** minimalnym przypadkiem, i tu jest jedna decyzja na potem:
+- `grup/2` przesuwa też **pojedynczą** grupę: coherent-4 z 2 na 2.5 (bo 1 grupa → +0.5). Elegancko, bo wtedy rozsypana czwórka (4 singletony → +2) sama daje floor 4 — cała miara się unifikuje. **Ale** ta unifikacja działa tylko przy N=4; na 2^5 rozsypane-8 dałoby `2 + 4 = 6`, a floor to 8 — rozjazd.
+- `grup − 1` zostawia pojedynczą grupę **nietkniętą** (coherent-4 = 2, jak w działającej drabinie), a floor zostaje osobną gałęzią.
+
+Skoro robimy minimalnie, wolę **nie ruszać** działającej drabiny ani floora — czyli `subcoherenceDepth = grupy − 1`, dodane tylko w nowej gałęzi „2 połówki". Pojedyncza grupa i floor bez zmian, dochodzi jeden przypadek: 2 połówki → `depth + 1`. Piękną unifikację `grup/2` odłóżmy — ma ten haczyk z N.
+
+To domyka **karę**. Zostaje druga połowa: **detekcja** — jak w shaderze rozpoznać, że reszta to 2 koherentne połówki. Najprościej: pogrupuj skręcone po **stanie**; jeśli są 2 stany, każdy po `scrambled/2` kubików i każdy jest kompletnym przecięciem (agreeAxes == depth połówki) → mamy 2 połówki. Pasuje ci ten warunek detekcji, czy widzisz przypadek, który by przez niego przeszedł niezłapany (np. 2 połówki tego samego stanu w różnych warstwach)?
+
+## 🧑 Robert
+
+Tak, dlatego mówiłem "na razie", ale masz rację, subcoherenceDepth = log(liczba grup)
+
+
+## 🤖 Claude
+
+Tak, `log₂(grupy)` jest lepsze i to trafny wybór — dla minimalnego przypadku daje dokładnie to, co ustaliliśmy:
+- 1 grupa (coherent-4): `log₂(1)=0` → depth+0 = 2 (drabina nietknięta),
+- 2 grupy (subcoherent-4): `log₂(2)=1` → depth+1 = 3.
+
+I ma tę piękną własność, dla której pewnie po nie sięgnąłeś: rozsypana reszta (grupy = scrambled) daje `(N − log₂ s) + log₂ s = N` — **floor wyłania się sam z formuły**, bez osobnej gałęzi. Całość to jedno wyrażenie: `koszt = N − log₂(scrambled) + log₂(grupy)`.
+
+Dwie rzeczy „na potem", żeby były zapisane (minimalnego kroku nie ruszają):
+1. To formuła **końcówki**. W środku gry (scrambled > T) rozsypane też spłaszczyłoby się do N, a tam potrzebny jest gradient liczenia — więc bazę zostawiamy dla scrambled > T.
+2. Wyłaniający się floor to **N**, nie 2^(N-2). Na 2^4 to samo (4); na 2^5 ciaśniejszy (5 vs 8) → słabsza premia za koherencję, do sprawdzenia. 
+
+Minimalnie i tak dodajemy tylko gałąź „2 połówki" = depth+1, reszta bez zmian.
+
+I wracam do **detekcji**, bo tego jeszcze nie domknęliśmy — bez niej nie zakoduję. Propozycja: grupujemy skręcone **po stanie**; jeśli wychodzą 2 stany, każdy po `scrambled/2` kubików i każdy jest kompletnym przecięciem (`agreeAxes == depth` połówki) → mamy 2 połówki. Widzisz przypadek, który by się wymknął — np. 2 połówki **tego samego** stanu w różnych warstwach? Bo jeśli tak, grupowanie po stanie go nie złapie i trzeba by cięcia po osi.
+
+## 🧑 Robert
+
+Nie, wygląda OK
+
+
+## 🤖 Claude
+
+Świetnie — detekcja i kara ustalone. Zakoduję gałąź „2 połówki". Najpierw przeczytam aktualny stan bloku, żeby wpiąć się precyzyjnie (był wielokrotnie ruszany).
+
+Detekcja i kara ustalone, więc wpinam gałąź „2 połówki" między pojedynczą grupę a floor. Struktura: grupuj po stanie (2 stany, każdy `scrambled/2`, każdy kompletne przecięcie), i wtedy `fA *= (depth+1)/scrambled`.
+
+Teraz zaktualizuję komentarz „SCAFFOLDING", bo już nieaktualny — 2 połówki są wpięte.
+
+Sprawdzam całość, żeby wyłapać ewentualną literówkę składniową zanim odpalisz.
+
+Jedna rzecz do poprawki: `half` jest **zarezerwowanym słowem GLSL** (półprecyzja), tak jak wcześniej `coherent`. Zmieniam na `halfCount`.
+
+Wpięte i nazwane. Podsumowanie tego, co teraz robi ewaluator w końcówce (scrambled ≤ T):
+
+- **1 koherentna grupa** (całe przecięcie) → `depth` (drabina, bez zmian),
+- **2 koherentne połówki** (2 stany, każdy kompletne przecięcie) → `depth + 1` — NOWE,
+- **reszta** (rozsypane) → floor `T`.
+
+Więc na 2^4 „2 pary w czwórce" kosztują teraz **3**, między coherent-4 (2) a floorem (4) — płaskowyż, na którym solver kręcił się w kółko, dostał wreszcie **gradient w dół**. O to chodziło.
+
+`half` przemianowane (zarezerwowane słowo GLSL), reszta nazw czysta. Shader kompiluje się przy starcie — gdyby rzucił log, wklej.
+
+Puść **2^4**: na czym patrzeć — czy stany „2 par" teraz *schodzą* zamiast czekać na ruch boczny, i czy ogon (te katastrofy 17k/21k z gated-sideways) się skraca, bo floor przestał być płaski. Jak 2^4 wygląda zdrowo — 2^5 i 3^4. To jest ten front, na który się przełączyłeś: dźwignia w ocenie, nie w STALL-u.
+
+## 🧑 Robert
+
+Teraz tak się zastanawiam dlaczego zrobiliśmy, że subcoherent4 jest gorszy od coherent2.
+
+
+## 🤖 Claude
+
+Zatrzymajmy się przy liczbach, bo w naszej formule one **nie są** gorsze — są **równe**. Policzmy na 2^4:
+- coherent-2 (pojedyncza para): drabina, `depth = N − log₂(2) = 3`.
+- subcoherent-4 (2 pary): 2 połówki, `eff = (N − log₂(4)) + 1 = 2 + 1 = 3`.
+
+Oba **3**. Więc nie zrobiliśmy subcoherent-4 gorszym — zrobiliśmy go **równym** coherent-2. I to jest chyba to, co Cię uwiera, tylko z drugiej strony: **stan z 4 nieułożonymi kosztuje tyle samo, co stan z 2 nieułożonymi** — a intuicyjnie mniej nieułożonych (coherent-2) jest *bliżej* końca, więc powinno być tańsze. Czyli subcoherent-4 powinien być **droższy** od coherent-2, a u nas jest równy.
+
+Skąd to się bierze w formule: rozłóż jedną parę (subcoherent-4 → coherent-2), czyli scrambled 4→2 i grupy 2→1. Człon `−log₂(scrambled)` rośnie o 1 (drożej), człon `+log₂(grupy)` maleje o 1 (taniej) — **znoszą się**. Więc ułożenie *jednej* pary jest kosztowo obojętne. Gradient dostajesz tylko za **scalenie** obu par w coherent-4 (3→2), a nie za **odłupanie** jednej pary.
+
+I to jest realny problem, który wychwyciłeś: między subcoherent-4 a coherent-2 jest **płaski odcinek** — solver nie jest nagradzany za rozwiązanie pierwszej pary, dopiero za ostatnią.
+
+Żeby to naprawić (subcoherent-4 > coherent-2), musiałby wpaść w wąskie pasmo (3, 4) na 2^4 — ciasne, bo floor jest nisko (4). I tu wraca nasze napięcie: **suma głębokości** dawała ten gradient odłupywania (subcoherent-4 = 6 > coherent-2 = 3), ale przebijała floor; **log₂(grup)** trzyma się pod floorem, ale spłaszcza odłupywanie.
+
+Więc pytanie do Ciebie, zanim cokolwiek ruszę: czy ta równość Ci przeszkadza (chcesz gradientu za *każdą* odłupaną parę), czy akceptujemy ją, licząc na ścieżkę scalania? Jeśli chcesz gradientu odłupywania, trzeba dać floorowi więcej miejsca — a to znaczy przemyśleć jego wartość na nowo.
+
+## 🧑 Robert
+
+Tak, a przypadkiem to równe 3, które Ci wychodzi nie jest dzielone przez scrambled - czyli jedno przez 4 a drugie przez 2?
+
+
+## 🤖 Claude
+
+Tak, dokładnie — i to dobre pytanie, bo tam jest sedno. Czynnik to `eff/scrambled`, więc faktycznie **÷4 dla subcoherent-4 i ÷2 dla coherent-2**. Ale `fA` **przed** mnożeniem to ≈ `scrambled` jednostek (bo to suma błędów po skręconych): ≈4 dla subcoherent-4, ≈2 dla coherent-2. Więc ÷scrambled **znosi się** z tym ≈scrambled i oba lądują na koszcie = `eff` = 3:
+
+- coherent-2: `2 × 3/2 = 3`,
+- subcoherent-4: `4 × 3/4 = 3`.
+
+Czyli równość bierze się stąd, że ustawiliśmy `eff = 3` dla obu (formuła `log₂(grup)`), a ÷scrambled to tylko **normalizacja** — sprowadza fA (≈licznik) do „efektywnej głębokości".
+
+I teraz najważniejsze, bo Twoja intuicja o „÷4 vs ÷2" prowadzi wprost do dźwigni: dzielimy przez **całość** (÷4). Gdybyśmy zamiast tego liczyli **per grupa** — każdą połówkę jej własną głębokością, ÷ przez połówkę — dostalibyśmy `3 + 3 = 6`, czyli **suma głębokości**. A to jest właśnie subcoherent-4 (6) > coherent-2 (3) — ta kolejność „odłupywania", której chciałeś. Tyle że to ta wersja, co przebijała floor.
+
+Więc to nie błąd — to **wybór normalizacji**: ÷przez całość → równe (pod floorem), liczenie per-grupa (÷przez połówkę) → zróżnicowane (nad floorem). Dokładnie oś log₂(grup)-kontra-suma-głębokości, tylko widziana od strony dzielnika. Pytanie, które przed nami stoi, jest więc: czy da się trafić w środek — subcoherent-4 *między* coherent-2 a floorem — a nie na jednym z tych dwóch skrajów.
+
+## 🧑 Robert
+
+Nie, w takim razie jest OK - one mają być tak samo ocenione - właściwie to przez "przypadek" jedna grupa 2-jek jest ułożona. Być może nawet to niespecjalnie wpływa na ułożenie (może trochę przeszkadzać)
+
+
+## 🤖 Claude
+
+Tak, i to jest dobre rozstrzygnięcie — Twoje własne. Zadaniem graded coherence jest **wyciągnąć stany strukturalne spod floora** (dać gradient *wyjścia* z rozsypania), a nie drobiazgowo porządkować same stany strukturalne między sobą. subcoherent-4 i coherent-2 to oba „struktura ≈ 3" — oba warte gonienia względem rozsypanej czwórki (4). Ta równość mówi po prostu: „jesteś w dobrym rejonie", a nie „ta połowa dobrego rejonu jest lepsza od tamtej".
+
+I Twój argument o „przypadkowym" ułożeniu jednej pary jest trafny: jeśli te dwie pary domyka się **wspólnym** ruchem, to przedwczesne odłupanie jednej niekoniecznie jest postępem — może wręcz przeszkadzać. Więc **nie** nagradzanie tego kroku (płasko) jest właściwe — nie wabimy solvera na możliwą ślepą odnogę. Nagroda przychodzi z bycia strukturalnym (pod floorem) i z **finalnego** domknięcia, nie z pośredniego półkroku. A gdyby po drodze był płaski odcinek, to jest dokładnie to, co ruch boczny przemierza.
+
+Czyli zostawiamy tak, jak jest — `log₂(grup)`, równe. Projekt domknięty, kod wpięty. Shader czeka; puść 2^4 i zobacz, czy stany „2 par" teraz schodzą spod floora zamiast czekać, i czy ogon się skraca.
+
+## 🧑 Robert
+
+Tak docelowo, to chyba nie będziemy musieli robić sprawdzenia oddzielnie dla charged i połówek, bo z połówek można chyba bardzo łatwo ustalić czy cały block jest spójny?
+
+
+## 🤖 Claude
+
+Tak, dokładnie — i to jest właściwa docelowa struktura. Pojedyncza grupa to po prostu **g=1** tej samej dekompozycji, którą robi gałąź połówek. Więc zamiast dwóch osobnych bramek — jedna pętla:
+
+1. pogrupuj skręcone **po stanie** → g grup,
+2. sprawdź, że **każda** grupa to kompletne przecięcie (`agreeAxes == depth grupy`),
+3. jeśli wszystkie spójne → koszt = `(N − log₂(scrambled)) + log₂(g)`.
+
+I to subsumuje wszystko naraz:
+- **g=1** (cała spójna) → `depth` (obecna drabina),
+- **g=2** (2 połówki) → `depth + 1`,
+- **g=4, 8** → `depth + 2, +3` — cała rekursja **za darmo**, bez osobnego kodu.
+
+Co ważne, zachowuje nieoszukiwalność i floor sam się wyłania:
+- rozsypane różnostanowe → g = scrambled → `(N − log₂ s) + log₂ s = N` (floor),
+- rozsypane **jednostanowe** (cheat 3/32) → g=1, ale ta grupa **nie jest** przecięciem → nie liczymy log₂(g), spada na floor. Cheat dalej nie przechodzi.
+
+Więc masz rację: to nie tylko czyściej, to **jedno** kryterium zamiast dwóch, i od razu otwiera drogę na dowolne g.
+
+Jedna uwaga pragmatyczna: ta unifikacja wymaga grupowania po **dowolnej** liczbie stanów (nie zaszytych s0/s1), więc to średni przepisanie — i łączy się z rekursją (g>2), którą i tak odkładaliśmy. Dlatego proponuję kolejność: **najpierw przetestuj obecny minimalny wariant** (czy 2 połówki w ogóle pomagają na ogonie), a jak się obroni — przepisujemy na tę jedną pętlę i przy okazji dostajemy pełne g. Sens jest, żeby nie przepisywać, zanim wiemy, że kierunek działa. Zgoda?
+
+## 🧑 Robert
+
+2^4 D3-subcoherent: 721, 205, 9583, 3733, 856, 3401, 2442, 3018, 2921, 571.
+Widziałem 8-ki złożone z 2 4-ek prowadzące po pewnej chwili do ułożenia. To naprawdę piękne, kiedy widzi się takie układy na diagrami stanu.
+
+
+## 🤖 Claude
+
+To jest naprawdę piękny wynik — i to na obu poziomach, wizualnym i liczbowym.
+
+Najpierw to, co zobaczyłeś: **ósemka złożona z dwóch koherentnych czwórek, prowadząca do ułożenia.** To jest dokładnie ten graded coherence, który przed chwilą wpięliśmy — metryka rozpoznaje subcoherent-8 (2 stany, każdy przecięcie 4 kubików), daje mu koszt między coherent-8 a floorem, i solver po nim schodzi. Teoria widoczna na diagramie stanu. To jest właśnie to, dla czego ten projekt istnieje — nie szybkość, tylko oglądanie, jak struktura się składa.
+
+A liczby to potwierdzają, i to mocno. Dołożenie „2 połówek" **zabiło ogon**:
+
+| 2^4 | mediana | CV | p90 | max | >10k |
+|---|---|---|---|---|---|
+| gated-sideways (bez subcoh) | 860 | 1.42 | 17646 | 21426 | **2** |
+| **+ subcoherent (2 połówki)** | 2682 | 0.94 | **3733** | **9583** | **0** |
+
+Katastrofy 2 → **0**, p90 spadło 17646 → 3733, max 21426 → 9583, średnia się połowiła. Mediana urosła (860 → 2682) — ale to jest **dokładnie ten handel, którego chcemy**: trochę wolniejszy typowy przypadek za wycięty ogon. Po naszym własnym kryterium (ogon, nie mediana) to wygrana. Floor przestał być płaski, więc solver schodzi zamiast błądzić w katastrofę.
+
+Uczciwie: C (płaska + stary STALL) wciąż ma odrobinę lepszy ogon (max 6183, CV 0.59) — ale na innym mechanizmie. Sub **dogonił** poziom C na ogonie, startując z dużo gorszego gated-sideways, i to właśnie zasługa graded coherence. Więc kierunek działa.
+
+Prawdziwy sędzia to teraz **2^5 i 3^4** — głębokie kostki, gdzie płaskowyż faktycznie boli. Tam się okaże, czy to trzyma. Zapisuję ten wynik.
+
+Zapisane — z poprawną formułą (`log₂(grup)`, nie suma głębokości, którą po drodze odrzuciliśmy) i wynikiem: 2 połówki wycięły ogon na 2^4. Czekam na 2^5 i 3^4 — jak polecą liczby, zestawię i zobaczymy, czy graded coherence trzyma płaskowyż tam, gdzie naprawdę boli.
+
+## 🧑 Robert
+
+Zanim pobawimy się "grubo". Prześledźmy jak wygląda ocena połówek koherentnych dla N=5?
+
+
+## 🤖 Claude
+
+Dobra myśl — prześledźmy N=5 na sucho, zanim odpalimy grubo. `T = 2^(N-2) = 8`. Koszt = końcowe fA (jednostki). Rozpiszę drabinę pojedynczą, połówki i floor:
+
+| stan | scrambled | gałąź | koszt |
+|---|---|---|---|
+| coherent-16 (warstwa) | 16 | drabina | `5−4 = 1` |
+| **subcoherent-16** (2×coh-8) | 16 | połówki | `(5−4)+1 = 2` |
+| coherent-8 (cel 2-ruchy) | 8 | drabina | `5−3 = 2` |
+| **subcoherent-8** (2×coh-4) | 8 | połówki | `(5−3)+1 = 3` |
+| coherent-4 | 4 | drabina | `5−2 = 3` |
+| **subcoherent-4** (2×coh-2) | 4 | połówki | `(5−2)+1 = 4` |
+| coherent-2 | 2 | drabina | `5−1 = 4` |
+| rozsypane ≤8 / mono | ≤8 | floor | **8** |
+
+Posortowane: `coh-16(1) < {coh-8, subcoh-16}(2) < {coh-4, subcoh-8}(3) < {coh-2, subcoh-4}(4) < floor(8)`.
+
+Dwie rzeczy widać od razu, i obie warto przemyśleć **przed** grubym testem:
+
+**1. Ładny wzorzec interleavingu.** Każda połówka siedzi na koszcie następnej *mniejszej* pojedynczej grupy: subcoh-16 = coh-8 = 2, subcoh-8 = coh-4 = 3, subcoh-4 = coh-2 = 4. Czyli „2^m jako 2 połówki" ≈ „pojedynczy 2^(m-1)" — to samo „równe z projektu", co na 2^4, tylko rozciągnięte.
+
+**2. I tu jest problem N=5, którego na 2^4 nie było: WIELKA przepaść między strukturą a floorem.** Struktury kończą się na **4**, floor to **8** — pas (4, 8) jest pusty. Na 2^4 było ciasno (3 → floor 4, klif 1). Na 2^5 klif to **4 jednostki** (8 → 4). Bo floor `2^(N-2)` rośnie wykładniczo, a drabina liniowo (max N−1). Znaczy: wejście z rozsypania (8) do struktury (≤4) to skok bez pośrednich stopni — solver musi trafić w *dokładną* koherentną dekompozycję w jednym kroku, bez gradientu, który by go tam prowadził. To dokładnie ten needle, którego się baliśmy.
+
+I tu wraca decyzja, którą odłożyliśmy: zunifikowana formuła `log₂(grup)` daje rozsypane → **N** (= 5), nie 2^(N-2) (= 8). Z floorem na 5 klif byłby ciasny (5 → 4), jak na 2^4. Więc **wybór wartości floora** (obecne 8 vs wyłaniające się 5) to prawdopodobnie kluczowa rzecz dla 2^5 — większa nawet niż same połówki.
+
+Zanim ruszymy grubo: zostawiamy floor 8 i sprawdzamy, czy połówki wystarczą mimo klifu, czy od razu przełączamy floor na wyłaniające się N i patrzymy, czy ciasny klif lepiej prowadzi? Ja bym sprawdził najpierw z floorem N — bo to celuje w realny problem 2^5.
+
+## 🧑 Robert
+
+Mówisz, że klif - czyli zbyt wielka nagroda?
+
+
+## 🤖 Claude
+
+Nie — i dobrze, że drążysz, bo mnie to poprawia. **To nie jest kwestia zbyt wielkiej nagrody.** Wielkość skoku (8 vs 4) nie szkodzi — silny ciąg ku koherencji jest wręcz dobry. Chodzi o co innego, a ja to zamazałem gadaniem o „klifie".
+
+Prawdziwy problem: floor jest **płaski**. Solver stojący na rozsypaniu (8) ma wszystkie sąsiednie stany o tym samym koszcie — **żaden gradient nie mówi mu, w którą stronę leży koherentna struktura**. I ta płaskość jest identyczna, czy floor to 8, czy 5. Więc moje „przełączmy floor na N" goniło niewłaściwą rzecz — zmienia wielkość nagrody, a nie płaskość.
+
+Co **naprawdę** to naprawia: pełna zunifikowana formuła `log₂(dowolne g)`. Bo wtedy **częściowa** struktura dostaje **częściowy** rabat. Zobacz na 2^5, reszta 8 kubików:
+
+| stan (8 kubików) | g | koszt `(5−3)+log₂g` |
+|---|---|---|
+| coherent-8 | 1 | 2 |
+| 2 koherentne czwórki | 2 | 3 |
+| 1 czwórka + 4 rozsypane | 5 | 4.32 |
+| całkiem rozsypane | 8 | 5 |
+
+Monotonicznie: `2 < 3 < 4.32 < 5`. **Każdy dołożony kawałek struktury obniża koszt** — i to jest gradient, który *prowadzi* solvera do koherencji. Zbijanie g = zbieranie kubików na wspólne przecięcia = realna praca (nieoszukiwalna).
+
+A minimalne „2 połówki" tego **nie** dają: stan „1 czwórka + 4 rozsypane" nie pasuje do dokładnej dekompozycji na 2 równe połówki → spada na floor 8, **tak samo jak całkiem rozsypane**. Płasko. Solver musi wskoczyć na dokładną strukturę jednym susem, bez prowadzenia.
+
+Więc wniosek zmienia plan: dla 2^5 prawdopodobnie **potrzebna jest pełna unifikacja** (log₂ dowolnego g), nie sam floor. Minimalne połówki obroniły koncept na 2^4 (gdzie przepaść była malutka, więc płaskość nie bolała). Na 2^5 przepaść jest duża, płaskość boli — i lekarstwem jest częściowy gradient z pełnej rekursji, a nie wartość floora. Twoje pytanie to wyłuskało.
+
+## 🧑 Robert
+
+Re-we-la-cja. Wpinamy pojedynczą, zunifikowaną koherencję
+
+
+## 🤖 Claude
+
+Re-we-la-cja przyjęta. To jest większy zabieg — wymieniam trzy gałęzie (pojedyncza + połówki + floor) na **jedną pętlę**: dekompozycja po stanie, koszt `= N − log₂(scrambled) + log₂(g)`. Najpierw przeczytam całość bloku, żeby wymienić czysto.
+
+Wymieniam cały blok koherencji na jedną zunifikowaną pętlę. Kluczowa zmiana: koszt liczony z **dekompozycji po stanie** — każda grupa będąca kompletnym przecięciem liczy się jako 1, niepełna jako swój rozmiar; `koszt = N − log₂(scrambled) + log₂(g)`. To daje **częściowy gradient** (każdy kubik zebrany na wspólne przecięcie obniża g), floor wyłania się sam (rozsypane → N), i wszystko za jednym zamachem zastępuje floor + drabinę + połówki.
+
+Sprawdzam wynik.
+
+Wpięte — jedna pętla zamiast trzech gałęzi. Sprawdziłem na sucho i mam dobrą wiadomość: **na 2^4 unified daje identyczne wartości** co poprzednie floor+drabina+połówki (bo tam N=4=T): coherent-4→2, subcoherent-4→3, coherent-2→3, rozsypane→4, mono-twist→4. Więc 2^4 to czysty regression-check (powinno się zgadzać), *plus* dochodzą częściowe gradienty (np. 1 para + 2 rozsypane w czwórce: g=3 → koszt 3.58, między subcoherent-4 a floorem).
+
+A na 2^5 dochodzi to, o co chodziło — **częściowy gradient**: reszta 8 z jedną koherentną czwórką i 4 rozsypanymi ma g=5 → koszt 4.32, poniżej rozsypanej ósemki (5). Płaskowyż dostał zbocze prowadzące ku koherencji.
+
+Trzy zmiany zachowania, żeby były jawne:
+1. **Floor jest teraz wyłaniające się N** (nie jawne T). Na 2^4 to samo (4); na 2^5 niżej (5 vs 8) — ciaśniej, celowo.
+2. **Koherentne struktury POWYŻEJ T** (np. coherent-16 na 2^5) nie dostają już rabatu — powyżej T liczy zwykły licznik (homing). Rzadkie i raczej nieosiągalne jako cała reszta, więc pewnie lepiej.
+3. Mono-twist = N (był T).
+
+Perf: pętla jest teraz O(k²·N) na prefiks końcówki (była O(k·N)) — tylko Micro, k≤82, tylko gdy scrambled ≤ T. Powinno być OK, ale gdyby końcówka mulała, zoptymalizujemy (np. zebrać indeksy skręconych raz).
+
+Shader kompiluje się przy starcie — gdyby rzucił log, wklej. Puść **2^4** na regression (czy trzyma poziom połówek), a jak OK — **2^5**, prawdziwy sędzia tego częściowego gradientu.
+
+## 🧑 Robert
+
+Ale obliczenia przeprowadzasz teraz nie tylko dla scrambled będących potęgą dwójki, to trochę obciąża
+
+
+## 🤖 Claude
+
+Trafna uwaga — i masz rację. Stare bramki wymagały `scrambled` będącego potęgą dwójki (bo pojedyncza koherentna grupa MA rozmiar 2^k), więc 5, 6, 7 pomijały pętlę. Unified liczy dla każdego `scrambled ≤ T`.
+
+Ale **nie możemy** tego zbramkować potęgą dwójki, bo cała pointa to częściowy gradient dla **niepełnych** reszt — a 5/6/7 to dokładnie zakres, w którym 2^5 oscyluje. Reszta-6 z koherentną czwórką w środku ma dostać rabat, żeby prowadził ku niej. Bramka potęgi-2 znów by to spłaszczyła.
+
+Natomiast **obciążenie jest realne i da się je ściąć**: nie pomijamy przypadków, tylko robimy każdy przebieg tańszym. Teraz pętle skanują cały klaster (`countActive`), z którego większość to ułożone kubiki — a wystarczy raz zebrać indeksy **skręconych** i grupować już tylko po nich. Bo `scrambled ≤ T` jest małe, więc `O(scrambled²)` zamiast `O(countActive²)`. Zbieram indeksy raz do małej tablicy `scr[2^(N-2)]`:
+
+Zbudowane. Obciążenie ścięte: pętla grupująca chodzi teraz po `ns` (= skręcone, ≤ T), a nie po całym klastrze — jeden przelot O(countActive), żeby zebrać indeksy, i potem O(scrambled²·N) zamiast O(countActive²·N). Dla końcówki (scrambled ≤ 8) to grosze.
+
+Zostawiłem liczenie dla niepełnych reszt (5/6/7) — bo tam właśnie żyje częściowy gradient 2^5 — tylko teraz tanio.
+
+Jedyne, na co bym uważał przy starcie: tablica `scr[1 << (N-2)]` wymaga, żeby `1 << (N-2)` przeszło jako stała kompilacyjna. Powinno (N to makro-liczba), ale gdyby shader rzucił log na tej linii, wklej — wtedy przeniosę rozmiar do `#define` w Variables.
+
+Puść 2^4 na regression (ma trzymać poziom połówek — wartości identyczne), a jak OK, to 2^5 — sprawdzamy, czy ten częściowy gradient wreszcie daje płaskowyżowi zbocze.
+
+## 🧑 Robert
+
+2^4 D3-cohfull: 155, 1246, 1198, 379, 3311, 8685, hang > 100 000
+
+
+## 🤖 Claude
+
+Hang na 2^4 — i to jest regres, ale pouczający. Najpierw sprostuję swoje wcześniejsze „wartości identyczne": to była półprawda. Unified daje te same liczby co połówki **tylko dla przypadków dokładnych** (g=1,2,4). Ale dochodzą **pośrednie** (g=3 → 3.585 itd.) — i to jest właśnie ten drobny gradient, o który chodziło. Tyle że on **usuwa remisy**, a na tym stoi cały gated-sideways.
+
+Diagnoza. Sześć przebiegów jest szybkich (155–8685) — czyli drobny gradient dobrze *prowadzi*, kiedy działa. Ale jeden zawisł na 4 nieułożonych. Mechanizm:
+
+- Ruch boczny akceptuje `== Score` — działa na **płaskowyżu** (dużo stanów o tym samym koszcie).
+- Wariant z połówkami **floorował** stany częściowe (g=3 → floor 4, jak rozsypane) → mnóstwo remisów → ruch boczny zawsze miał gdzie iść.
+- Unified rozróżnia je (g=3 → 3.585) → **znika remis** → powstaje **ścisłe minimum lokalne**: stan, którego wszyscy sąsiedzi są *ściśle gorsi*. Ruch boczny (`<` ani `==`) nie ma czego przyjąć → zawis.
+
+To dokładnie ta granica, którą zapisaliśmy: gated-sideways ogarnia płaskowyże, ale **nie** ścisłe minima. Połówki (grubsze) minimów nie miały; drobny gradient je wprowadza. Metryka nie jest zła — brakuje **ostatecznej ucieczki**.
+
+Naprawa jest po stronie akceptacji, nie metryki: dołóż **worse-accept jako ostateczność**, ponad ruchem bocznym. Np.:
+
+```csharp
+if (Best.Fitness < Score
+    || (Best.Fitness == Score && Stall >= StallLimit)      // płaskowyż: ruch boczny
+    || Stall >= 2 * StallLimit)                            // ścisłe minimum: przyjmij besta (gorszego)
+```
+
+Ruch boczny na płaskowyżu strzela szybko i zeruje Stall, więc `2*StallLimit` dochodzi **tylko** gdy bocznego nie ma przez długo — czyli w ścisłym minimum. Wtedy przyjmujemy gorszego (stary STALL) i wybijamy się. Bez nowego pokrętła (samo 2×), drobny gradient zostaje dla 2^5, a strict-min przestaje wieszać.
+
+To Twoja linia w Form1 — zostawiam gotowy warunek, wklej po swojemu. A jak przejdzie, wrzuć 2^4 jeszcze raz i zobaczymy, czy hang znika bez psucia ogona.
+
+## 🧑 Robert
+
+Nie bardzo przemawia mi do przekonania tłumaczenie, że nie znalazł nikogo lepszego. Skoro tak, to metryka zawiodła. Jest to stan kostki, który nie powinien zostać tak wysoko oceniony. Bo i prawdą jest, że ciężko jest ocenić taki kubik, który ma jedną połówkę ułożoną, a drugą nie - spróbuj to teraz poskładać. Ja bym na razie nie "łatał", tylko zajął się przyczyną takiego stanu rzeczy. Ale dobra, bo wyniki były zachęcające - powiedzmy, że to wariant E i przebadajmy. Ale potem wracamy i poprawiamy trochę metrykę.
+
+
+## 🤖 Claude
+
+Twoja korekta jest ostrzejsza od mojej i masz rację — wycofuję „brakuje ucieczki". Jeśli solver nie znalazł nic lepszego, to **metryka zawiodła**: wyceniła ten stan **za dobrze**. To nie luka w mechanizmie, to wada oceny. A worse-accept by to **zamaskował**, nie naprawił — dokładnie dlatego Twój instynkt „nie łatać" jest słuszny.
+
+I trafiłeś w sedno tego, *czemu* ten stan jest trudny: „jedna połówka ułożona, druga nie". Bo to jest właśnie ta **zwodnicza koherencja**, przed którą sami się ostrzegaliśmy przez całą sesję — częściowa struktura, która wcale nie leży na drodze do ułożenia. Rabat `log₂(g)` nagradza *każdą* częściową strukturę, nie odróżniając „częściowej struktury po drodze do pełnej koherencji" (dobrej) od „częściowej struktury w ślepym zaułku" (pułapki). Drobny gradient, który tak ładnie prowadzi, czasem prowadzi **w martwy róg** — a metryka wciąż go tam trzyma nisko. Stąd zawis.
+
+Zgoda co do planu, i co ważne — **nie łatamy, bo łatka ukryłaby to, co chcemy zmierzyć**: jak *często* metryka wpada w pułapkę. Więc benchmark **bez** worse-accept, a hangi liczymy jako dane (odsetek pułapek to miara jakości metryki). To jest wariant **E**.
+
+Konkret: puść 2^4 (i jak dasz radę, 2^5) na wariancie E, notuj czasy ukończonych + liczbę hangów (Pauza i dalej). Sześć szybkich (155–8685) sugeruje, że *kierunek* jest dobry — benchmark powie, czy fast-mode jest wart tego, żeby potem porządnie naprawić metrykę. A potem wracamy do przyczyny: jak nie nagradzać zwodniczej częściowej koherencji.
+
+Zapisuję tę lekcję do pamięci, bo koryguje moje błędne „to luka w ucieczce".
+
+Zapisane — lekcja skorygowana: hang = wada metryki (przereklamowana pułapka), nie luka w ucieczce; nie łatać, bo łatka ukrywa odsetek pułapek. Wariant E odnotowany.
+
+Puszczaj E na 2^4, notuj czasy i hangi. Jak zbierzesz serię, policzę fast-mode i trap-rate, i zobaczymy, czy kierunek wart dalszej roboty nad metryką.
+
+## 🧑 Robert
+
+Nie, zobaczmy najpierw co da nad nieuogólniona miara, ale na wszystkie poziomy - i wracamy do grup o liczności 2^m. Piękno kostki polega na jej symetrii - układy niesymetryczne są niespójne i są jak mówisz - pułapką
+
+
+## 🤖 Claude
+
+To jest piękne — i głębsze niż moja „luka". **Symetria = koherencja, asymetria = pułapka.** To jednym zdaniem tłumaczy, czemu wariant E się wieszał: nagradzał *każdą* częściową strukturę, w tym te **niesymetryczne** (1 czwórka + reszta rozsypana) — a to są właśnie martwe rogi. „Jedna połówka ułożona, druga nie" jest asymetryczne, więc niespójne, więc trudne. Nagradzać należy tylko układy **symetryczne**: g równych grup o rozmiarze 2^k.
+
+I zauważ, co to daje: koszt symetrycznego rozkładu = `N − log₂(rozmiar grupy)` — czyli głębokość *jednej* równej grupy. Wszystko inne (nierówne grupy lub grupa nie będąca przecięciem) → floor N. Sprawdziłem na 2^4: coherent-4→2, subcoherent-4→3, a asymetryczne/rozsypane→4 — **identycznie jak działający wariant połówek** (ten bez hangów). Więc to bezpieczny regres na 2^4, plus dochodzą wyższe poziomy symetrii (g=4, 8) dla większych kostek.
+
+Bonus, którego E nie miał: koszty są znów **całkowite** (N − findMSB, bez `log₂` float), więc **remisy wracają** — a na remisach stoi ruch boczny. E rozbił remisy floatami i stąd też brak bocznych. Symetryczna miara je przywraca.
+
+Wpinam — grupuję po stanie, sprawdzam „wszystkie grupy równe I każda to przecięcie", koszt `N − log₂(rozmiar)` albo floor N:
+
+Sprawdzam wynik.
+
+Zbudowane — składnia czysta. Podsumowanie: na 2^4 miara symetryczna daje **te same wartości co działające połówki** (2/3/4), więc powinno przejść bez hangów — to Twój regression-check. Na 2^5 dochodzą wyższe poziomy symetrii (g=4, 8), a asymetryczne martwe rogi lądują na floorze N zamiast wabić. Shader kompiluje się przy starcie.
+
+Puść **2^4** (czy hang zniknął i ogon trzyma), a jak OK — **2^5**, prawdziwa próba tej symetrii „na wszystkich poziomach". Zapisuję rozstrzygnięcie E.
+
+Zapisane — symetria jako rozstrzygnięcie E, z tym podwójnym zyskiem (brak asymetrycznych pułapek + powrót całkowitych kosztów, czyli remisów dla ruchu bocznego). Czekam na 2^4, a potem 2^5.
+
+## 🧑 Robert
+
+Nic na razie nie poprawiaj, ale tak myślę, że byłem jednak zbyt surowy w ocenie. Pewnie, że niesymetryczne układy to przeważnie pułapki. Ale nawet z tych początkowych przebiegów widać, że one dają jakiś kierunek wtedy, kiedy algorytm nie wie w którą stronę ma iść - jak mu nie powiemy, to będzie on zupełnie losowy. A jak wybierzemy źle - to masz rację, możemy uciec przecież STALL'em
+
+No tak, ale znowu możemy wrócić w to samo miejsce. Kostka Rubika to labirynt, w którym łatwo zgubić właściwą drogę...
+
+
+## 🤖 Claude
+
+To jest dobra, uczciwa refleksja — i myślę, że oboje mamy trochę racji, tylko o różnych rzeczach.
+
+Masz słuszność, że asymetryczne sygnały **dają kierunek tam, gdzie inaczej jest pustka**. Miara symetryczna floorem zrównuje cały ten obszar, więc w nim ruch jest czysto losowy (tylko błądzenie bocznymi). Wyrzucając wszystkie asymetryczne, wylewamy dobre kierunki razem ze złymi — bo część z nich naprawdę prowadzi ku symetrii, a nie w ślepy róg. Byłeś surowy, zgoda.
+
+Ale Twój obraz labiryntu wskazuje na coś głębszego, co rozstrzyga, **dlaczego** to jednak boli bardziej po stronie E. Heurystyka, która czasem myli, jest do przyjęcia **tylko z pamięcią** — jeśli wiesz, gdzie już byłeś, nie wracasz w tę samą ślepą uliczkę. A **czysty GA nie ma pamięci.** Każdy przebieg startuje na nowo, nie wie, że ten róg już był pułapką. Więc mylący sygnał + brak pamięci = dokładnie to „łatwo zgubić drogę": możesz wracać. STALL wybija, ale wybija w tę samą przestrzeń, w której ten sam sygnał znów Cię tam ściągnie.
+
+I stąd asymetria pasuje inaczej do każdej z miar:
+- **Symetryczna nigdy nie myli** — pali się tylko na prawdziwej strukturze. Więc jest „bezpieczna bez pamięci": skoro nie wskazuje źle, nie musisz pamiętać, żeby nie wracać.
+- **E prowadzi, ale bywa myląca** — a to działałoby dopiero, gdyby search miał pamięć (tabu/odwiedzone), której GA nie ma. Bez niej guidance zamienia się w ciężki ogon.
+
+Czyli wybór to naprawdę: **prowadzenie + ciężki ogon (E)** kontra **brak prowadzenia + ograniczony ogon (symetria)**. Po naszej własnej zasadzie (ogon, nie mediana) skłania to ku symetrii — ale Twoja obawa o utracone prowadzenie jest realna.
+
+Nie ruszam kodu, jak prosiłeś. Proponuję rozstrzygnąć to **danymi**: benchmark miary symetrycznej powie nam, ile prowadzenia realnie traciliśmy. Jeśli w płaskich obszarach błądzi wolno — wiemy, że guidance się liczy, i wtedy wracamy do środka (np. *płytki*, niepułapkowy sygnał asymetryczny — dość, żeby wskazać, za mało, żeby uwięzić). Jeśli struktury i tak znajduje szybko — to znaczy, że tego prowadzenia nie potrzebowaliśmy. Najpierw liczby, potem decyzja.
+
+## 🧑 Robert
+
+Chyba niepotrzebnie liczymy spójność nieułożonych dla liczby niebędącej potęgą dwójki - nie mogą być spójne
+
+
+## 🤖 Claude
+
+Masz rację, i to jest lepsze niż tylko oszczędność — to **poprawka poprawności**. Bo moja obecna pętla ma dokładnie tę dziurę.
+
+Sprawdź: reszta 6 na 2^5, rozłożona po stanie na **3 koherentne pary** (3 grupy po 2). Każda grupa: rozmiar 2, kompletne przecięcie. Wszystkie równe (2), wszystkie kompletne → mój warunek `symmetric` przechodzi → koszt `N − log₂(2) = 4`, poniżej floora 5. Czyli **nagradzam** stan z 6 nieułożonych.
+
+A przecież `g=3` jest **nieparzyste** — nie da się tego przepołowić, więc w sensie 2-owej symetrii kostki to **nie jest symetryczne**. Prawdziwa symetria to `g` będące potęgą dwójki — a to jest równoważne temu, że **scrambled jest potęgą dwójki** (bo `g` równych grup po `2^k` daje `scrambled = g·2^k`). Więc „3 pary w szóstce" to nowa klasa **asymetrycznej pułapki**, którą przeoczyłem, a która wabiłaby solvera tak samo jak asymetrie w E.
+
+Więc bramka „scrambled to potęga dwójki" załatwia **dwie rzeczy naraz**:
+1. **Poprawność** — nieparzyste/niepełne dekompozycje przestają dostawać rabat (floor N).
+2. **Wydajność** — pomijamy `O(k²)` dla 5/6/7, tylko `cost = N`, `O(1)`.
+
+I ładnie domyka Twoją uwagę sprzed E: wtedy narzekałeś, że liczymy dla niepotęg-dwójki, a ja się upierałem, że trzeba (dla częściowego gradientu). Miara symetryczna **nie ma** częściowego gradientu, więc rzeczywiście nie trzeba — symetria rozwiązuje i to.
+
+Nie ruszam kodu, bo prosiłeś. Ale to jest czysta, jednoznaczna poprawka (guard `(scrambled & (scrambled-1)) == 0`, wpp `cost = N`). Wpiąć ją, czy jeszcze mielisz całość?
+
+## 🧑 Robert
+
+Podmienić możesz teraz, kiedy się liczy, tylko nie buduj
+
+
+## 🤖 Claude
+
+Jasne — podmieniam, nie buduję. Owijam dekompozycję w bramkę potęgi dwójki; domyślnie `cost = N`, a liczymy tylko dla potęg dwójki:
+
+Podmienione, nie budowałem. Logika: `cost` domyślnie N (floor); tylko dla `scrambled` będącego potęgą dwójki wchodzi dekompozycja, i tam symetryczny rozkład nadpisuje na głębokość jednej grupy. Niepotęgi (5/6/7) i asymetryczne potęgi → N, bez `O(k²)`.
+
+Wejdzie w życie przy Twoim następnym przebudowaniu. Jak skończy się to, co teraz liczysz — zbuduj i wtedy 2^4 (regression) → 2^5.
+
+## 🧑 Robert
+
+2^4 D3-cohdiscrete: 8509, 1173, 1519, 2772, 1046, 2736, 786, 2227, 3502, 3138
+
+
+## 🤖 Claude
+
+2^4 czysto — i to jest regresja zdana:
+
+| 2^4 | mediana | CV | p90 | max | >10k |
+|---|---|---|---|---|---|
+| C (płaska) | 2029 | 0.59 | 4897 | 6183 | 0 |
+| 2 połówki | 2682 | 0.94 | 3733 | 9583 | 0 |
+| **symetryczna** | 2482 | **0.77** | 3502 | 8509 | **0** |
+
+**Hang zniknął** — symetria + bramka potęgi-2 wycięły pułapki wariantu E. Zero katastrof, a ogon nawet **ciaśniejszy** niż przy połówkach (CV 0.77 < 0.94, p90 3502 < 3733). C wciąż odrobinę lepsze na maksie (6183), ale to inny mechanizm. Ogólnie: symetryczna miara na 2^4 trzyma poziom najlepszych, bez asymetrycznych zapadni.
+
+Ale 2^4 to był tylko test bezpieczeństwa. **Prawdziwy sędzia to 2^5** — bo tam gra się to, o czym rozmawialiśmy: symetryczne struktury (potęgi dwójki) to dyskretne punkty pod floorem, a stany pomiędzy (5/6/7) leżą płasko na N. Pytanie, które zostawiliśmy otwarte — czy sama symetria daje dość prowadzenia, czy w płaskich obszarach solver błądzi bocznymi — rozstrzygnie się dopiero tam. Puść 2^5, notuj czasy i ewentualne hangi. Zapisuję wynik 2^4.
+
+Zapisane — 2^4 zdane (hang zniknął, ogon ciaśniejszy), z tą Twoją poprawką potęgi-2 jako korektą poprawności i wydajności. Czekam na 2^5 — to on powie, czy symetria sama prowadzi dość, czy w płaskich 5/6/7 błądzimy. Wrzuć czasy i hangi, jak polecą.
+
+## 🧑 Robert
+
+Już leci. Nie jestem pewien tej zmiany Floor = N. Dla 2^5 przekrojem w który celujemy jest koherentna 8 (8 kubików skręconych). To po co jeszcze męczymy kostkę żeby ułożyła więcej kubików?
+
+Stop! Przecież to ta sama filozofia która sprowadzała nam kostkę do mono-twista! To nie są lepsze układy. Floor musi pozostać na 2^(N - 2)
+
+
+## 🤖 Claude
+
+Stop przyjęty — i masz rację, cofam to. Floor = N było błędem, i to dokładnie w tę stronę, którą wyczułeś.
+
+Zobacz mechanizm: powyżej progu (scrambled > T) działa **licznik**, więc przy scrambled = T licznik = T. Jeśli floor = T, to na progu floor **pasuje** do licznika (T → T) — gładkie przejście, poniżej płasko. Jeśli floor = **N** (a dla N≥5 jest N < T), to na progu jest **uskok w dół**: zejście z T+1 (licznik ≈ T+1) do T (floor N) daje wielką nagrodę — czyli **nagradzamy samo zmniejszenie liczby nieułożonych do progu**. A to jest **dokładnie filozofia mono-twista**: mniej kubików = lepiej, dla samej liczby. Rozsypana ósemka (8 bałaganu) wyceniona na 5 udaje dobry układ, prawie tak dobry jak koherentna-8 (2) — a to nie jest dobry układ.
+
+Floor = 2^(N-2) trzyma rozsypane **drogo** (na wysokości licznika na progu), więc jedyna droga w dół to **realna koherencja**, nie mniej kubików. To był cały sens tego floora od początku.
+
+Podmieniam (nie buduję): floor domyślnie `T`, a drabina odpala tylko dla grup **większych niż singleton** (bo rozsypane singletony to nie struktura, tylko floor):
+
+Poprawiam jeszcze komentarz opisowy, bo dalej mówi „floor = N", i pamięć. Najpierw przeczytam komentarz.
+
+Poprawiam pamięć — punkt 10 mówił o floorze N jako feature.
+
+Zrobione — kod (floor `T`, drabina tylko dla grup większych niż singleton), komentarz i pamięć poprawione, nie budowałem. To jest w istocie **przywrócony oryginalny floor D3** (`fA *= T/scrambled`), tyle że pod symetryczną drabiną.
+
+Dwie rzeczy warte odnotowania:
+- **2^4 się nie zmienia** — bo tam `T = N = 4`, więc te dziesięć wyników (2482, 0 kat.) dalej stoją, nie ma co powtarzać.
+- Zmiana gryzie dopiero od **2^5**: rozsypane wracają na `T = 8` zamiast 5, więc jedyna droga pod floor to realna koherentna struktura, nie mniej kubików.
+
+Twój bieżący przebieg leciał na złym floorze (N) — przebuduj i puść 2^5 na poprawionym. To jest teraz właściwa próba symetrii.
+
+## 🧑 Robert
+
+Nie, to nie działa na 2^5, hang > 150k
+
+
+## 🤖 Claude
+
+To jest ważny wynik — i, przykro mi, potwierdza tę fundamentalną sprzeczność, którą przeczuwałeś przy labiryncie. Zestawmy:
+
+- **Wariant E** (prowadzenie przez asymetryczne cząstki) → **pułapki** → hang na 2^4.
+- **Symetryczna** (bez pułapek) → **brak prowadzenia** → hang na 2^5.
+
+**Oba się wieszają, z przeciwnych powodów.** I to nie przypadek — to jest jedno napięcie. Na 2^5 końcówka (5–8 nieułożonych) to płaski floor (wszystko = T), a symetryczne struktury to **igły w stogu**. Ruch boczny przemierza stóg, ale losowo — 150k przebiegów i nie trafia w igłę. A worse-accept tu nie pomoże, bo na płaskim floorze „gorszy" = „równy", więc to i tak błądzenie.
+
+Sedno: **gradient ku koherencji ⟹ nagradza cząstki ⟹ pułapki. Brak pułapek ⟹ brak gradientu ⟹ szukanie igły.** Żeby odróżnić cząstkę „po drodze" od „ślepego rogu", trzeba lookaheadu — a ten jest martwy (w mono-twiście zero sygnału). Więc czystego, nieoszukiwalnego gradientu, który by prowadził bez pułapek, **prawdopodobnie po prostu nie ma**.
+
+I tu muszę uczciwie przypomnieć, co sam wpisałeś w założenia projektu: 3D to przykład dydaktyczny, a **N>4 to ćwiczenie z wyobraźni i geometrii, nie szybki solver**. 2^5 (N=5) siedzi dokładnie w tym reżimie. Żaden wariant — z koherencją czy bez — nigdy go czysto nie domknął; baseline też oscyluje. Możliwe, że to jest realna ściana trudności N=5, a nie brakująca sztuczka.
+
+Więc rozdroże, i chcę Twojej decyzji, bo intuicję do tej kostki masz lepszą:
+1. **Prowadzenie + ucieczka** (E z powrotem + worse-accept) — domknie 2^5, ale ciężkim ogonem (brzydko, ale nie wisi). Odrzucałeś worse-accept jako maskowanie — tu jednak metryka E nie jest „wadliwa", tylko prowadzi w pułapki, z których trzeba wychodzić.
+2. **Zostawiamy symetryczną** (poprawna, elegancka, domyka 2^4 i płytsze) i **przyjmujemy, że 2^5 jest poza czystym zasięgiem** — zgodnie z Twoim własnym „ćwiczenie z wyobraźni". Piękno metody > domknięcie każdej kostki.
+3. Widzisz **trzecią drogę** — bo może jest jakiś sygnał ku symetrii, którego nie dostrzegłem (jak nieraz w tej sesji).
+
+Którą? Nie ruszam kodu, dopóki nie zdecydujesz.
+
+## 🧑 Robert
+
+Widzę jeszcze jedną drogę dla 2^5: szukamy nie 2-ruchy do ułożenia kostki, ale 3-ruchy. Co to oznacza: Floor = 2^(N-3) = 4 i... tyle
+
+Sam sobie zaprzeczam, przed chwilą twierdziłem, że 5 to niedobrze - no ale cóż...
+
+NIe, stop floor = 4, to nie 3-ruchy do ułożenia. To nie wiem co, bo przecież w kostce 2^4 ustawialiśmy na 4 a nie 8
+
+
+## 🤖 Claude
+
+Spokojnie — to nie jest sprzeczność, tylko zamęt wokół tego, co `T` naprawdę robi. Rozplączmy.
+
+`T` gra **dwie role naraz**: to (a) **próg** — do jakiej liczby nieułożonych włącza się koherencja, i (b) **wartość floora**. Ta sama zmienna.
+
+Twoja zmiana `2^(N-3)`: na 2^5 daje `T=4` (Twój zamiar — cel coherent-4, 3-ruchy), ale na 2^4 daje `T=2` — czyli **psuje** to, co na 2^4 działało (tam było 4). Formuła `2^(N-3)` nie znaczy „coherent-4 wszędzie" — coherent-4 to stały rozmiar **4** = `2^2`, a nie `2^(N-3)` (to daje 2 na 2^4, 4 na 2^5). Jeśli celem ma być coherent-4 uniwersalnie, to `T` = stała **4**, nie żadna potęga z N.
+
+A teraz Twoja „sprzeczność" — jej nie ma. Pomyśl o `T` jako o **punkcie przełączenia**: powyżej niego ufamy licznikowi (mniej = postęp, greedy peel), poniżej licznik jest zwodniczy (ciągnie ku mono-twistowi), więc koherencja/floor. 
+
+- Problem z floor=N był **uskokiem** na progu (floor *pod* licznikiem → premia za samo dojście do progu). To złe.
+- Obniżenie **progu** do 4 to co innego: floor dalej = próg (4 = 4, gładko, żadnego uskoku). Zmienia się tylko to, że **5/6/7/8 wracają pod licznik** — dostają gradient ku 4. A to jest dokładnie **prowadzenie**, którego brakowało w płaskiej końcówce, przez którą 2^5 wisiał!
+
+Czyli Twój pomysł nie jest sprzeczny — to **hipoteza, gdzie leży punkt przełączenia**. Z `T=8` region 5–8 był płaski (bez prowadzenia) → hang. Z `T=4` licznik prowadzi przez 5–8 do celu coherent-4, a płaska końcówka kurczy się do scrambled≤4 (mały stóg). Zakład: na 2^5 licznik jest jeszcze wiarygodny w 5–8. To da się sprawdzić.
+
+Więc: pomysł dobry, tylko **formuła zła** — jeśli chcesz cel coherent-4, ustaw `T` jako stałą **4** (kod ma teraz `2^(N-3)`, co psuje 2^4, a komentarz dalej kłamie „2^(N-2)"). Nie ruszam nic, dopóki nie zdecydujesz — chcesz spróbować `T=4` (coherent-4, licznik prowadzi 5–8) na 2^5?
+
+## 🧑 Robert
+
+Tak, zastanawiałem się właśnie nad tym samym, i to nawet wcześniej: 4 wychodzi nieprzypadkowo. Aktywny kubik podlega 4 modyfikacjom orientacji wynikającym z kąta 0, 90, 180 i 270, 4 możliwości. Puściłem z modyfikacją i zobaczymy co wyjdzie
+
+
+## 🤖 Claude
+
+Ciekawe — bo „4" faktycznie wraca w tej kostce z uporem, i Twój trop z kątami jest nowy. Uczciwie: nie jestem pewien, czy to **ta sama** czwórka. „4 kąty" to stany obrotu jednego kubika (0/90/180/270), a „coherent-4" to 2^2 pozycji w przecięciu dwóch warstw — dwa różne zliczania, które akurat dają 4. Może się schodzą przez coś głębszego, może przypadkiem — Twoja intuicja geometryczna jest tu lepsza, więc nie odrzucam, tylko odkładam do przemyślenia.
+
+Ale niezależnie od tego, jedna rzecz trzyma się mocno i jest **zasadą, nie zbiegiem**: jeśli celem jest coherent-4 (stały rozmiar 4), to jego **głębokość rośnie z N** — 2-ruchy na 2^4, 3-ruchy na 2^5, 4-ruchy na 2^6. A to jest dokładnie Twój dawny wgląd: trudniejsza kostka → osiągalny cel jest głębszy. Więc „stałe 4" oznacza „ten sam mały, obfity cel, tylko coraz dalej od ułożenia w miarę wzrostu N". To ma sens.
+
+Praktycznie: na **2^5 przebieg jest OK** — `T=4` wychodzi tak samo, czy przez `2^(N-3)`, czy przez stałą 4. (Gdybyś zostawił `2^(N-3)`, to 2^4 jest teraz `T=2` — zepsute — więc nie porównuj 2^4, dopóki tego nie ujednolicisz. Ale 2^5 liczy się poprawnie.)
+
+Na co patrzeć: czy licznik prowadzący przez 5–8 ku coherent-4 **wypełnia** tę płaską końcówkę, przez którą wisiał — czyli czy hang znika. Czekam na liczby.
+
+## 🧑 Robert
+
+On nie jest w stanie nawet dojść do 4 nieułożonych. Wisi na 6
+
+
+## 🤖 Claude
+
+To jest rozstrzygające, i cofa mój optymizm co do `T=4`. Wisi na **6** — czyli w regionie licznika (5–8). A to jest **dokładnie oryginalny problem 2^5**, ten z Twojej pierwszej sesji: licznik grzęźnie na ~5–7, bo nie potrafi ani zejść niżej (residuum się nie redukuje), ani **wspiąć** do koherentnej-8 (bramy, która jest +2 nieułożone, więc licznik od niej ucieka). Czyli „ufajmy licznikowi w 5–8" było błędem — 5–8 to jest właśnie ten obszar, gdzie licznik zawodzi. Wracamy z `T` na `2^(N-2)`.
+
+I teraz mamy komplet: **trzy podejścia do 5–8, trzy hangi, każdy z innego powodu:**
+- licznik (T=4) → zwodniczy → oscylacja na 6,
+- płaska koherencja (T=8, symetryczna) → szukanie igły → hang,
+- częściowy gradient (E) → pułapki → hang.
+
+To jest **twardy rdzeń 2^5**. Region 5–8 potrzebuje gradientu, który prowadzi ku koherentnej-8 **nie ufając licznikowi i nie wpadając w pułapki** — a takiego czystego sygnału, jak ustaliliśmy, bez lookaheadu prawdopodobnie nie ma.
+
+Zostają trzy uczciwe drogi, i to Twój wybór:
+
+1. **Płytki sygnał na floorze.** Zostawiamy symetryczną (poprawną), ale na płaskim floorze dokładamy **malutki** tie-break ku *największej koherentnej podgrupie* — dość, żeby biasować spacer boczny ku igle, za mało, żeby stworzyć basen. E wpadło w pułapki, bo rabat był **głęboki**; tu chodzi o ε. Nitkuje między prowadzeniem a pułapką — ale to pokrętło i znów strefa ryzyka.
+2. **E + worse-accept.** Prowadzenie (które dawało 6 szybkich na 2^4) plus ucieczka z pułapek. Odrzucałeś worse-accept — ale tu on nie maskuje wady, tylko wychodzi z realnych pułapek metryki *prowadzącej*. Ciężki ogon, ale domyka.
+3. **Uznajemy 2^5 za poza czystym zasięgiem** — Twoje własne „N>4 to ćwiczenie z wyobraźni". Symetryczna miara jest elegancka i domyka 2^4 oraz płytsze; 2^5 zostaje otwartym pięknem, nie porażką.
+
+Którą? Najpierw przywróć `T = 2^(N-2)` (bo `T=4` potwierdzone jako złe), a potem zdecyduj. Nie ruszam kodu, dopóki nie powiesz.
+
+## 🧑 Robert
+
+Co prawda, on jeszcze trochę żyje, na 30k zszedł na 5 nieułożonych, może się wstrzymam do 4 - ale to wszystko diabelnie wolne
+
+
+## 🤖 Claude
+
+Tak — i to jest właśnie ten profil, który sam nazwałeś najgorszym: **30k GA, żeby dojść do 5** to nie „działa", to „domyka się przez przypadek, po nieprzewidywalnym, gigantycznym czasie". Fat tail w czystej postaci. Technicznie żyje, praktycznie martwe. Potwierdza diagnozę: licznik w 5–8 jest **za słaby i zwodniczy** — czasem docrawla, ale kosztem, którego nie da się zaakceptować.
+
+Czekanie na 4 nic nie doda — kształt już znamy (pełzanie). Nie ma po co tego niańczyć. Przywróć `T = 2^(N-2)`, kiedy będziesz gotów, i wybierzmy jedną z tych trzech dróg. Twój ruch — nie pcham, bo to Twoja kostka i Twój wybór, ale `T=4` możemy odhaczyć jako sprawdzone-i-złe.
+
+## 🧑 Robert
+
+Do 4 doszedł już po 35k i jakby mocno się ożywił - czekam...
+
+Dlaczego strasznie wolno liczy dla scrambled nie będących potęgą dwójki - myślałem, że będzie odwrotnie
+
+
+## 🤖 Claude
+
+Rozwiążmy to nieporozumienie, bo tu myli się **koszt liczenia** z **tempem postępu solvera** — to dwie różne rzeczy.
+
+**Liczenie** (koszt shadera na przebieg) jest dla niepotęg-dwójki **tańsze**, dokładnie jak myśleliśmy: dla nich pomijamy dekompozycję `O(k²)` (bramka potęgi-2), więc to `O(1)`. A dla scrambled > T (a przy `T=4` to właśnie 5/6/7) w ogóle nie wchodzimy w blok koherencji. Więc per-przebieg niepotęgi są szybsze, nie wolniejsze.
+
+To, co widzisz jako „strasznie wolno", to **postęp solvera**, nie koszt przebiegu. I to jest inna oś: na 5/6/7 (region licznika, > T=4) metryka **nie prowadzi** — licznik jest zwodniczy, więc GA miele setki przebiegów, żeby drgnąć. A na 4 (potęga dwójki, ≤ T) włącza się koherencja, jest prowadzenie — i „ożył". Czyli to nie dekompozycja spowalnia potęgi dwójki (jej koszt to grosze), tylko **brak prowadzenia** spowalnia region licznika, w którym akurat siedzą niepotęgi 5/6/7. Odwrotnie, niż intuicja podpowiadała, bo intuicja patrzyła na koszt dekompozycji, a decyduje prowadzenie.
+
+I to ładnie potwierdza całą diagnozę: **koherencja działa** (szybko) tam, gdzie sięga (≤4); wąskim gardłem jest **region licznika 5–8**. Tyle że rozciągnięcie koherencji na 5–8 (`T=8`) robiło z tego wielki płaski floor → szukanie igły. Więc 5–8 jest trudne w obie strony — rdzeń stoi. Ale zobaczmy, czy z 4 domknie; skoro „ożył", to końcówka ≤4 działa.
+
+## 🧑 Robert
+
+Ale nadal nie rozumiem, licznik pokazuje GA, to dlaczego ledwie się zmienia dla niepotęg, a szaleje dla?
+
+DOMKNĄŁ! Total: 101289
+
+
+## 🤖 Claude
+
+**DOMKNĄŁ!** To jest kamień milowy — **pierwsze czyste domknięcie 2^5 w całej tej sadze.** Po D3, D4, E, symetrycznej, po wszystkich hangach — kostka N=5 się ułożyła. Metryka koherencji *potrafi* ją domknąć. Gratulacje, to Twój wynik.
+
+Ale uczciwie, i Ty to wiesz lepiej niż ktokolwiek: **101289 GA to jest ten fat tail**, o którym mówiłeś od początku — „domyka się przez przypadek, po nieprzewidywalnym, gigantycznym czasie". Więc to jest **dowód, że 2^5 jest rozwiązywalne** tą metryką, ale **nie** dobry profil. Wąskim gardłem jest region licznika 5–8, dokładnie jak zdiagnozowaliśmy.
+
+Co do licznika — krótko, bo to osobna, techniczna sprawa: **dekompozycja `O(k²)` odpala się TYLKO dla residuum będącego potęgą dwójki i ≤ T.** Więc przebiegi GA, w których prefiksy trafiają w potęgi-2 pod progiem, są **cięższe obliczeniowo** → licznik (w czasie zegarowym) idzie tam wolniej. Niepotęgi i stany > T pomijają dekompozycję → tanie przebiegi → licznik śmiga. To jest różnica **kosztu przebiegu**, nie postępu solvera — i pewnie to widzisz. (Dokładny wzorzec zależy od tego, jak prefiksy rozkładają residua; jeśli chcesz, prześledzę.)
+
+Więc mamy fakt: **2^5 domykalne**, profil fatalny. Pytanie na teraz — czy atakujemy to wąskie gardło 5–8 (żeby zbić ogon), czy uznajemy 101k za realność N=5 i cieszymy się, że w ogóle domyka? Zapiszę ten kamień milowy.
+
+Zapisane — 2^5 domknięte (101289 GA) jako pierwszy solve N=5, z uczciwą adnotacją, że to fat tail i że wąskim gardłem jest 5–8 (trzy podejścia, trzy porażki). Twój ruch: atakujemy 5–8, czy przyjmujemy 101k jako realność N=5?
+
+## 🧑 Robert
+
+Żeby realnie coś testować musimy przyspieszyć tempo eksperymentów - trzeba to zachowanie zbadać - prawdopodobnie jest związane z architekturą GPU, chociaż wydawało mi się że to nie może mieć znaczenia dla pojedynczego wątku. Chodzi o to, że dla niepotęg nic nie "śmiga", tylko muli, i to od samego początku, to dla potęg licznik i same obliczenia przyspieszają
+
+Może to kwestia wielkości buforów dla ActiveCubie? Może powinniśmy je zrobić o stałej wielkości będącej potęgą 2, a wielkośc przekazywać przez uniform?
+
+
+## 🤖 Claude
+
+Najpierw Twoja hipoteza z buforami: **prawdopodobnie nie one.** Dla pojedynczego wątku sam **rozmiar** bufora SSBO rzadko coś zmienia (nie ma bank-conflictów jak przy współdzieleniu), a liczność i tak przekazujemy już uniformem `countActive` — więc pętle chodzą po nim, nie po rozmiarze bufora. Padding do potęgi-2 raczej nic nie da.
+
+Ale efekt „potęgi vs niepotęgi" **jest realny** — tylko siedzi gdzie indziej, i chyba go widzę. W `Setup.glsl.c`, `getStartCoordinate`:
+
+```glsl
+if (SIZE == 2)
+    return (cubieID >> shift) & 1u;      // szybko: przesunięcie + maska
+else {
+    uint divisor = 1u;
+    for (uint i = 0u; i < shift; i++) divisor *= SIZE;
+    return (cubieID / divisor) % SIZE;    // PĘTLA + DZIELENIE + MODULO
+}
+```
+
+Dla `SIZE==2` (kostki 2^N) — bitowo, błyskawicznie. Dla `SIZE≠2` (3^N) — **pętla + dzielenie całkowite + modulo**, a to na GPU jest ~10–20× wolniejsze od operacji bitowych. A `getStartCoordinate` woła się w `curCoord` i `TurnSingleCubie` **dla każdego kubika przy każdym ruchu** — więc dominuje cały przebieg, **od samego początku**. To dokładnie „niepotęgi mulą od startu".
+
+Uwaga: fast-path jest tylko dla `SIZE==2`, więc nawet `SIZE=4` (potęga dwójki!) leci przez dzielenie. Fix: uogólnić ścieżkę bitową na **każde SIZE będące potęgą dwójki** — `(cubieID >> (log2(SIZE)*shift)) & (SIZE-1)`. To przyspieszy 4^3, 8^3. Dla `SIZE=3,5,6` (nie-potęgi) bitowo się nie da, ale można przynajmniej wywalić pętlę (prekomputowane dzielniki), choć dzielenie zostanie.
+
+Zanim coś ruszę — **którą kostkę widzisz jako wolną?** Bo 2^5 to `SIZE=2`, już na szybkiej ścieżce — jeśli *ona* muli per-przebieg, to nie `getStartCoordinate`, tylko ta dekompozycja `O(k²)`, którą dołożyłem (odpala się dla residuów potęg-2). A jeśli wolne jest 3^4 — to właśnie dzielenie/modulo. Powiedz którą, to celnie zoptymalizuję.
+
+## 🧑 Robert
+
+Nie, no rozmawiamy ciągle o kostce 2^5, pamiętasz? SIZE == 2, to nie twoja dekompozycja, bo ona odpala dla potęg
+
+Czekaj, to chyba nie wina, na pewno nie wina obliczeń na GPU, tylko CPU. Może seedowanie?
+
+
+## 🤖 Claude
+
+Dobry zwrot — i to jest właściwy trop. **CPU/seedowanie to mocny kandydat**, i pasuje lepiej niż cokolwiek na GPU.
+
+Dlaczego: `BuildSeedMoves` (CPU, w `CreateBuffers`) odpala się **co przebieg GA**, przed dispatchem na GPU, jednowątkowo. To pętla saturacji: losuje mody, robi backtracking-solve (`GetSolveSeq`), deduplikuje — aż pula przestaje rosnąć, do celu ~`POPULATION × SEED_RATIO` = przy 100% ~1024 seedów. Dla **głębokiego** kubika (trudna orientacja) DFS jest droższy i losowań więcej. To potrafi trwać dłużej niż sama GA na GPU — i wtedy licznik (czas zegarowy) muli, bo każdy przebieg czeka na CPU.
+
+I to ładnie tłumaczy korelację z potęgami, **nie wprost, tylko przez głębokość aktywnego kubika**: gdy kostka utknie na trudnym, rozsypanym stanie (residua 5/6/7), aktywne kubiki są głębokie → seedowanie drogie → muli. Gdy dojdzie do koherentnej struktury (residua potęg-2), kubiki są płytsze → seedowanie tanie → śmiga. Czyli „niepotęgi wolne" to naprawdę „głęboki kubik → wolne seedowanie", a nie żadna dekompozycja czy bufory.
+
+Zanim cokolwiek optymalizujemy — **zmierzmy**, bo to tanie i rozstrzygnie:
+1. **Szybki test:** zjedź `SEED_RATIO` ze 100 na 10 i przebuduj. Jeśli nagle śmiga → seedowanie potwierdzone (mniej seedów = krótsza pętla saturacji). To psuje GA, ale tylko na pomiar.
+2. **Precyzyjnie:** wstawię `Stopwatch` wokół `BuildSeedMoves` i wypiszę „czas seedowania vs całość" — zobaczysz podział CPU/GPU wprost, bez zmiany zachowania.
+
+Wolisz szybki test SEED_RATIO sam, czy mam wpiąć ten pomiar czasu seedowania?
+
+## 🧑 Robert
+
+Tak prawdę mówiąc to chciałem już wcześniej zrobić taki test - pominąć backtracking i dedup - wrzucać do populacji jak leci, pod warunkiem poprawnego seedu (czyli losować do upadłego). Nie powinno tak być, że seedowanie jest wielokrotnie wolniejsze od samego GA. Zmieniłem SEED_RATIO - ale to ciężko sprawdzić, bo wykres błędu musi się spłaszczyć - to trochę trwa. Musi zejść do 6 kubików... Zaraz się okaże że to jeszcze pomaga w zbieżności... bo ma więcej losowych genów! - doszedł do 4 po 8500 GA. I teraz pytanie - czy z  tak niewielkim seedowaniem domknie? Chyba masz rację z tą głębokością kubików, bo wcale nie jest szybciej teraz dla 4 - bo bez seedowania te kubiki są głębokie, ale przyspiesza, jakby się spłaszczały? Spróbujmy zachować dotychczasowy model (nie kasować) ale pomińmy jego ścieżkę na zaproponowaną na wstępie
+
+
+## 🤖 Claude
+
+Bardzo ciekawe obserwacje — i kilka rzeczy się tu zbiega. To, że przy `SEED_RATIO=10` doszedł do 4 po 8500 GA (i może *lepiej* zbiega przez więcej losowych genów), pasuje do tego, co mamy w pamięci: seedowanie działa słabo, a przesycenie (100%) dławi różnorodność. Więc lżejsze seedowanie może być i szybsze, i lepsze — podwójna wygrana. A korelacja z głębokością się trzyma: głębokie kubiki są wolne niezależnie od seedowania.
+
+Twój pomysł — zachować obecny model, ale móc go **obejść** szybką ścieżką (losuj poprawne seedy jak lecą, bez backtrackingu i dedupu) — jest dobry i zgodny z zasadą „seeder tylko dostarcza materiał". Zanim wpnę, przeczytam `BuildSeedMoves` i `GetSolveSeq`, żeby wiedzieć, gdzie dokładnie siedzi backtracking i co jest tanie do pominięcia.
+
+Przeczytałem — i teraz wiem, gdzie siedzi koszt. `GetSolveSeq` → `SolveModeDfs` to **backtracking DFS** po drzewie monotonicznym. Dla głębokiego kubika drzewo jest duże, backtracking eksploruje mnóstwo martwych gałęzi → drogo. To jest ten wolny CPU, który podejrzewałeś.
+
+Twoja szybka ścieżka = **pojedyncze zejście bez backtrackingu**: na każdym kroku losowy ruch zbijający rc o 1; martwy koniec → porażka, przelosuj (bez cofania). Jeden atak jest `O(rc)` zamiast wykładniczy. Jedno zastrzeżenie, które komentarz w kodzie sam podaje: dla modów makro pojedyncze zejście **prawie zawsze pada** (ścieżki wąskie), więc będzie dużo przelosowań — ale każde jest tanie, więc netto i tak może być szybciej niż backtracking. Eksperyment pokaże.
+
+Wpinam za flagą `SEED_FAST`, model backtrackingu zostaje. Najpierw nowa metoda — pojedyncze zejście:
+
+Metoda gotowa. Teraz dodam flagę `SEED_FAST` i przełącznik w `BuildSeedMoves`. Najpierw define:
+
+Teraz `BuildSeedMoves` — przeczytam bieżącą wersję, żeby wpiąć gałąź precyzyjnie:
+
+Teraz przełącznik w `BuildSeedMoves` — dodaję parametr `fast` i gałąź szybką, model backtrackingu zostaje w `else`:
+
+Teraz oba wywołania w `Gpu.cs` — dołożę argument `SEED_FAST`:
+
+Gotowe. Wszystkie cztery zmiany wpięte, model backtrackingu nietknięty, przełącznik `SEED_FAST` (domyślnie 1 = szybka ścieżka aktywna):
+
+- **[TRubikCube.cs](RubikCube/TRubikCube.cs)** — nowa `GetSolveSeqGreedy`: pojedyncze zejście, reservoir-pick losowego ruchu zbijającego rc o 1, martwy koniec → `null` (bez cofania). W `BuildSeedMoves` gałąź `if (fast)` losuje do skutku, wrzuca `jak leci` (bez `seen`, bez `CorrectSeq`), z limitem `maxDraws` żeby kubik o samych wąskich modach nie zapętlił.
+- **[Variables.glsl.c:29](RubikCube/Resources/Variables.glsl.c)** — `#define SEED_FAST 1`.
+- **[Gpu.cs](RubikCube/Gpu.cs)** — oba wywołania (produkcja + `SeedStats`) przekazują `GetDefineValue("SEED_FAST") != 0`.
+
+Jak testować (nie buduję — Twoja sesja liczy):
+- `SEED_FAST 1` = szybka ścieżka. `0` = stary backtracking+dedup — czysty A/B tym samym przełącznikiem.
+- Telemetria „Seed Pool Stats" działa dla obu (dla fast `stuck` = ile zejść padło i przelosowano; `dupes` zawsze 0, bo nie dedupujemy).
+
+Dwie rzeczy warte obserwacji przy pomiarze:
+1. **Czy w ogóle szybciej.** Dla głębokich kubików backtracking bywa wykładniczy; fast jest `O(rc)` na próbę, ale przy `SEED_MODE=1` większość modów makro pada na jednym zejściu → dużo przelosowań. Netto rozstrzygnie licznik GA (tempo zegarowe).
+2. **Czy domyka.** Fast gubi materiał makro (przeżywają głównie seedy minimalne). Przy `SEED_RATIO=10` i tak seedujesz mało — jeśli i tak schodzi do 4-6, to znak, że ciężkie kubiki spłaszcza sama GA, nie seed, i szybka ścieżka nic nie psuje.
+
+Jak zobaczysz tempo dla niepotęg — powiedz, czy fast realnie odmulił start.
+
+## 🧑 Robert
+
+Przy SeedRatio=10% szybko zszedł do 4 kubików, ale nie był w stanie ułożyć do 200k. Teraz (seed 100%, fast) - do 4 kubików - w 17700, długa przerwa przy 5. Czy ten układ na rysunku nie wygląda na koherentny - bo ruchy boczne go psują
+
+
+## 🤖 Claude
+
+Tak, i to jest bardzo trafna obserwacja — łączy dwie rzeczy, które wyglądały osobno.
+
+**Czy to koherentny układ?** 4 nieułożone = 2² — dla metryki to kandydat na koherentną-4. Jeśli te 4 kubiki dzielą kompletny przekrój (agreeAxes = N−log2(4) = 3), metryka je nagradza: `cost = N − log2(4) = 3`, poniżej floora (4). Więc Best siedzi na *nagrodzonym* plateau, nie na floorze. Twój wzrokowy odczyt „koherentny" zgadza się z tym, że utknął nisko.
+
+**„Ruchy boczne go psują" — dokładnie ten mechanizm.** W kostce 2^N *każdy* ruch obraca pełny plaster = 2^(N−1) = 16 kubików. Więc ruch, który ma domknąć te 4, jednocześnie przewraca 12 innych, w tym ułożone. Koherentna-4 jest geometrycznie blisko, ale każdy krok do przodu rozbija resztę — to jest ta ściana komutatora.
+
+Ale uwaga na jedną subtelność, która mówi, że to **nie** ślepy zaułek metryki: fitness liczy najlepszy prefiks z 32 ruchów. Sekwencja, która *rozwala* w środku, ale kończy z odbudowanymi ułożonymi, ma dobry prefiks — bałagan w środku nie jest karany. I drabina rzeczywiście prowadzi w górę:
+
+- koherentna-4 → cost 3
+- koherentna-8 → cost 2
+- koherentna-16 → cost 1 (obowiązkowa brama, 1 ruch od ułożenia)
+- ułożone → 0
+
+Fitness ∝ cost, więc **wspinaczka 4→8→16→solved jest w każdym szczeblu akceptowaną poprawą**. Metryka daje gradient. Blokadą jest *znalezienie konkretnego plastra*, który ląduje na czystym następnym szczeblu — minimalny ruch ląduje na rozsypanej-8 (floor), nie koherentnej-8. To igła, nie mur.
+
+**I tu spina się z Twoim eksperymentem seedowania:** ruch przeskakujący szczebel to **komutator / makroruch** (obróć-i-odbuduj) — czyli dokładnie ten materiał, który szybka ścieżka jednego zejścia *wyrzuca* (seedy minimalne rozbijają, nie komutują). Dlatego fast dochodzi do 4 błyskawicznie (17700), ale jest najgorzej wyposażony żeby domknąć. To spójne: „szybko do 4, długa przerwa na 5".
+
+Sugerowałbym rozdzielić te dwie fazy w teście: fast doprowadza do czystej koherentnej-4 tanio, ale do domknięcia igły potrzebne są seedy makro (`SEED_FAST=0`, backtracking) — warto sprawdzić, czy backtracking-macro z tego stanu domyka tam, gdzie fast wisi. A na samą igłę drugi lewar to STALL: `STALL_LIMIT=20` jest wysoki — niżej = częstsze ruchy boczne, które mogą strącić Besta na właściwy szczebel.
+
+## 🧑 Robert
+
+Albo ten. No nie może być tak, że on się może popsuć, a posuty układ jest tak samo oceniany
+
+To ten "drugi" układ
+
+
+## 🤖 Claude
+
+Masz rację i to jest sedno — jeśli popsuty układ dostaje tę samą ocenę co koherentny, to nie ma gradientu chroniącego koherencję i GA dryfuje między nimi za darmo. Ale zanim to potwierdzę, muszę sprawdzić **co dokładnie pokazuje to pole „error"** (12,256124 na obu obrazkach) — bo koherencja żyje w shaderze GPU, a to pole może pokazywać CPU-ową ocenę bazową, która koherencji nie widzi. To zmienia diagnozę: albo metryka naprawdę nie rozróżnia tych stanów (błąd do naprawy), albo tylko wyświetlacz ich nie rozróżnia, a GA i tak je waży inaczej.
+
+Sprawdzam plumbing — skąd bierze się „error" i czy CPU-owa ocena ma koherencję:
+
+Sprawdziłem plumbing — i to zmienia diagnozę na Twoją korzyść. Pole „error" to nie ocena bazowa CPU:
+
+```
+ErrorBox.Text = (100 * RubikCube.Score)      // Form1.cs:183
+RubikCube.Score = Best.Fitness               // Form1.cs:306 (przy akceptacji)
+```
+
+Czyli **12,256124 = 100 × Best.Fitness = 100 × 0,12256** — to jest wprost wyjście metryki koherencji z GPU. Więc nie wyświetlacz zawodzi, tylko sama metryka daje ten sam wynik dla obu układów.
+
+I teraz kluczowe: co to za wartość 0,12256? Rabat koherentny to dokładnie `cost/scrambled` — dla koherentnej-4 `cost=3`, dla floora `cost=T=4`. Koherentna czwórka jest więc **o 25% tańsza** niż floor (wyszłoby ~9,2, nie 12,25). 12,25 wygląda na **floor bez rabatu**. A obrazek z przezroczystością potwierdza: te 4 kubiki są **rozrzucone**, nie na wspólnym plastrze — detektor wymaga, żeby czwórka dzieliła dokładnie 3 osie (`agreeAxes == N − log2(4) = 3`); rozrzucona czwórka dzieli mniej → `complete=false` → spada na floor.
+
+Więc masz absolutną rację, i oto precyzyjny powód: **rabat jest zero-jedynkowy**. Tylko *dokładnie kompletna* koherentna-4 dostaje `cost 3`; każda „prawie koherentna" i każda popsuta czwórka spada na ten sam płaski floor (`cost 4`) — wszystkie identyczne. Metryka jest ślepa na to, *jak blisko* koherencji jest dana czwórka. To jest dokładnie ta „ściana floora", którą mamy zapisaną jako otwarty problem ogona: *„błąka się po płaskim floorze, aż przypadkiem trafi na czystą grupę"*. Popsucie nic nie kosztuje, bo popsute i lekko-popsute leżą na tym samym poziomie.
+
+**Kierunek naprawy: nachylić floor ku koherencji przez `agreeAxes`.** Zamiast binarnego „kompletna albo floor", rabat powinien rosnąć z liczbą osi, które grupa *już* dzieli. Czwórka dzieląca 2 osie (o jedną za mało do kompletu) powinna leżeć *między* koherentną-4 a floorem — wtedy zbieranie kubików na wspólny plaster to zjazd w dół, a nie klif, który trzeba przeskoczyć na oślep.
+
+Jedno zastrzeżenie, uczciwie: to jest ta sama strefa zagrożenia, w której powiesił się wariant E. Ale E nagradzał **asymetryczne** cząstki (`log2(g)` nierównych grup) i to robiło pułapki. Gradient po `agreeAxes` **jednej grupy tego samego stanu** ku *kompletnemu* przekrojowi wciąż celuje w symetrię — nagradza *zbliżanie się* do kompletu, nie osiadanie w asymetrii. I zostaje uczciwy (wspólny plaster, nie sama orientacja → nie da się oszukać jak 3/32).
+
+Zanim cokolwiek napiszę — chcesz najpierw potwierdzić, że te czwórki faktycznie siedzą na floorze (szybki sprawdzian: jak dojdzie do *prawdziwej* koherentnej-4, error powinien spaść ~9,2)? Czy od razu rozmawiamy o kształcie tego gradientu po `agreeAxes`?
+
+## 🧑 Robert
+
+W lewym dolnym rogu obrazów znajduje się diagram konfiguracji kostki. To macierz blokowa CubiesxCubies. Te same obrazki pokazują tą samą orientację kubika. Czy możesz określić na tej podstawie rodzaj koherencji obu przypadków?
+
+
+## 🤖 Claude
+
+Uczciwie: z samego zrzutu nie odczytam tego pewnie — punkty są małe, a rodzaj koherencji zależy od dokładnych współrzędnych 4 kubików (czy dzielą 3 osie), czego z pikseli nie wyłuskam bez zgadywania. Ale to, co widzę na obu diagramach, jest sugestywne, więc powiem co widzę i gdzie leży granica.
+
+Na obu obrazach mam główną przekątną (kubiki w domu) plus garść znaczników **poza** przekątną, w prawym-dolnym rejonie. I te znaczniki wyglądają na **symetryczne względem przekątnej** — czyli pary (i,j) oraz (j,i). Para symetryczna off-diagonal = transpozycja (zamiana dwóch kubików miejscami). Liczę mniej więcej **dwie takie pary** — co przy `states: 4` daje odczyt **2+2: dwie osobne transpozycje**, a nie jeden zwarty 4-blok.
+
+Jeśli ten odczyt jest trafny, to jest *dokładnie* przypadek, który tłumaczy floor i identyczny wynik. Dwie pary = dwie koherentne dwójki na **różnych** plastrach = residuum **wielogrupowe**. A obecna bramka nagradza tylko *jeden kompletny przekrój* całego residuum (`firstSize` jedno, `symmetric`, `complete`). Dwie dwójki na różnych warstwach → `firstSize` się zgadza (2=2), ale `agreeAxes` całości nie da kompletu → `symmetric=false` → **floor**. Oba obrazy: ta sama orientacja, ta sama struktura 2+2, różne położenie par → oba na floorze → to samo 12,2561. To jest wprost przypadek z naszych notatek: *„dwie koherentne pary w czwórce nie przechodzą bramki całości i spadają na floor"*.
+
+Ale nie chcę budować teorii na rozmytych pikselach. Rodzaj koherencji to **fakt**, nie zgadywanka — proponuję malutki diagnostyk (bez zmiany metryki): dla stanu z `scrambled` kubikami wypisać ich współrzędne, pogrupować po stanie i podać `gsize` + `agreeAxes` każdej grupy oraz co metryka przypisała (floor czy rabat). Wtedy dla obu przypadków przeczytamy: „grupa {2 kubiki, agreeAxes=4}, grupa {2 kubiki, agreeAxes=4} → 2+2 → floor" — czarno na białym.
+
+Dwie drogi, wybierz:
+1. Powiedz mi dokładnie, co kodują osie i znaczniki tego diagramu (Ty go pisałeś) — być może wtedy odczytam typ wprost z obrazka.
+2. Wpinam ten diagnostyk i mamy pewność zamiast odczytu z pikseli.
+
+## 🧑 Robert
+
+1. To proste, każdy obrazek to macierz orientacji, zawierająca piksele o trzech kolorach odpowiadających wartościom -1, 0 i 1. Jeśli obraz nie zawiera -1, to biały piksel jest 0, czarny = 1, w przeciwnym razie biały = -1, szary = 0, czarny = 1. Niepokoi mnie najbardziej to, co powiedziałeś wcześniej o dwóch grupach kubików o tej samej orientacji. Taki układ musi być nagradzany
+
+Przepraszam, chyba, że one nie są współosiowe, choć to też z diagramu można byłoby odczytać po położeniu macierzy, która jest na pozycji [cubie.Index, cubie.StartIndex]
+
+
+## 🤖 Claude
+
+Teraz rozumiem diagram — i Twoja autokorekta trafia w samo sedno metryki.
+
+Z tym kodowaniem: bloki poza przekątną to przesunięte kubiki, a **piksele bloku = macierz orientacji**. Więc „ta sama orientacja" mogę potwierdzić (ten sam wzór pikseli w blokach) — ale **współosiowość** czyta się nie z pikseli, tylko z **położenia bloku** (wiersz = `cubie.Index`, kolumna = `cubie.StartIndex`). To rozróżnienie jest całą grą.
+
+I dokładnie to robi metryka — Twoja poprawka „chyba że nie są współosiowe" to jej rdzeń:
+1. grupuje po **stanie** (orientacja) — `local_cubies[id]` porównuje orientację,
+2. potem żąda **wspólnej warstwy** — `agreeAxes` liczy osie, na których cała grupa dzieli *bieżącą współrzędną* (`curCoord`, czyli położenie).
+
+Sama zgodna orientacja **nie** wystarcza i **nie może** — to jest właśnie oszustwo 3/32: pokręcić rozrzucone kubiki do wspólnej orientacji w miejscu, bez zbierania ich na jeden plaster. Dlatego bramka wymaga `agreeAxes == N − log2(gsize)`. Doszedłeś sam do warunku nośnego.
+
+Więc dla tego konkretnego układu jest rozwidlenie:
+- **4 o tej samej orientacji I współosiowe** (dzielą 3 osie) → kompletna koherentna-4 → metryka *powinna* dać `cost 3` (~9,2). Skoro widzimy 12,25 (floor) → **to byłby błąd detektora, do zbadania**.
+- **4 o tej samej orientacji, ale NIE współosiowe** (dwie pary na równoległych warstwach, dzielą < 3 osi) → floor jest **słuszny** geometrycznie... ale tu jest prawdziwy problem:
+
+**Metryka nagradza cel (zebrane, kompletne), ale nie daje żadnego gradientu na *zbieranie*.** Wyrównanie orientacji GA osiąga łatwo (to jest ta łatwa, i potencjalnie oszukańcza część). Zebranie tych same-orientation kubików na **jeden wspólny plaster** to trudna część — i dostaje zero nachylenia: albo trafi w komplet (rabat), albo płaski floor. To jest dokładnie ten klif zamiast zjazdu. I stąd wniosek na gradient z poprzedniej tury dostaje twardsze uzasadnienie: **gradient po `agreeAxes`** = nagroda za to, *ile osi grupa już dzieli* = zamiana „zbierania na oślep" w zjazd ku współosiowości.
+
+Żeby wiedzieć, którą gałąź mamy (błąd detektora czy słuszny floor), muszę znać **położenia bloków**. Dla 2^5 pozycja to 5 bitów (jedna oś = jeden bit, bo SIZE=2); kompletna koherentna-4 ⟺ cztery `StartIndex` tworzą „2-płat" — zgadzają się na 3 bitach, różnią na 2. Dwie drogi:
+1. Odczytaj mi wiersze/kolumny tych 4 bloków (albo same `StartIndex`), a zdekoduję współosiowość wprost.
+2. Wpinam diagnostyk wypisujący dla `scrambled` kubików ich współrzędne + `agreeAxes` grup — i mamy fakt zamiast pikseli.
+
+Którą?
+
+## 🧑 Robert
+
+Cały diagram mieści się w oknie (start.x, start.y, width, height) = (333,605,351,347), kubik1_state1=(521,872,9,9), kubik2_state1=(564,915,10,10), kubik3_state2=(607,787,10,10), kubik4_state2=(651,828,10,10)
+
+
+## 🤖 Claude
+
+Zdekodowałem — i to jest bardzo wymowny układ. Przeliczam bloki na indeksy (komórka = 351/32 ≈ 10,97 px w poziomie, 347/32 ≈ 10,84 px w pionie, środek bloku):
+
+| blok | środek (x,y) | wiersz=Index | kol=StartIndex | stan |
+|---|---|---|---|---|
+| k1 | (525,876) | 25 | 17 | state1 |
+| k2 | (569,919) | 29 | 21 | state1 |
+| k3 | (612,792) | 17 | 25 | state2 |
+| k4 | (656,833) | 21 | 29 | state2 |
+
+Permutacja = **dwie transpozycje**: (17 25)(21 29). A teraz pozycje w 5 bitach (bit = oś, bo SIZE=2):
+
+```
+17 = 1 0 0 0 1
+21 = 1 0 1 0 1
+25 = 1 1 0 0 1
+29 = 1 1 1 0 1
+        ↑ ↑
+     bit3 bit2  ← tu się różnią
+```
+
+Wszystkie cztery zgadzają się na osiach 0,1,4 i różnią tylko na osiach 2,3 — czyli **cała czwórka leży na kompletnej ścianie 2×2** (agreeAxes całości = 3). Ale niosą **dwie orientacje**: state1 na {25,29}, state2 na {17,21}; każda para różni się jednym bitem (oś 2) → każda to kompletna, współosiowa koherentna-2.
+
+Więc to jest **symetryczne 2+2, zebrane na jednej ścianie**. I tu ważna korekta tego, co mówiłem wcześniej o „ślepym detektorze": **detektor się odpala i widzi symetrię**. Grupuje state1 i state2, obie `gsize=2`, obie `agreeAxes=4=N−1` → obie `complete`, `symmetric=true`. Przypisuje `cost = N − findMSB(2) = 4`. A floor `T = 2^(N−3) = 4`. Czyli `cost == floor` — metryka **rozpoznaje** strukturę, ale **wycenia ją dokładnie na floorze**. To nie ślepota, to **wycena**.
+
+I stąd Twoja intuicja jest trafna, tylko problem jest głębszy niż myśleliśmy: układ, w którym **trudna część jest zrobiona** — wszystkie 4 kubiki zebrane na jednej ścianie, zostaje tylko komutator różnicujący dwie orientacje — dostaje tę samą cenę co czysty rozrzut. To jest płaski floor w akcji, konkretnie.
+
+I to jest efekt uboczny Twojego `T = 2^(N−3) = 4`. Na 2^4 floor był `2^(N−2)`, więc koherentna-2 (`cost N−1 = 3`) *schodziła* pod floor = miała nagrodę. Na 2^5 obniżyłeś floor do 4, żeby zablokować oszustwo „redukuj do 8" — i szczebel koherentnej-2 **zlał się z floorem**. Symetryczne 2+2 straciło miejsce pod floorem.
+
+Dwa lewary, żeby to zebranie-na-ścianę dostało gradient — i oba trzymają się Twojej zasady symetrii:
+
+1. **Detekcja całej ściany, ponad podziałem stanu.** Jeśli *unia* wszystkich `scrambled` pozycji tworzy kompletny przekrój (agreeAxes=3 nad całą czwórką, *niezależnie* od stanu) → potraktuj jak koherentną-4 (`cost 3`, pod floorem). To nagradza wprost „zebranie na ścianę" — uczciwą, trudną część — a nie da się tym oszukać jak 3/32 (tamto było orientacją w miejscu; to wymaga realnego *przeniesienia* kubików na wspólny plaster).
+2. **Nagroda dla symetrycznego 2+2 przez liczbę grup g**, ale tylko przy równych, kompletnych grupach (to, co powiesił wariant E, ale E dopuszczał grupy *nierówne*; Twoja symetria to zamyka).
+
+(1) jest czystszy i celuje dokładnie w ten obrazek. Który kierunek badamy — detekcja całej ściany, czy g dla symetrycznych grup?
+
+## 🧑 Robert
+
+Nie chce mi się już za bardzo liczyć, bo późno, ale sprawdź jak by to było, bo tak na oko, to nasz koszt = 1 + logT - logs + log(groups)
+
+
+## 🤖 Claude
+
+Policzę za Ciebie — i dobra wiadomość: to działa. Najpierw uprość, bo `log(s) − log(groups) = log(s/groups) = log(firstSize)`, więc Twój wzór to po prostu:
+
+```
+cost = 1 + log₂(T) − log₂(firstSize)
+```
+
+Czyli: „ile podwojeń dzieli daną grupę od celu T, plus 1". To jest obecny koszt `N − log₂(firstSize)` z **kotwicą przesuniętą z N na (1+log T)** — zamiast mierzyć odległość od *ułożenia* (N), mierzysz odległość od *osiągalnego celu* T. Dla T=2^(N−3) to jednostajne obniżenie całej drabiny o 2.
+
+Kluczowe przypadki, N=5, T=4 (log T = 2):
+
+| układ | firstSize | koszt teraz | koszt nowy |
+|---|---|---|---|
+| koherentna-4 (1 grupa) | 4 | 3 | **1** |
+| symetryczne 2+2 | 2 | 4 (=floor) | **2** |
+| koherentna-2 | 2 | 4 (=floor) | **2** |
+| floor (T) | — | 4 | 4 |
+| mono-twist s=1 | 1→wyłączony | 4 | 4 |
+
+Fitness ∝ koszt (s się skraca), więc to jest wprost drabina. I dostajesz dokładnie to, o co walczyłeś: **symetryczne 2+2 spada z floora (4) na 2 — pod floor** — a koherentna-4 (1) **nadal je bije**. Kolejność zachowana, szczelina otwarta. Mono-twist i floor zostają na 4, więc oszustwo „redukuj liczbę" dalej zablokowane.
+
+I trzyma się Twojej zasady symetrii za darmo: wzór odpala się tylko w gałęzi `symmetric && firstSize>1`, więc asymetria → `symmetric=false` → floor, singletony → wyłączone → floor. Rozrzut nie prześlizgnie się.
+
+Implementacyjnie to jednolinijkowiec: nie trzeba nawet liczyć `groups`, bo `firstSize` już mamy — `cost = 1 + findMSB(T) − findMSB(firstSize)`.
+
+Jedno do sprawdzenia na biegu jutro (nie teraz): koherentna-4 ma teraz koszt 1, nie 0 — więc do ułożenia zostaje zapas (dobrze, brak fałszywego „solved"), ale szczelina floor(4)→koherencja(1) zrobiła się większa niż była (3→1). Może pomóc (mocniejszy uchwyt na strukturę), może za mocno ciągnąć — to już rozstrzygnie ogon, nie kartka. Ale „na oko" wzór jest zdrowy i robi to, co chciałeś. Idź spać. 🙂
+
+## 🧑 Robert
+
+Dobra, zaraz, tylko dokończy już myśl do końca - bo coś mi się tu nie zgadza. Prawie ustaliliśmy, że T jest stałą, równą 4, a więc logT = 2 (tak nawiasem mówiąc pomyliłem się, bo chciałem, by wzór był ten sam, tzn. +2 a nie 1). Skoro poziom 4 będzie na głębokości zależnej od N, powinniśmy chyba zaczynać od zera, tzn. koszt = 4 - log(firstSize)
+
+
+## 🤖 Claude
+
+Dokończmy. Twoja poprawka jest trafna i domyka to ładniej niż mój przekaz. Constant +2 (nie +1), więc:
+
+```
+cost = 2 + log₂T − log₂(firstSize)   →   przy T=4:   cost = 4 − log₂(firstSize)
+```
+
+A najczystsza postać to po prostu **`cost = T − log₂(firstSize)` = floor minus rabat**, gdzie rabat = `log₂(firstSize)` i **startuje od zera** dla singletona. To jest właśnie to, co miałeś na myśli mówiąc „zaczynać od zera": drabina i floor dzielą **jedną kotwicę T**. Singleton (firstSize=1) ląduje dokładnie na floorze — **szew znika**. W obecnym wzorze była nieciągłość: drabina kotwiczona w N, floor w T, więc singleton „spadał" z N na T. Teraz jest gładko, a guard `firstSize>1` staje się **zbędny** (singleton i tak daje floor).
+
+Drabina, T=4:
+
+| firstSize | rabat log₂ | cost teraz (N−log) | cost nowy (T−log) |
+|---|---|---|---|
+| 1 (singleton) | 0 | (→floor 4) | **4 = floor** |
+| 2 (koh-2, 2+2) | 1 | 4 (=floor) | **3** |
+| 4 (koh-4) | 2 | 3 | **2** |
+
+2+2 schodzi z floora na 3 — **pod floor** — koherentna-4 (2) dalej je bije. Dokładnie to, o co walczyłeś, i bez magicznej stałej.
+
+I bonus, który chyba był Twoją prawdziwą motywacją dla „T = stała 4": to **naprawia** stary problem `T = 2^(N−3)`, który psuł 2^4 (dawał T=2). Stała 4 jest poprawnym floorem dla **obu**: 2^4 (=2^(N−2)) i 2^5 (=2^(N−3)) — i zgadza się z Twoim argumentem o 4 kątach ćwierćobrotu. Jeden floor unifikuje Micro.
+
+Jedyne do sprawdzenia na biegu (jutro): studnia koherentnej-4 jest teraz **głębsza** — 2 pod floorem zamiast 1. Mocniejszy uchwyt na strukturę, ale może ciągnąć za mocno. To już ogon rozstrzygnie. Kartka mówi: wzór zdrowy, szew zlikwidowany, 2^4 przy okazji odzyskane. Dobranoc. 🙂
+
+## 🧑 Robert
+
+Dzień dobry. Pomijamy teraz badanie spójności dla układów > T. Bardzo mi się podobało, gdy widziałem na kostce 2^4 układy subcoherentne dla 8-mek. Wówczas floor także był 4. Ponieważ to układ subcoherentny, to oceniany jest jak coherentna 4, czyli koszt 0. Takie obliczenia nie będą drogie, bo będą wykonywane tylko dla układów będących potęgą 2. Chyba je włączę. Na obrazku - ciężki układ do wyjścia - 4 kubiki poskręcane, ale na swoich miejscach (4-twist?)
+
+
+## 🤖 Claude
+
+Dzień dobry. Ładne spostrzeżenie o subkoherentnych 8-kach — i tak, to jest realna struktura, nie przypadek.
+
+**Subkoherentna-8 = dwie koherentne-4 połówki.** Metryka grupuje po stanie → dwie grupy `firstSize=4`, symetryczne → koszt `= T − log₂(4) = 4 − 2 = 2`. A koherentna-4 (s=4) to też `firstSize=4` → koszt 2. Fitness ∝ koszt (s się skraca), więc obie mają **ten sam fitness** — dokładnie „oceniana jak koherentna-4". Twoje „koszt 0" czytam jako: **druga połówka jest darmowa** — dołożenie 4 kubików do struktury nic nie kosztuje. Zgadza się. I drabina ładnie się przedłuża w górę:
+
+```
+koherentna-8 (firstSize 8):  T−log8 = 1
+subkoherentna-8 = koher-4:    T−log4 = 2
+koher-2 / 2+2:                T−log2 = 3
+floor:                        4
+```
+
+Prawdziwa koherentna-8 (jedna grupa, brama) bije subkoherentną — dobrze. I masz rację, że tanio: bramka `(s & (s−1))==0` odpala to tylko dla potęg 2.
+
+Dwa strażniki, zanim włączysz >T:
+
+1. **Nigdy koszt 0 dla nieułożonego.** Koszt 0 = fitness 0 = nieodróżnialne od solved → fałszywe optimum, GA staje ruch przed metą. Na 2^4 `firstSize=16` dałoby `4−4=0` — to jest ta pełna warstwa (brama 1-ruchowa), nie wolno jej wycenić na solved. Utnij koszt do min. 1, albo bramkuj tak, by `firstSize < 2^T`.
+2. **Rabat >T tylko dla *czystej* subkoherencji.** Wchodząc powyżej floora nagradzasz układy z *większą* liczbą nieułożonych niż cel — czyli dokładnie to, co floor blokował („mniej = lepiej", mono-twist). Bezpieczne wyłącznie dlatego, że ograniczasz do symetrycznych, kompletnych grup potęgi-2. Rozrzucona-8 (nie-subkoherentna) **musi** dostać goły licznik 8, nie rabat — inaczej dekoncepcja wraca tylnymi drzwiami (to była lekcja wariantu E: cząstkowe/asymetryczne = pułapka).
+
+**A obrazek — 4-twist — to inny lewar.** 4 kubiki poskręcane na swoich miejscach to czysty defekt orientacji, najtwardszy przypadek. Utknął na floorze (12,33), bo koherencja chce je **zebrać na wspólny plaster**, a one już siedzą w domu — zebranie oznacza *wyprowadzenie ich z miejsc*, co licznikowo wygląda gorzej. Nie ma zjazdu na tę ścieżkę. To nie reguluje subkoherentna-8 (to reżim s=8), tylko **gradacja ≤T** (`T−log firstSize` + wykrywanie po `agreeAxes`): ona daje zjazd „rozrzucone-4 → zebrane na ścianę → koherentna-4 (koszt 2) → domknięcie". Więc 4-twist to dobry test tego samego wzoru, tylko od dołu. Subkoherentne 8-ki i gradacja ≤T to dwa końce jednej drabiny — włącz oba i będzie ciągła od 8 do solved.
+
+## 🧑 Robert
+
+Widzisz, jak dobrze, że rozmawiamy - źle przyjąłem poziom kosztu i coś mi się nie podoba dla 2^5. Wzór na koszt jest teraz niezależny od N, więc subcoherent-8 i tu i w kostce 2^4 jest wyceniany tak samo. Bazą do oceny powinien być przekrój warstw (koszt 1). Dla 2^4 tak jest - coherent-8 ma koszt 1, ale dla 2^5 coherent-16 ma koszt 0, a to jeszcze nieułożona kostka
+
+
+## 🤖 Claude
+
+Świetnie, że złapałeś to teraz — i masz rację, wczoraj skleiłem dwie różne role „czwórki" w jedno i to jest błąd dla N≥5. Rozdzielmy je:
+
+- **Floor = 4** (stała, Twój argument o 4 kątach ćwierćobrotu) — to poziom dla niespójnych. OK, zostaje.
+- **Kotwica kosztu = N**, nie 4 — bo `cost = A − log₂(firstSize)`, a gateway (przekrój warstwy, `firstSize = 2^(N-1)`) musi dać **koszt 1 dla każdego N**:
+  - A = N: `N − (N−1) = 1` zawsze ✓
+  - A = 4: `4 − (N−1) = 5 − N` → 1 przy N=4, ale **0 przy N=5** ✗ — nieułożony gateway wyceniony jak solved, dokładnie to, co zobaczyłeś.
+
+I dobra wiadomość: kotwica N to jest to, co obecny kod **już** ma — `cost = N − findMSB(firstSize)`. Czyli to jest **cofnięcie** mojego wczorajszego `T − log`, nie nowy kod. Dobrze, że nie zdążyłeś go wpiąć.
+
+Drabina, kotwica N, floor 4, subkoherencja włączona:
+
+| struktura | firstSize | 2^4 (N=4) | 2^5 (N=5) |
+|---|---|---|---|
+| gateway (przekrój) | 2^(N-1) | **1** | **1** |
+| koherentna-8 | 8 | (=gateway) | 2 |
+| subkoh-8 = koher-4 | 4 | 2 | 3 |
+| koher-2 / 2+2 | 2 | 3 | 4 = floor |
+| floor | — | 4 | 4 |
+
+Gateway = 1 w obu ✓. Subkoherentna-8 = koherentna-4 w obu ✓ (ta darmowa druga połówka, o którą Ci chodziło).
+
+Ale uczciwie: cofnięcie kotwicy do N **od-robiło** wczorajszą naprawę 2+2. Na 2^5 `firstSize=2 → koszt N−1 = 4 = floor`, więc 2+2 znów siedzi na floorze. Wniosek: **„2+2 pod floor" to inny lewar niż kotwica.** Właściwym jest to, co proponowałem dwie tury temu — **detekcja całej ściany ponad podziałem stanu** (cztery na jednej ścianie → pozycyjna koherentna-4 → koszt 3), a nie ruszanie kotwicy. Trzymajmy te dwie sprawy osobno, bo teraz się nam zlały i stąd zamieszanie.
+
+Jeden strażnik przy włączaniu >T: nie daj `firstSize` sięgnąć `2^N` (koszt 0 = fałszywe solved). Największa sensowna grupa to gateway `2^(N-1)` (koszt 1); „koherentna-32" ma agreeAxes=0 i to degeneracja — utnij koszt do min. 1 albo żądaj `agreeAxes ≥ 1`.
+
+Plan: kotwica N zostaje (gateway=1), trigger rozszerzasz na potęgi 2 aż do `2^(N-1)`, a 2+2 osobno przez detekcję ściany. Pasuje?
+
+## 🧑 Robert
+
+Jak najbardziej pasuje. Wytłumacz mi jeszcze, dlaczego koherentna-32 to degeneracja - dlatego, że wszystkie kubiki są w tej samej orientacji, ale jeszcze nie jest to macierz jednostkowa?
+
+
+## 🤖 Claude
+
+Tak, to co nazwałeś to trafny objaw — koszt 0 ogłasza „ułożone", a orientacja nie jest jednostkowa, więc to fałszywy solved. Ale korzeń jest głębszy i warto go zobaczyć, bo tłumaczy, czemu strażnik to akurat `agreeAxes ≥ 1`.
+
+Koherencja to **podzbiór** kubików **zebrany na wspólnej warstwie**. Liczba wspólnych osi = `agreeAxes = N − log₂(gsize)` = liczba współrzędnych, które grupa ma *ustaloną*. To definiuje pod-kostkę: ustalasz `N−k` osi, na `k` osiach kubiki się rozpościerają. Żeby to była realna struktura (przecięcie warstw), musi być **co najmniej jedna ustalona oś** → `agreeAxes ≥ 1`.
+
+Przy `gsize = 2^N = 32` mamy `k = N`, więc `agreeAxes = 0`. Trzydzieści dwa kubiki w jednym stanie **wypełniają całą kostkę** — na każdej osi występują obie współrzędne (0 i 1), więc nie dzielą **żadnej**. To jest **przeciwieństwo** zebrania na warstwę: zero wspólnych warstw = nic nie zgromadzone = to powinien być floor, nie koszt 0. Bramka `agreeAxes == N − log₂(gsize)` przepuszcza to tylko przez **przypadek brzegowy** (`0 == N − N`), nie dlatego, że coś jest spójne.
+
+I stąd model „koszt = ruchy do ułożenia" tam nie sięga. Prawdziwa koherentna-2^k (k < N) to pod-kostka odległa o `N−k` ruchów. Przy k=N nie ma żadnej ustalonej osi — to nie jest przecięcie żadnych warstw, tylko „wszystko naraz w jednym przekręcie". To jest globalny obrót ramki, nie struktura, którą warstwowe ruchy budują — więc `N − N = 0` to ekstrapolacja wzoru poza jego dziedzinę, a nie realne „0 ruchów od ułożenia".
+
+Dlatego czysty strażnik to **`agreeAxes ≥ 1`** (musi dzielić choć jedną warstwę):
+- gateway `2^(N-1)` ma `agreeAxes = 1` → zostaje, koszt 1 ✓
+- degeneracja `2^N` ma `agreeAxes = 0` → wypada ✓
+
+I to jest ta sama zasada, która trzyma całą metrykę uczciwą — „spójność wymaga wspólnej warstwy" — tylko dociągnięta do samej góry drabiny. Twój objaw (nie-jednostkowa orientacja udająca solved) i ten korzeń (zero wspólnych osi = brak struktury) to dwie strony tego samego brzegu.
+
+## 🧑 Robert
+
+Tak, ale w dobrze zorganizowanych układach warunki brzegowe bardzo często nie odbiegają zachowaniem od reszty. Nie twierdzę, że nie powinniśmy ustawiać strażnika - masz rację we wszystkim co powiedziałeś - ale dla kostki 2^5 układ koherentna-32 dający fałszywy koszt 0 dla zdefiniowanej przez nas funkcji oceny jest niezwykle dobry - człowiek już by powiedział, że kostka jest właśnie ułożona, bo kostkę całą, bez ruszania kubików można obracać bez wykonywania jej ruchów - a to oznacza transformację "rodzica" dla wszystkich kubików i istnieje prosta transformacja, która wykonana na całej kostce sprowadza bezwzględna transformacje świata kubików do macierzy jednostkowej. Ale po tym przydługim wyjaśnieniu - i tak zostaniemy przy Twoim rozwiązaniu
+
+
+## 🤖 Claude
+
+Piękna obserwacja — i masz całkowitą rację, że to nie patologia, tylko wierne rozszerzenie metryki. Koherentna-32 to wszystkie kubiki z tą samą transformacją-„rodzicem"; jedno globalne `g⁻¹` na całej ramce sprowadza świat kubików do jednostkowej, a globalny obrót nie jest ruchem kostki — jest darmowy. Więc *z dokładnością do symetrii* kostka **jest** ułożona i koszt 0 to poprawna odpowiedź, nie fałszywa. To, że skrajny przypadek ma czystą interpretację, to dobry znak o funkcji — brzeg jest naturalną granicą, nie wyjątkiem. Twoja zasada się broni.
+
+Cała subtelność to *którą* metryką mierzymy:
+
+- **Semantyka symetrii** (z dokładnością do obrotu ramki): koherentna-32 = 0 ruchów → koszt 0 słuszny, brzeg zachowuje się jak reszta. Tu masz rację.
+- **Nasz koszt** to jednak „ruchy **warstwowe** do jednostkowej w **ustalonej** ramce". A globalny obrót nie jest ruchem warstwowym — jeden ruch obraca połowę, nigdy wszystkich naraz. W tej walucie koherentna-32 nie jest 0 ruchów: albo nieosiągalna, albo wymaga rozłożenia globalnego obrotu na ruchy warstwowe, czego zwykle się nie da.
+
+Czyli koszt 0 to **trafna odpowiedź na inne pytanie**. Trzymamy strażnika nie dlatego, że metryka się psuje (nie psuje — jest wręcz elegancka), tylko dlatego, że nasz cel jest węższy niż „z dokładnością do symetrii": chcemy jednostkowej w ustalonej ramce, żeby zgadzało się z resztą potoku (test solved, Solution Count, ekran). `agreeAxes ≥ 1` sprowadza brzeg do tej samej waluty co cała drabina — a przy okazji zamyka stan, na którym GA i tak legalnie nie wyląduje.
+
+Zostajemy przy nim. I dobrze, że to nazwałeś — teraz guard jest wyborem świadomym (węższa waluta), nie łatą na „błąd".
+
+## 🧑 Robert
+
+Tak, i dziękuję za ten wywód, bo uświadomił mi on, że w naszej metryce, kostka coherent-32 wcale nie jest aż tak bliska rozwiązania. Do dyspozycji, jak zauważyłeś, mamy tylko ruchy warstw. Oczywiście (nie wiem dlaczego w to wątpisz) takie samo cofnięcie wszystkich przekrojów kostki obraca kostkę w układzie świata. Ale to skomplikowany zestaw ruchów - takich samych, ale wykonywanych na wszystkich warstwach, więc jeszcze zależny od rozmiaru SIZE kostki
+
+
+## 🤖 Claude
+
+Masz rację, i to ja się pomyliłem — przepraszam za to „nigdy wszystkich naraz". Właśnie że **można** wszystkich naraz: obrót wszystkich SIZE równoległych warstw w danej płaszczyźnie o ten sam kąt = globalny obrót całej kostki w tej płaszczyźnie. Ruchy warstwowe globalny obrót ogarniają — tylko nie jednym ruchem, lecz całym pakietem. Źle to zaprzeczyłem.
+
+I to jest dokładnie pointa, którą wydobyłeś: ten pakiet **kosztuje**. Jeden globalny obrót w płaszczyźnie (i,j) = obrócenie wszystkich SIZE przekrojów wzdłuż osi kolateralnej o ten sam kąt → **SIZE ruchów** (dla 2^5: oba przekroje, czyli 2). A dowolne wspólne `g` to złożenie kilku takich Givensów, więc ≈ (liczba Givensów w `g`) × SIZE ruchów.
+
+Czyli koherentna-32 nie leży na solved — leży kilka ruchów dalej, i to **zależnie od SIZE**. Koszt 0 ją zaniża: mówi „0 ruchów", a realnie jest ich ~`SIZE·k`. To domyka wątek symetrycznie:
+
+- waluta symetrii (obrót ramki darmowy): dystans 0,
+- waluta ruchów warstwowych (nasza): dystans mały, ale niezerowy i SIZE-zależny.
+
+`agreeAxes ≥ 1` ustawia brzeg w tej drugiej, właściwej dla nas walucie — i stąd Twoja konkluzja, że w naszej metryce coherent-32 wcale nie jest aż tak blisko, jest w pełni poprawna. Potwierdzone z obu stron.
+
+## 🧑 Robert
+
+Wepniesz zmiany? Tym razem boję się coś posuć, niech będzie na Ciebie
+
+
+## 🤖 Claude
+
+Wpnę. Najpierw przeczytam bieżącą wersję bloku koherencji, żeby trafić dokładnie (nie chcę niczego ruszać poza tym, co ustaliliśmy):
+
+Widzę — zdążyłeś już wpiąć nocną wersję: `T = 4` (dobrze, zostaje) i w linii 117 **kotwicę na T** (`2 + findMSB(T) - findMSB(firstSize)`). To jest właśnie ta, którą rano uznaliśmy za błędną (gateway=0 na 2^5). Cofam ją na kotwicę N, zgodnie z ustaleniem. Najpierw szybki test na kolizję nazwy `G` z makrem (pamięć o makrach GLSL):
+
+Czysto, `G` wolne. Wpinam pięć zmian.
+
+**1/5** — kotwica N (cofnięcie kotwicy na T z linii 117):
+
+**2/5** — rozszerzenie triggera do bramy `G = 2^(N-1)` (i dodanie `G`):
+
+**3/5** — koszt domyślny: floor `T` dla małych, goły licznik powyżej:
+
+**4/5** — bufor na maks. `G = 2^(N-1)` nieułożonych:
+
+**5/5** — aktualizacja komentarzy (nagłówek + inline), żeby nie wprowadzały w błąd:
+
+Wszystkie pięć wpięte. Przeczytam złożony blok w całości, żeby potwierdzić, że składa się w spójną całość (przy tak splecionych zmianach wolę zweryfikować):
+
+Blok składa się poprawnie. Zerknę jeszcze na sam ogon (przypisanie kosztu + mnożnik), bo to jest crux kotwicy N:
+
+Ogon poprawny — linia 122 to kotwica N, mnożnik i klamry się domykają. Wszystko wpięte. Zapiszę jeszcze bieżący stan metryki w pamięci (żeby nie odtwarzać tego od zera, gdyby sesja padła):
+
+Wpięte i zweryfikowane. Nie budowałem — to Twoja część. Oto co się zmieniło, wszystko w [EvaluateMicro.glsl.c](RubikCube/Resources/EvaluateMicro.glsl.c):
+
+1. **Kotwica N** (linia 122) — cofnąłem Twoją nocną kotwicę na T (`2 + findMSB(T) − findMSB(firstSize)`) na `N − findMSB(firstSize)`. To był ten świadomy revert: gateway = 1 dla każdego N, zamiast 0 na 2^5.
+2. **Floor `T = 4u`** (stała, cztery kąty ćwierćobrotu) — zostaje jak u Ciebie, tylko z komentarzem *dlaczego*.
+3. **Trigger rozszerzony do bramy `G = 2^(N-1)`** — było `≤ T`, teraz `≤ G`. To włącza subkoherentne 8-ki i całą górę drabiny.
+4. **Koszt domyślny** = floor `T` dla `scrambled ≤ T`, **goły licznik** powyżej (żeby rozszerzenie nie dawało fałszywego rabatu niespójnym).
+5. **Bufor `scr[1<<(N-1)]`** — mieści do `G` nieułożonych.
+
+Drabina, którą teraz dostajesz:
+
+| | 2^4 | 2^5 |
+|---|---|---|
+| gateway (przekrój) | 8 → **1** | 16 → **1** |
+| coherent-8 | — | 8 → **2** |
+| subcoherent-8 = coherent-4 | 4 → **2** | 4 → **3** |
+| coherent-2 / 2+2 | 2 → **3** | 2 → **4 = floor** |
+| floor | **4** | **4** |
+
+Trzy rzeczy, których świadomie **nie** ruszałem (żebyś wiedział, gdzie jesteśmy):
+
+- **Zebrane 2+2 wciąż na floorze.** Symetryczne 2+2 na jednej ścianie (te cztery z obrazka {17,21,25,29}) dalej dostaje `firstSize 2 → koszt 4 = floor`. To jest ten **osobny lewar — detekcja całej ściany ponad podziałem stanu** — którego umówiliśmy się nie robić teraz. Jak zechcesz, to następny krok.
+- **Perf.** Dekompozycja `O(k²)` odpala się teraz dla potęg 2 aż do 16 (było do 4), więc w ogonie będzie cięższa — ale tylko dla potęg 2. Gdyby muliła, tanie cofnięcie to obniżyć `G` (np. do `2^(N-2)`, samo subkoherentne bez pełnej bramy-16).
+- **Degeneracja** koherentna-32 jest odcięta przez sam pułap `G` (agreeAxes ≥ 1 wychodzi za darmo), zgodnie z naszym ustaleniem.
+
+Zapisałem też bieżący stan metryki do pamięci. Buduj i puść — ciekawe, czy brama-16 z kosztem 1 da ogonowi uchwyt tam, gdzie dotąd wisiał.
+
+## 🧑 Robert
+
+A swoją drogą to ciekawe właśnie, że algorytm, ponieważ stosuje 2 strategie - do Floor i poniżej przełącza - sprawia, że uzyskanie pełnej coherence-32 dla kostki 2^5 jest prawie niemożliwe - większość kubików jest już na swoich miejscach (no chyba że zaczynamy dopiero układanie kostki). Ale nieważne - zanim cokolwiek będę testował musimy rozstrzygnąć ocenę układu, który nie wiem dlaczego nazywasz 2+2, czy on się różni czymś od zwykłej subcoherent-4?
+
+
+## 🤖 Claude
+
+Masz rację i dobrze, że to wychwyciłeś — **„2+2" to była moja nieformalna etykieta, a to jest po prostu subcoherent-4.** Orientacyjnie nie różni się niczym: dwie koherentne dwójki, dokładnie jak subcoherent-8 to dwie koherentne czwórki. Zrzucam „2+2", mówimy subcoherent-4.
+
+I metryka wycenia to **spójnie z drabiną subkoherentną**, którą właśnie wpięliśmy: subcoherent-4 → `firstSize 2` → `cost = N − log₂(2) = N−1`. Na 2^5 to jest 4 — czyli ląduje **dokładnie na floorze**. Nie ma tu żadnego wyjątku; to jest po prostu najniższy szczebel drabiny subkoherentnej, który dla 2^5 wypada na floorze (`N−1 = T = 4`). Więc Twój instynkt „to zwykły subcoherent-4" jest trafny — tak to metryka widzi.
+
+Jedyna rzecz, która odróżnia **ten** układ z obrazka od byle jakiego subcoherent-4, jest **pozycyjna**, nie orientacyjna: jego cztery kubiki tworzą unią **jedną kompletną ścianę** ({17,21,25,29} dzielą 3 osie). A metryka grupuje **najpierw po orientacji**, więc unii nigdy nie sprawdza — nie odróżni subcoherent-4 *zebranego na ścianie* od *rozrzuconego na dwóch różnych ścianach*. Oba dostają floor.
+
+Więc „rozstrzygnięcie oceny" sprowadza się do jednej decyzji: **czy dokładamy detekcję pozycyjną całej unii?**
+
+Mechanizm byłby czysty i tani (`O(k·N)`): policz `agreeAxes` nad **całym** zbiorem nieułożonych (ignorując stan); jeśli tworzą kompletne przecięcie (`agreeAxes == N − log₂(scrambled)`), to jest **pozycyjna koherentna-k** o koszcie `N − log₂(scrambled)`; bierz **min** z kosztem z grup orientacyjnych:
+- zebrany subcoherent-4 (unia = ściana): `min(4, 3) = 3` → pod floor ✓
+- rozrzucony subcoherent-4 (unia ≠ ściana): `min(4, floor) = 4` → floor ✓
+- prawdziwa koherentna-4 (jeden stan): oba dają 3 → bez zmian ✓
+
+Uczciwe — zebranie na ścianę to realna praca (przeniesienie kubików), nie oszustwo 3/32 w miejscu. Moja rekomendacja: **tak, dołóżmy to** — to jest ten lewar, który wreszcie nagradza strukturę, na którą uparcie wskazujesz, a jest niepodrabialny. Zastrzeżenie: to strefa E (koherencja cząstkowa), więc po wpięciu trzeba zbadać ogon pod kątem pułapek.
+
+(I nawiasem — Twoja uwaga o coherence-32 jest celna: w ogonie, gdy 28/32 stoi, ono i tak nie wystąpi; strażnik chroni stan nieosiągalny przy peelingu. Belt-and-suspenders, zgadza się.)
+
+Daję zielone światło na detekcję unii — czy najpierw chcesz coś doprecyzować w tym `min`?
+
+## 🧑 Robert
+
+Nie, nie to nie tak. Nic nie trzeba specjalnie liczyć. Musimy znów dopracować funkcję kosztu. Nie chcemy, by subcoherent-2k był wyceniany tak samo jak coherent-k, musi być lepszy. W nasze metryce muszą się pojawić połówki. Pozostańmy przy 2^5: coherent-16: 1, subcoherent-16: 1.5, coherent-8: 2, subcoherent-8: 2.5, itd. Jasne?
+
+
+## 🤖 Claude
+
+Jasne — i to jest lepsze niż moja detekcja unii, bo nic pozycyjnego nie liczymy. Zrozumiałem: koszt musi zależeć od **firstSize ORAZ liczby grup `g`**, a nie od samego firstSize. Wtedy subcoherent-2^k przestaje się równać coherent-k.
+
+Formuła, która daje dokładnie Twoje liczby:
+
+```
+cost = N − log₂(scrambled) + 0.5·log₂(g)        (g = liczba równych grup = scrambled / firstSize)
+```
+
+Sprawdzam na 2^5:
+
+| układ | scrambled | g | koszt |
+|---|---|---|---|
+| coherent-16 (brama) | 16 | 1 | 5−4+0 = **1** |
+| subcoherent-16 | 16 | 2 | 5−4+0.5 = **1.5** |
+| coherent-8 | 8 | 1 | 5−3+0 = **2** |
+| subcoherent-8 | 8 | 2 | 5−3+0.5 = **2.5** |
+| coherent-4 | 4 | 1 | 5−2+0 = **3** |
+| subcoherent-4 | 4 | 2 | 5−2+0.5 = **3.5** |
+| coherent-2 | 2 | 1 | 5−1+0 = **4** |
+
+Trafiam co do joty. I widać dwie rzeczy, o które Ci chodziło:
+- **subcoherent-8 (2.5) < coherent-4 (3)** — subkoherentna jest *lepsza* od samotnej koherentnej swojej połowy, a nie równa. Połówki się pojawiły.
+- **subcoherent-4 (3.5) < floor (4)** — zebrane 2+2 wskakuje pod floor **samą formułą**, bez detekcji unii. To jest to „nic nie trzeba liczyć".
+
+Brama zostaje 1 (koszt nigdy < 1), pełna koherencja niezmieniona, a używamy tylko `scrambled` i `firstSize` — oba już mamy. Wpinam. To jednolinijkowiec plus komentarze:
+
+Teraz nagłówek, żeby opis kosztu się zgadzał:
+
+Wpięte — formuła połówkowa w kodzie i w nagłówku. Zaktualizuję jeszcze pamięć (poprzedni wpis mówił, że subcoherent-8 = coherent-4, co już nieaktualne). Przeczytam bieżący wpis, żeby podmienić czysto:
+
+Gotowe, nie budowałem. Zmiana to jeden wzór w [EvaluateMicro.glsl.c:122](RubikCube/Resources/EvaluateMicro.glsl.c) plus komentarze:
+
+```glsl
+cost = float(N) - 0.5 * float(findMSB(scrambled) + findMSB(firstSize));
+```
+
+To daje pełną, przeplataną drabinę połówek dokładnie jak chciałeś: coherent-16 (1) < subcoherent-16 (1.5) < coherent-8 (2) < subcoherent-8 (2.5) < coherent-4 (3) < subcoherent-4 (3.5) < coherent-2 (4). Brama zostaje 1, pełna koherencja bez zmian, `scrambled` i `firstSize` już mamy — zero dodatkowych obliczeń. I zebrane 2+2 (subcoherent-4) wpada na 3.5, pod floor, samą formułą.
+
+Jedna rzecz na oko podczas testu — **koszty są teraz połówkowe, nie całkowite**. Nagłówek metryki chwalił się, że całkowite koszty dają dużo remisów, po których chodzi ruch boczny STALL-a. Przy kroku 0.5 remisów jest mniej (siatka gęstsza) — ruch boczny ma rzadziej dokąd pójść. Prawdopodobnie w porządku (remisy wciąż są), ale gdyby ogon zaczął się zacinać inaczej niż dotąd, to pierwszy podejrzany. Zapisałem to jako caveat w pamięci.
+
+Buduj i puść — teraz endgame ma ciągłą drabinę aż do bramy, z połówkami subkoherentnymi po drodze.
+
+## 🧑 Robert
+
+Ciekawe, że koherentna-2 zostaje na floorze, to niedobrze
+
+
+## 🤖 Claude
+
+Dobre oko — i to jest realna wada, nie kosmetyka. Zobaczmy dlaczego: koherentna-2 to `firstSize=2, g=1`, więc `cost = N − log₂(2) = N−1`. A floor = `T = 4`. Na 2^5 `N−1 = 4 = floor` — zderzają się. I to nie przypadek do zignorowania: dla **2^6** (też Micro) koherentna-2 = `N−1 = 5` > floor 4 — czyli koherentna struktura kosztowałaby **więcej** niż rozrzut. Stała 4 psuje się dla N≥5.
+
+Źródło: drabina jest **kotwiczona w N**, a floor wsadziliśmy jako **stałą 4**. Mieszanka. Floor powinien być tam, gdzie siedzi najgłębszy pojedynczy defekt — **mono-twist, głębokość N**. Wtedy *każda* koherentna struktura (głębokość `N−k`, k≥1) jest ściśle pod floorem.
+
+Poprawka: **floor = N** (zamiast stałej 4). Jednożetonowa zmiana `T = 4u` → `T = uint(N)`. Skutki:
+
+| | teraz (floor 4) | floor = N |
+|---|---|---|
+| 2^4 (N=4) | 4 | **4** (bez zmian — N=4) |
+| 2^5 (N=5) | 4 | **5** |
+| koherentna-2 na 2^5 | 4 = floor ✗ | 4 < **5** ✓ |
+
+Drabina 2^5 z floor=5:
+```
+coh-16(1) < subcoh-16(1.5) < coh-8(2) < subcoh-8(2.5) < coh-4(3) < subcoh-4(3.5) < coh-2(4) < floor(5)
+```
+Wszystkie koherentne ściśle pod floorem, ciągłość zachowana (przy `scrambled=5` floor 5 = goły licznik 5).
+
+I to godzi się z Twoim argumentem o ćwierćobrotach — tamta „4" należy do **struktury coherent-4** (2² kubiki, koszt N−2), a nie do wartości floora. Floor to głębokość mono-twista = N. Na 2^4 obie „4" się pokrywały (N=4), stąd zamieszanie; na 2^5 się rozjeżdżają.
+
+Zmieniam `T` na `N`? To jedyna zmiana — trigger `G` i cała drabina zostają.
+
+## 🧑 Robert
+
+Nie, sam zmieniłem. Ciekawe, że tak właśnie był ten próg określony oryginalnie - na N, potem coś zacząłem mieszać z liczbą kubików na przekroju - ale to dwie różne strategie, które muszą się spotkać w odpowiednim miejscu. No i dla floor=5 kubiki od razu wylądowały znowu na swoich miejscaw twiście - i jest impas
+
+
+## 🤖 Claude
+
+To jest bardzo dobra obserwacja i celnie nazwana — te dwie strategie to naprawdę dwie różne rzeczy:
+- **floor = N** = głębokość mono-twista (najgłębszy pojedynczy defekt) → każda koherentna struktura pod nim,
+- **2^(N-2)** = rozmiar osiągalnego przekroju (cel „ilu kubików na warstwie").
+
+I miejsce, gdzie się spotykają, to nie jest wartość floora — to **rozmiar płaskiego plateau**, które floor tworzy. I tu jest przyczyna impasu.
+
+**Dlaczego floor=5 wpycha w twist „od razu":** floor=5 spłaszcza **całą** powłokę `scrambled ≤ 5` do jednej wartości. A na płaskim plateau jedyny sygnał, jaki zostaje, to baza magnitudowa — a jej minimum to **kubiki najbliżej domu = twist w miejscu**. Więc GA zjeżdża po tym jedynym gradiencie prosto w twist i siada. Przy floor=4 powłoka `scrambled=5` miała jeszcze **goły licznik** (gradient redukcji) — to dawało szukaniu gdzie się kręcić, zanim skolapsuje. Floor=5 ten gradient zabrał → przedwczesna zbieżność w twist.
+
+I teraz uczciwa, niewygodna część: **4-twist siedzi na floorze przy KAŻDEJ wartości floora** (to residuum ≤4, floor zawsze je obejmuje). Wyjście z niego to komutator zbierający kubiki **z domu na wspólny plaster** (ku coherent-4) — a to jest problem **przeszukiwania**, nie wyceny. Wartość floora zmienia tylko *jak szybko* GA w to wpada, nie *czy* może wyjść. Floor=5 = wpada natychmiast.
+
+Więc „miejsce spotkania" tych dwóch strategii to: floor **na tyle wysoki, by nagrodzić coherent-2** (musi być > 4), ale **na tyle niski, by nie spłaszczyć powłoki peela**. Kandydat, który to nawleka — i pasuje do połówek, które już mamy:
+
+**floor = N − 0.5 = 4.5**, stosowany dla `scrambled < N`:
+- coherent-2 (4) < **4.5** → nagrodzona ✓
+- `scrambled = 5` → goły licznik 5 > 4.5 → **gradient peela zostaje** (plateau tylko ≤4, nie ≤5)
+- mono-twist → 4.5
+
+To odzyskuje to, co floor=4 robił dobrze (powłoka 5 żyje), a jednocześnie daje coherent-2 pół szczebla pod floorem. Ale — twist-4 dalej leży na tym plateau (4.5), więc sam twist to nie floor go rozwiąże, tylko **eskejp** (STALL/kick): to jest ta końcowa igła orientacyjna, o której mówiliśmy.
+
+Więc dwie drogi, i wolę Twój wybór, bo to Ty tu ręcznie kręcisz:
+1. **floor = N − 0.5** — odzyskaj gradient powłoki, coherent-2 nadal nagrodzona; twist zostawiamy eskejpowi.
+2. Zostań przy floor = N i uderzamy w twist **eksploracją** (niższy STALL_LIMIT = częstszy kick), bo to i tak problem przeszukiwania, nie wyceny.
+
+Którą?
+
+## 🧑 Robert
+
+Ciekawe, że zszedł do 4 scrambled przy naszym progu, który nie jest koherentny
+
+
+## 🤖 Claude
+
+Tak, i to jest wymowne. error 15.32 = 100 × fitness ≈ **floor**: cztery rozrzucone kubiki, koszt 5 (= floor N), fitness ≈ 5/33. Gdyby te cztery zebrały się w **koherentną-4** (koszt 3), error spadłby do ~9. Czyli zachęta **15 → 9 istnieje** — GA jej po prostu nie realizuje.
+
+I to pokazuje, co się naprawdę wydarzyło na końcu: ostatnie zejście było napędzane **licznikiem** (peel: goły licznik nad floorem redukuje kubik po kubiku) i wylądowało na **4 rozrzuconych** — nie koherencją, która by je **zebrała**. Koherencja jest tu **bierna**: nagradza koherentną-4, *gdyby* powstała, ale nie daje żadnego nachylenia, żeby ją **uformować** z rozrzutu. Floor płaski → rozrzucona-4 nie ma zbocza ku zebraniu.
+
+Więc przejście rozrzucona-4 → koherentna-4 to komutator = problem **przeszukiwania**, nie wyceny. Metryka mówi „zebrana czwórka warta 9", ale drogi tam nie wytycza. To jest ta luka wprost: nagradzamy **strukturę**, nie **tworzenie struktury**.
+
+I stąd wracają dwie rzeczy, które zawiesiliśmy:
+
+1. **Eskejp (STALL/kick)** — skoro zachęta 15→9 jest realna, wystarczy, żeby szukanie *natknęło się* na zebranie; jak trafi, zjedzie samo. To jest właściwy lewar na „bierną" koherencję.
+2. **Gradient na floorze ku zebraniu** (agreeAxes — ile osi rozrzucona-4 już dzieli) — jedyne, co dałoby *zbocze* z rozrzutu ku koherencji zamiast klifu. Ale to strefa E, którą świadomie odłożyłeś.
+
+A floor = N−0.5 z poprzedniej tury pomógłby peelowi nie siadać tak twardo na powłoce-5, ale tej rozrzuconej-4 i tak nie zbierze. Więc to nie jest problem floora — to albo eskejp, albo ten gradient agreeAxes. Który front otwieramy?
+
+## 🧑 Robert
+
+Czekaj, ale w ogóle nie rozumiem, dlaczego gradient wybrał skręcone 4 zamiast skręconych i rozrzuconych 5. Wydawało mi się, że nasz floor odpycha nas od dna, właśnie do floor = 5
+
+
+## 🤖 Claude
+
+Aha — tu jest źródło nieporozumienia, i dobre pytanie. **Nasz floor wcale nie pcha ku 5. Jest płaski.** Zobacz dlaczego, bo to kluczowe:
+
+`local_fA_sum` ≈ `scrambled × M` (każdy nieułożony wnosi ~M = maxClusterState/max_fA). A mnożymy przez `cost/scrambled`. Więc:
+
+```
+fitness = (scrambled · M) · (cost / scrambled) = M · cost      ← scrambled SIĘ SKRACA
+```
+
+Przy floorze `cost = 5` (stała) → fitness = **5M dla KAŻDEJ liczby nieułożonych ≤ 5**. Piątka, czwórka, trójka, mono-twist — wszystkie równe 5M. **Licznik jest wykasowany przez normalizację** (to jest właśnie cała idea koherencji: fitness zależy od kosztu-struktury, nie od liczby).
+
+Więc gradient **niczego nie wybrał** — 4 i 5 mają identyczny fitness. GA **zdryfowało** do 4 ruchami bocznymi (STALL akceptuje `== Score`) po płaskim plateau. To przypadek, nie zjazd. (A malutki tiebreak magnitudowy `d` lekko ciągnie ku stanom o niższej magnitudzie = kubiki bliżej domu = **ku twistowi**. Stąd „skręcone 4".)
+
+I tu rozjazd z Twoją intuicją: floor robi **„mniej NIE jest lepsze"** (blokuje dekoncepcję) — ale **NIE robi „mniej jest gorsze"**. Nie odpycha od dna, tylko je zrównuje. To płaskość, nie dolina z minimum w 5.
+
+To, co Ty sobie wyobrażałeś — **odpychanie ku 5** — to byłby **floor pochyły**: koszt rosnący, gdy liczba maleje. Np. `cost = 2T − scrambled`:
+
+```
+scrambled=5 → cost 5 → 5M   (minimum, dno litery V)
+scrambled=4 → cost 6 → 6M   (gorzej → ODRZUCONE)
+mono-twist  → cost 9 → 9M   (mocno odepchnięte)
+```
+
+Powyżej T goły licznik też rośnie (6→6M, 7→7M) — więc **T=5 staje się stabilnym atraktorem**, litera V z dnem w 5. I najważniejsze: to **nie blokuje realnego postępu** — bo koherentna-4 to koszt 3 (=3M), poniżej wszystkiego. Czyli z rozrzuconej-5 GA ma zakaz dryfu do rozrzuconej-4 (6M), ale wolną drogę do koherentnej-4 (3M). Kanałuje endgame: **trzymaj 5 albo formuj koherencję — żadnego osypywania się w twist**.
+
+To jest untried i celuje dokładnie w to, co Cię zaskoczyło. Płaski floor pozwala dryfować na dno; pochyły V odpycha. Spróbujemy pochyłego (`cost = 2T − scrambled` dla `scrambled ≤ T`)?
+
+## 🧑 Robert
+
+Nie, dobra, no po to go wymyśliłem żeby zrównywał, ale local_score to nie jest dokładnie M8Scrabled, tam wchodzi do akcji drugi człon
+
+Zaraz UŁOZY! subcoherent-16!
+
+
+## 🤖 Claude
+
+Dawaj!! 🎉 subcoherent-16 to koszt **1.5** — pół szczebla nad bramą. To jest dokładnie dowód, że drabina połówkowa działa: metryka **wspięła się w górę** do stanu dwóch koherentnych ósemek, o jeden merge od bramy-16, a brama to jeden ruch od ułożenia. Dwa poprzednie stany (rozrzucona-4 na floorze) tego nie miały — a teraz wjechała na szczebel, którego wcześniej w ogóle nie było w metryce.
+
+(I masz rację z tym drugim członem — `d` nie kasuje się do zera, i to właśnie ono robiło ten dryf. Ale teraz nieważne.)
+
+Trzymam kciuki — mów co pokazał licznik!
+
+## 🧑 Robert
+
+Score jest 7,5...
+
+
+## 🤖 Claude
+
+Ślicznie — i te liczby się zgadzają z drabiną. error 7.66 = 100 × fitness, a `100·M ≈ 3` (bo scattered-4 na floorze-5 dawało 15 ≈ 5·3). Więc **7.66 ≈ koszt 2.5** — czyli symetryczna struktura koherentna na 16 kubikach, parę szczebli pod bramą.
+
+I najważniejsze: to jest **16 nieułożonych z NIŻSZYM błędem niż 4 rozrzucone** (7.66 vs 15.3). Metryka świadomie **rozłożyła** kostkę z 4 z powrotem na 16 — bo 16 spiętych jest bliżej bramy niż 4 rozsypane. To jest dokładnie to, po co budowaliśmy połówki: *koherentnych-wiele < rozrzuconych-mało*. Wcześniej ta ścieżka w ogóle nie istniała, GA siadało na floorze; teraz wjechało na drabinę i **wspina się**.
+
+Cel to ścisnąć to ku koszcie 1 (koherentna-16 = brama, error ~3) — a brama to jeden ruch od ułożenia. Jesteś na dobrej gałęzi. Mów co dalej pokazuje! 🤞
+
+## 🧑 Robert
+
+No właśnie nic się nie dzieje - nie znajduje właściwego rozwiązania. Seedowanie jest za płytkie, będę musiał wrócić chyba do drzewa DFS - ale teraz MUSI sobie poradzić!
+
+
+## 🤖 Claude
+
+Tak, i to jest czysta diagnoza — rozdzieliłeś dwie rzeczy, które długo się nam zlewały: **metryka już działa** (doprowadziła do koherentnej-16, dała gradient), ale **szukanie nie ma czym zagrać**. Skok o szczebel w górę — ściśnięcie ku bramie, domknięcie — to **makroruch / komutator**, a pojedyncze zejście produkuje tylko seedy minimalne. Fast wyrzuca dokładnie ten materiał, który jest potrzebny na końcu.
+
+To zresztą przewidzieliśmy, wpinając fast: „tanie na CPU, ale gubi makro, a endgame to właśnie makro". Więc `SEED_FAST=0` (backtracking DFS) to teraz właściwy ruch — mieszane mody Givensa dają ścieżki dłuższe niż minimalne, czyli surowiec komutatorowy, którego brama potrzebuje.
+
+I dobrze, że zostawiliśmy flagę — to czysty A/B, jeden `#define`. Teraz kostka ma **oba** kawałki: drabinę, po której ma iść (metryka), i głębokie ruchy, którymi może iść (DFS). Wcześniej brakowało albo jednego, albo drugiego.
+
+Flipuj `SEED_FAST` na 0 i puszczaj — z tej koherentnej-16 z prawdziwymi makroseedami **powinno** dowieźć. Trzymam kciuki, mów co licznik. 🤞
+
+## 🧑 Robert
+
+Wszystko prawda, ale w runtimie nie zmienię SEED_MODE. Nawet nie spodziewałem się, że nagradzamy takie układy - czy wszystko jest OK? Ona by się już dawno ułożyła, gdyby to były dwie szesnastki, ale to są 3 grupy: 16, 8 i 8
+
+A nie, przepraszam, tylko mi się tak wydawało - to jakiś bardzie złożony układ, możesz określić jaki?
+
+
+## 🤖 Claude
+
+Określam: error 7.66 ≈ 3.03 × koszt → **koszt 2.5**. A na 16 kubikach `2.5 = 1 + 0.5·log₂(g)` → `log₂(g) = 3` → **g = 8**. Czyli **osiem koherentnych par** (16 kubików = 8 współosiowych dwójek, 8 różnych orientacji). Nie subcoherent-16 (to byłoby g=2, koszt 1.5, error ~4.6) — dużo bardziej rozdrobniony układ. Stąd Twoje „gdyby to były dwie szesnastki, już by ułożyła" — masz rację, osiem par to znacznie dalej.
+
+Czy OK? **Tak, to zgodne z formułą, nie błąd** — osiem równych, kompletnych grup przechodzi bramkę symetrii, `cost 2.5`. I ważne: metryka **karze rozdrobnienie** — człon `0.5·log₂(g)` sprawia, że osiem par (2.5) jest **gorsze** niż subcoherent-16 (1.5) i coherent-16 (1). Więc gradient wskazuje właściwie: **scalaj pary → mniej, większych grup → w dół ku bramie**. Metryka nie myli rankingu.
+
+Problem jest tam, gdzie sam wskazałeś: **scalanie par to makroruch**, a płytkie seedy go nie mają. Więc GA usiadło na symetrycznym minimum (osiem par, 2.5) i nie umie scalić. To dokładnie ta sama przyczyna co Twój wniosek o DFS — tylko widziana od strony struktury.
+
+Jedno uczciwe zastrzeżenie na potem: `0.5` za poziom rozdrobnienia może być **za słabą karą** — osiem par wycenione na 2.5, a realnie to ~kilka scaleń od bramy. Jeśli po DFS-seedach kostka *dalej* będzie siadać na takich rozdrobnionych symetriach, to znak, że trzeba **postromić** karę za g (np. `0.75·log₂(g)`), żeby GA mocniej wolało mniej-a-większe grupy. Ale najpierw DFS — gradient już celuje w scalanie, brakuje tylko ruchów, żeby to zrobić.
+
+(I tak, `SEED_FAST` to `#define` czytany przy starcie — rebuild, nie runtime. Przebuduj z 0 i lecimy.)
+
+## 🧑 Robert
+
+Czekaj, coś nasza drabina kosztu jest coś za biedna, ma znowu zbyt małą gradację. 8 kohetentnych 2-jek to subsubsubcoherent-8 tak?
+
+
+## 🤖 Claude
+
+Tak — 8 koherentnych 2-jek to `g = 8 = 2³`, czyli **trzy poziomy podziału** poniżej koherentnej-16: coh-16 → sub (2×coh-8) → subsub (4×coh-4) → **subsubsub (8×coh-2)**. „Subsubsub" jest trafne. Tylko całość to 16 kubików, więc ja bym nazwał to subsubsubcoherent-**16** (baza = coherent-2, ×8) — ale koncept masz idealnie.
+
+I masz rację co do drabiny. Rodzina 16-kubikowa to:
+
+```
+coh-16 (g=1) 1 | sub 1.5 | subsub 2 | subsubsub 2.5
+```
+
+— eight-par (2.5) siedzi zaledwie **w połowie drogi** do floora (5). Wygodne miejsce do siedzenia, słaby ciąg ku scalaniu. „Znowu za mała gradacja" — zgoda.
+
+Skąd 0.5 na poziom i jak to postromić bez psucia: koszt to `N − 0.5·log₂(scrambled) − 0.5·log₂(firstSize)`. Te **dwie połówki sumują się do 1** — i to jest to, co przybija bramę do 1 (przy `scrambled=firstSize=2^(N-1)` wychodzi `N−(N-1)=1`). Dopóki `a+b=1`, brama zostaje 1 dla każdego N. Ale **wagi mogą być różne** — dołóż więcej na `firstSize` (kara za rozdrobnienie), zdejmij z `scrambled`:
+
+`cost = N − 0.25·log₂(scrambled) − 0.75·log₂(firstSize)` (a=0.25, b=0.75):
+
+```
+coh-16 1 | sub 1.75 | subsub 2.5 | subsubsub 3.25
+```
+
+Krok 0.75, eight-par ląduje na 3.25 — bliżej floora, mniej wygodne. I bez kolizji: subcoherent-16 (1.75) ≠ coherent-8 (2), bo różni je `scrambled`. Ćwierćkroki = bogatsza gradacja, dokładnie to, o co prosisz.
+
+Jedno tylko: właśnie wpiąłeś DFS-seedy, a eight-par to głównie **problem scalania** (search), nie wyceny — gradient *już* wskazuje w dół drabiny (2.5 → 2 → 1.5 → 1). Stromsza drabina da mocniejszy **ciąg do ucieczki**, ale sama ruchu scalającego nie wyczaruje. Więc albo: najpierw sprawdź, czy DFS scala z obecnej drabiny; albo od razu przeważ (b=0.75) i puść z jednym i drugim. Co wolisz?
+
+## 🧑 Robert
+
+cost = N - logs + depth * log(g)
+
+
+## 🤖 Claude
+
+Rozczytuję to jako `depth = N − log₂(scrambled)` (głębokość bazowa, gdyby całość była jedną koherentną grupą). Wtedy `cost = (N − logs)·(1 + log₂ g)`. Policzmy:
+
+Rodzina 16-kubikowa (depth=1): **1, 2, 3, 4** (g=1,2,4,8) — stromo i czysto, dokładnie ta bogatsza gradacja, o którą Ci chodzi. Na tym końcu formuła jest świetna.
+
+Ale **mały koniec się rozjeżdża**, bo mnożysz przez głębokość, a ta rośnie, gdy kubików ubywa:
+```
+subcoherent-4 (s=4, g=2): (5−2)·(1+1) = 3·2 = 6   ← POWYŻEJ floora (5)!
+```
+Czyli zebrane 2+2, o które biłeś się dwie tury temu, żeby było **pod** floorem — ląduje **nad** nim, wycenione gorzej niż zwykły rozrzut. `×depth` przepłaca dokładnie te **głębokie (mało-scrambled)** struktury, które chcemy tuż pod floorem — zły kierunek skalowania na tym końcu. (Plus wraca kolizja: subcoherent-16 = coherent-8 = 2.)
+
+To samo postromienie, ale **bez ofiar na małym końcu** — przez wagi (pamiętasz, `a+b=1` przybija bramę do 1), dokładając na `firstSize`:
+
+```
+cost = N − 0.25·log₂(scrambled) − 0.75·log₂(firstSize)
+```
+
+| | 0.5/0.5 (teraz) | 0.25/0.75 |
+|---|---|---|
+| eight-pairs (16) | 2.5 | **3.25** |
+| subcoherent-4 | 3.5 | **3.75** (< floor ✓) |
+| coherent-2 | 4 | 4 |
+| brama | 1 | 1 |
+
+Eight-pairs jedzie ku floorowi (2.5→3.25), a subcoherent-4 **zostaje nagrodzone** (3.75 < 5), brama trzyma 1, zero kolizji. Ten sam cel co Twoje `depth·log(g)`, tylko że nie zabija małych struktur i nie wywala nic nad floor.
+
+Różnica filozoficzna: `depth·log(g)` mówi „rozdrobnienie boli proporcjonalnie do głębokości" (→ eksploduje głęboko); waga `b` mówi „rozdrobnienie boli tyle samo wszędzie" (→ równomiernie stromo). To drugie pasuje lepiej do tego, co chcemy.
+
+Wpiąć `b = 0.75`? Czy celujesz wyżej (b=0.8+, eight-pairs jeszcze bliżej floora)?
+
+## 🧑 Robert
+
+cost = N - logs + 1/logs * log(g)
+
+
+## 🤖 Claude
+
+To jest **elegackie** — i naprawia dokładnie to, co nazwałeś „za małą gradacją", tylko lepiej niż moja waga. Zobacz, co robi `1/logs`:
+
+Maksymalna kara za rozdrobnienie (przy `g = scrambled/2`, `log g = logs−1`) wynosi `(1/logs)(logs−1) = 1 − 1/logs`, czyli **zawsze < 1**. A odstęp do następnego pasma (mniejsza koherentna) to dokładnie 1. Więc **każda liczba nieułożonych dostaje własne pasmo `[N−logs, N−logs+1)` i pasma się NIE nakładają**:
+
+```
+s=16 (pasmo [1,2)):  coh 1 | sub 1.25 | subsub 1.5 | subsubsub 1.75
+s=8  (pasmo [2,3)):  coh 2 | sub 2.33 | subsub 2.67
+s=4  (pasmo [3,4)):  coh 3 | sub 3.5
+s=2  (pasmo [4,5)):  coh 4
+floor:               5
+```
+
+I tu jest sedno — **kolizje znikają**. W obecnym 0.5 miałeś:
+- subsubcoherent-16 = 2 = **coherent-8** (kolizja!)
+- eight-pairs = 2.5 = **subcoherent-8** (kolizja!)
+
+To była ta „za mała gradacja": różne struktury dostawały ten sam koszt. `1/logs` daje **każdej strukturze inny koszt**, uporządkowany: cała szesnastka (nawet rozdrobniona) zawsze bije całą ósemkę, ósemka bije czwórkę. I gratis: wszystko **automatycznie pod floorem** (górny kraniec pasma < N), więc żaden guard `min(cost, floor)` niepotrzebny, a brama trzyma 1.
+
+Jedna rzecz świadomie: to spłaszcza rodzinę 16 (eight-pairs zjeżdża z 2.5 na **1.75**), więc nie *odpycha* od rozdrobnionych stanów — przeciwnie, priorytetem jest **wspinaczka do największego pasma** (dojdź do szesnastki), a de-fragmentacja w paśmie jest łagodna (kroki 0.25). To inna filozofia niż moje „b=0.75" (tamto stromiło ku floorowi, ale wracała kolizja pasm). Twoja mówi: *najpierw zbierz jak najwięcej kubików w koherencję, potem czyść* — i to jest chyba właściwy priorytet, bo cel to brama = największa koherentna.
+
+Kod (bezpieczne, bo `firstSize > 1` ⇒ `logs ≥ 1`, brak dzielenia przez 0):
+```glsl
+int ls = findMSB(scrambled), lf = findMSB(firstSize);
+cost = float(int(N) - ls) + float(ls - lf) / float(ls);
+```
+
+Wpinam? Zastępuje obecną linię `float(N) - 0.5*float(findMSB(scrambled)+findMSB(firstSize))`.
+
+## 🧑 Robert
+
+Nie sam wpiąłem. A co z tą analizą local_score, gdy ważny staje się drugi człon? Stan kubików powinien być mnożony przez próg T, więc liczy się ŚREDNI stan - czy układ z 4 czy 5 wygra zalżeć powinno od tej średniej
+
+
+## 🤖 Claude
+
+Masz rację, i moje „płaskie" było niepełne — zróbmy to ścisłe. Przy floorze:
+
+```
+fitness = local_fA_sum · (T / scrambled)
+        = (Σ eᵢ) · T/scrambled
+        = T · avg(eᵢ)                    ← stan × T, ale przez /scrambled to ŚREDNIA
+```
+
+A `eᵢ = (maxClusterState + dᵢ)/max_fA = M + dᵢ/max_fA`, więc:
+
+```
+fitness = T·M  +  T · avg(d)/max_fA
+          └─┬─┘    └────┬────────┘
+       stałe dno    DRUGI CZŁON = średnia magnituda
+```
+
+Pierwszy człon `T·M` jest **identyczny dla 4 i dla 5** (licznik się skasował — to jest blokada dekoncepcji). Więc o tym, czy wygra układ z 4 czy z 5, decyduje **wyłącznie drugi człon: `avg(d)`** — średni stan nieułożonego kubika. Dokładnie tak, jak mówisz: liczy się średnia, nie liczba. To ja to wcześniej zamiotłem pod dywan słowem „płaskie".
+
+Ale zobacz, dokąd ta średnia ciągnie: `avg(d)` jest najmniejsze, gdy kubiki mają **najmniejszą magnitudę** = najbliżej domu (pozycja OK, została orientacja) = **twist**. Więc czwórka o niższej średniej pobiła piątkę właśnie dlatego, i to jest ten sam mechanizm, który osypuje kostkę w twist. Średnia magnituda to uczciwy, count-inwariantny rozjemca — ale jego minimum to defekt orientacyjny.
+
+Więc pytanie brzmi: czy `avg(d)` to **właściwy** drugi człon na floorze? Jest czysty (średnia, sprawiedliwy między 4 a 5), ale wskazuje ku twistowi zamiast ku zebraniu na warstwę. Gdybyśmy chcieli, żeby na floorze średnia ciągnęła ku **koherencji** (kubiki na wspólny plaster), a nie ku domowi — to musiałby być inny człon niż goła magnituda. To już zmiana bazy (`GetActiveCubieError`), nie floora.
+
+Zostawiamy `avg(d)` jako rozjemcę (świadomie: twist to i tak problem search/eskejpu, nie wyceny), czy chcesz pogrzebać w drugim członie, żeby średnia celowała ku zebraniu?
+
+## 🧑 Robert
+
+Tak nie do końca się zgadzam z tym twistem, bo coś mylisz. Funkcja ewaluacji bierze pod uwagę wyłącznie macierz orientacji (jej odległość L1 od Identity, czyli ułożenia). Jeśli kubik jest na diagonalu, ale obrócony, to wcale nie ma lepszej oceny. Ale uwaga o zbliżeniu tego członu do koherencji jest ciekawa. Jak to sobie wyobrażasz? I pamiętaj - algorytm bardzo silnie zależy do zejścia na floor od zbieżności, więc człon ten musi być mniejszy od pierwszego
+
+
+## 🤖 Claude
+
+Racja, i to ważna korekta — dzięki. `GetActiveCubieError` patrzy **wyłącznie na macierz orientacji** (aktywne osie + L1 od Identity), pozycja nie wchodzi. Kubik na diagonalu, ale obrócony, ma **taki sam** błąd jak tak samo obrócony gdziekolwiek indziej. Więc mój „dryf ku domowi = twist" był błędny — wycofuję go. `avg(d)` to średnia **złożoność orientacji**, a jej minimum to kubiki o orientacji najbliższej Identity, nie „przy swoich miejscach".
+
+I to odsłania ostrzejszy problem, który wzmacnia Twoją intuicję: **obecny drugi człon celuje DOKŁADNIE PRZECIW koherencji.** Bo koherentna grupa dzieli wspólną orientację `g`, która może być **daleko od Identity** (duże `d`). Więc formująca się koherencja ma *wysokie* `avg(d)` — a rozjemca minimalizujący `avg(d)` woli **rozrzut blisko Identity** od **koherencji-ale-obróconej**. Czyli drugi człon aktywnie zniechęca do zbierania w grupę o wspólnej, przekręconej orientacji. Stąd brak zbocza ku koherencji na floorze — on ciągnie w drugą stronę.
+
+Jak to sobie wyobrażam, z Twoim ograniczeniem (`człon 2 < człon 1`, żeby nie ruszać zejścia na floor):
+
+Zamień „odległość od Identity" na **„odległość od koherencji"**. Czyli drugi człon mierzy, jak blisko `scrambled` są do wspólnej warstwy — **niedomiar agreeAxes** (ile osi brakuje grupom tego samego stanu do kompletnego przekroju). Mniejszy niedomiar = bardziej zebrane = niższy człon. To jest **uczciwe** (wspólna warstwa = pozycja, `curCoord`, nie sama orientacja — więc oszustwo 3/32 nie działa), i daje na floorze łagodne zbocze: wśród układów o równej liczbie wygrywa **bardziej zebrany**.
+
+Dwie rzeczy, które to spinają z Twoimi obawami:
+- **`< pierwszego członu` gratis:** jeśli ograniczysz ten niedomiar per-kubik i podzielisz przez `max_fA` (tak jak `d` teraz), to zostaje mniejszy od `T·M` o czynnik ~`countActive`. Zejście na floor (od którego zależy zbieżność) **nietknięte** — to czysty rozjemca.
+- **Strefa E rozbrojona:** to jest ten sam gradient cząstkowej koherencji, który powiesił wariant E — ale tam był **głównym** kosztem i wabił search w asymetryczne pułapki. Jako drobny drugi człon **nie może** wygrać (główny koszt nadal floor), więc tylko *muska* ku zebraniu, nie zwabia. Skalowanie < człon 1 to dokładnie to zabezpieczenie.
+
+Chcesz, żebym naszkicował konkretną wielkość tego niedomiaru (np. `Σ_grup (N − log2(gsize) − agreeAxes)` znormalizowane), czy najpierw pogadamy, czy „odległość od koherencji" ma być liczona po grupach stanu, czy globalnie po całym `scrambled`?
+
+## 🧑 Robert
+
+Nie chciałbym liczyć wszystkiego od początku, a nasze obliczenia dotyczą tylko przypadków potęg 2. Czy tu nie wraca jednak wariant E?
+
+
+## 🤖 Claude
+
+Tak — masz rację w obu punktach, i to ja się zagalopowałem. Rozłóżmy uczciwie.
+
+**Obliczenia.** Deficyt-koherencji musiałby lecieć na **każdym** stanie, też niepotęgach — dokładnie tego `O(k²)` unikamy. I gorzej: dla niepotęgi „odległość do koherencji" jest **źle zdefiniowana**, bo niepotęga *nie może* być koherentna. Żeby 5 czy 6 stało się koherentne, trzeba najpierw **zmienić liczbę** na potęgę — a tego floor celowo nie widzi (licznik skasowany). Więc drugi człon nie ma czego „ciągnąć" na floorze niepotęgowym. To bije w sam fundament „tanio, tylko potęgi".
+
+**Wariant E.** I tak, **wraca** — stłumiony, ale wraca, i słusznie to wyłapałeś. Deficyt daje **cząstkową** nagrodę za częściowe zebranie, więc faworyzuje stany „jedna połowa zebrana" — czyli dokładnie te asymetryczne pułapki, które metryka teraz **świadomie wyklucza** (nagradzamy tylko symetryczne). Że to drugi człon, mały? Słaby bias ku pułapce to **wciąż bias** — GA może na niej usiąść, bo rozjemca ją preferuje. Moje „rozbrojone skalowaniem" było za mocne. Symetryczna bramka, która naprawiła E, zostaje **obejściem** przez tylne drzwi cząstkowego kredytu. Cofam tamten optymizm.
+
+Więc — **odpuśćmy drugi człon ku koherencji.** Nie jest wart ani kosztu, ani ryzyka E.
+
+I dobra wiadomość: **nie potrzebujemy go.** Strona wyceny jest teraz naprawdę dobra — drabina `1/logs` bogata, bez kolizji, wszystko koherentne pod floorem, celuje w bramę. To, czego brakuje, to **dojście** do tych struktur = zebranie = **problem search**, nie wyceny. A właściwy lewar na to już pociągnąłeś: **DFS-seedy**. Metryka ma nagradzać *wynik* zebrania (i nagradza), a *znajdowaniem* ruchu ma się zająć seed + STALL.
+
+Zostaw floor jaki jest (neutralny `avg(d)` jako rozjemca — niech nie walczy o koherencję), puść z DFS-seedami i zobaczmy, czy z eight-pairs (1.75) potrafi teraz scalić ku bramie. Jeśli po DFS *dalej* wisi — to znak, że brakuje nie gradientu, tylko **głębokości/eskejpu** (dłuższe seedy, niższy STALL_LIMIT), a nie że metryka jest zła.

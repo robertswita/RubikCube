@@ -273,11 +273,29 @@ namespace RubikCube
                 var moves = cube.FreeMoves.ToArray();
                 fixed (int* p = moves) FreeMovesBuffer.Update(moves.Length * sizeof(int), p);
                 // Per-specimen seed sequences for Init: reverse-transform moves that undo active-cluster
-                // cubies. SEED_RATIO % of the population is seeded (rest random); stride = N-1 genes.
-                var seedMoves = cube.BuildSeedMoves(TGA<TRubikGenome>.PopulationCount, TAffine.N - 1,
-                                                    GetDefineValue("SEED_RATIO"), out NumSeeds);
+                // cubies. SEED_RATIO % of the population is seeded (rest random); stride = plane count P =
+                // N*(N-1)/2 genes, matching SEED_STRIDE (mixed-Givens seeds can be longer than N-1 moves).
+                var seedMoves = cube.BuildSeedMoves(TGA<TRubikGenome>.PopulationCount, TAffine.Planes.Length,
+                                                    GetDefineValue("SEED_RATIO"), GetDefineValue("SEED_MODE") != 0,
+                                                    GetDefineValue("SEED_FAST") != 0, out NumSeeds);
                 fixed (int* p = seedMoves) SeedMovesBuffer.Update(seedMoves.Length * sizeof(int), p);
             }
+        }
+
+        // On-demand seed-pool telemetry (File menu). Runs BuildSeedMoves with the SAME production parameters
+        // CreateBuffers uses, so the returned report reflects exactly what Init would receive: accepted vs
+        // target, stuck/duplicate draws, how many of the 2^P modes contributed, and the accepted-length
+        // histogram. Operates on cubie copies (no cube mutation); does not touch GPU buffers.
+        public static string SeedStats(TRubikCube cube)
+        {
+            if (cube.ActiveCubie == null)
+                return "No active cubie - select a scrambled cluster first (a solved cube has nothing to seed).";
+            TRubikCube.Diagnostic = true;                        // enable the census + report for this call only
+            cube.BuildSeedMoves(TGA<TRubikGenome>.PopulationCount, TAffine.Planes.Length,
+                                GetDefineValue("SEED_RATIO"), GetDefineValue("SEED_MODE") != 0,
+                                GetDefineValue("SEED_FAST") != 0, out _);
+            TRubikCube.Diagnostic = false;
+            return cube.LastSeedReport;
         }
 
         // Scores the current cube on the GPU with the SAME evaluator the GA uses: a zero specimen (all
@@ -301,7 +319,7 @@ namespace RubikCube
         static float EvalZeroSpecimen(TRubikCube cube)
         {
             CreateBuffers(cube);
-            var micro = cube.Cubies.Length <= 64;
+            var micro = cube.Cubies.Length <= 82;   // Micro carries the coherence eval; 82 admits 3^4 (81) and 4^3 (64)
             var eval = micro ? EvaluateMicroProgram : EvaluateMacroProgram;
             var spec = new int[TChromosome.GenesLength + 2];   // all zero = identity moves
             fixed (int* p = spec) Population.Update(spec.Length * sizeof(int), p);
@@ -324,7 +342,7 @@ namespace RubikCube
         {
             var cube = TRubikGenome.RubikCube;
             var populationCount = (uint)TGA<TRubikGenome>.PopulationCount;
-            var micro = cube.Cubies.Length <= 64;
+            var micro = cube.Cubies.Length <= 82;   // Micro carries the coherence eval; 82 admits 3^4 (81) and 4^3 (64)
             var evalProgram = micro ? EvaluateMicroProgram : EvaluateMacroProgram;
 
             // Create + upload all buffers for this run (population, packed cube, free moves, indices, planes).
