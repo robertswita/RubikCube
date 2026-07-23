@@ -429,3 +429,6 @@ fabric.properties
 # Project specific
 # =============================================================================
 RubikCube/bin/
+
+# Working documents, conversation logs and measurement scratch (not source)
+Docs/

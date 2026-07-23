@@ -4,6 +4,10 @@ struct Specimen {
     uint Fitness;      // floatBitsToUint(fitness_float)
     uint MovesCount;
     uint Moves[GENES_COUNT];
+    // DIAGNOSTIC (appended LAST so no existing offset shifts): the coherence piece-size histogram of the state at
+    // the best step. 5 bits per bucket, bucket b = pieces with agreeAxes = b+1, i.e. of size 2^(N-1-b); counts
+    // clamped at 31. 0 = not decomposed (no coherence / above the gateway). Host decodes it into "4+2" etc.
+    uint Structure;
 };
 
 struct Move
@@ -54,6 +58,11 @@ layout(location = 5) uniform uint countActive;
 layout(location = 2) uniform uint u_Stage;
 layout(location = 3) uniform uint u_PassModStage;
 layout(location = 6) uniform uint numSeeds;   // Init: number of specimens pre-seeded from SeedMoves
+// Endgame count-flattening range: the floor multiplies fitness by FLOOR/scrambled for scrambled <= FLOOR,
+// which cancels the base's ~scrambled and leaves the coherence factor alone. A UNIFORM, not a #define,
+// so it can follow the cube's current structure without recompiling the evaluator. The host MUST set the
+// same value for the GA and for the reference score (EvalZeroSpecimen), or the two are not comparable.
+layout(location = 7) uniform uint FLOOR;
 
 
 void getRow(uint M, uint row, out uint outCol, out int outSign)

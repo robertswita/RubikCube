@@ -13,6 +13,7 @@ namespace RubikCube
         public int StartPos;
         public int StopPos;
         public int BestMovesCount;
+        public uint Structure;                  // packed coherence piece histogram; 0 = not decomposed
         //public static List<int> FreeMoves;
         public static TRubikCube RubikCube;
         public static List<List<int>> RevSeqs;
@@ -22,8 +23,35 @@ namespace RubikCube
         {
             Fitness = BitConverter.UInt32BitsToSingle((uint)buffer[0]);
             BestMovesCount = (int)buffer[1];
-            for (int i = 0; i < BestMovesCount; i++) 
+            for (int i = 0; i < BestMovesCount; i++)
                 Genes[i] = buffer[i + 2];
+            Structure = (uint)buffer[GenesLength + 2];   // appended after Moves[] - see struct Specimen
+        }
+
+        // Decodes the packed coherence histogram into a readable label, biggest pieces first: "4+2", "2+1+1".
+        // 5 bits per bucket; bucket b holds the count of pieces of size 2^(n-1-b). 0 = not decomposed.
+        public static string DescribeStructure(uint packed, int n)
+        {
+            if (packed == 0) return "-";
+            var parts = new List<string>();
+            for (int b = 0; b < n; b++)
+            {
+                int count = (int)((packed >> (5 * b)) & 31u);
+                int size = 1 << (n - 1 - b);
+                for (int i = 0; i < count; i++) parts.Add(size.ToString());
+            }
+            return parts.Count == 0 ? "-" : string.Join("+", parts);
+        }
+
+        // Size of the LARGEST coherent block in a packed histogram; 0 when there is none (residual above the
+        // gateway, so the evaluator never decomposed it). Buckets run biggest-first, so the first non-empty
+        // one is the answer. Drives the WALKING FLOOR - see the FLOOR comment in EvaluateMicro.
+        public static int LargestPiece(uint packed, int n)
+        {
+            for (int b = 0; b < n; b++)
+                if (((packed >> (5 * b)) & 31u) != 0u)
+                    return 1 << (n - 1 - b);
+            return 0;
         }
 
         //public TRubikGenome(): base()

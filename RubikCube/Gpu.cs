@@ -134,6 +134,24 @@ namespace RubikCube
             return -1;
         }
 
+        // Raw string value of a #define, or null if there is no such define. Unlike GetDefineValue this does not
+        // parse -- it serves floats/expressions and, crucially, reports ABSENCE, so a caller can log an
+        // experiment's setting ONLY while its define exists and silently stop once it is removed (no compile-time
+        // reference to a define that may be deleted).
+        public static string TryGetDefine(string defineName)
+        {
+            string targetToken = "#define " + defineName + " ";
+            using var reader = new StringReader(Variables);
+            string line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                line = line.Trim();
+                if (line.StartsWith(targetToken, StringComparison.Ordinal))
+                    return line.Substring(targetToken.Length).Trim();
+            }
+            return null;
+        }
+
         static void SetDefineValue(string defineName, int value)
         {
             var oldValue = GetDefineValue(defineName);
@@ -141,6 +159,20 @@ namespace RubikCube
                 return;
             var defineLine = "#define " + defineName + " ";
             Variables = Variables.Replace(defineLine + oldValue, defineLine + value);
+        }
+
+        // Endgame coherence LATCH. Coherence is a compile-time #if in the evaluator, but it must be a PHASE, not a
+        // static flag: it STALLS the descent (rewards building structure over peeling down), yet is what closes the
+        // endgame (build a coherent-4 gateway). So the host toggles it at runtime by rewriting the COHERENCE define
+        // and recompiling ONLY the micro-evaluator (one cheap program). Solve() keeps it 0 through the descent and
+        // latches it to 1 the first time the active cluster reaches the floor (scrambled <= N), then leaves it on so
+        // the search may climb back above N to build the gateway. No-op when the value is unchanged (no recompile).
+        public static void SetCoherence(int value)
+        {
+            if (GetDefineValue("COHERENCE") == value) return;
+            SetDefineValue("COHERENCE", value);
+            CompileComputeProgram(EvaluateMicroProgram, "Resources.EvaluateMicro.glsl.c");
+            noOpPenalty = float.NaN;   // recompiled evaluator -> re-measure the no-op baseline on next ScoreCube
         }
 
         // Injects N/SIZE from the current cube as compile-time defines (the shader arrays are sized by
@@ -236,6 +268,10 @@ namespace RubikCube
             OpenGL.LinkProgram(program);
         }
 
+        // Size of one Specimen in ints - the SINGLE place that knows the layout, which must match
+        // `struct Specimen` in Setup.glsl.c: Fitness, MovesCount, Moves[GENES_COUNT], Structure.
+        static int SpecimenInts => TChromosome.GenesLength + 3;
+
         // Uploads the per-run data into the buffers reserved in Init (0 Population, 1 NewPopulation,
         // 2 Cubies, 3 FreeMoves, 4 SolvedCubies, 5 ActiveCubies, 6 Planes UBO). Update reuses the same
         // ids/bindings and resizes the store as needed, so there is no buffer churn between GA runs.
@@ -245,7 +281,7 @@ namespace RubikCube
             // when the dimension or size changed, otherwise the shader reads Cubies out of bounds.
             if (CompiledN != TAffine.N || CompiledSize != TRubikCube.Size)
                 BuildShaders();         
-            var populationSize = TGA<TRubikGenome>.PopulationCount * (TChromosome.GenesLength + 2) * sizeof(int);
+            var populationSize = TGA<TRubikGenome>.PopulationCount * SpecimenInts * sizeof(int);
             var cubies = cube.PackCubies();
             // Pad empty index arrays to one element so we never make a zero-size SSBO (unreliable
             // .length() / binding). The countSolved / countActive uniforms gate the loops.
@@ -304,6 +340,12 @@ namespace RubikCube
         // hardcoded, as the same zero specimen's fitness on a SOLVED cube (baseline == 0, so the fitness
         // is exactly the penalty). One scorer (the evaluator), no separate kernel, no magic constant,
         // and the baseline tracks any future change to the no-op penalty automatically.
+        // Endgame count-flattening range, passed to the evaluator as uniform 7 (see the FLOOR comment in
+        // EvaluateMicro). A field, not a define, so moving it costs no shader rebuild. 2 = the peel keeps its
+        // full gradient all the way down; the walking-floor plan is min(2*d_max, G) from the current cube.
+        // Both the GA and EvalZeroSpecimen read THIS value -- they must, or Fitness and Score are incomparable.
+        public static uint Floor = 4;
+
         static float noOpPenalty;   // reset to NaN in BuildShaders (Init + on N/SIZE change) -> measured on first ScoreCube
         public static float ScoreCube(TRubikCube cube)
         {
@@ -321,11 +363,12 @@ namespace RubikCube
             CreateBuffers(cube);
             var micro = cube.Cubies.Length <= 82;   // Micro carries the coherence eval; 82 admits 3^4 (81) and 4^3 (64)
             var eval = micro ? EvaluateMicroProgram : EvaluateMacroProgram;
-            var spec = new int[TChromosome.GenesLength + 2];   // all zero = identity moves
+            var spec = new int[SpecimenInts];                  // all zero = identity moves
             fixed (int* p = spec) Population.Update(spec.Length * sizeof(int), p);
             OpenGL.UseProgram(eval);
             OpenGL.Uniform1ui(4, (uint)cube.SolvedCubies.Count);
             OpenGL.Uniform1ui(5, (uint)cube.ActiveCluster.Count);
+            OpenGL.Uniform1ui(7, Floor);       // MUST match the GA's floor, or Score and Fitness differ
             OpenGL.BindBufferBase(Population.Type, 0, Population.Id);
             OpenGL.DispatchCompute(1, 1, 1);                        // one specimen: 1 thread (micro) / 1 block (macro)
             OpenGL.MemoryBarrier(OpenGL.MemoryBarrierFlags.ShaderStorage);
@@ -357,7 +400,7 @@ namespace RubikCube
 
             int parentSlot = 0;
             var best = new TRubikGenome();
-            var specimenSize = (TChromosome.GenesLength + 2) * sizeof(int);
+            var specimenSize = SpecimenInts * sizeof(int);
             var bestBuffer = new int[specimenSize / sizeof(int)];
             fixed (int* bestBufPtr = bestBuffer)
             {
@@ -380,6 +423,7 @@ namespace RubikCube
                     OpenGL.UseProgram(evalProgram);
                     OpenGL.Uniform1ui(4, solvedCount);
                     OpenGL.Uniform1ui(5, activeCount);
+                    OpenGL.Uniform1ui(7, Floor);
                     OpenGL.BindBufferBase(parent.Type, 0, parent.Id);
                     OpenGL.DispatchCompute(evalGroups, 1, 1);
                     OpenGL.MemoryBarrier(OpenGL.MemoryBarrierFlags.ShaderStorage);

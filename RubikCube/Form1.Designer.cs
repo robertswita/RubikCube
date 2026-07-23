@@ -59,6 +59,7 @@
             label4 = new System.Windows.Forms.Label();
             ClusterLbl = new System.Windows.Forms.Label();
             SolvedLbl = new System.Windows.Forms.Label();
+            StructureBox = new System.Windows.Forms.TextBox();
             label3 = new System.Windows.Forms.Label();
             button2 = new System.Windows.Forms.Button();
             button1 = new System.Windows.Forms.Button();
@@ -75,6 +76,8 @@
             orientClusterToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             verifyManoeuvresToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             seedStatsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            batch10ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            verifyClustersToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
             stateGridBindingSource = new System.Windows.Forms.BindingSource(components);
             tRubikCubeBindingSource = new System.Windows.Forms.BindingSource(components);
@@ -124,6 +127,7 @@
             panel1.Controls.Add(label4);
             panel1.Controls.Add(ClusterLbl);
             panel1.Controls.Add(SolvedLbl);
+            panel1.Controls.Add(StructureBox);
             panel1.Controls.Add(label3);
             panel1.Controls.Add(button2);
             panel1.Controls.Add(button1);
@@ -373,6 +377,19 @@
             SolvedLbl.Size = new System.Drawing.Size(76, 20);
             SolvedLbl.TabIndex = 41;
             SolvedLbl.Text = "Solved -/-";
+            //
+            // StructureBox
+            //
+            StructureBox.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            StructureBox.Location = new System.Drawing.Point(373, 560);
+            StructureBox.Multiline = true;                 // a scattered gateway is "1+1+..." x16 (x32 on 2^6) - must wrap
+            StructureBox.Name = "StructureBox";
+            StructureBox.ReadOnly = true;
+            StructureBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
+            StructureBox.Size = new System.Drawing.Size(118, 92);
+            StructureBox.TabIndex = 42;
+            StructureBox.TabStop = false;
+            StructureBox.Text = "Struct -";
             // 
             // label3
             // 
@@ -417,7 +434,7 @@
             // 
             // fileToolStripMenuItem
             // 
-            fileToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { openToolStripMenuItem, saveToolStripMenuItem, saveClustersToolStripMenuItem, showClusterToolStripMenuItem, makeMovesToolStripMenuItem, undoMovesToolStripMenuItem, greedyTestToolStripMenuItem, orientClusterToolStripMenuItem, verifyManoeuvresToolStripMenuItem, seedStatsToolStripMenuItem });
+            fileToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { openToolStripMenuItem, saveToolStripMenuItem, saveClustersToolStripMenuItem, showClusterToolStripMenuItem, makeMovesToolStripMenuItem, undoMovesToolStripMenuItem, greedyTestToolStripMenuItem, orientClusterToolStripMenuItem, verifyManoeuvresToolStripMenuItem, seedStatsToolStripMenuItem, batch10ToolStripMenuItem, verifyClustersToolStripMenuItem });
             fileToolStripMenuItem.Name = "fileToolStripMenuItem";
             fileToolStripMenuItem.Size = new System.Drawing.Size(46, 24);
             fileToolStripMenuItem.Text = "File";
@@ -489,7 +506,21 @@
             seedStatsToolStripMenuItem.Size = new System.Drawing.Size(216, 26);
             seedStatsToolStripMenuItem.Text = "Seed Pool Stats";
             seedStatsToolStripMenuItem.Click += seedStatsToolStripMenuItem_Click;
-            // 
+            //
+            // batch10ToolStripMenuItem
+            //
+            batch10ToolStripMenuItem.Name = "batch10ToolStripMenuItem";
+            batch10ToolStripMenuItem.Size = new System.Drawing.Size(216, 26);
+            batch10ToolStripMenuItem.Text = "Batch 10 Solves";
+            batch10ToolStripMenuItem.Click += batch10ToolStripMenuItem_Click;
+            //
+            // verifyClustersToolStripMenuItem
+            //
+            verifyClustersToolStripMenuItem.Name = "verifyClustersToolStripMenuItem";
+            verifyClustersToolStripMenuItem.Size = new System.Drawing.Size(216, 26);
+            verifyClustersToolStripMenuItem.Text = "Verify Cluster Orbits";
+            verifyClustersToolStripMenuItem.Click += verifyClustersToolStripMenuItem_Click;
+            //
             // openFileDialog1
             // 
             openFileDialog1.FileName = "openFileDialog1";
@@ -559,6 +590,7 @@
         private System.Windows.Forms.Label label4;
         private System.Windows.Forms.Label ClusterLbl;
         private System.Windows.Forms.Label SolvedLbl;
+        private System.Windows.Forms.TextBox StructureBox;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Button button2;
         private System.Windows.Forms.Label label1;
@@ -589,6 +621,8 @@
         private System.Windows.Forms.ToolStripMenuItem orientClusterToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem verifyManoeuvresToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem seedStatsToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem batch10ToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem verifyClustersToolStripMenuItem;
         private System.Windows.Forms.BindingSource tRubikCubeBindingSource;
         private System.Windows.Forms.BindingSource stateGridBindingSource;
         private System.Windows.Forms.PictureBox StateBox;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using TGL;
 
@@ -152,20 +153,25 @@ namespace RubikCube
             var orientations = AllOrientations();
 
             var cube = new TRubikCube();
-            // Generic target: a cubie whose distances from the centre are all distinct (trivial stabilizer),
-            // so no two manoeuvres collapse to the same whole-cube effect by position symmetry. Needs Size >= 2N-1.
-            int targetIndex = -1;
+            // Generic target = a cubie with a TRIVIAL rotation stabilizer: no non-identity proper rotation fixes it,
+            // so it can be forced into EVERY orientation AND no two manoeuvres collapse to the same whole-cube effect
+            // by a position symmetry -- exactly what this verification needs. Detected by ORBIT size == orientation
+            // count (as in FindOrientationCluster), which is exact and SIGN-AWARE: it accepts the even-cube clusters
+            // (4^3, 6^4) that a "distinct distance magnitudes" test wrongly rejects (a repeated magnitude with
+            // opposite signs is broken only by a reflection, so the rotation stabilizer stays trivial). So the true
+            // minimum is even Size = 2(N-1) -- 6 for 4D, not the 7 the magnitude bound would demand.
+            int orientCount = orientations.Count;
+            var clusterSize = new Dictionary<int, int>();
             foreach (var cubie in cube.Cubies)
             {
-                var org = cubie.Transform.Origin;
-                bool distinct = true;
-                for (int i = 0; i < n && distinct; i++)
-                    for (int j = i + 1; j < n; j++)
-                        if (Math.Abs(Math.Abs(org[i]) - Math.Abs(org[j])) < 0.5f) { distinct = false; break; }
-                if (distinct) { targetIndex = cubie.StartIndex; break; }
+                clusterSize.TryGetValue(cubie.ClusterIndex, out var c);
+                clusterSize[cubie.ClusterIndex] = c + 1;
             }
+            int targetIndex = -1;
+            foreach (var cubie in cube.Cubies)
+                if (clusterSize[cubie.ClusterIndex] == orientCount) { targetIndex = cubie.StartIndex; break; }
             if (targetIndex < 0)
-                return $"No generic (distinct-distance) cubie at Size = {TRubikCube.Size}. Set Size >= {2 * n - 1} (see Orientation Cluster), then retry.";
+                return $"No full-orientation cluster (size {orientCount}) at Size = {TRubikCube.Size}. For N = {n} set Size >= {2 * (n - 1)} (even, e.g. {2 * (n - 1)}; odd needs {2 * n - 1}), then retry.";
             var tgt = cube.Cubies[targetIndex];
             var targetCoords = string.Join(",", tgt.Position);
 
@@ -259,10 +265,14 @@ namespace RubikCube
             return sb.ToString();
         }
 
-        // Finds the cubie cluster whose size equals the number of orientations. A cubie whose distances from
-        // the centre are all distinct with one zero ({0,1,...,N-1}) has a trivial rotation stabilizer, so its
-        // cluster size = 2^(N-1) * N! = the rotation-group order = every cubie there reaches ALL orientations.
-        // That multiset needs max distance N-1, i.e. Size >= 2N-1 (7 for N=4). We pick our slice frame there.
+        // Finds the cubie cluster whose orbit size equals the number of orientations 2^(N-1)*N! -- a cubie with a
+        // TRIVIAL rotation stabilizer, so every cubie there reaches ALL orientations. It is detected by orbit size
+        // (== orientCount), which is exact and sign-aware, so it works at the TRUE minimal size, NOT the older
+        // "all distances distinct" bound: distinct distance MAGNITUDES are sufficient but not necessary. In an EVEN
+        // cube a repeated magnitude carried with OPPOSITE signs (e.g. coords just under and just over the centre)
+        // can only be swapped by a REFLECTION (det -1), which is not a proper rotation, so the rotation stabilizer
+        // stays trivial anyway. Smallest cube with such a cluster is therefore even Size = 2(N-1) -- 4^3 and 6^4 --
+        // below the distinct-magnitude bound 2N-1 (5^3 / 7^4). (Odd cubes still need 2N-1.)
         public static string FindOrientationCluster()
         {
             int n = TAffine.N;
@@ -288,7 +298,7 @@ namespace RubikCube
             int matches = 0;
             foreach (var kv in sizeByCluster) if (kv.Value == orientCount) matches++;
             if (matches == 0)
-                sb.AppendLine($"  no cluster of size {orientCount} at Size = {TRubikCube.Size}  (for N = {n} set Size >= {2 * n - 1}).");
+                sb.AppendLine($"  no cluster of size {orientCount} at Size = {TRubikCube.Size}  (for N = {n} set Size >= {2 * (n - 1)} even, e.g. {2 * (n - 1)}; odd needs {2 * n - 1}).");
             else
             {
                 sb.AppendLine($"  clusters of size {orientCount} (every cubie there reaches all orientations):");
@@ -306,6 +316,100 @@ namespace RubikCube
             foreach (var kv in bySize)
                 sb.AppendLine($"    {kv.Key,6} : {kv.Value}");
             return sb.ToString();
+        }
+
+        // VERIFY the cluster metric empirically. The metric keys a cluster by the sorted |coord| multiset; the TRUE
+        // cluster is the orbit of a position under the actual move group. This BFSes the real orbit (apply every
+        // move, follow ONE tracked position) and partitions each metric-cluster into true orbits. A metric-cluster
+        // that splits into >1 orbit is WRONGLY MERGED. Theory (determinant invariant): every move is det +1 on the
+        // signed-permutation of a position, so a class with ALL-DISTINCT nonzero magnitudes contains both dets and
+        // splits into >=2 orbits -> merged; a class with any REPEATED magnitude is a single orbit -> fine. Distinct
+        // magnitudes need Size >= 2N (even) / 2N+1 (odd), so the bug is DORMANT below that and REAL at/above it.
+        // Run on a small safe cube (all "1 orbit") and a large one (e.g. 6^3 / 7^3, expect the {distinct} classes
+        // to show "2 orbits  <-- MERGED"). O(orbit * moves * replay) -- a one-off diagnostic, fine up to ~7^3/8^4.
+        public static string VerifyClusterOrbits()
+        {
+            int n = TAffine.N, size = TRubikCube.Size;
+            var baseCube = new TRubikCube();
+            var byCluster = new Dictionary<int, List<int>>();            // metric clusterIndex -> cubie array slots
+            for (int slot = 0; slot < baseCube.Cubies.Length; slot++)
+            {
+                int ci = baseCube.Cubies[slot].ClusterIndex;
+                if (!byCluster.TryGetValue(ci, out var l)) { l = new List<int>(); byCluster[ci] = l; }
+                l.Add(slot);
+            }
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Cluster-orbit verification  (N = {n}, Size = {size})");
+            sb.AppendLine("  metric cluster = sorted |coord| multiset;  true orbit = BFS under real Turn moves.");
+            sb.AppendLine("  a metric cluster that splits into >1 orbit is WRONGLY MERGED by the metric.");
+            sb.AppendLine();
+
+            int mergedClusters = 0, mergedCubies = 0;
+            foreach (var kv in byCluster.OrderBy(k => k.Key))
+            {
+                var memberKey = new Dictionary<string, int>();          // solved-position key -> slot
+                foreach (var slot in kv.Value) memberKey[PosKey(baseCube.Cubies[slot].Position)] = slot;
+                var uncovered = new HashSet<string>(memberKey.Keys);
+                var orbitSizes = new List<int>();
+                while (uncovered.Count > 0)
+                {
+                    int startSlot = memberKey[uncovered.First()];
+                    var orbit = OrbitOf(startSlot);                     // set of position keys reachable by moves
+                    int inThisCluster = 0;
+                    foreach (var pk in orbit) if (uncovered.Remove(pk)) inThisCluster++;
+                    orbitSizes.Add(inThisCluster);
+                }
+                bool merged = orbitSizes.Count > 1;
+                if (merged) { mergedClusters++; mergedCubies += kv.Value.Count; }
+                // only print the interesting ones in full; summarise sizes
+                sb.AppendLine($"  cluster {kv.Key,4}: metric size {kv.Value.Count,4} -> {orbitSizes.Count} orbit(s) " +
+                              $"{{{string.Join(",", orbitSizes)}}}" + (merged ? "   <-- MERGED" : ""));
+            }
+            sb.AppendLine();
+            sb.AppendLine(mergedClusters == 0
+                ? "  RESULT: every metric cluster is a single true orbit -> metric CORRECT at this size."
+                : $"  RESULT: {mergedClusters} cluster(s) merged (covering {mergedCubies} cubies) -> metric WRONG at this size.");
+            return sb.ToString();
+        }
+
+        static string PosKey(int[] pos) => string.Join(",", pos);
+
+        // The true orbit of the cubie in array slot `targetSlot`: the set of positions it can reach under the move
+        // group. BFS where each node is a position; expand by replaying the node's move-sequence from a solved cube,
+        // then applying every move GetAllMoves lists for the target at that position. Positions are stable identities
+        // (Turn rotates Transforms in place, never reorders Cubies), so Cubies[targetSlot] is always the same cubie.
+        static HashSet<string> OrbitOf(int targetSlot)
+        {
+            var visited = new HashSet<string>();
+            var parent = new Dictionary<string, List<int>>();          // position key -> moves from solved
+            var start = new TRubikCube();
+            string sk = PosKey(start.Cubies[targetSlot].Position);
+            visited.Add(sk); parent[sk] = new List<int>();
+            var queue = new Queue<string>();
+            queue.Enqueue(sk);
+            while (queue.Count > 0)
+            {
+                var pk = queue.Dequeue();
+                var seq = parent[pk];
+                var cube = new TRubikCube();
+                foreach (var code in seq) cube.Turn(TMove.Decode(code));
+                cube.ActiveCubie = cube.Cubies[targetSlot];
+                foreach (var code in cube.GetAllMoves())
+                {
+                    var cube2 = new TRubikCube();
+                    foreach (var c in seq) cube2.Turn(TMove.Decode(c));
+                    cube2.Turn(TMove.Decode(code));
+                    var np = PosKey(cube2.Cubies[targetSlot].Position);
+                    if (visited.Add(np))
+                    {
+                        var next = new List<int>(seq) { code };
+                        parent[np] = next;
+                        queue.Enqueue(np);
+                    }
+                }
+            }
+            return visited;
         }
 
         // All reachable cubie orientations, generated by closing the identity under every quarter-turn.

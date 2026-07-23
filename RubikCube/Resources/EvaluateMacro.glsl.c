@@ -107,5 +107,6 @@ void main()
     if (tid == 0) {
         Population[specimenID].Fitness = floatBitsToUint(specimen_best_fitness);
         Population[specimenID].MovesCount = specimen_best_moves_count;
+        Population[specimenID].Structure = 0u;            // Macro has no coherence decomposition -> "unknown"
     }
 }

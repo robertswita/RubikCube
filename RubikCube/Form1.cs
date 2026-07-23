@@ -136,6 +136,7 @@ namespace RubikCube
                 //Scrambled = scrambled;
                 MovesLbl.Text = MovesCount.ToString();
                 UpdateClusterInfo();
+                UpdateWalkingFloor();
                 RubikCube.StateGrid = null;
                 StateBox.Invalidate();
                 //if (RubikCube.ActiveCubie != null)
@@ -229,6 +230,18 @@ namespace RubikCube
                     }
             }
             gc.DrawImage(bmp, StateBox.ClientRectangle);
+
+            // Thin pale-red grid, one line per cubie-matrix cell, to help locate a cubie's block. Low alpha so
+            // the dense grid stays light and doesn't glare (raise the alpha in the Pen if you want it stronger).
+            var rect = StateBox.ClientRectangle;
+            using (var gridPen = new Pen(Color.FromArgb(70, 210, 40, 40)))
+                for (int k = 0; k <= gridSize; k++)
+                {
+                    float gx = rect.X + rect.Width * k / (float)gridSize;
+                    float gy = rect.Y + rect.Height * k / (float)gridSize;
+                    gc.DrawLine(gridPen, gx, rect.Y, gx, rect.Bottom);
+                    gc.DrawLine(gridPen, rect.X, gy, rect.Right, gy);
+                }
         }
 
         void OnProgress(TRubikGenome specimen)
@@ -298,7 +311,7 @@ namespace RubikCube
                 bool inCoherence = RubikCube.Score * (RubikCube.ActiveCluster.Count + 1) < TAffine.N - 0.5;
                 if (Best.Fitness < RubikCube.Score
                     || (Best.Fitness == RubikCube.Score && Stall >= TGA<TRubikGenome>.StallLimit))
-                    //|| Stall >= TGA<TRubikGenome>.StallLimit && !inCoherence)
+                    //|| Stall >= TGA<TRubikGenome>.StallLimit)// && !inCoherence)
                 {
                     Stall = 0;
                     OnProgress(Best);
@@ -362,6 +375,7 @@ namespace RubikCube
             //RubikCube.GetActCubie();
             RubikCube.Score = 0;
             RubikCube.ActiveCubie = null;
+            Gpu.Floor = 2;                 // a fresh solve starts in the descent phase - see UpdateWalkingFloor
             Solve();
         }
 
@@ -655,6 +669,135 @@ namespace RubikCube
             ShowTextDialog("Seed pool stats", report);
         }
 
+        private void verifyClustersToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var report = TGreedyDiversity.VerifyClusterOrbits();
+            System.Diagnostics.Debug.WriteLine(report);
+            ShowTextDialog("Cluster-orbit verification", report);
+        }
+
+        // --- Batch measurement: solve N fresh scrambles headless, record the GA count of each, append a summary
+        //     to Docs/batch_results.txt. Runs on the UI thread (freezes the window for the duration) -- it is a
+        //     measurement tool, not interactive. A run that exceeds BATCH_CAP GA is recorded as a hang (DNF).
+        const int BATCH_RUNS = 10;
+        const int BATCH_CAP = 60000;
+        static readonly string BatchFile =
+            @"C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\Docs\batch_results.txt";
+
+        private void batch10ToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (MoveTimer.Enabled) return;                 // don't fight an interactive solve in progress
+            var title = Text;
+            var results = new int[BATCH_RUNS];
+            var hung = new bool[BATCH_RUNS];
+            for (int r = 0; r < BATCH_RUNS; r++)
+            {
+                Text = $"BATCH {r + 1}/{BATCH_RUNS} ...";
+                Application.DoEvents();                     // let the title repaint; no input is processed meaningfully
+                results[r] = SolveOnceHeadless(out hung[r]);
+            }
+            Text = title;
+            tglView1.Invalidate();
+
+            // Stats over ALL runs (hung ones counted at the cap -- conservative, and flagged).
+            var sorted = (int[])results.Clone();
+            Array.Sort(sorted);
+            double mean = results.Average();
+            double var = results.Select(v => (v - mean) * (v - mean)).Average();
+            double median = BATCH_RUNS % 2 == 1
+                ? sorted[BATCH_RUNS / 2]
+                : (sorted[BATCH_RUNS / 2 - 1] + sorted[BATCH_RUNS / 2]) / 2.0;
+            int hangCount = hung.Count(h => h);
+
+            var sb = new StringBuilder();
+            var pair = Gpu.TryGetDefine("PAIR");               // logged only while the experiment's define exists
+            sb.AppendLine("======================================================================");
+            sb.AppendLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  N={TAffine.N}  Slices={TRubikCube.Size}  " +
+                          $"Floor={Gpu.Floor}  StallLimit={TGA<TRubikGenome>.StallLimit}  cap={BATCH_CAP}" +
+                          (pair != null ? $"  PAIR={pair}" : ""));
+            sb.AppendLine("runs: " + string.Join(", ",
+                results.Select((v, i) => hung[i] ? v + "(HANG)" : v.ToString())));
+            sb.AppendLine($"min {sorted[0]}   median {median}   tail {sorted[BATCH_RUNS - 1]}   " +
+                          $"mean {mean:F0}   std {Math.Sqrt(var):F0}   var {var:F0}" +
+                          (hangCount > 0 ? $"   HANGS {hangCount}/{BATCH_RUNS}" : ""));
+            var report = sb.ToString();
+
+            try { System.IO.File.AppendAllText(BatchFile, report); }
+            catch (Exception ex) { report += "\n(could not write file: " + ex.Message + ")"; }
+            ShowTextDialog("Batch " + BATCH_RUNS, report);
+        }
+
+        // One full solve of a FRESH random scramble, headless (no animation). Mirrors the interactive Solve() +
+        // timer move-application loop EXACTLY (same accept test, same NextCluster-sets-Score, same walking floor),
+        // minus the UI/chart/TrySolutions (TrySolutions is a no-op -- the Solutions dict is empty). Returns the GA
+        // count; sets hung=true and returns the cap if the run fails to close within BATCH_CAP.
+        private int SolveOnceHeadless(out bool hung)
+        {
+            // Fresh cube + scramble (identical to Load + the Shuffle button, so no state carries between runs).
+            RubikCube = new TRubikCube();
+            RubikCube.Parent = Scene.Root;
+            var rnd = TChromosome.Rnd;
+            for (int i = 0; i < 200 * RubikCube.Cubies.Length; i++)
+            {
+                RubikCube.ActiveCubie = RubikCube.Cubies[rnd.Next(RubikCube.Cubies.Length)];
+                var all = RubikCube.GetAllMoves();
+                RubikCube.Turn(TMove.Decode(all[rnd.Next(all.Count)]));
+            }
+
+            // Reset exactly as the Solve button does (Gpu.Floor MUST match button1_Click).
+            MovesCount = 0; Iteration = 0; GACount = 0; Stall = 0;
+            RubikCube.Score = 0; RubikCube.ActiveCubie = null;
+            Gpu.Floor = 2;
+
+            hung = false;
+            while (true)
+            {
+                if (RubikCube.Score == 0)
+                    RubikCube.NextCluster();               // advances to the next cluster and sets its Score
+                if (RubikCube.ActiveCubie == null)
+                    return GACount;                        // all clusters solved
+                if (GACount >= BATCH_CAP) { hung = true; return BATCH_CAP; }
+
+                TRubikGenome.RubikCube = RubikCube;
+                Best = Gpu.ExecuteGA();
+                Iteration += Gpu.GenerationsCount;
+                GACount = Iteration;
+                Stall++;
+                if (Best.Fitness < RubikCube.Score
+                    || (Best.Fitness == RubikCube.Score && Stall >= TGA<TRubikGenome>.StallLimit))
+                {
+                    Stall = 0;
+                    Best.Correct();
+                    for (int i = 0; i < Best.BestMovesCount; i++)
+                        RubikCube.Turn(TMove.Decode((int)Best.Genes[i]));
+                    RubikCube.Score = Best.Fitness;
+                    UpdateWalkingFloor();                  // faithful to interactive (currently pinned -> no-op)
+                }
+            }
+        }
+
+        // WALKING FLOOR: the count-flattening range follows the cube's CURRENT structure, min(2*d_max, gateway).
+        // While the residual is scattered d_max is 1, so the floor stays at 2 and the peel keeps its full
+        // gradient; once a coherent block forms the flat range widens by exactly one rung, which is what makes
+        // k+0 -> k+k downhill locally. d_max is read from Best.Structure - the evaluator already reports the
+        // decomposition of the state it reached, so the host never repeats that work and the two cannot drift.
+        // Called after the moves have been applied, i.e. when the cube IS the state Best described.
+        // Moving the floor RESCALES every fitness, so RubikCube.Score (the reference for the next run's accept
+        // test) must be re-measured in the new landscape - otherwise the comparison spans two of them.
+        private void UpdateWalkingFloor()
+        {
+            return;   // PAIR EXPERIMENT: pin the floor at 2 (the field's start value). Remove to restore the walk.
+#pragma warning disable CS0162
+            if (Best == null) return;
+            int largest = TRubikGenome.LargestPiece(Best.Structure, TAffine.N);
+            uint gateway = 1u << (TAffine.N - 1);
+            uint floor = 2u;// Math.Max(4u, Math.Min(2u * (uint)Math.Max(largest, 1), gateway));
+            if (floor == Gpu.Floor) return;
+            Gpu.Floor = floor;
+            RubikCube.Score = Gpu.ScoreCube(RubikCube);
+#pragma warning restore CS0162
+        }
+
         // Status labels: which cluster is being solved (by ClusterIndex, 1-based) out of the total, and how
         // many of the active cluster's cubies are already solved. ActiveCubie == null means the cube is solved.
         private void UpdateClusterInfo()
@@ -664,6 +807,7 @@ namespace RubikCube
             {
                 ClusterLbl.Text = $"Cluster - / {RubikCube.ClustersCount}";
                 SolvedLbl.Text = "Solved - / -";
+                StructureBox.Text = "Struct -";
                 return;
             }
             int solved = 0;
@@ -671,6 +815,10 @@ namespace RubikCube
                 if (c.State == 0) solved++;
             ClusterLbl.Text = $"Cluster {RubikCube.ActiveCubie.ClusterIndex} / {RubikCube.ClustersCount}";
             SolvedLbl.Text = $"Solved {solved} / {RubikCube.ActiveCluster.Count}";
+            // Coherence decomposition of the residual, as the METRIC sees it ("4+2", "2+1+1") - reported by the
+            // evaluator itself, so it can never drift from the metric the way an eyeball reading does.
+            StructureBox.Text = "Struct " + (Best == null ? "-" : TRubikGenome.DescribeStructure(Best.Structure, TAffine.N));
+            //StructureBox.Refresh();
         }
 
         // Read-only monospace text box in a small dialog: the report stays selectable/copyable (Ctrl+A,

@@ -63,6 +63,13 @@
 #define SEED_STRIDE (uint(N) * (uint(N) - 1u) / 2u)
 #define STALL_LIMIT 20
 
+// EXPERIMENT: extra factor on the two-equal-blocks states (k+k) ONLY, to probe the k+0 vs k+k rung.
+// With the sqrt(s*G) denominator k+k sits sqrt(2)=1.414 above k+0. PAIR=1 leaves k+0 better (current),
+// PAIR=0.7071 makes the structural terms TIE (then the orientation-magnitude sub-gradient decides),
+// PAIR=0.5 makes k+k better. Run at a CONSTANT floor of 2 (walking floor disabled), or the floor's own
+// x2 on the k=2 rung confounds it. Set to 1.0 to remove the experiment.
+#define PAIR 0.5000
+
 // Max number of scene lights the render fragment shader can consume (sizes the Lights UBO array).
 // The host uploads only the enabled lights (up to this cap) and their actual count in the header.
 #define MAX_LIGHTS 8
