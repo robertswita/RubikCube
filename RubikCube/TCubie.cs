@@ -182,13 +182,45 @@ namespace RubikCube
                 var position = new int[pos.Size];
                 for (int dim = 0; dim < position.Length; dim++)
                     position[dim] = (int)Math.Round(Math.Abs(Transform.Origin[dim]) + TRubikCube.C);
+                int chirality = Chirality(position);   // BEFORE the sort: position is still the per-AXIS magnitude
                 Array.Sort(position);
                 Array.Reverse(position);
-                ClusterIndex = SizeMatrix.Coords2Index(position);
+                int key = SizeMatrix.Coords2Index(position);
+
+                // CHIRALITY BIT. The |coord| multiset alone MERGES two mirror orbits whenever the magnitudes are
+                // ALL DISTINCT and nonzero (see Chirality). Keying 2*key + bit never collides across classes (odd
+                // vs even) and only ever splits a chiral class; below Size 2N no class is chiral, so the bit is 0
+                // and RenumberClusters yields ranks identical to before -- the split activates only at Size >= 2N.
+                ClusterIndex = 2 * key + chirality;
             }
         }
 
         public int GetPos(int coord) { return (int)Math.Round(Transform.Origin[coord] + TRubikCube.C); }
+
+        // Chirality BIT (0/1) of a position for the cluster key. Two mirror orbits share a distance-magnitude
+        // multiset but differ by the determinant of the position's signed permutation (sgn of the sort permutation
+        // * product of the centred-coordinate signs); that determinant is a move-invariant (every move is det +1),
+        // so it is the only thing separating them. Computed matrix-free in ONE pass and folded to a bit: det<0 -> 1,
+        // det>0 -> 0. Returns 0 (do NOT split) when the class is not chiral -- any coord at the centre or any
+        // repeated magnitude makes the determinant ill-defined and splitting would wrongly break one true orbit.
+        // Takes the still-UNSORTED per-axis magnitudes: position[k] = round(|origin[k]|+C) = C + integer magnitude,
+        // so all tests are EXACT integer comparisons -- centre <=> position==C, repeat <=> equal, order <=> order --
+        // while the SIGN of each coord still comes from origin (position discarded it via Abs).
+        int Chirality(int[] position)
+        {
+            int det = 1;
+            for (int i = 0; i < position.Length; i++)
+            {
+                if (position[i] == TRubikCube.C) return 0;                // magnitude 0 -> a coord AT the centre -> not chiral
+                if (Transform.Origin[i] < 0) det = -det;                  // product of coord signs
+                for (int j = i + 1; j < position.Length; j++)
+                {
+                    if (position[i] == position[j]) return 0;             // a repeated magnitude -> not chiral
+                    if (position[i] < position[j]) det = -det;            // sort-permutation inversion
+                }
+            }
+            return det < 0 ? 1 : 0;                                       // the chirality bit
+        }
         public int[] Position
         {
             get 

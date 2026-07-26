@@ -45,7 +45,11 @@ void main()
             local_fA_sum += e;
             if (e != 0.0) scrambled++;
         }
-#if COHERENCE
+        // ACTIVE FORM: discount suma/(G*N) with suma = cost + collat (the long note below documents an older
+        // (cost+2*collat)/(N*s) variant -- kept as history). COHERENT is a UNIFORM LATCH (Setup loc 8), NOT a
+        // compile flag: the host keeps it 0 through the count-peel descent and latches it to 1 once the residual
+        // reaches the floor, so coherence shapes ONLY the endgame. The count is cancelled INSIDE the factor
+        // (the /scrambled), so once latched the fitness is the bare coherence factor across the whole endgame.
         // Coherence metric — WEAKEST-BLOCK measure ("D3FragSymmAll"), applied as a DISCOUNT for the ENDGAME
         // (0 < scrambled <= gateway 2^(N-1)). Decompose the scrambled cubies into maximal complete coherent blocks
         // (a stack scan per state-group), then price the LEVEL OF THE WEAKEST one: a config is only as good as its
@@ -82,17 +86,20 @@ void main()
         // toward the gateway and finishes in one turn. Two endgame strategies, not two versions of one.
         // Baseline for the older (cost+collat)/(G*N) form, 2^4, 10 runs, no hangs: 2840, 4928, 1625, 632, 827,
         // 3591, 1142, 288, 686, 751 -- the 2*collat and /scrambled changes are UNMEASURED against it. Micro only.
-        uint G = 1u << (uint(N) - 1u);                        // gateway 2^(N-1): the endgame bound, and a perf gate
-        if (scrambled > 0u && scrambled <= G) {                // (above it the residual is scattered -> f ~ 1 anyway)
+        uint G = 1u << (uint(N) - 1u);                        // gateway 2^(N-1): the endgame bound
+        if (COHERENT != 0u && scrambled > 0u && scrambled <= G) {   // latch OFF on the descent, ON at the floor
             uint scr[CUBIES_COUNT];                           // scrambled active cubies (the endgame residual, <= G)
             uint ns = 0u;
             for (uint i = 0u; i < countActive; i++) {
                 uint id = ActiveCubies[i];
                 if (cubieL1(local_cubies[id]) != 0u) scr[ns++] = id;
             }
-            uint aMax = 0u;                                   // WEAKEST-PIECE rule: the deepest (smallest) piece dictates
+            uint aMax = 0u;                                   // WEAKEST-PIECE rule: max agreeAxes = the smallest (weakest) piece
+            uint aSum = 0u;
             uint seenAgree = 0u;                              // bitmask of occurring agreeAxes -> #distinct = SYMMETRY
             uint pieces = 0u;                                 // #complete blocks (for the PAIR experiment gate)
+            uint dHist[N + 1];                                // block count by depth (agreeAxes) -- for the m measure
+            for (uint di = 0u; di <= uint(N); di++) dHist[di] = 0u;
             for (uint gi = 0u; gi < ns; gi++) {
                 uint sa = local_cubies[scr[gi]];              // handle each STATE once, at its first cubie
                 bool firstState = true;
@@ -128,7 +135,9 @@ void main()
                     uint agreeAxes = 0u;
                     for (uint j = 0u; j < uint(N); j++) if (agree[j]) agreeAxes++;
                     if (cnt == (1u << (uint(N) - agreeAxes))) {
-                        aMax = max(aMax, agreeAxes);          // FULLY-filled box -> one complete piece. Track the
+                        aMax = max(aMax, agreeAxes);          // FULLY-filled box -> track the WEAKEST (deepest) piece
+                        aSum += agreeAxes;
+                        dHist[agreeAxes] += 1u;              // depth histogram for the m measure
                         seenAgree |= 1u << agreeAxes;         // WEAKEST (deepest) piece + which distinct sizes occur
                         pieces++;                             // and count the pieces (PAIR gate)
                         uint sh = 5u * (agreeAxes - 1u);      // DIAGNOSTIC histogram (UI only): bucket agreeAxes-1,
@@ -144,22 +153,41 @@ void main()
                     }
                 }
             }
-            uint smallest = 1u << (uint(N) - aMax);           // size of the weakest piece
-            float S = float(bitCount(seenAgree));             // self-scaling SYMMETRY = # of distinct piece sizes
-            float cost = float(scrambled / smallest) * float(aMax) * S;   // as-if ALL cubies sat at the weakest level
-            float collat = 0.0;                               // COLLATERAL: the interval [scrambled, G) as maximal
-            uint s = scrambled;                               // aligned blocks -- depends ONLY on scrambled
-            for (int g = 0; g < int(N) && s < G; g++) {
-                uint blk = s & (~s + 1u);                     // lowest set bit = the maximal aligned block at s
-                uint aa = uint(N) - uint(findMSB(blk));       // agreeAxes of this collateral block = N - log2(blk)
-                collat += float(aa);
-                s += blk;
+            //uint smallest = 1u << (uint(N) - aMax);           // size of the weakest piece
+            uint S = bitCount(seenAgree);             // self-scaling SYMMETRY = # of distinct piece sizes
+            //float cost = float(scrambled / smallest) * float(aMax) * S;   // as-if ALL cubies sat at the weakest level
+            //float collat = 0.0;                               // COLLATERAL: the interval [scrambled, G) as maximal
+            //uint s = scrambled;                               // aligned blocks -- depends ONLY on scrambled
+            //for (int g = 0; g < int(N) && s < G; g++) {
+            //    uint blk = s & (~s + 1u);                     // lowest set bit = the maximal aligned block at s
+            //    uint aa = uint(N) - uint(findMSB(blk));       // agreeAxes of this collateral block = N - log2(blk)
+            //    collat += float(aa);
+            //    s += blk;
+            //}
+            //local_fA_sum *= float(N * aMax + S - 1) / float(N * N);
+            //local_fA_sum *= (float(aMax*aMax) + float(SSIGN) * S) / float((N*N) + (SSIGN));
+            //local_fA_sum *= float(N * aMax + SSIGN * (S - 1)) / float(N * N * scrambled);
+            //local_fA_sum *= float(aSum + 2 * (S - 1u)) / float(G + 2 * (N - 1));
+            // MEASURE P: the number of PARENT (white internal) nodes of the compact-packing tree = the merge
+            // scaffolding. The carry counts them: at depth d, par = ceil(occ/2). Empty partners (the "+0" of k+0)
+            // are LEAVES, not parents, so P does NOT count them -> k+0 = k+k = 2+1+1 = 2+1+0 all TIE (identical
+            // parent structure, differ only in filled-vs-empty leaves). Explosion IS caught at every level (more
+            // blocks -> bigger tree -> more parents: 2+2+2+2 > 2+2). Forming a block removes a parent, so
+            // 2+1+1 < 1+1+1+1 (no barrier). Count-cancelled by /scrambled; the scattered floor (P = N+1) pins to
+            // 1.0. Ladder for 2^4: 0.2 / 0.4 / 0.6 / 0.8 / 1.0.
+            uint occ = dHist[N];
+            uint P = 0u;
+            for (int d = N; d >= 1; d--) {
+                uint par = (occ + 1u) >> 1;                   // ceil(occ/2): parent nodes at depth d-1
+                P += par;
+                occ = dHist[d - 1] + par;                     // dHist[0] stays 0 (no whole-cube block in the residual)
             }
-            local_fA_sum *= (cost + collat) / (float(N) * sqrt(float(scrambled) * float(G)));
-            // EXPERIMENT (PAIR): tip the k+0 vs k+k rung. Fires only on exactly two equal blocks of size >= 2
-            // (2+2, 4+4, 8+8) -- nothing else. Set PAIR=1.0 in Variables to disable. See the PAIR note there.
-            if (pieces == 2u && bitCount(seenAgree) == 1u && aMax < uint(N))
-                local_fA_sum *= float(PAIR);
+            local_fA_sum *= float(N * P + S) / float(N * (uint(N) + 2u) * scrambled);   // # parent nodes, count-cancelled (floor P = N+1)
+            //local_fA_sum *= (cost + collat) / sqrt(float(81) * float(scrambled));   // suma/(G*N): no /s, no sqrt (baseline)
+            // PAIR: tip the k+0 vs k+k rung. Fires only on exactly two equal blocks of size >= 2 (2+2, 4+4, 8+8) --
+            // nothing else. PAIR=EQUAL (the default, = 1.0) is a no-op: k+0 and k+k already tie in suma. See Variables.
+            //if (pieces == 2u && bitCount(seenAgree) == 1u && aMax < uint(N))
+            //    local_fA_sum *= float(PAIR);
 
             // ---------------------------------------------------------------------------------------------------
             // ALTERNATIVE, kept for A/B -- the LADDER metric. To switch: comment out the block above, uncomment
@@ -184,20 +212,13 @@ void main()
             // local_fA_sum *= 4.0 * invSum / (s * s);
             // ---------------------------------------------------------------------------------------------------
         }
-#endif
-        // FLOOR flattens the COUNT (never the structure) over 0 < scrambled <= FLOOR, by cancelling the base's
-        // ~scrambled: fitness there becomes FLOOR * factor, so only coherence and the magnitude sub-gradient
-        // decide. Above it the bare count drives the peel. It is a UNIFORM (Setup, location 7), not a #define,
-        // so the host can move it WITHOUT recompiling the evaluator -- the intent is a WALKING floor,
-        // min(2*d_max, G) taken from the CURRENT cube: while the residual is scattered d_max = 1, so FLOOR = 2
-        // and the peel keeps its full gradient; once a coherent block exists the flat range widens by exactly
-        // ONE rung, making k+0 -> k+k locally downhill. It must follow the CUBE, not the candidate -- keyed to
-        // the candidate's own d_max it would raise the floor on every merge and push the merged state back up.
-        // Measured on 2^4: FLOOR=2 median 1705, FLOOR=G median 3292. A fixed G cancels the count across the
-        // WHOLE endgame (fitness = G * factor exactly) and hands it to a measure of structure, which has no way
-        // to peel single cubies -- that is why it is slower, not faster.
-        if (scrambled > 0u && scrambled <= FLOOR)
-            local_fA_sum *= float(FLOOR) / float(scrambled);
+        // The factor is P / (N+1) -- P = number of parent (internal) nodes of the compact-packing tree over the
+        // blocks. Empty partners (the "+0") are leaves, not parents, so P ties k+0 = k+k = 2+1+1 = 2+1+0; more
+        // blocks mean a bigger tree, so explosion is penalized at every level. Count-cancelled by /scrambled so
+        // the endgame reads as the bare P/(N+1): scattered floor (P = N+1) is 1.0, an 8-block is 0.2. FLOOR
+        // (uniform 7) is now ONLY the host-side latch threshold -- the factor no longer reads it (dead-uniform
+        // cleanup pending). On the descent (Coherent = 0) this block is skipped; the bare count peels.
+        // (aMax/aSum/S still computed but unused -- kept for A/B.)
         for (uint i = 0; i < countSolved; i++)
             if (cubieL1(local_cubies[SolvedCubies[i]]) != 0u)
                 local_solved_errors += 1;

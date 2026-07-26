@@ -313,25 +313,34 @@ namespace RubikCube
                 // N*(N-1)/2 genes, matching SEED_STRIDE (mixed-Givens seeds can be longer than N-1 moves).
                 var seedMoves = cube.BuildSeedMoves(TGA<TRubikGenome>.PopulationCount, TAffine.Planes.Length,
                                                     GetDefineValue("SEED_RATIO"), GetDefineValue("SEED_MODE") != 0,
-                                                    GetDefineValue("SEED_FAST") != 0, out NumSeeds);
+                                                    SeedFast, out NumSeeds);
                 fixed (int* p = seedMoves) SeedMovesBuffer.Update(seedMoves.Length * sizeof(int), p);
             }
         }
 
-        // On-demand seed-pool telemetry (File menu). Runs BuildSeedMoves with the SAME production parameters
-        // CreateBuffers uses, so the returned report reflects exactly what Init would receive: accepted vs
-        // target, stuck/duplicate draws, how many of the 2^P modes contributed, and the accepted-length
-        // histogram. Operates on cubie copies (no cube mutation); does not touch GPU buffers.
+        // On-demand seed-pool telemetry (File menu). Builds the pool TWICE on the SAME cubie -- once fast, once
+        // backtracking -- and returns both reports. Running both here is the whole point: SEED_FAST is read from
+        // the Variables text loaded at Init, so flipping it otherwise needs an edit + restart, by which time the
+        // cube is in a different state and the two pools are not comparable (we already got burned comparing a
+        // depth-4 cubie against a depth-2 one). Same coordinates, same orientation, two pools side by side.
+        // The production run uses whichever SeedFast selects; this is diagnostic only -- it operates on cubie
+        // copies, mutates nothing, and touches no GPU buffer.
         public static string SeedStats(TRubikCube cube)
         {
             if (cube.ActiveCubie == null)
                 return "No active cubie - select a scrambled cluster first (a solved cube has nothing to seed).";
-            TRubikCube.Diagnostic = true;                        // enable the census + report for this call only
-            cube.BuildSeedMoves(TGA<TRubikGenome>.PopulationCount, TAffine.Planes.Length,
-                                GetDefineValue("SEED_RATIO"), GetDefineValue("SEED_MODE") != 0,
-                                GetDefineValue("SEED_FAST") != 0, out _);
+            int ratio = GetDefineValue("SEED_RATIO");
+            bool mixed = GetDefineValue("SEED_MODE") != 0;
+            var sb = new System.Text.StringBuilder();
+            TRubikCube.Diagnostic = true;                        // enable the census + report for these calls only
+            foreach (var fast in new[] { true, false })
+            {
+                cube.BuildSeedMoves(TGA<TRubikGenome>.PopulationCount, TAffine.Planes.Length, ratio, mixed, fast, out _);
+                sb.AppendLine($"===== SEED_FAST = {(fast ? 1 : 0)}{(fast == SeedFast ? "   <-- production uses this now" : "")} =====");
+                sb.AppendLine(cube.LastSeedReport);
+            }
             TRubikCube.Diagnostic = false;
-            return cube.LastSeedReport;
+            return sb.ToString();
         }
 
         // Scores the current cube on the GPU with the SAME evaluator the GA uses: a zero specimen (all
@@ -340,11 +349,27 @@ namespace RubikCube
         // hardcoded, as the same zero specimen's fitness on a SOLVED cube (baseline == 0, so the fitness
         // is exactly the penalty). One scorer (the evaluator), no separate kernel, no magic constant,
         // and the baseline tracks any future change to the no-op penalty automatically.
-        // Endgame count-flattening range, passed to the evaluator as uniform 7 (see the FLOOR comment in
-        // EvaluateMicro). A field, not a define, so moving it costs no shader rebuild. 2 = the peel keeps its
-        // full gradient all the way down; the walking-floor plan is min(2*d_max, G) from the current cube.
-        // Both the GA and EvalZeroSpecimen read THIS value -- they must, or Fitness and Score are incomparable.
+        // Coherence LATCH THRESHOLD + endgame NORMALIZER base. Single source of truth for both roles: the host
+        // reads it to flip Coherent 0->1 when the residual reaches it (UpdateCoherenceLatch), and it is uploaded
+        // to uniform 7 so the factor can normalize by FLOOR * N (pinning the scattered floor state to fitness
+        // 1.0). It no longer WALKS -- fixed at FloorStart, reset per cluster (ResetFloor). Both the GA and
+        // EvalZeroSpecimen upload THIS value, or Fitness and Score are incomparable.
         public static uint Floor = 4;
+
+        // Coherence LATCH (uniform 8): 0 = bare count-peel (descent), 1 = endgame coherence discount. The host
+        // sets it to 1 once the active cluster's residual reaches Floor and back to 0 for each new cluster. Like
+        // Floor, BOTH the GA and EvalZeroSpecimen must use the same value or Fitness and Score are incomparable.
+        public static uint Coherent = 0;
+
+        // Seeding follows the coherence LATCH, because the two phases consume DIFFERENT manoeuvre material.
+        // While peeling (Coherent = 0) the FAST path fits: a single greedy descent dead-ends more often the
+        // LONGER the path, so it filters long manoeuvres out and the pool comes out weighted toward short ones
+        // (measured on a deep 2^5 cubie: 41% one-move, 71% <= two moves) -- exactly what "solve one cubie
+        // without disturbing the rest" needs. Once coherence latches on, the endgame needle needs the opposite:
+        // the backtracking pool rescues the long macro/commutator sequences the fast path throws away, and its
+        // dedup re-weights the pool toward them (distinct short solutions are few, distinct long ones many).
+        // SEED_FAST still gates the descent half, so setting it to 0 means "backtracking in BOTH phases".
+        static bool SeedFast => GetDefineValue("SEED_FAST") != 0 && Coherent == 0;
 
         static float noOpPenalty;   // reset to NaN in BuildShaders (Init + on N/SIZE change) -> measured on first ScoreCube
         public static float ScoreCube(TRubikCube cube)
@@ -368,7 +393,8 @@ namespace RubikCube
             OpenGL.UseProgram(eval);
             OpenGL.Uniform1ui(4, (uint)cube.SolvedCubies.Count);
             OpenGL.Uniform1ui(5, (uint)cube.ActiveCluster.Count);
-            OpenGL.Uniform1ui(7, Floor);       // MUST match the GA's floor, or Score and Fitness differ
+            OpenGL.Uniform1ui(7, Floor);       // latch threshold + endgame normalizer base -- MUST match the GA's
+            OpenGL.Uniform1ui(8, Coherent);    // MUST match the GA's latch, or Score and Fitness differ
             OpenGL.BindBufferBase(Population.Type, 0, Population.Id);
             OpenGL.DispatchCompute(1, 1, 1);                        // one specimen: 1 thread (micro) / 1 block (macro)
             OpenGL.MemoryBarrier(OpenGL.MemoryBarrierFlags.ShaderStorage);
@@ -424,6 +450,7 @@ namespace RubikCube
                     OpenGL.Uniform1ui(4, solvedCount);
                     OpenGL.Uniform1ui(5, activeCount);
                     OpenGL.Uniform1ui(7, Floor);
+                    OpenGL.Uniform1ui(8, Coherent);
                     OpenGL.BindBufferBase(parent.Type, 0, parent.Id);
                     OpenGL.DispatchCompute(evalGroups, 1, 1);
                     OpenGL.MemoryBarrier(OpenGL.MemoryBarrierFlags.ShaderStorage);

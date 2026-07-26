@@ -28,7 +28,9 @@
 // descent per draw, NO backtracking, NO dedup - "draw until valid, throw in as they come"; O(rc) per attempt so
 // cheap even when a narrow mode dead-ends and is redrawn), 0 = the reliable backtracking-DFS + dedup + saturation
 // model. Fast trades macro-move seeds (narrow modes rarely survive a single descent) for CPU speed on deep cubies.
-#define SEED_FAST 0
+// NOTE: this now gates only the DESCENT half -- Gpu.SeedFast ANDs it with the coherence latch, so the endgame
+// (Coherent = 1) always uses the backtracking pool. Set to 0 for backtracking in both phases.
+#define SEED_FAST 1
 
 // A/B switch for the evaluator: 1 = COHERENCE, 0 = baseline per-cubie sum. Baseline fA is essentially a
 // COUNT of scrambled cubies, which is deceptive - a COHERENT residual (cubies a single turn advances
@@ -63,12 +65,17 @@
 #define SEED_STRIDE (uint(N) * (uint(N) - 1u) / 2u)
 #define STALL_LIMIT 20
 
-// EXPERIMENT: extra factor on the two-equal-blocks states (k+k) ONLY, to probe the k+0 vs k+k rung.
-// With the sqrt(s*G) denominator k+k sits sqrt(2)=1.414 above k+0. PAIR=1 leaves k+0 better (current),
-// PAIR=0.7071 makes the structural terms TIE (then the orientation-magnitude sub-gradient decides),
-// PAIR=0.5 makes k+k better. Run at a CONSTANT floor of 2 (walking floor disabled), or the floor's own
-// x2 on the k=2 rung confounds it. Set to 1.0 to remove the experiment.
-#define PAIR 0.5000
+// Extra factor on the two-equal-blocks states (k+k = 2+2, 4+4, 8+8) ONLY, to tilt the k+0 vs k+k rung.
+// In the ACTIVE suma/(G*N) metric k+0 and k+k have EQUAL suma, so below the floor (fitness ~ suma) they already
+// TIE -- EQUAL (= 1.0, a no-op multiplier) is that intended tie. Named EQUAL, not 1.0, to avoid the collision with
+// the OLD sqrt(s*G) metric where PAIR=1.0 instead meant "k+0 BETTER" and the tie was 1/sqrt(2). Deviate only to
+// experiment: a value < EQUAL favours k+k, > EQUAL favours k+0. The batch logs the raw token, so it reads PAIR=EQUAL.
+#define EQUAL   1.0
+#define SINGLE  1.4      // k+0 lepsze  (partner karany)
+#define TWIN    0.714    // k+k lepsze  (partner nagradzany)   = 1/1.4
+//#define PAIR EQUAL
+//#define SSIGN -1
+#define MEASURE NP+S
 
 // Max number of scene lights the render fragment shader can consume (sizes the Lights UBO array).
 // The host uploads only the enabled lights (up to this cap) and their actual count in the header.

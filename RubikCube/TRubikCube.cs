@@ -1,4 +1,6 @@
 using GA;
+using Microsoft.VisualBasic;
+using Microsoft.VisualBasic.Devices;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -20,6 +22,10 @@ namespace RubikCube
         public static List<int> EulerOrder;
         public static bool IsEulerOrderReversed;
         public float Score;
+        public int Scrambled;
+        public TRubikGenome Best;
+        public int IterationsCount;
+        int Stall;
 
         //sbyte[] Transforms;
         //public int[,] StateGrid2
@@ -585,8 +591,79 @@ namespace RubikCube
             }
         }
 
+        public void Reset()
+        {
+            IterationsCount = 0;
+            Score = 0;
+            ActiveCubie = null;
+        }
+
+        // ONE GA decision step -- Runs in BOTH phases
+        // (the count-peel descent AND the post-floor coherence climb). It:
+        //   1. re-selects the target cubie -- UNSOLVED one of the active cluster -- which is what lets
+        //      successive GA runs during a stall attack the SAME configuration from different cubies;
+        //   2. advances to the next cluster when the current one is solved (descent phase, base floor);
+        //   3. runs one GA and applies the STALL accept test (accept strictly-better always, equal only after
+        //      StallLimit consecutive non-improving runs -- a gated sideways step off a plateau).
+        // Returns the accepted moves (empty if none, or if the whole cube is solved -> Best == null).
+        public List<TMove> GetNextMoves()
+        {
+            var moves = new List<TMove>();
+            if (Score == 0)                            // current cluster solved -> advance
+                NextCluster();
+            if (ActiveCubie == null) // whole cube solved
+            {
+                Best = null;
+                return moves;
+            }
+            Scrambled = 0;
+            foreach (var c in ActiveCluster) if (c.State != 0) Scrambled++;
+            // COHERENCE LATCH (no walk). Two phases: during the DESCENT coherence is OFF, so the evaluator is the
+            // bare count and the peel drives the residual down fast; once the active cluster's residual reaches the
+            // floor (base 4), latch coherence ON for the ENDGAME and leave it on for the rest of the cluster. The
+            // floor is now ONLY this latch threshold -- it never walks. Count-cancellation lives inside the metric
+            // (the /scrambled in the coherence factor), so once latched the fitness is the bare coherence factor
+            // for the whole endgame (0 < scrambled <= G) and the yardstick never jumps. The latch itself DOES
+            // switch metrics (count -> factor), so RubikCube.Score (the accept-test reference) is re-measured once,
+            // at the flip. Reset to descent (coherence OFF, floor 4) per cluster in Solve(). Called after the moves
+            // are applied, when the cube IS the state just reached.
+            if (Gpu.Coherent == 0 && Scrambled <= Gpu.Floor)     // reached the floor -> latch the endgame ONCE
+            {
+                Gpu.Coherent = 1;
+                Score = Gpu.ScoreCube(this); // metric switched count -> factor: rebase the accept test
+            }
+            // advance target: DETERMINISTIC round-robin --  // the next UNSOLVED cubie of the cluster after the
+            var cluster = ActiveCluster;           // current one (wrapping). Cluster order is stable
+            int cur = cluster.IndexOf(ActiveCubie);// (Cubies array order), so successive steps cycle
+            for (int step = 1; step <= cluster.Count; step++)// through all cubies once per pass -- no coupon-
+            {                                                // collector waste of the old random pick, and it
+                var cand = cluster[(cur + step) % cluster.Count];  // pairs exactly with StallLimit = #unsolved.
+                if (cand.State != 0) { ActiveCubie = cand; break; }
+            }
+            TRubikGenome.RubikCube = this;
+            Best = Gpu.ExecuteGA();
+            // Accept EQUAL fitness too (<=), not only strictly-better: a sideways move on the plateau, but only
+            // after a full round-robin pass with no improvement. Safe because the no-op penalty (2*CUBIES_COUNT)
+            // makes standing still score ABOVE Score, so Fitness == Score is always a REAL move to a different
+            // equal-fitness state. The stall budget is the number of UNSOLVED cubies: paired with the round-robin
+            // target advance, that is exactly "try every cubie once; if none improved, step sideways" -- a
+            // principled limit, not the old fixed 20 (STALL_LIMIT define is no longer read here).
+            Stall++;
+            if (Best.Fitness < Score
+                || (Best.Fitness == Score && Stall >= ActiveCluster.Count))
+            {
+                Stall = 0;
+                Best.Correct();
+                for (int i = 0; i < Best.BestMovesCount; i++)
+                    moves.Add(TMove.Decode((int)Best.Genes[i]));
+                Score = Best.Fitness;
+            }
+            IterationsCount += Gpu.GenerationsCount;
+            return moves;
+        }
         public void NextCluster()
         {
+            Gpu.Coherent = 0;    // new cluster -> descent
             if (ActiveCubie != null)
                 SolvedCubies.AddRange(ActiveCluster);
             ActiveCubie = null;
@@ -611,13 +688,13 @@ namespace RubikCube
             }
         }
 
-        public int ScrambledCount()
-        {
-            var scrambled = 0;
-            for (int i = 0; i < Cubies.Length; i++)
-                if (Cubies[i].State != 0) scrambled++;
-            return scrambled;
-        }
+        //public int ScrambledCount()
+        //{
+        //    var scrambled = 0;
+        //    for (int i = 0; i < Cubies.Length; i++)
+        //        if (Cubies[i].State != 0) scrambled++;
+        //    return scrambled;
+        //}
 
         //public List<int> GetReversedSeq2()
         //{

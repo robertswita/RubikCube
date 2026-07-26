@@ -16,7 +16,7 @@ namespace RubikCube
     public partial class TRubikForm : Form
     {
         //TSolver Solver;
-        int GACount;
+        //int GACount;
         TimeSpan IterElapsed;
         TimeSpan Time;
         int MovesCount;
@@ -24,12 +24,9 @@ namespace RubikCube
         Dictionary<string, List<TMove>> Solutions = new Dictionary<string, List<TMove>>();
         int MoveNo;
         public TRubikCube RubikCube;// = new TRubikCube();
-        int Iteration;
-        int Stall;
         //public TScene Scene = new TScene();
         //public TCamera Camera;
         //TGA<TRubikGenome> Ga;
-        TRubikGenome Best;
         TScene Scene = new TScene();
         TLight Light = new TLight();
         //int Scrambled;
@@ -132,11 +129,10 @@ namespace RubikCube
                 Moves.Clear();
                 //label2.Text = HighScore.ToString();
                 //var scrambled = RubikCube.Code.Count(x => x != '\0');
-                label4.Text = RubikCube.ScrambledCount().ToString();
+                label4.Text = RubikCube.Scrambled.ToString();
                 //Scrambled = scrambled;
                 MovesLbl.Text = MovesCount.ToString();
                 UpdateClusterInfo();
-                UpdateWalkingFloor();
                 RubikCube.StateGrid = null;
                 StateBox.Invalidate();
                 //if (RubikCube.ActiveCubie != null)
@@ -160,12 +156,7 @@ namespace RubikCube
                 TimeBox.Text = Time.ToString();
                 //SeqCountLbl.Text = "SeqCount:" +Ga.Best.MoveCount.ToString();
                 MoveTimer.Stop();
-                var freeCubies = new List<TCubie>();
-                foreach (var cubie in RubikCube.ActiveCluster)
-                    if (cubie.State != 0)
-                        freeCubies.Add(cubie);
-                if (freeCubies.Count > 0)
-                    RubikCube.ActiveCubie = freeCubies[TChromosome.Rnd.Next(freeCubies.Count)];
+                // (target re-pick moved into PeelStep, the shared decision core)
                 //if (Best.Fitness < RubikCube.Score)
                 //{ 
                 //    RubikCube.Score = Best.Fitness;
@@ -183,7 +174,7 @@ namespace RubikCube
                 //RubikCube.GetSolveSeq();
                 ErrorBox.Text = (100 * RubikCube.Score).ToString();
                 ErrorBox.Refresh();
-                if (Best != null)
+                if (RubikCube.Best != null)
                     Solve();
             }
         }
@@ -249,7 +240,7 @@ namespace RubikCube
             //if (chart1.Series[0].Points.Count % 300 == 0)
             //    chart1.Series[0].Points.Clear();
             //var ga = (TGA<TRubikGenome>)sender;
-            chart1.Series[0].Points.AddXY(Iteration, 100 * specimen.Fitness);
+            chart1.Series[0].Points.AddXY(RubikCube.IterationsCount, 100 * specimen.Fitness);
             chart1.Refresh();
             var iterTime = Watch.Elapsed - IterElapsed;
             IterTimeBox.Text = "Iter time:" + iterTime.Milliseconds;
@@ -270,98 +261,66 @@ namespace RubikCube
 
         bool TrySolutions = true;
         Stopwatch Watch;
-        int StartGACount;
+
+        // Interactive driver: one GaStep, then hand the accepted moves to the timer to ANIMATE (the timer's
+        // move-branch Turns them frame by frame, its MoveNo>0 branch latches coherence and re-calls Solve). All
+        // the UI (chart, labels, solution-cache probe) lives here; the decision lives in GaStep.
         void Solve()
         {
             Watch = Stopwatch.StartNew();
-            if (RubikCube.Score == 0)
-            {
-                chart1.Series[0].Points.Clear();
-                RubikCube.NextCluster();
-                UpdateClusterInfo();
-                //if (RubikCube.ActiveCubie != null)
-                //{
-                //    TRubikGenome.FreeMoves = RubikCube.GetFreeMoves();
-                //    RubikCube.GetSolveSeq();
-                //    RubikCube.Score = Gpu.ScoreCube(RubikCube);
-                //}
-            }
-            if (RubikCube.ActiveCubie != null)
-            {
-                IterElapsed = TimeSpan.Zero;
-                StartGACount = GACount;
-                TRubikGenome.RubikCube = RubikCube;
-                Best = Gpu.ExecuteGA();
-                Iteration += Gpu.GenerationsCount;
-                GACount = Iteration;                 // tick the live counter every run, not only on accept (OnProgress)
-                ItersBox.Text = GACount.ToString();
-                ItersBox.Refresh();
-                Stall++;
+            IterElapsed = TimeSpan.Zero;
+            bool newCluster = RubikCube.Score == 0;
+            if (newCluster) chart1.Series[0].Points.Clear();
 
-                //if (Ga.HighScore == 0 && RubikCube.ActiveCluster.Count > 1)
-                //{
-                //    //SaveSolution(Ga.Best);
-                //}
-                //if (Ga.HighScore < HighScore)
-                // Accept EQUAL fitness too (<=), not only strictly-better: a sideways move on the plateau.
-                // Safe because the no-op penalty (2*CUBIES_COUNT) makes standing still score ABOVE Score, so
-                // Fitness == Score is always a REAL move to a different equal-fitness state. Walks the plateau
-                // instead of STALL jumping off it; un-hangs the plain < case. Cost: solution length inflates,
-                // and a strict local min (every move worse) would still hang -> STALL returns as last resort.
-                bool inCoherence = RubikCube.Score * (RubikCube.ActiveCluster.Count + 1) < TAffine.N - 0.5;
-                if (Best.Fitness < RubikCube.Score
-                    || (Best.Fitness == RubikCube.Score && Stall >= TGA<TRubikGenome>.StallLimit))
-                    //|| Stall >= TGA<TRubikGenome>.StallLimit)// && !inCoherence)
+            var moves = RubikCube.GetNextMoves();
+
+            if (newCluster) UpdateClusterInfo();
+            ItersBox.Text = RubikCube.IterationsCount.ToString();
+            ItersBox.Refresh();
+            if (RubikCube.Best == null) return;                            // whole cube solved -> stop (timer not restarted)
+
+            if (moves.Count > 0)                              // a move was accepted
+            {
+                OnProgress(RubikCube.Best);
+                Moves.AddRange(moves);
+                TrySolutions = true;
+            }
+            if (TrySolutions)
+            {
+                foreach (var solution in Solutions)
                 {
-                    Stall = 0;
-                    OnProgress(Best);
-                    Best.Correct();
-                    for (int i = 0; i < Best.BestMovesCount; i++)
-                        Moves.Add(TMove.Decode((int)Best.Genes[i]));
-                    RubikCube.Score = Best.Fitness;
-                    TrySolutions = true;
-                }
-                if (TrySolutions)
-                {
-                    foreach (var solution in Solutions)
+                    var tryMoves = DecodeSolution(solution.Value);
+                    for (int j = -1; j < 0 * RubikCube.FreeMoves.Count; j++)
                     {
-                        var tryMoves = DecodeSolution(solution.Value);
-                        for (int j = -1; j < 0 * RubikCube.FreeMoves.Count; j++)
+                        var speedMoves = new List<TMove>();
+                        if (j < 0)
+                            speedMoves.AddRange(tryMoves);
+                        else
                         {
-                            var moves = new List<TMove>();
-                            if (j < 0)
-                                moves.AddRange(tryMoves);
-                            else
-                            {
-                                var move = TMove.Decode(RubikCube.FreeMoves[j]);
-                                moves.Add(move);
-                                moves.AddRange(tryMoves);
-                                move = TMove.Decode(RubikCube.FreeMoves[j]);
-                                move.Angle = 2 - move.Angle;
-                                moves.Add(move);
-                            }
-                            var cube = new TRubikCube(RubikCube);
-                            foreach (var move in moves)
-                                cube.Turn(move);
-                            var score = Gpu.ScoreCube(cube);
-                            if (score < RubikCube.Score)
-                            {
-                                RubikCube.Score = score;
-                                Moves = moves;
-                            }
+                            var move = TMove.Decode(RubikCube.FreeMoves[j]);
+                            speedMoves.Add(move);
+                            speedMoves.AddRange(tryMoves);
+                            move = TMove.Decode(RubikCube.FreeMoves[j]);
+                            move.Angle = 2 - move.Angle;
+                            speedMoves.Add(move);
+                        }
+                        var cube = new TRubikCube(RubikCube);
+                        foreach (var move in speedMoves)
+                            cube.Turn(move);
+                        var score = Gpu.ScoreCube(cube);
+                        if (score < RubikCube.Score)
+                        {
+                            RubikCube.Score = score;
+                            Moves = speedMoves;
                         }
                     }
                 }
-                if (Moves.Count == 0)
-                    TrySolutions = false;
-                MovesCount += Moves.Count;
-                Time += Watch.Elapsed;
-                MoveTimer.Start();
             }
-            else
-            {
-                Best = null;
-            }
+            if (Moves.Count == 0)
+                TrySolutions = false;
+            MovesCount += Moves.Count;
+            Time += Watch.Elapsed;
+            MoveTimer.Start();
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -369,13 +328,8 @@ namespace RubikCube
             if (MoveTimer.Enabled) return;
             MovesCount = 0;
             Time = TimeSpan.Zero;
-            GACount = 0;
-            Iteration = 0;
             IsPaused = false;
-            //RubikCube.GetActCubie();
-            RubikCube.Score = 0;
-            RubikCube.ActiveCubie = null;
-            Gpu.Floor = 2;                 // a fresh solve starts in the descent phase - see UpdateWalkingFloor
+            RubikCube.Reset();
             Solve();
         }
 
@@ -710,11 +664,15 @@ namespace RubikCube
             int hangCount = hung.Count(h => h);
 
             var sb = new StringBuilder();
+            var measure = Gpu.TryGetDefine("MEASURE");
             var pair = Gpu.TryGetDefine("PAIR");               // logged only while the experiment's define exists
+            var ssign = Gpu.TryGetDefine("SSIGN");             // +1 -> asymmetry PENALISED (+S), -1 -> REWARDED (-S)
             sb.AppendLine("======================================================================");
             sb.AppendLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  N={TAffine.N}  Slices={TRubikCube.Size}  " +
-                          $"Floor={Gpu.Floor}  StallLimit={TGA<TRubikGenome>.StallLimit}  cap={BATCH_CAP}" +
-                          (pair != null ? $"  PAIR={pair}" : ""));
+                          $"Floor={Gpu.Floor}  Stall=RR/active  cap={BATCH_CAP}" +
+                          (measure != null ? $"  MEASURE={measure}" : "") +
+                          (pair != null ? $"  PAIR={pair}" : "") +
+                          (ssign != null ? $"  variant={(ssign.Contains("-") ? "-S" : ssign == "0" ? "0" : "+S")}" : ""));
             sb.AppendLine("runs: " + string.Join(", ",
                 results.Select((v, i) => hung[i] ? v + "(HANG)" : v.ToString())));
             sb.AppendLine($"min {sorted[0]}   median {median}   tail {sorted[BATCH_RUNS - 1]}   " +
@@ -727,10 +685,10 @@ namespace RubikCube
             ShowTextDialog("Batch " + BATCH_RUNS, report);
         }
 
-        // One full solve of a FRESH random scramble, headless (no animation). Mirrors the interactive Solve() +
-        // timer move-application loop EXACTLY (same accept test, same NextCluster-sets-Score, same walking floor),
-        // minus the UI/chart/TrySolutions (TrySolutions is a no-op -- the Solutions dict is empty). Returns the GA
-        // count; sets hung=true and returns the cap if the run fails to close within BATCH_CAP.
+        // One full solve of a FRESH random scramble, headless (no animation). Drives the SAME GaStep decision core
+        // the interactive Solve() uses -- so the batch can no longer drift from what you watch on screen -- and
+        // just applies each accepted move immediately (Turn) instead of animating it. Returns the GA count; sets
+        // hung=true and returns the cap if the run fails to close within BATCH_CAP.
         private int SolveOnceHeadless(out bool hung)
         {
             // Fresh cube + scramble (identical to Load + the Shuffle button, so no state carries between runs).
@@ -743,59 +701,18 @@ namespace RubikCube
                 var all = RubikCube.GetAllMoves();
                 RubikCube.Turn(TMove.Decode(all[rnd.Next(all.Count)]));
             }
-
-            // Reset exactly as the Solve button does (Gpu.Floor MUST match button1_Click).
-            MovesCount = 0; Iteration = 0; GACount = 0; Stall = 0;
-            RubikCube.Score = 0; RubikCube.ActiveCubie = null;
-            Gpu.Floor = 2;
-
+            // Reset exactly as the Solve button does (Gpu.Coherent MUST match button1_Click).
+            RubikCube.Reset();
             hung = false;
             while (true)
             {
-                if (RubikCube.Score == 0)
-                    RubikCube.NextCluster();               // advances to the next cluster and sets its Score
-                if (RubikCube.ActiveCubie == null)
-                    return GACount;                        // all clusters solved
-                if (GACount >= BATCH_CAP) { hung = true; return BATCH_CAP; }
-
-                TRubikGenome.RubikCube = RubikCube;
-                Best = Gpu.ExecuteGA();
-                Iteration += Gpu.GenerationsCount;
-                GACount = Iteration;
-                Stall++;
-                if (Best.Fitness < RubikCube.Score
-                    || (Best.Fitness == RubikCube.Score && Stall >= TGA<TRubikGenome>.StallLimit))
-                {
-                    Stall = 0;
-                    Best.Correct();
-                    for (int i = 0; i < Best.BestMovesCount; i++)
-                        RubikCube.Turn(TMove.Decode((int)Best.Genes[i]));
-                    RubikCube.Score = Best.Fitness;
-                    UpdateWalkingFloor();                  // faithful to interactive (currently pinned -> no-op)
-                }
+                var moves = RubikCube.GetNextMoves();      // SAME decision core as interactive (re-pick, cluster
+                if (RubikCube.Best == null)                          // advance, GA, STALL) -- one source of truth now
+                    return RubikCube.IterationsCount;                        // whole cube solved
+                foreach (var m in moves)                   // apply immediately: batch = no animation
+                    RubikCube.Turn(m);
+                if (RubikCube.IterationsCount >= BATCH_CAP) { hung = true; return BATCH_CAP; }
             }
-        }
-
-        // WALKING FLOOR: the count-flattening range follows the cube's CURRENT structure, min(2*d_max, gateway).
-        // While the residual is scattered d_max is 1, so the floor stays at 2 and the peel keeps its full
-        // gradient; once a coherent block forms the flat range widens by exactly one rung, which is what makes
-        // k+0 -> k+k downhill locally. d_max is read from Best.Structure - the evaluator already reports the
-        // decomposition of the state it reached, so the host never repeats that work and the two cannot drift.
-        // Called after the moves have been applied, i.e. when the cube IS the state Best described.
-        // Moving the floor RESCALES every fitness, so RubikCube.Score (the reference for the next run's accept
-        // test) must be re-measured in the new landscape - otherwise the comparison spans two of them.
-        private void UpdateWalkingFloor()
-        {
-            return;   // PAIR EXPERIMENT: pin the floor at 2 (the field's start value). Remove to restore the walk.
-#pragma warning disable CS0162
-            if (Best == null) return;
-            int largest = TRubikGenome.LargestPiece(Best.Structure, TAffine.N);
-            uint gateway = 1u << (TAffine.N - 1);
-            uint floor = 2u;// Math.Max(4u, Math.Min(2u * (uint)Math.Max(largest, 1), gateway));
-            if (floor == Gpu.Floor) return;
-            Gpu.Floor = floor;
-            RubikCube.Score = Gpu.ScoreCube(RubikCube);
-#pragma warning restore CS0162
         }
 
         // Status labels: which cluster is being solved (by ClusterIndex, 1-based) out of the total, and how
@@ -810,14 +727,12 @@ namespace RubikCube
                 StructureBox.Text = "Struct -";
                 return;
             }
-            int solved = 0;
-            foreach (var c in RubikCube.ActiveCluster)
-                if (c.State == 0) solved++;
+            int solved = RubikCube.ActiveCluster.Count - RubikCube.Scrambled;
             ClusterLbl.Text = $"Cluster {RubikCube.ActiveCubie.ClusterIndex} / {RubikCube.ClustersCount}";
             SolvedLbl.Text = $"Solved {solved} / {RubikCube.ActiveCluster.Count}";
             // Coherence decomposition of the residual, as the METRIC sees it ("4+2", "2+1+1") - reported by the
             // evaluator itself, so it can never drift from the metric the way an eyeball reading does.
-            StructureBox.Text = "Struct " + (Best == null ? "-" : TRubikGenome.DescribeStructure(Best.Structure, TAffine.N));
+            StructureBox.Text = "Struct " + (RubikCube.Best == null ? "-" : TRubikGenome.DescribeStructure(RubikCube.Best.Structure, TAffine.N));
             //StructureBox.Refresh();
         }
 

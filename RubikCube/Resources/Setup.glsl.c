@@ -58,11 +58,15 @@ layout(location = 5) uniform uint countActive;
 layout(location = 2) uniform uint u_Stage;
 layout(location = 3) uniform uint u_PassModStage;
 layout(location = 6) uniform uint numSeeds;   // Init: number of specimens pre-seeded from SeedMoves
-// Endgame count-flattening range: the floor multiplies fitness by FLOOR/scrambled for scrambled <= FLOOR,
-// which cancels the base's ~scrambled and leaves the coherence factor alone. A UNIFORM, not a #define,
-// so it can follow the cube's current structure without recompiling the evaluator. The host MUST set the
-// same value for the GA and for the reference score (EvalZeroSpecimen), or the two are not comparable.
+// Coherence LATCH THRESHOLD, reused as the endgame NORMALIZER base. A uniform (single source of truth =
+// Gpu.Floor), so the host and the evaluator can never disagree. It no longer WALKS -- it is the fixed floor
+// (FloorStart) that (a) the host uses to trip Coherent 0->1 and (b) the factor divides by, as FLOOR * N, to
+// pin the scattered floor state to fitness 1.0.
 layout(location = 7) uniform uint FLOOR;
+// Coherence LATCH (0/1). A uniform, not a #define, so the phase switch costs no shader rebuild: the host keeps it
+// 0 through the count-peel descent and sets it to 1 once the active cluster's residual reaches the floor. When 0
+// the evaluator is the bare per-cubie count; when 1 the endgame coherence discount applies (scrambled <= gateway).
+layout(location = 8) uniform uint COHERENT;
 
 
 void getRow(uint M, uint row, out uint outCol, out int outSign)
