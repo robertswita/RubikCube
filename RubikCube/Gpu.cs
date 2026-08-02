@@ -19,7 +19,7 @@ namespace RubikCube
         static string Setup, Variables;
         static int CompiledN, CompiledSize;
         static uint NumSeeds;   // specimens pre-seeded by Init (host-built SeedMoves)
-        public static int GenerationsCount;
+        public static int GenerationNo;
 
         // --- Instanced cube render (Gpu owns the GL resources; TGLContext gathers the scene). ---
         // All cubies share ONE base hypercube mesh (TCubie.Cube), differing only by their transform,
@@ -184,6 +184,8 @@ namespace RubikCube
             SetDefineValue("N", TAffine.N);
             SetDefineValue("SIZE", TRubikCube.Size);
             SetDefineValue("CUBIES_COUNT", (int)Math.Pow(TRubikCube.Size, TAffine.N));
+            // Coherence scratch is sized by the largest cluster, NOT the whole cube (SIZE-independent, tiny for Macro).
+            SetDefineValue("MAX_CLUSTER", TRubikCube.MaxClusterSize);
             TChromosome.GenesLength = GetDefineValue("GENES_COUNT");
             TGA<TRubikGenome>.PopulationCount = GetDefineValue("POPULATION_COUNT");
             TGA<TRubikGenome>.GenerationsCount = GetDefineValue("GENERATIONS_COUNT");
@@ -270,7 +272,7 @@ namespace RubikCube
 
         // Size of one Specimen in ints - the SINGLE place that knows the layout, which must match
         // `struct Specimen` in Setup.glsl.c: Fitness, MovesCount, Moves[GENES_COUNT], Structure.
-        static int SpecimenInts => TChromosome.GenesLength + 3;
+        static int SpecimenInts => TChromosome.GenesLength + 4;   // Fitness, MovesCount, Moves[], Structure, Ladder
 
         // Uploads the per-run data into the buffers reserved in Init (0 Population, 1 NewPopulation,
         // 2 Cubies, 3 FreeMoves, 4 SolvedCubies, 5 ActiveCubies, 6 Planes UBO). Update reuses the same
@@ -285,7 +287,7 @@ namespace RubikCube
             var cubies = cube.PackCubies();
             // Pad empty index arrays to one element so we never make a zero-size SSBO (unreliable
             // .length() / binding). The countSolved / countActive uniforms gate the loops.
-            var solved = cube.SolvedCubies.Select(c => c.StartIndex).ToArray();
+            var solved = cube.SolvedInSlices.Select(c => c.StartIndex).ToArray();   // break-check only needs Solved the cluster's moves can touch
             if (solved.Length == 0) solved = new int[1];
             var active = cube.ActiveCluster.Select(c => c.StartIndex).ToArray();
             if (active.Length == 0) active = new int[1];
@@ -306,7 +308,7 @@ namespace RubikCube
 
             if (cube.ActiveCubie != null)
             {
-                var moves = cube.FreeMoves.ToArray();
+                var moves = cube.ClusterMoves.ToArray();
                 fixed (int* p = moves) FreeMovesBuffer.Update(moves.Length * sizeof(int), p);
                 // Per-specimen seed sequences for Init: reverse-transform moves that undo active-cluster
                 // cubies. SEED_RATIO % of the population is seeded (rest random); stride = plane count P =
@@ -372,36 +374,40 @@ namespace RubikCube
         static bool SeedFast => GetDefineValue("SEED_FAST") != 0 && Coherent == 0;
 
         static float noOpPenalty;   // reset to NaN in BuildShaders (Init + on N/SIZE change) -> measured on first ScoreCube
+        public static uint LastScoreStructure;   // piece histogram of the cube ScoreCube just evaluated -- decode with TRubikGenome.DescribeStructure
+        public static uint LastScoreLadder;       // integer ladder value of that cube -- the coherence accept baseline (read from the GPU, not re-derived)
         public static float ScoreCube(TRubikCube cube)
         {
-            var score = EvalZeroSpecimen(cube);
+            var score = EvalZeroSpecimen(cube, out LastScoreStructure, out LastScoreLadder);
             if (float.IsNaN(noOpPenalty))
-                noOpPenalty = EvalZeroSpecimen(new TRubikCube());
+                noOpPenalty = EvalZeroSpecimen(new TRubikCube(), out _, out _);   // solved-cube baseline; its structure/ladder are irrelevant
             return score - noOpPenalty;
         }
 
         // Evaluates ONE all-zero specimen (identity
         // moves) and returns its fitness = the cube's raw score PLUS the no-op penalty (a zero specimen
         // never changes the active cluster, so the penalty always fires).
-        static float EvalZeroSpecimen(TRubikCube cube)
+        static float EvalZeroSpecimen(TRubikCube cube, out uint structure, out uint ladder)
         {
             CreateBuffers(cube);
-            var micro = cube.Cubies.Length <= 82;   // Micro carries the coherence eval; 82 admits 3^4 (81) and 4^3 (64)
+            var micro = TRubikCube.MaxClusterSize <= 82;   // UNIFIED Micro holds only the LARGEST CLUSTER now (not the whole cube), so gate on MaxClusterSize, not Cubies.Length -> big cubes (6^3: MaxClusterSize~24) run the coherence eval on Micro. Still admits 3^4/4^3 (clusters ~32/24).
             var eval = micro ? EvaluateMicroProgram : EvaluateMacroProgram;
             var spec = new int[SpecimenInts];                  // all zero = identity moves
             fixed (int* p = spec) Population.Update(spec.Length * sizeof(int), p);
             OpenGL.UseProgram(eval);
-            OpenGL.Uniform1ui(4, (uint)cube.SolvedCubies.Count);
+            OpenGL.Uniform1ui(4, (uint)cube.SolvedInSlices.Count);
             OpenGL.Uniform1ui(5, (uint)cube.ActiveCluster.Count);
             OpenGL.Uniform1ui(7, Floor);       // latch threshold + endgame normalizer base -- MUST match the GA's
             OpenGL.Uniform1ui(8, Coherent);    // MUST match the GA's latch, or Score and Fitness differ
             OpenGL.BindBufferBase(Population.Type, 0, Population.Id);
             OpenGL.DispatchCompute(1, 1, 1);                        // one specimen: 1 thread (micro) / 1 block (macro)
             OpenGL.MemoryBarrier(OpenGL.MemoryBarrierFlags.ShaderStorage);
-            var result = new int[1];
+            var result = new int[SpecimenInts];                    // read the WHOLE specimen so we can also grab Structure
             OpenGL.BindBuffer(Population.Type, Population.Id);
             fixed (int* rp = result)
-                OpenGL.GetBufferSubData(Population.Type, 0, sizeof(float), rp);
+                OpenGL.GetBufferSubData(Population.Type, 0, SpecimenInts * sizeof(int), rp);
+            structure = (uint)result[SpecimenInts - 2];            // Structure, then Ladder are the last two ints (see Setup: Fitness, MovesCount, Moves[], Structure, Ladder)
+            ladder = (uint)result[SpecimenInts - 1];
             return BitConverter.Int32BitsToSingle(result[0]);
         }
 
@@ -411,12 +417,12 @@ namespace RubikCube
         {
             var cube = TRubikGenome.RubikCube;
             var populationCount = (uint)TGA<TRubikGenome>.PopulationCount;
-            var micro = cube.Cubies.Length <= 82;   // Micro carries the coherence eval; 82 admits 3^4 (81) and 4^3 (64)
+            var micro = TRubikCube.MaxClusterSize <= 82;   // UNIFIED Micro holds only the LARGEST CLUSTER now (not the whole cube), so gate on MaxClusterSize, not Cubies.Length -> big cubes (6^3: MaxClusterSize~24) run the coherence eval on Micro. Still admits 3^4/4^3 (clusters ~32/24).
             var evalProgram = micro ? EvaluateMicroProgram : EvaluateMacroProgram;
 
             // Create + upload all buffers for this run (population, packed cube, free moves, indices, planes).
             CreateBuffers(cube);
-            var solvedCount = (uint)cube.SolvedCubies.Count;
+            var solvedCount = (uint)cube.SolvedInSlices.Count;
             var activeCount = (uint)cube.ActiveCluster.Count;
 
             // Dispatch dims. Init/SelCrossover: 1 thread per specimen (blocks of 64).
@@ -426,6 +432,7 @@ namespace RubikCube
 
             int parentSlot = 0;
             var best = new TRubikGenome();
+            best.Fitness = float.MaxValue;   // running-best sentinel: the first generation's winner always beats it
             var specimenSize = SpecimenInts * sizeof(int);
             var bestBuffer = new int[specimenSize / sizeof(int)];
             fixed (int* bestBufPtr = bestBuffer)
@@ -440,7 +447,7 @@ namespace RubikCube
                 OpenGL.MemoryBarrier(OpenGL.MemoryBarrierFlags.ShaderStorage);
 
                 var pop = new[] { Population, Children };   // local ping-pong pair (binding 0/1 swap each gen)
-                for (GenerationsCount = 0; GenerationsCount < TGA<TRubikGenome>.GenerationsCount; GenerationsCount++)
+                for (GenerationNo = 0; GenerationNo < TGA<TRubikGenome>.GenerationsCount; GenerationNo++)
                 {
                     var parent = pop[parentSlot];
                     var child = pop[parentSlot ^ 1];
@@ -468,7 +475,8 @@ namespace RubikCube
                         }
                     }
 
-                    // 3. Read the best specimen (Population[parentSlot][0] after the sort).
+                    // 3. Read this generation's best (Population[0] after the sort), track the running best on
+                    //    the CPU, and early-exit as soon as it beats the current accepted Score.
                     OpenGL.BindBuffer(parent.Type, parent.Id);
                     OpenGL.GetBufferSubData(parent.Type, 0, specimenSize, bestBufPtr);
                     var fitness = BitConverter.UInt32BitsToSingle((uint)bestBuffer[0]);

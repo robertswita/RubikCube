@@ -85,6 +85,8 @@ namespace RubikCube
         TShape ActSlice;
         public void Group(List<TCubie> selection)
         {
+            if (ActSlice?.Parent != null)
+                UnGroup();
             ActSlice = new TShape();
             for (int i = 0; i < selection.Count; i++)
                 selection[i].Parent = ActSlice;
@@ -242,11 +244,11 @@ namespace RubikCube
             //var ga = (TGA<TRubikGenome>)sender;
             chart1.Series[0].Points.AddXY(RubikCube.IterationsCount, 100 * specimen.Fitness);
             chart1.Refresh();
-            var iterTime = Watch.Elapsed - IterElapsed;
+            var iterTime = RubikCube.ComputeTime.Elapsed - IterElapsed;
             IterTimeBox.Text = "Iter time:" + iterTime.Milliseconds;
             IterTimeBox.Refresh();
             //IterElapsed += iterTime;
-            IterElapsed = Watch.Elapsed;
+            IterElapsed = RubikCube.ComputeTime.Elapsed;
             //GACount = Iteration;// StartGACount + Ga.IterCount;
             //ItersBox.Text = GACount.ToString();
             //ItersBox.Refresh();
@@ -260,15 +262,12 @@ namespace RubikCube
         }
 
         bool TrySolutions = true;
-        Stopwatch Watch;
 
         // Interactive driver: one GaStep, then hand the accepted moves to the timer to ANIMATE (the timer's
         // move-branch Turns them frame by frame, its MoveNo>0 branch latches coherence and re-calls Solve). All
         // the UI (chart, labels, solution-cache probe) lives here; the decision lives in GaStep.
         void Solve()
         {
-            Watch = Stopwatch.StartNew();
-            IterElapsed = TimeSpan.Zero;
             bool newCluster = RubikCube.Score == 0;
             if (newCluster) chart1.Series[0].Points.Clear();
 
@@ -290,17 +289,17 @@ namespace RubikCube
                 foreach (var solution in Solutions)
                 {
                     var tryMoves = DecodeSolution(solution.Value);
-                    for (int j = -1; j < 0 * RubikCube.FreeMoves.Count; j++)
+                    for (int j = -1; j < 0 * RubikCube.ClusterMoves.Count; j++)
                     {
                         var speedMoves = new List<TMove>();
                         if (j < 0)
                             speedMoves.AddRange(tryMoves);
                         else
                         {
-                            var move = TMove.Decode(RubikCube.FreeMoves[j]);
+                            var move = TMove.Decode(RubikCube.ClusterMoves[j]);
                             speedMoves.Add(move);
                             speedMoves.AddRange(tryMoves);
-                            move = TMove.Decode(RubikCube.FreeMoves[j]);
+                            move = TMove.Decode(RubikCube.ClusterMoves[j]);
                             move.Angle = 2 - move.Angle;
                             speedMoves.Add(move);
                         }
@@ -319,7 +318,7 @@ namespace RubikCube
             if (Moves.Count == 0)
                 TrySolutions = false;
             MovesCount += Moves.Count;
-            Time += Watch.Elapsed;
+            Time = RubikCube.ComputeTime.Elapsed;   // authoritative compute time now lives in the cube (works headless too)
             MoveTimer.Start();
         }
 
@@ -328,6 +327,7 @@ namespace RubikCube
             if (MoveTimer.Enabled) return;
             MovesCount = 0;
             Time = TimeSpan.Zero;
+            IterElapsed = TimeSpan.Zero;
             IsPaused = false;
             RubikCube.Reset();
             Solve();
@@ -342,7 +342,7 @@ namespace RubikCube
             for (int i = 0; i < 200 * RubikCube.Cubies.Length; i++)
             {
                 RubikCube.ActiveCubie = RubikCube.Cubies[rnd.Next(RubikCube.Cubies.Length)];
-                var allMoves = RubikCube.GetAllMoves();
+                var allMoves = RubikCube.GetClusterMoves();
                 var code = allMoves[rnd.Next(allMoves.Count)];
                 var move = TMove.Decode(code);
                 //Moves.Add(move);
@@ -644,11 +644,14 @@ namespace RubikCube
             var title = Text;
             var results = new int[BATCH_RUNS];
             var hung = new bool[BATCH_RUNS];
+            var times = new double[BATCH_RUNS];             // per-run GA compute time (ms) -- the cost the gen count hides
+            List<string> worstTraj = null; int worstResult = -1, worstRun = -1;
             for (int r = 0; r < BATCH_RUNS; r++)
             {
                 Text = $"BATCH {r + 1}/{BATCH_RUNS} ...";
                 Application.DoEvents();                     // let the title repaint; no input is processed meaningfully
-                results[r] = SolveOnceHeadless(out hung[r]);
+                results[r] = SolveOnceHeadless(out hung[r], out var traj, out times[r]);
+                if (results[r] > worstResult) { worstResult = results[r]; worstTraj = traj; worstRun = r; }   // keep only the worst
             }
             Text = title;
             tglView1.Invalidate();
@@ -678,10 +681,25 @@ namespace RubikCube
             sb.AppendLine($"min {sorted[0]}   median {median}   tail {sorted[BATCH_RUNS - 1]}   " +
                           $"mean {mean:F0}   std {Math.Sqrt(var):F0}   var {var:F0}" +
                           (hangCount > 0 ? $"   HANGS {hangCount}/{BATCH_RUNS}" : ""));
+            double totMs = times.Sum(), totGen = results.Sum();   // ms/1k-gen = per-generation cost -> the GPU-efficiency knob (coherence-on costs more)
+            sb.AppendLine($"time ms: total {totMs:F0}   mean {times.Average():F0}   tail {times.Max():F0}   " +
+                          $"ms/1k-gen {(totGen > 0 ? 1000.0 * totMs / totGen : 0):F1}");
             var report = sb.ToString();
 
             try { System.IO.File.AppendAllText(BatchFile, report); }
             catch (Exception ex) { report += "\n(could not write file: " + ex.Message + ")"; }
+            if (worstTraj != null)                          // dump ONLY the worst run's per-step trajectory (overwrite each batch)
+            {
+                var sbT = new StringBuilder();
+                sbT.AppendLine($"# WORST run {worstRun + 1}/{BATCH_RUNS}: {worstResult} gens{(hung[worstRun] ? " (HANG)" : "")}" + (measure != null ? $"   MEASURE={measure}" : ""));
+                sbT.AppendLine("# gen\tscrambled\tstructure\tbestFit\tscore\tmoves\tstepMs");
+                foreach (var l in worstTraj) sbT.AppendLine(l);
+                var safeMeasure = string.IsNullOrEmpty(measure)                   // per-MEASURE file so each metric keeps its own trace
+                    ? "none"
+                    : string.Concat(measure.Trim().Split(System.IO.Path.GetInvalidFileNameChars()));   // strip '*' etc., keep '+'
+                var trajFile = BatchFile.Replace("batch_results.txt", $"worst_trajectory_{safeMeasure}.txt");
+                try { System.IO.File.WriteAllText(trajFile, sbT.ToString()); } catch { }
+            }
             ShowTextDialog("Batch " + BATCH_RUNS, report);
         }
 
@@ -689,29 +707,39 @@ namespace RubikCube
         // the interactive Solve() uses -- so the batch can no longer drift from what you watch on screen -- and
         // just applies each accepted move immediately (Turn) instead of animating it. Returns the GA count; sets
         // hung=true and returns the cap if the run fails to close within BATCH_CAP.
-        private int SolveOnceHeadless(out bool hung)
+        private int SolveOnceHeadless(out bool hung, out List<string> traj, out double computeMs)
         {
+            traj = new List<string>();                      // per-step trajectory (gen, scrambled, structure, fitness, moves, stepMs) -- always tracked
             // Fresh cube + scramble (identical to Load + the Shuffle button, so no state carries between runs).
-            RubikCube = new TRubikCube();
-            RubikCube.Parent = Scene.Root;
+            var rubikCube = new TRubikCube();
+            //RubikCube.Parent = Scene.Root;
             var rnd = TChromosome.Rnd;
-            for (int i = 0; i < 200 * RubikCube.Cubies.Length; i++)
+            for (int i = 0; i < 200 * rubikCube.Cubies.Length; i++)
             {
-                RubikCube.ActiveCubie = RubikCube.Cubies[rnd.Next(RubikCube.Cubies.Length)];
-                var all = RubikCube.GetAllMoves();
-                RubikCube.Turn(TMove.Decode(all[rnd.Next(all.Count)]));
+                rubikCube.ActiveCubie = rubikCube.Cubies[rnd.Next(rubikCube.Cubies.Length)];
+                var all = rubikCube.GetClusterMoves();
+                rubikCube.Turn(TMove.Decode(all[rnd.Next(all.Count)]));
             }
             // Reset exactly as the Solve button does (Gpu.Coherent MUST match button1_Click).
-            RubikCube.Reset();
+            rubikCube.Reset();
             hung = false;
+            double prevMs = 0;                              // for per-step compute ms (delta of the cube's ComputeTime)
             while (true)
             {
-                var moves = RubikCube.GetNextMoves();      // SAME decision core as interactive (re-pick, cluster
-                if (RubikCube.Best == null)                          // advance, GA, STALL) -- one source of truth now
-                    return RubikCube.IterationsCount;                        // whole cube solved
+                var moves = rubikCube.GetNextMoves();      // SAME decision core as interactive (re-pick, cluster
+                if (rubikCube.Best == null)                          // advance, GA, STALL) -- one source of truth now
+                {
+                    computeMs = rubikCube.ComputeTime.Elapsed.TotalMilliseconds;
+                    return rubikCube.IterationsCount;                        // whole cube solved
+                }
                 foreach (var m in moves)                   // apply immediately: batch = no animation
-                    RubikCube.Turn(m);
-                if (RubikCube.IterationsCount >= BATCH_CAP) { hung = true; return BATCH_CAP; }
+                    rubikCube.Turn(m);
+                int scrNow = 0;                             // RESULTING scrambled (AFTER the move) -- consistent with Score
+                foreach (var c in rubikCube.ActiveCluster) if (c.State != 0) scrNow++;
+                double nowMs = rubikCube.ComputeTime.Elapsed.TotalMilliseconds;
+                double stepMs = nowMs - prevMs; prevMs = nowMs;   // compute time of THIS step alone
+                traj.Add($"{rubikCube.IterationsCount}\t{scrNow}\t{TRubikGenome.DescribeStructure(rubikCube.Best.Structure, TAffine.N)}\t{rubikCube.Best.Fitness:F4}\t{rubikCube.Score:F4}\t{moves.Count}\t{stepMs:F1}");
+                if (rubikCube.IterationsCount >= BATCH_CAP) { hung = true; computeMs = rubikCube.ComputeTime.Elapsed.TotalMilliseconds; return BATCH_CAP; }
             }
         }
 
@@ -722,13 +750,13 @@ namespace RubikCube
             if (RubikCube == null || RubikCube.Cubies == null) return;
             if (RubikCube.ActiveCubie == null)
             {
-                ClusterLbl.Text = $"Cluster - / {RubikCube.ClustersCount}";
+                ClusterLbl.Text = $"Cluster - / {TRubikCube.Clusters.Count}";
                 SolvedLbl.Text = "Solved - / -";
                 StructureBox.Text = "Struct -";
                 return;
             }
             int solved = RubikCube.ActiveCluster.Count - RubikCube.Scrambled;
-            ClusterLbl.Text = $"Cluster {RubikCube.ActiveCubie.ClusterIndex} / {RubikCube.ClustersCount}";
+            ClusterLbl.Text = $"Cluster {RubikCube.ActiveCubie.ClusterIndex} / {TRubikCube.Clusters.Count}";
             SolvedLbl.Text = $"Solved {solved} / {RubikCube.ActiveCluster.Count}";
             // Coherence decomposition of the residual, as the METRIC sees it ("4+2", "2+1+1") - reported by the
             // evaluator itself, so it can never drift from the metric the way an eyeball reading does.

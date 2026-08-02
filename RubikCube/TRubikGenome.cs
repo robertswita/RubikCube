@@ -14,6 +14,7 @@ namespace RubikCube
         public int StopPos;
         public int BestMovesCount;
         public uint Structure;                  // packed coherence piece histogram; 0 = not decomposed
+        public uint Ladder;                     // integer structure value the coherence accept compares -- computed on the GPU (see Setup: Ladder)
         //public static List<int> FreeMoves;
         public static TRubikCube RubikCube;
         public static List<List<int>> RevSeqs;
@@ -26,6 +27,7 @@ namespace RubikCube
             for (int i = 0; i < BestMovesCount; i++)
                 Genes[i] = buffer[i + 2];
             Structure = (uint)buffer[GenesLength + 2];   // appended after Moves[] - see struct Specimen
+            Ladder = (uint)buffer[GenesLength + 3];      // and the ladder value after it
         }
 
         // Decodes the packed coherence histogram into a readable label, biggest pieces first: "4+2", "2+1+1".
@@ -54,6 +56,10 @@ namespace RubikCube
             return 0;
         }
 
+        // ACCEPT metric for the COHERENCE phase = the integer ladder value, now computed on the GPU and read from
+        // Specimen.Ladder (TRubikGenome.Ladder / Gpu.LastScoreLadder). Kept there as the SINGLE source of truth so a
+        // metric change in EvaluateMicro needs no matching C# edit. (Was LadderValue(packed, n) re-deriving P2 + n*S.)
+
         //public TRubikGenome(): base()
         //{
         //    Correct();
@@ -70,7 +76,7 @@ namespace RubikCube
         }
         public override void MutateGene(int idx)
         {
-            Genes[idx] = RubikCube.FreeMoves[Rnd.Next(RubikCube.FreeMoves.Count)];
+            Genes[idx] = RubikCube.ClusterMoves[Rnd.Next(RubikCube.ClusterMoves.Count)];
             //if (idx == GenesLength - 1)
             //{
             //    //Check();

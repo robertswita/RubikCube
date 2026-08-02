@@ -19,13 +19,17 @@ namespace RubikCube
         public TCubie[] Cubies;
         public TCubie ActiveCubie;
         public List<TCubie> SolvedCubies = new List<TCubie>();
+        public List<TCubie> SolvedInSlices = new List<TCubie>();   // Solved cubies the active cluster's moves can TOUCH (>=1 coord in validSlices) -- the only ones the GPU break-check must replay. Computed once per cluster in NextCluster.
         public static List<int> EulerOrder;
         public static bool IsEulerOrderReversed;
         public float Score;
+        uint ScoreLadder;   // ladder value of the currently ACCEPTED config -- the coherence accept baseline (GPU-computed)
         public int Scrambled;
         public TRubikGenome Best;
         public int IterationsCount;
         int Stall;
+        public static List<TCluster> Clusters = new List<TCluster>();
+        public static int MaxClusterSize = 12;
 
         //sbyte[] Transforms;
         //public int[,] StateGrid2
@@ -108,21 +112,31 @@ namespace RubikCube
         // remap - so the solve order is unchanged.
         private void RenumberClusters()
         {
+            Clusters.Clear();
             var byOrbit = new List<TCubie>(Cubies);
             byOrbit.Sort((a, b) => a.ClusterIndex.CompareTo(b.ClusterIndex));
             int rank = 0, prevOrbit = int.MinValue;
+            TCluster cluster = null;
             foreach (var cubie in byOrbit)
             {
                 int orbit = cubie.ClusterIndex;                  // still the orbit index (not yet remapped)
-                if (orbit != prevOrbit) { rank++; prevOrbit = orbit; }   // 1, 2, 3, ...
+                if (orbit != prevOrbit) 
+                { 
+                    rank++;
+                    cluster = new TCluster();
+                    Clusters.Add(cluster);
+                    prevOrbit = orbit; 
+                }
                 cubie.ClusterIndex = rank;
+                cluster.Size++;
             }
-            ClustersCount = rank;
+            //ClustersCount = rank;
+            MaxClusterSize = Clusters.Max(c => c.Size);
         }
 
         public TRubikCube(TRubikCube src)
         {
-            ClustersCount = src.ClustersCount;
+            //ClustersCount = src.ClustersCount;
             Cubies = new TCubie[src.Cubies.Length];
             for (int pos = 0; pos < Cubies.Length; pos++)
             {
@@ -426,153 +440,71 @@ namespace RubikCube
             return 100 * score;
         }
 
-        public List<int> GetAllMoves()
+        public List<int> GetClusterMoves()
         {
-            var freeGenes = new List<int>();
             var pos = ActiveCubie.Position;
-            for (int axis = 0; axis < TAffine.N; axis++)
-                for (int coord = 0; coord < TAffine.N; coord++)
-                    for (int side = 0; side < 2; side++)
-                        for (int plane = 0; plane < TAffine.Planes.Length; plane++)
-                        {
-                            var move = new TMove();
-                            move.Plane = plane;
-                            var planeAxes = move.GetPlaneAxes();
-                            if (planeAxes[0] == axis || planeAxes[1] == axis)
-                                continue;
-                            move.Axis = axis;
-                            if (side == 0)
-                                move.Slice = pos[coord];
-                            else
-                                move.Slice = Size - 1 - pos[coord];
-                            var gene = move.Encode();
-                            if (freeGenes.IndexOf(gene) < 0)
-                            {
-                                freeGenes.Add(gene + 1);   // 90
-                                freeGenes.Add(gene + 2);   // 180
-                                freeGenes.Add(gene + 3);   // 270  (angle 0 = identity, excluded)
-                            }
-                        }
-            return freeGenes;
-        }
 
-        List<int> freeMoves;
-        public List<int> FreeMoves => freeMoves ??= GetFreeMoves();
-        void RebuildFreeMoves() => freeMoves = null;
-
-        List<int> GetFreeMoves()
-        {
-            var freeGenes = new List<int>();
-            var pos = ActiveCubie.Position;
-            for (int axis = 0; axis < TAffine.N; axis++)
-                for (int coord = 0; coord < TAffine.N; coord++)
-                    for (int side = 0; side < 2; side++)
-                        for (int plane = 0; plane < TAffine.Planes.Length; plane++)
-                        //for (int plane = 0; plane < TAffine.N - 1; plane++)
-                        {
-                            var move = new TMove();
-                            move.Plane = plane;
-                            var planeAxes = move.GetPlaneAxes();
-                            if (planeAxes[0] == axis || planeAxes[1] == axis)
-                                continue;
-                            //if (planeAxes[0] != 0 && planeAxes[1] != 0)
-                            //    continue;
-                            move.Axis = axis;
-                            if (side == 0)
-                                move.Slice = pos[coord];
-                            else
-                                move.Slice = Size - 1 - pos[coord];
-                            var gene = move.Encode();
-                            if (freeGenes.IndexOf(gene) < 0)
-                            {
-                                freeGenes.Add(gene + 1);   // 90
-                                freeGenes.Add(gene + 2);   // 180
-                                freeGenes.Add(gene + 3);   // 270  (angle 0 = identity, excluded)
-                            }
-                        }
-            return freeGenes;
-        }
-
-        public List<int> GetFreeMoves2()
-        {
-            var freeGenes = new List<int>();
-            foreach (var cubie in ActiveCluster)
+            // slice'y dotykane przez KT�RYKOLWIEK kubik aktywnego klastra: klaster to orbita
+            // (permutacje osi + odbicia) aktywnego kubika, wi�c jego warto�ci wsp�rz�dnych + lustra
+            // daj� ca�y zakres slice'�w klastra.
+            // Podw�jny zapis do tej samej kom�rki jest bezpieczny (m.in. �rodek przy nieparzystym SIZE).
+            var validSlices = new bool[Size];
+            for (int coord = 0; coord < TAffine.N; coord++)
             {
-                if (cubie.State != 0)
-                {
-                    //for (int i = 0; i < TAffine.Planes.Length; i++)
-                    //{
-                    //var angle = cubie.State >> 2 * i & 3;
-                    //if (angle > 0)
-                    //{
-                    //for (int coord = 0; coord < TAffine.N; coord++)
-                    for (int j = 0; j < TAffine.Planes.Length; j++)
-                        //for (int side = 0; side < 2; side++)
-                        for (int axis = 0; axis < TAffine.N; axis++)
-                        {
-                            var move = new TMove();
-                            move.Plane = j;
-                            var planes = move.GetPlaneAxes();
-                            if (axis == planes[0] || axis == planes[1])
-                                continue;
-                            move.Axis = axis;
-                            var pos = (int)Math.Round(cubie.Transform.Origin[axis] + TRubikCube.C);
-                            //if (side == 0)
-                            move.Slice = pos;
-                            //else
-                            //    move.Slice = Size - 1 - pos;
-                            //move.Angle = 3 - angle;
-                            var gene = move.Encode();
-                            if (freeGenes.IndexOf(gene) < 0)
-                            {
-                                //freeGenes.Add(gene);
-                                //if (move.Angle != 1)
-                                //{
-                                //    move.Angle = 2 - move.Angle;
-                                //    freeGenes.Add(move.Encode());
-                                //}
-                                freeGenes.Add(gene + 1);   // 90
-                                freeGenes.Add(gene + 2);   // 180
-                                freeGenes.Add(gene + 3);   // 270  (angle 0 = identity, excluded)
-                            }
-                        }
-                }
-
-                //}
-                //var pos = ActiveCubie.Position;
-                //for (int axis = 0; axis < TAffine.N; axis++)
-                //    for (int coord = 0; coord < TAffine.N; coord++)
-                //        for (int side = 0; side < 2; side++)
-                //            for (int plane = 0; plane < TAffine.Planes.Length; plane++)
-                //            //for (int plane = 0; plane < TAffine.N - 1; plane++)
-                //            {
-                //                var move = new TMove();
-                //                move.Plane = plane;
-                //                var planeAxes = move.GetPlaneAxes();
-                //                if (planeAxes[0] == axis || planeAxes[1] == axis)
-                //                    continue;
-                //                move.Axis = axis;
-                //                if (side == 0)
-                //                    move.Slice = pos[coord];
-                //                else
-                //                    move.Slice = Size - 1 - pos[coord];
-                //                var gene = move.Encode();
-                //                if (freeGenes.IndexOf(gene) < 0)
-                //                {
-                //                    freeGenes.Add(gene + 0);
-                //                    freeGenes.Add(gene + 1);
-                //                    freeGenes.Add(gene + 2);
-                //                }
-                //            }
-                //}
+                validSlices[pos[coord]] = true;
+                validSlices[Size - 1 - pos[coord]] = true;
             }
-            return freeGenes;
+            var clusterMoves = new List<int>();
+            var move = new TMove();
+            for (move.Slice = 0; move.Slice < Size; move.Slice++)
+            {
+                if (!validSlices[move.Slice]) continue;
+                for (move.Plane = 0; move.Plane < TAffine.Planes.Length; move.Plane++)
+                {
+                    var planeAxes = TAffine.Planes[move.Plane];
+                    for (move.Axis = 0; move.Axis < TAffine.N; move.Axis++)
+                    {
+                        if (move.Axis == planeAxes[0] || move.Axis == planeAxes[1]) continue;
+                        for (move.Angle = 1; move.Angle < 4; move.Angle++)
+                            clusterMoves.Add(move.Encode());
+                    }
+                }
+            }
+            return clusterMoves;
+        }
+
+        List<int> clusterMoves;
+        public List<int> ClusterMoves => clusterMoves ??= GetClusterMoves();
+        void RebuildClusterMoves() => clusterMoves = null;
+
+        // The Solved cubies that the active cluster's free moves can actually TOUCH: those with >=1 coord in
+        // validSlices (the cluster's coord values + mirrors = exactly the layers ClusterMoves turns; validSlices is
+        // orbit-invariant, so the active cubie's current position gives the same set as its home). A solved cubie
+        // outside every valid slice is never in a turned layer -> can never break, so the GPU break-check may SKIP it.
+        // Safe because ALL genes stay within validSlices: Init draws FreeMoves, crossover recombines, and seed moves
+        // have Slice = a cluster cubie's coord (always in validSlices). Computed ONCE per cluster (in NextCluster).
+        void ComputeSolvedInSlices()
+        {
+            var pos = ActiveCubie.Position;
+            var validSlices = new bool[Size];
+            for (int coord = 0; coord < TAffine.N; coord++)
+            {
+                validSlices[pos[coord]] = true;
+                validSlices[Size - 1 - pos[coord]] = true;
+            }
+            SolvedInSlices = new List<TCubie>();
+            foreach (var s in SolvedCubies)
+            {
+                var sp = s.Position;
+                for (int coord = 0; coord < TAffine.N; coord++)
+                    if (validSlices[sp[coord]]) { SolvedInSlices.Add(s); break; }
+            }
         }
 
 
         // Number of distinct clusters. After RenumberClusters, cubie ClusterIndex runs 1..ClustersCount in
         // solve order. Set once during cube construction; used for the UI "Cluster k / K" label.
-        public int ClustersCount;
+       // public int ClustersCount;
 
         private List<TCubie> activeCluster;
         public List<TCubie> ActiveCluster
@@ -591,11 +523,17 @@ namespace RubikCube
             }
         }
 
+        // Accumulated GA COMPUTE time (GPU work + orchestration) across all GetNextMoves steps of the current
+        // solve -- the piece the generation count hides: coherence-on steps cost far more than count-peel steps.
+        // Reset per solve; read by the form for display and by the batch for per-run timing.
+        public readonly System.Diagnostics.Stopwatch ComputeTime = new System.Diagnostics.Stopwatch();
+
         public void Reset()
         {
             IterationsCount = 0;
             Score = 0;
             ActiveCubie = null;
+            ComputeTime.Reset();
         }
 
         // ONE GA decision step -- Runs in BOTH phases
@@ -608,12 +546,14 @@ namespace RubikCube
         // Returns the accepted moves (empty if none, or if the whole cube is solved -> Best == null).
         public List<TMove> GetNextMoves()
         {
+            ComputeTime.Start();                       // accumulate GA compute time (paired Stop before EVERY return)
             var moves = new List<TMove>();
             if (Score == 0)                            // current cluster solved -> advance
                 NextCluster();
             if (ActiveCubie == null) // whole cube solved
             {
                 Best = null;
+                ComputeTime.Stop();
                 return moves;
             }
             Scrambled = 0;
@@ -627,10 +567,18 @@ namespace RubikCube
             // switch metrics (count -> factor), so RubikCube.Score (the accept-test reference) is re-measured once,
             // at the flip. Reset to descent (coherence OFF, floor 4) per cluster in Solve(). Called after the moves
             // are applied, when the cube IS the state just reached.
-            if (Gpu.Coherent == 0 && Scrambled <= Gpu.Floor)     // reached the floor -> latch the endgame ONCE
+            // COHERENCE LATCH by TWO conditions, Floor gating BOTH (single knob): coherence is the ENDGAME escape hatch,
+            // engaged only when (1) the residual is SMALL -- Scrambled < Floor, so its decomposition is cheap and
+            // meaningful (never invoked on a large scattered residual, where it struggles) AND (2) the peel is STUCK
+            // there -- Stall > Floor, i.e. score has NOT strictly dropped for > Floor runs. Floor is no longer a lone
+            // trigger (that prematurely latched, e.g. the 9th-cluster stall); it now bounds size AND stall together.
+            // Latched once -> stays on for the cluster; the metric switch (count -> ladder) rebases Score here once.
+            if (Gpu.Coherent == 0 && Scrambled < (int)Gpu.Floor && Stall > (int)Gpu.Floor)
             {
                 Gpu.Coherent = 1;
-                Score = Gpu.ScoreCube(this); // metric switched count -> factor: rebase the accept test
+                Score = Gpu.ScoreCube(this);
+                ScoreLadder = Gpu.LastScoreLadder;
+                Stall = 0;
             }
             // advance target: DETERMINISTIC round-robin --  // the next UNSOLVED cubie of the cluster after the
             var cluster = ActiveCluster;           // current one (wrapping). Cluster order is stable
@@ -641,7 +589,7 @@ namespace RubikCube
                 if (cand.State != 0) { ActiveCubie = cand; break; }
             }
             TRubikGenome.RubikCube = this;
-            Best = Gpu.ExecuteGA();
+            var candidate = Gpu.ExecuteGA();   // fresh GA result; Best (the displayed/accepted state) advances ONLY on accept
             // Accept EQUAL fitness too (<=), not only strictly-better: a sideways move on the plateau, but only
             // after a full round-robin pass with no improvement. Safe because the no-op penalty (2*CUBIES_COUNT)
             // makes standing still score ABOVE Score, so Fitness == Score is always a REAL move to a different
@@ -649,21 +597,35 @@ namespace RubikCube
             // target advance, that is exactly "try every cubie once; if none improved, step sideways" -- a
             // principled limit, not the old fixed 20 (STALL_LIMIT define is no longer read here).
             Stall++;
-            if (Best.Fitness < Score
-                || (Best.Fitness == Score && Stall >= ActiveCluster.Count))
+            // Accept: DESCENT compares the (fine) fitness; COHERENCE compares the STRUCTURE ladder value so
+            // structurally-equal configs tie (sideways fire). The extra Best.Fitness < 1 gate rejects any move that
+            // breaks a Solved cluster: the fitness is normalised to < 1, so Fitness >= 1 means solved_errors >= 1
+            // (or a no-op) -- one test kills both, even on a sideways.
+            bool accept = Gpu.Coherent == 0
+                ? candidate.Fitness <= Score
+                : candidate.Fitness < 1f
+                  && candidate.Ladder <= ScoreLadder;   // GPU-computed ladder: structurally-equal configs tie -> sideways fire
+            if (accept)
+            //if (candidate.Fitness <= Score)
             {
-                Stall = 0;
+                Best = candidate;   // ACCEPTED -> the displayed/state Best advances (untouched during Stall, so the label no longer flickers to rejected candidates)
                 Best.Correct();
                 for (int i = 0; i < Best.BestMovesCount; i++)
                     moves.Add(TMove.Decode((int)Best.Genes[i]));
+                if (Best.Fitness < Score) Stall = 0;   // STRICT improvement -> reset (compare BEFORE overwriting Score, which still holds the OLD value); a sideways (== Score) keeps Stall growing toward the latch
                 Score = Best.Fitness;
+                if (Gpu.Coherent != 0) ScoreLadder = Best.Ladder;   // advance the coherence accept baseline
             }
-            IterationsCount += Gpu.GenerationsCount;
+            else if (Best == null) Best = candidate;   // first run before any accept: keep Best non-null (null == "whole cube solved" to Form1)
+            IterationsCount += Gpu.GenerationNo;
+            ComputeTime.Stop();
             return moves;
         }
+
         public void NextCluster()
         {
             Gpu.Coherent = 0;    // new cluster -> descent
+            Stall = 0;           // fresh stall counter -> the new cluster's peel starts un-stalled (latch is per-cluster)
             if (ActiveCubie != null)
                 SolvedCubies.AddRange(ActiveCluster);
             ActiveCubie = null;
@@ -682,7 +644,8 @@ namespace RubikCube
                 SolvedCubies.Clear();
             else
             {
-                RebuildFreeMoves();
+                RebuildClusterMoves();
+                ComputeSolvedInSlices();   // bound the break-check to the Solved cubies these moves can touch (once per cluster)
                 GetSolveSeq();
                 Score = Gpu.ScoreCube(this);
             }

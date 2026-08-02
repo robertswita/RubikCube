@@ -8,6 +8,10 @@ struct Specimen {
     // the best step. 5 bits per bucket, bucket b = pieces with agreeAxes = b+1, i.e. of size 2^(N-1-b); counts
     // clamped at 31. 0 = not decomposed (no coherence / above the gateway). Host decodes it into "4+2" etc.
     uint Structure;
+    // The INTEGER structure value the coherence accept compares -- the metric's integer term (currently
+    // 2*(P2+N*S)) at the best step. The host reads THIS instead of re-deriving it, so changing the metric
+    // lives entirely in EvaluateMicro (one line) and never needs a matching edit on the C# side.
+    uint Ladder;
 };
 
 struct Move
@@ -141,6 +145,14 @@ uint curCoord(uint M, uint cubieID, uint axis) {
     return (sign == 1) ? start : (SIZE - 1u) - start;
 }
 
+// BINARY SIDE of a coordinate within its reflection pair {v, SIZE-1-v}: 0 for the low half, 1 for the high.
+// A layer rotation maps v <-> SIZE-1-v, so within a cluster each axis is effectively BINARY (a +/- pair) and the
+// cluster is "2^N cubies on a larger orbit". The coherence decomposition works in this SIDE-space, so it stays
+// 2-based (ladder + gateway binary) for ANY SIZE. SIZE=2 -> identity (0->0, 1->1).
+uint coordSide(uint M, uint cubieID, uint axis) {
+    return (2u * curCoord(M, cubieID, axis) >= uint(SIZE)) ? 1u : 0u;
+}
+
 uint TurnSingleCubie(uint cubieMatrix, uint cubieID, Move move) {
     uint col;
     int sign;
@@ -185,6 +197,23 @@ uint activeAxes(uint M) {
 // search minimises the number of moves first, then the orientation distance within that.
 uint cubieState(uint M) {
     return activeAxes(M) * (uint(MAX_CUBIE_L1) + 1u) + cubieL1(M);
+}
+
+// SOLVED break-check by REPLAY (unified-evaluator direction): a Solved cubie is "broken" if the specimen's first
+// prefixLen moves do NOT compose to identity on it. Replay those moves on ONE cubie -- start from its GA-start state
+// Cubies[id] (identity for a Solved cubie), apply TurnSingleCubie step by step -- with O(1) storage, so we never need
+// all Solved states in registers at once. This is what lets the evaluator hold ONLY the active cluster instead of the
+// whole cube. Returns the count of broken Solved cubies (>=1 -> the move breaks a solved cluster -> host rejects).
+uint solvedBrokenCount(uint specimenID, uint prefixLen) {
+    uint broken = 0u;
+    for (uint i = 0u; i < countSolved; i++) {
+        uint id = SolvedCubies[i];
+        uint mat = Cubies[id];
+        for (uint m = 0u; m < prefixLen; m++)
+            mat = TurnSingleCubie(mat, id, getMove(Population[specimenID].Moves[m]));
+        if (cubieL1(mat) != 0u) broken++;
+    }
+    return broken;
 }
 
 float GetActiveCubieError(uint cubieMatrix, float maxClusterState, float max_fA) {

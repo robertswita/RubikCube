@@ -271,6 +271,25 @@ namespace TGL
             return m;
         }
 
+        // Inverse of OrthoPack: rebuilds the orientation block M (a signed permutation) from its packed form. Row r
+        // holds its nonzero column (bitsForCol bits) + sign (1 bit) at offset r*bitsPerRow; zero the row and drop the
+        // single +-1. Origin/translation is NOT touched (OrthoPack never captured it). Decode mirrors getRow in
+        // Setup.glsl.c, so OrthoPack() == p after OrthoUnpack(p) for every valid p.
+        public void OrthoUnpack(uint packed)
+        {
+            int bitsForCol = TAffine.N <= 4 ? 2 : 3;
+            int bitsPerRow = bitsForCol + 1;
+            uint colMask = (1u << bitsForCol) - 1u;
+            for (int row = 0; row < TAffine.N; row++)
+            {
+                uint rowData = (packed >> (row * bitsPerRow)) & ((1u << bitsPerRow) - 1u);
+                int nzCol = (int)(rowData & colMask);
+                int sign = ((rowData >> bitsForCol) & 1u) == 1u ? -1 : 1;
+                for (int col = 0; col < TAffine.N; col++) M[row, col] = 0f;
+                M[row, nzCol] = sign;
+            }
+        }
+
 
         //public List<TVector> GetReversedEulerAngles()
         //{

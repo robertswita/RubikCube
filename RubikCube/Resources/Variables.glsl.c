@@ -3,6 +3,9 @@
 #define SIZE 3
 // Cubies Count = Size^N
 #define CUBIES_COUNT 27
+// Largest position-orbit (cluster) of THIS cube -- host-injected max over ClusterIndex groups (TRubikCube.MaxClusterSize).
+// SIZE-independent bound (<= N!*2^(N-1)); sizes the coherence scratch (scr/grp/stateDone) instead of the whole-cube CUBIES_COUNT.
+#define MAX_CLUSTER 12
 #define PLANES_COUNT (N*(N-1)/2)
 #define GENERATIONS_COUNT 50
 #define GENES_COUNT 32
@@ -75,7 +78,7 @@
 #define TWIN    0.714    // k+k lepsze  (partner nagradzany)   = 1/1.4
 //#define PAIR EQUAL
 //#define SSIGN -1
-#define MEASURE NP+S
+#define MEASURE P2+NS
 
 // Max number of scene lights the render fragment shader can consume (sizes the Lights UBO array).
 // The host uploads only the enabled lights (up to this cap) and their actual count in the header.
