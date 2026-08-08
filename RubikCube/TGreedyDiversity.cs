@@ -394,8 +394,7 @@ namespace RubikCube
                 var seq = parent[pk];
                 var cube = new TRubikCube();
                 foreach (var code in seq) cube.Turn(TMove.Decode(code));
-                cube.ActiveCubie = cube.Cubies[targetSlot];
-                foreach (var code in cube.GetClusterMoves())
+                foreach (var code in cube.GetClusterMoves(cube.Cubies[targetSlot]))
                 {
                     var cube2 = new TRubikCube();
                     foreach (var c in seq) cube2.Turn(TMove.Decode(c));

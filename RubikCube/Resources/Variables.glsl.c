@@ -1,6 +1,8 @@
 ﻿#define uint unsigned int
 #define N 3
 #define SIZE 3
+#define BITSIZE 2
+#define BITSIZE_MASK ((1u << BITSIZE) - 1u)
 // Cubies Count = Size^N
 #define CUBIES_COUNT 27
 // Largest position-orbit (cluster) of THIS cube -- host-injected max over ClusterIndex groups (TRubikCube.MaxClusterSize).
@@ -9,7 +11,7 @@
 #define PLANES_COUNT (N*(N-1)/2)
 #define GENERATIONS_COUNT 50
 #define GENES_COUNT 32
-#define POPULATION_COUNT 1024
+#define POPULATION_COUNT 2048
 #define WINNERS_RATIO 10
 // Percentage of children rebuilt by macro-mutation (fresh seed + conjugate) in SelCrossover.
 // The only mutation operator - single-gene random mutation was removed.
@@ -20,7 +22,7 @@
 // the active cubie has - often far fewer than the target (e.g. <= 3 for N=3, where the collateral
 // axis is forced), so most of the population starts random and the real seeding pressure comes from
 // macro-mutation, not Init.
-#define SEED_RATIO 100
+#define SEED_RATIO 0
 
 // A/B switch for the host seed generator (read by BuildSeedMoves, not the shader): 1 = mixed-Givens modes
 // (draw a random mode per seed -> macro-moves on deep cubies), 0 = baseline (mode 0 only -> standard minimal
@@ -49,13 +51,23 @@
 
 // Row packing of the orientation matrix (N in range [3, 8]): bits for the column index + 1 sign bit.
 // Equivalent to findMSB(N-1)+1, but as a compile-time constant (findMSB is not a constant expression).
-#define BITS_FOR_COL (N <= 4 ? 2 : 3)
-#define BITS_PER_ROW (BITS_FOR_COL + 1)
+#define BITS_PER_ROW (N <= 4 ? 3 : 4)
+#define BITS_PER_ROW_MASK ((1u << BITS_PER_ROW) - 1u)
+#define IDENTITY ( \
+    ((7u << (7 * BITS_PER_ROW)) | \
+    (6u << (6 * BITS_PER_ROW)) | \
+    (5u << (5 * BITS_PER_ROW)) | \
+    (4u << (4 * BITS_PER_ROW)) | \
+    (3u << (3 * BITS_PER_ROW)) | \
+    (2u << (2 * BITS_PER_ROW)) | \
+    (1u << (1 * BITS_PER_ROW)) | \
+    (0u << (0 * BITS_PER_ROW))) << 1u   \
+)
 
 // Rigorous upper bound on the per-cubie L1 distance.
 // This exceeds the achievable maximum, so each active-cluster
 // magnitude term stays strictly below 1.
-#define MAX_CUBIE_L1 (N * ((1 << BITS_FOR_COL) + N - 1))
+#define MAX_CUBIE_L1 (N * (1 << BITS_PER_ROW))
 
 // Per-cubie penalty = moves-to-solve (active axes, dominant) * (MAX_CUBIE_L1 + 1) + L1 (tiebreak).
 // Rigorous upper bound: m <= N active axes, L1 <= MAX_CUBIE_L1; still exceeds the achievable maximum,
@@ -78,7 +90,7 @@
 #define TWIN    0.714    // k+k lepsze  (partner nagradzany)   = 1/1.4
 //#define PAIR EQUAL
 //#define SSIGN -1
-#define MEASURE P2+NS
+#define MEASURE P2+NS_REF
 
 // Max number of scene lights the render fragment shader can consume (sizes the Lights UBO array).
 // The host uploads only the enabled lights (up to this cap) and their actual count in the header.

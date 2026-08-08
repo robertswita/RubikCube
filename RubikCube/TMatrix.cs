@@ -8,12 +8,80 @@ using System.Runtime.InteropServices;
 namespace TGL
 {
     // Klasa macierzy w zapisie kolumnowym
+    public sealed class TDims
+    {
+        private readonly int[] _dims;
+        private readonly int[] _strides;
+        private readonly int[] _bitWidths;
+        private readonly int[] _bitShifts;
+
+        public int Rank => _dims.Length;
+        public int TotalLinearSize { get; }
+        public int TotalBitSize { get; } // rozmiar "logiczny" z paddingiem do potęgi 2
+
+        public TDims(params int[] dims)
+        {
+            _dims = (int[])dims.Clone();
+            int n = dims.Length;
+
+            _strides = new int[n];
+            _strides[n - 1] = 1;
+            for (int i = n - 2; i >= 0; i--)
+                _strides[i] = _strides[i + 1] * _dims[i + 1];
+            TotalLinearSize = _strides[0] * _dims[0];
+
+            _bitWidths = new int[n];
+            _bitShifts = new int[n];
+            int bitOffset = 0;
+            for (int i = 0; i < n; i++)
+            {
+                int bits = System.Numerics.BitOperations.Log2((uint)(2 * _dims[i] - 1));
+                _bitWidths[i] = bits;
+                _bitShifts[i] = bitOffset;
+                bitOffset += bits;
+            }
+            TotalBitSize = 1 << bitOffset;
+        }
+
+        public int CoordsToLinear(ReadOnlySpan<int> coords)
+        {
+            int idx = 0;
+            for (int i = 0; i < Rank; i++) idx += coords[i] * _strides[i];
+            return idx;
+        }
+
+        public int[] LinearToCoords(int idx)
+        {
+            var c = new int[Rank];
+            for (int i = 0; i < Rank; i++) { c[i] = idx / _strides[i]; idx %= _strides[i]; }
+            return c;
+        }
+
+        public int CoordsToBitIndex(ReadOnlySpan<int> coords)
+        {
+            int idx = 0;
+            for (int i = 0; i < Rank; i++) idx |= coords[i] << _bitShifts[i];
+            return idx;
+        }
+
+        public int[] BitIndexToCoords(int idx)
+        {
+            var c = new int[Rank];
+            for (int i = 0; i < Rank; i++)
+                c[i] = (idx >> _bitShifts[i]) & ((1 << _bitWidths[i]) - 1);
+            return c;
+        }
+
+        //public int GetDim(int axis) => _dims[axis];
+        public int this[int axis] => _dims[axis];
+    }
     public class TMatrix : TVector
     {
         public int ColsCount;
         public int RowsCount;
         public TCols Cols;
-        public int[] DimSizes;
+        private readonly TDims _dims;
+        //public int[] DimSizes;
         public class TCols
         {
             public TMatrix M;
@@ -43,36 +111,50 @@ namespace TGL
                 Array.Resize(ref M.Data, M.RowsCount * M.ColsCount);
             }
         }
-        public TMatrix(int rowsCount, int colsCount) : base(rowsCount * colsCount)
+        //public TMatrix(int rowsCount, int colsCount) : base(rowsCount * colsCount)
+        //{
+        //    Cols = new TCols();
+        //    Cols.M = this;
+        //    RowsCount = rowsCount;
+        //    ColsCount = colsCount;
+        //    DimSizes = new int[] { RowsCount, ColsCount };
+        //}
+
+        public TMatrix(TDims dims) : base(dims.TotalLinearSize)
         {
+            _dims = dims;
             Cols = new TCols();
             Cols.M = this;
-            RowsCount = rowsCount;
-            ColsCount = colsCount;
-            DimSizes = new int[] { RowsCount, ColsCount };
+            RowsCount = _dims[0];
+            ColsCount = _dims[1];
         }
 
-        public int Coords2Index(int[] coords)
-        {
-            var index = coords[0];
-            for (int i = 1; i < coords.Length; i++)
-                index = index * DimSizes[i] + coords[i];
-            return index;
-        }
+        public TMatrix(params int[] dims) : this(new TDims(dims)) { }
 
-        public TVector Index2Coords(int index)
-        {
-            var stride = Size;
-            var coords = new TVector(DimSizes.Length);
-            for (int i = 0; i < coords.Size; i++)
-            {
-                stride /= DimSizes[i];
-                var coord = index / stride;
-                index -= coord * stride;
-                coords[i] = coord;
-            }
-            return coords;
-        }
+        public TDims Dims => _dims;
+
+
+        //public int Coords2Index(int[] coords)
+        //{
+        //    var index = coords[0];
+        //    for (int i = 1; i < coords.Length; i++)
+        //        index = index * DimSizes[i] + coords[i];
+        //    return index;
+        //}
+
+        //public TVector Index2Coords(int index)
+        //{
+        //    var stride = Size;
+        //    var coords = new TVector(DimSizes.Length);
+        //    for (int i = 0; i < coords.Size; i++)
+        //    {
+        //        stride /= DimSizes[i];
+        //        var coord = index / stride;
+        //        index -= coord * stride;
+        //        coords[i] = coord;
+        //    }
+        //    return coords;
+        //}
 
         public override TVector Clone()
         {

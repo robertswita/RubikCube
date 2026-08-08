@@ -12,6 +12,7 @@ struct Specimen {
     // 2*(P2+N*S)) at the best step. The host reads THIS instead of re-deriving it, so changing the metric
     // lives entirely in EvaluateMicro (one line) and never needs a matching edit on the C# side.
     uint Ladder;
+    uint SeedLen;
 };
 
 struct Move
@@ -31,6 +32,12 @@ Move getMove(uint code)
     return Move(axis, slice, plane, angle);
 }
 
+// Inverse move: keep axis/plane/slice, negate the angle in quarter-turns (1<->3, 2 and 0 stay).
+// Matches TMove.GetRevCode. Shared by Init (commutator [S,R]) and SelCrossover (commutator [M,D]).
+uint getRevCode(uint code) {
+    return (code & ~3u) | ((4u - (code & 3u)) & 3u);
+}
+
 // Fast bitwise hash for randomness generation (shared by Init and SelCrossover)
 uint hash(uint x) {
     x = ((x >> 16) ^ x) * 0x45d9f3bu;
@@ -42,23 +49,19 @@ uint hash(uint x) {
 // 2. Central buffer registry
 layout(std430, binding = 0) buffer PopulationBuffer { Specimen Population[]; };
 layout(std430, binding = 1) buffer NewPopulationBuffer { Specimen NewPopulation[]; }; // Crossover output (ping-pong with Population)
-layout(std430, binding = 2) buffer CubiesBuffer { uint Cubies[]; };
+layout(std430, binding = 2) buffer ClusterBuffer { uint ClusterCubies[]; };
 layout(std430, binding = 3) buffer FreeMovesBuffer { uint FreeMoves[]; };
-layout(std430, binding = 4) buffer SolvedBuffer { uint SolvedCubies[]; };
-layout(std430, binding = 5) buffer ActiveBuffer { uint ActiveCubies[]; };
+layout(std430, binding = 4) buffer SolvedPosBuffer { uint SolvedPos[]; };
+layout(std430, binding = 5) buffer ActivePosBuffer { uint ActivePos[]; };
 layout(std140, binding = 6) uniform PlanesBuffer { ivec2 Planes[PLANES_COUNT]; };
 layout(std430, binding = 7) buffer SeedBuffer { uint SeedMoves[]; };   // Init: per-specimen seed sequences
 
 // 3. Uniform location registry
-//layout(location = 0) uniform uint N;
-//layout(location = 1) uniform uint SIZE;
-//layout(location = 2) uniform uint CUBIES_COUNT; // SIZE^N
-//layout(location = 3) uniform uint PLANES_COUNT;
 layout(location = 0) uniform uint TimeSeed;
 // Cluster sizes come from the host, not buffer .length(): a first cluster has an empty SolvedCubies
 // buffer, and .length() on a zero-size SSBO is unreliable across drivers.
 layout(location = 4) uniform uint countSolved;
-layout(location = 5) uniform uint countActive;
+//layout(location = 5) uniform uint countActive;
 layout(location = 2) uniform uint u_Stage;
 layout(location = 3) uniform uint u_PassModStage;
 layout(location = 6) uniform uint numSeeds;   // Init: number of specimens pre-seeded from SeedMoves
@@ -73,64 +76,46 @@ layout(location = 7) uniform uint FLOOR;
 layout(location = 8) uniform uint COHERENT;
 
 
-void getRow(uint M, uint row, out uint outCol, out int outSign)
+uint getRow(uint M, uint rowIdx)
 {
-    uint rowData = (M >> (row * BITS_PER_ROW)) & ((1u << BITS_PER_ROW) - 1u);
-
-    outCol = rowData & ((1u << BITS_FOR_COL) - 1u);
-    outSign = ((rowData >> BITS_FOR_COL) & 1u) == 1u ? -1 : 1;
+    return (M >> (rowIdx * BITS_PER_ROW)) & BITS_PER_ROW_MASK;
 }
 
-uint setRow(uint M, uint row, uint col, int sign)
+void setRow(inout uint M, uint rowIdx, uint row)
 {
-    uint signBit = (sign == -1) ? 1u : 0u;
-    uint rowData = (signBit << BITS_FOR_COL) | (col & ((1u << BITS_FOR_COL) - 1u));
-    uint shift = row * BITS_PER_ROW;
-    uint mask = ((1u << BITS_PER_ROW) - 1u) << shift;
-    return (M & ~mask) | (rowData << shift);
+    uint shift = rowIdx * BITS_PER_ROW;
+    uint mask = BITS_PER_ROW_MASK << shift;
+    M = (M & ~mask) | (row << shift);
 }
 
 void RotateMatInt(inout uint M, uint axis1, uint axis2, uint angleStep)
 {
     // Extract only the two rows we care about, which form the rotation plane
-    uint col1, col2;
-    int sign1, sign2;
-    getRow(M, axis1, col1, sign1);
-    getRow(M, axis2, col2, sign2);
+    uint row1 = getRow(M, axis1);
+    uint row2 = getRow(M, axis2);
 
     // angleStep is the number of quarter-turns: 0 = identity (no rotation), 1/2/3 = 90/180/270.
     if (angleStep == 1)      // 90 degrees left
     {
-        M = setRow(M, axis1, col2, -sign2);
-        M = setRow(M, axis2, col1, sign1);
+        setRow(M, axis1, row2 ^ 1u);
+        setRow(M, axis2, row1);
     }
     else if (angleStep == 2) // 180 degrees
     {
-        M = setRow(M, axis1, col1, -sign1);
-        M = setRow(M, axis2, col2, -sign2);
+        setRow(M, axis1, row1 ^ 1u);
+        setRow(M, axis2, row2 ^ 1u);
     }
     else if (angleStep == 3) // 270 degrees (90 degrees right)
     {
-        M = setRow(M, axis1, col2, sign2);
-        M = setRow(M, axis2, col1, -sign1);
+        setRow(M, axis1, row2);
+        setRow(M, axis2, row1 ^ 1u);
     }
 }
 
 uint getStartCoordinate(uint cubieID, uint col)
 {
-    // Home coordinate along dimension col. The CPU linear index (TMatrix.Coords2Index) is
-    // coords[0]*SIZE^(N-1) + ... + coords[N-1], so axis col has stride SIZE^(N-1-col), i.e. axis 0
-    // is the most significant digit. This keeps the shader's axis numbering identical to the CPU's.
-    uint shift = N - 1u - col;
-    if (SIZE == 2)
-        return (cubieID >> shift) & 1u; // Fast bitwise op for SIZE = 2
-    else
-    {
-        uint divisor = 1u;
-        for (uint i = 0u; i < shift; i++)
-            divisor *= SIZE;
-        return (cubieID / divisor) % SIZE;
-    }
+    uint shift = col * BITSIZE;
+    return (cubieID >> shift) & BITSIZE_MASK;
 }
 
 // Current coordinate of a cubie along a given axis - the layer index a move on that axis addresses.
@@ -138,11 +123,11 @@ uint getStartCoordinate(uint cubieID, uint col)
 // coordinate along that column, flipped when the axis is reflected. Two cubies sharing this value on
 // SOME axis lie in a common layer, so one turn of that layer moves them together.
 uint curCoord(uint M, uint cubieID, uint axis) {
-    uint col;
-    int sign;
-    getRow(M, axis, col, sign);
+    uint rowData = getRow(M, axis);
+    uint col = rowData >> 1u;
+    uint sign = rowData & 1u;
     uint start = getStartCoordinate(cubieID, col);
-    return (sign == 1) ? start : (SIZE - 1u) - start;
+    return (sign == 0u) ? start : (SIZE - 1u) - start;
 }
 
 // BINARY SIDE of a coordinate within its reflection pair {v, SIZE-1-v}: 0 for the low half, 1 for the high.
@@ -154,11 +139,7 @@ uint coordSide(uint M, uint cubieID, uint axis) {
 }
 
 uint TurnSingleCubie(uint cubieMatrix, uint cubieID, Move move) {
-    uint col;
-    int sign;
-    getRow(cubieMatrix, move.Axis, col, sign);
-    uint startLayerIndex = getStartCoordinate(cubieID, col);
-    uint currentLayer = (sign == 1) ? startLayerIndex : (SIZE - 1) - startLayerIndex;
+    uint currentLayer = curCoord(cubieMatrix, cubieID, move.Axis);
     if (currentLayer == move.Slice) {
         uint axis1 = Planes[move.Plane].x;
         uint axis2 = Planes[move.Plane].y;
@@ -167,18 +148,27 @@ uint TurnSingleCubie(uint cubieMatrix, uint cubieID, Move move) {
     return cubieMatrix;
 }
 
-// L1 (Manhattan) distance of a packed orientation matrix from IDENTITY.
-// The identity row r encodes (col = r, sign = +), i.e. field value r; a solved cubie -> 0. The sign
-// is kept on the high bit of the field, so a reflected axis differs by 2^BITS_FOR_COL (>= N),
-// dominating any column displacement (the "largest difference") so distinct orientations do not
-// collide to the same L1.
-uint cubieL1(uint M) {
+// L1 distance between two packed orientation matrices, field by field. matL1(M, IDENTITY) == cubieL1(M).
+// The endgame orientation sub-gradient uses it as "distance from a REFERENCE orientation": the cluster's
+// DOMINANT orientation while building coherence (drive to uniformity = one block = the gateway), then IDENTITY
+// once uniform (collapse the block to solved).
+uint matL1(uint M, uint R) {
     uint dist = 0u;
     for (uint r = 0u; r < uint(N); r++) {
-        uint field = (M >> (r * BITS_PER_ROW)) & ((1u << BITS_PER_ROW) - 1u);
-        dist += (field > r) ? (field - r) : (r - field);
+        uint rowM = getRow(M, r);
+        uint rowR = getRow(R, r);
+        dist += (rowM > rowR) ? (rowM - rowR) : (rowR - rowM);
     }
     return dist;
+}
+
+// L1 (Manhattan) distance of a packed orientation matrix from IDENTITY.
+// In new approach: The sign
+// is kept on the low bit of the field, so a reflected axis differs by 1,
+// (the "lowest difference") so distinct orientations do not
+// collide to the same L1.
+uint cubieL1(uint M) {
+    return matL1(M, IDENTITY);
 }
 
 // Number of axes the orientation does not leave fixed (row r != identity value r). A cubie needs
@@ -186,8 +176,9 @@ uint cubieL1(uint M) {
 uint activeAxes(uint M) {
     uint m = 0u;
     for (uint r = 0u; r < uint(N); r++) {
-        uint field = (M >> (r * BITS_PER_ROW)) & ((1u << BITS_PER_ROW) - 1u);
-        if (field != r) m++;
+        uint rowM = getRow(M, r);
+        uint rowI = getRow(IDENTITY, r);
+        if (rowM != rowI) m++;
     }
     return m;
 }
@@ -197,23 +188,6 @@ uint activeAxes(uint M) {
 // search minimises the number of moves first, then the orientation distance within that.
 uint cubieState(uint M) {
     return activeAxes(M) * (uint(MAX_CUBIE_L1) + 1u) + cubieL1(M);
-}
-
-// SOLVED break-check by REPLAY (unified-evaluator direction): a Solved cubie is "broken" if the specimen's first
-// prefixLen moves do NOT compose to identity on it. Replay those moves on ONE cubie -- start from its GA-start state
-// Cubies[id] (identity for a Solved cubie), apply TurnSingleCubie step by step -- with O(1) storage, so we never need
-// all Solved states in registers at once. This is what lets the evaluator hold ONLY the active cluster instead of the
-// whole cube. Returns the count of broken Solved cubies (>=1 -> the move breaks a solved cluster -> host rejects).
-uint solvedBrokenCount(uint specimenID, uint prefixLen) {
-    uint broken = 0u;
-    for (uint i = 0u; i < countSolved; i++) {
-        uint id = SolvedCubies[i];
-        uint mat = Cubies[id];
-        for (uint m = 0u; m < prefixLen; m++)
-            mat = TurnSingleCubie(mat, id, getMove(Population[specimenID].Moves[m]));
-        if (cubieL1(mat) != 0u) broken++;
-    }
-    return broken;
 }
 
 float GetActiveCubieError(uint cubieMatrix, float maxClusterState, float max_fA) {

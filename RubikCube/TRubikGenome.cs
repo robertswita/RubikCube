@@ -15,6 +15,7 @@ namespace RubikCube
         public int BestMovesCount;
         public uint Structure;                  // packed coherence piece histogram; 0 = not decomposed
         public uint Ladder;                     // integer structure value the coherence accept compares -- computed on the GPU (see Setup: Ladder)
+        public uint SeedLen;
         //public static List<int> FreeMoves;
         public static TRubikCube RubikCube;
         public static List<List<int>> RevSeqs;
@@ -28,6 +29,7 @@ namespace RubikCube
                 Genes[i] = buffer[i + 2];
             Structure = (uint)buffer[GenesLength + 2];   // appended after Moves[] - see struct Specimen
             Ladder = (uint)buffer[GenesLength + 3];      // and the ladder value after it
+            SeedLen = (uint)buffer[GenesLength + 4];
         }
 
         // Decodes the packed coherence histogram into a readable label, biggest pieces first: "4+2", "2+1+1".
@@ -74,6 +76,11 @@ namespace RubikCube
             clone.BestMovesCount = BestMovesCount;
             return clone;
         }
+        // DEAD CPU-GA path (no TGA<TRubikGenome> is ever instantiated -- the solve runs entirely on the GPU via
+        // Gpu.ExecuteGA). These methods read the SEARCH target (ClusterMoves / GetSolveSeq / GetOrder / the cube's
+        // Evaluate + ActiveCluster) which moved to TRubikSolver, so they are #if false'd rather than deleted --
+        // kept as reference while the seed path is under review. Revive by threading a TRubikSolver in.
+#if false
         public override void MutateGene(int idx)
         {
             Genes[idx] = RubikCube.ClusterMoves[Rnd.Next(RubikCube.ClusterMoves.Count)];
@@ -83,6 +90,7 @@ namespace RubikCube
             //    //Mutate();
             //}
         }
+#endif
 
         public void Conjugate()
         {
@@ -405,6 +413,7 @@ namespace RubikCube
 
         public bool FromPredict;
         public List<TMove> PredictSeq;
+#if false   // DEAD CPU evaluator (uses the cube's Evaluate + ActiveCluster, both retired). See the note on MutateGene.
         public override float Evaluate()
         {
             //var seq = RubikCube.ReverseSeq;
@@ -527,6 +536,7 @@ namespace RubikCube
             }
             return Fitness;
         }
+#endif
 
         public static List<TRubikGenome> SelectRank(List<TRubikGenome> population, int count)
         {
@@ -554,6 +564,7 @@ namespace RubikCube
             return sel;
         }
 
+#if false   // DEAD CPU seeder (uses GetOrder / GetSolveSeq, both moved to TRubikSolver). See the note on MutateGene.
         public static void Genesis(List<TRubikGenome> population, int count)
         {
             RevSeqs = new List<List<int>>();
@@ -589,6 +600,7 @@ namespace RubikCube
                 population.Add(specimen);
             }
         }
+#endif
 
 #if !MAUI
         public static void Evaluate(List<TRubikGenome> population)

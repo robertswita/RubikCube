@@ -31,6 +31,7 @@ namespace TGL
                     }
             }
         }
+        public static int BitsPerRow => N <= 4 ? 3 : 4;
         public TMatrix M = new TMatrix(N, N);
         public TVector Origin = new TVector(N);
         public TAffine() { M.LoadIdentity(); }
@@ -254,10 +255,25 @@ namespace TGL
       return angles;
         }
 
+        //public uint OrthoPack2()
+        //{
+        //    int bitsForCol = TAffine.N <= 4 ? 2 : 3;
+        //    int bitsPerRow = bitsForCol + 1;
+        //    uint m = 0;
+        //    for (int row = 0; row < TAffine.N; row++)
+        //    {
+        //        int nzCol = 0;
+        //        float nz = 0;
+        //        for (int col = 0; col < TAffine.N; col++)
+        //            if (Math.Abs(M[row, col]) > Math.Abs(nz)) { nz = M[row, col]; nzCol = col; }
+        //        uint sign = nz < 0 ? 1u : 0u;
+        //        m |= ((sign << bitsForCol) | (uint)nzCol) << (row * bitsPerRow);
+        //    }
+        //    return m;
+        //}
+
         public uint OrthoPack()
         {
-            int bitsForCol = TAffine.N <= 4 ? 2 : 3;
-            int bitsPerRow = bitsForCol + 1;
             uint m = 0;
             for (int row = 0; row < TAffine.N; row++)
             {
@@ -266,7 +282,8 @@ namespace TGL
                 for (int col = 0; col < TAffine.N; col++)
                     if (Math.Abs(M[row, col]) > Math.Abs(nz)) { nz = M[row, col]; nzCol = col; }
                 uint sign = nz < 0 ? 1u : 0u;
-                m |= ((sign << bitsForCol) | (uint)nzCol) << (row * bitsPerRow);
+                uint rowData = sign | ((uint)nzCol << 1);
+                m |= rowData << (row * BitsPerRow);
             }
             return m;
         }
@@ -275,21 +292,33 @@ namespace TGL
         // holds its nonzero column (bitsForCol bits) + sign (1 bit) at offset r*bitsPerRow; zero the row and drop the
         // single +-1. Origin/translation is NOT touched (OrthoPack never captured it). Decode mirrors getRow in
         // Setup.glsl.c, so OrthoPack() == p after OrthoUnpack(p) for every valid p.
+        //public void OrthoUnpack(uint packed)
+        //{
+        //    int bitsForCol = TAffine.N <= 4 ? 2 : 3;
+        //    int bitsPerRow = bitsForCol + 1;
+        //    uint colMask = (1u << bitsForCol) - 1u;
+        //    for (int row = 0; row < TAffine.N; row++)
+        //    {
+        //        uint rowData = (packed >> (row * bitsPerRow)) & ((1u << bitsPerRow) - 1u);
+        //        int nzCol = (int)(rowData & colMask);
+        //        int sign = ((rowData >> bitsForCol) & 1u) == 1u ? -1 : 1;
+        //        for (int col = 0; col < TAffine.N; col++) M[row, col] = 0f;
+        //        M[row, nzCol] = sign;
+        //    }
+        //}
         public void OrthoUnpack(uint packed)
         {
-            int bitsForCol = TAffine.N <= 4 ? 2 : 3;
-            int bitsPerRow = bitsForCol + 1;
-            uint colMask = (1u << bitsForCol) - 1u;
+            int bitsPerRow = TAffine.BitsPerRow;
+            uint rowMask = (1u << bitsPerRow) - 1u;
             for (int row = 0; row < TAffine.N; row++)
             {
-                uint rowData = (packed >> (row * bitsPerRow)) & ((1u << bitsPerRow) - 1u);
-                int nzCol = (int)(rowData & colMask);
-                int sign = ((rowData >> bitsForCol) & 1u) == 1u ? -1 : 1;
+                uint rowData = (packed >> (row * bitsPerRow)) & rowMask;
+                int nzCol = (int)(rowData >> 1);
+                int sign = (rowData & 1u) == 1u ? -1 : 1;
                 for (int col = 0; col < TAffine.N; col++) M[row, col] = 0f;
                 M[row, nzCol] = sign;
             }
         }
-
 
         //public List<TVector> GetReversedEulerAngles()
         //{

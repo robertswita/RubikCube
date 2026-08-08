@@ -12,10 +12,35 @@ namespace RubikCube
     public class TCubie : TShape
     {
         public static TShape Cube;
-        public static TMatrix SizeMatrix;
+        public static TDims DimsSizes;
         public static int MaxScore;
         //public double Error;
-        public int StartIndex;
+        public int Id;
+        int startIndex;
+        public int StartIndex
+        {
+            get => startIndex;
+            set
+            {
+                var coords = DimsSizes.LinearToCoords(value);
+                Id = DimsSizes.CoordsToBitIndex(coords);
+                var position = new int[coords.Length];
+                for (int dim = 0; dim < position.Length; dim++)
+                {
+                    Transform.Origin[dim] = coords[dim] - TRubikCube.C;
+                    position[dim] = (int)Math.Round(Math.Abs(Transform.Origin[dim]) + TRubikCube.C);
+                }
+                int chirality = Chirality(position);   // BEFORE the sort: position is still the per-AXIS magnitude
+                Array.Sort(position);
+                int key = DimsSizes.CoordsToBitIndex(position);
+
+                // CHIRALITY BIT. The |coord| multiset alone MERGES two mirror orbits whenever the magnitudes are
+                // ALL DISTINCT and nonzero (see Chirality). Keying 2*key + bit never collides across classes (odd
+                // vs even) and only ever splits a chiral class; below Size 2N no class is chiral, so the bit is 0
+                // and RenumberClusters yields ranks identical to before -- the split activates only at Size >= 2N.
+                ClusterIndex = 2 * key + chirality;
+            }
+        }
         int rotationCount;
         public int RotationCount
         {
@@ -174,24 +199,12 @@ namespace RubikCube
 
         public int Index
         {
-            get { return SizeMatrix.Coords2Index(Position); }
+            get { return DimsSizes.CoordsToLinear(Position); }
             set
             {
-                var pos = SizeMatrix.Index2Coords(value);
-                Transform.Origin = pos - TRubikCube.C;
-                var position = new int[pos.Size];
-                for (int dim = 0; dim < position.Length; dim++)
-                    position[dim] = (int)Math.Round(Math.Abs(Transform.Origin[dim]) + TRubikCube.C);
-                int chirality = Chirality(position);   // BEFORE the sort: position is still the per-AXIS magnitude
-                Array.Sort(position);
-                Array.Reverse(position);
-                int key = SizeMatrix.Coords2Index(position);
-
-                // CHIRALITY BIT. The |coord| multiset alone MERGES two mirror orbits whenever the magnitudes are
-                // ALL DISTINCT and nonzero (see Chirality). Keying 2*key + bit never collides across classes (odd
-                // vs even) and only ever splits a chiral class; below Size 2N no class is chiral, so the bit is 0
-                // and RenumberClusters yields ranks identical to before -- the split activates only at Size >= 2N.
-                ClusterIndex = 2 * key + chirality;
+                var coords = DimsSizes.LinearToCoords(value);
+                for (int dim = 0; dim < coords.Length; dim++)
+                    Transform.Origin[dim] = coords[dim] - TRubikCube.C;
             }
         }
 
