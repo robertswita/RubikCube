@@ -432,3 +432,8 @@ RubikCube/bin/
 
 # Working documents, conversation logs and measurement scratch (not source)
 Docs/
+
+# Ignore local snapshot history folder (moved snapshots)
+History/
+# Ignore all nested content under History
+History/**
