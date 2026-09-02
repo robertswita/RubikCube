@@ -1,0 +1,252 @@
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-129-            else if (MoveNo > 0)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-130-            {
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-131-                MoveNo = 0;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-132-                Moves.Clear();
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-133-                //label2.Text = HighScore.ToString();
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-134-                //var scrambled = RubikCube.Code.Count(x => x != '\0');
+RubikCube\Form1.cs:135:                label4.Text = RubikCube.ScrambledCount().ToString();
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-136-                //Scrambled = scrambled;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-137-                MovesLbl.Text = MovesCount.ToString();
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-138-                UpdateClusterInfo();
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-139-                UpdateWalkingFloor();
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-140-                RubikCube.StateGrid = null;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-141-                StateBox.Invalidate();
+--
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-241-                    float gy = rect.Y + rect.Height * k / (float)gridSize;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-242-                    gc.DrawLine(gridPen, gx, rect.Y, gx, rect.Bottom);
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-243-                    gc.DrawLine(gridPen, rect.X, gy, rect.Right, gy);
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-244-                }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-245-        }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-246-
+RubikCube\Form1.cs:247:        void OnProgress(TRubikGenome specimen)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-248-        {
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-249-            //if (chart1.Series[0].Points.Count % 300 == 0)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-250-            //    chart1.Series[0].Points.Clear();
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-251-            //var ga = (TGA<TRubikGenome>)sender;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-252-            chart1.Series[0].Points.AddXY(Iteration, 100 * specimen.Fitness);
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-253-            chart1.Refresh();
+--
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-695-        // many of the active cluster's cubies are already solved. ActiveCubie == null means the cube is solved.
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-696-        private void UpdateClusterInfo()
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-697-        {
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-698-            if (RubikCube == null || RubikCube.Cubies == null) return;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-699-            if (RubikCube.ActiveCubie == null)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-700-            {
+RubikCube\Form1.cs:701:                ClusterLbl.Text = $"Cluster - / {RubikCube.ClustersCount}";
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-702-                SolvedLbl.Text = "Solved - / -";
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-703-                StructureBox.Text = "Struct -";
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-704-                return;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-705-            }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-706-            int solved = 0;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-707-            foreach (var c in RubikCube.ActiveCluster)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-708-                if (c.State == 0) solved++;
+RubikCube\Form1.cs:709:            ClusterLbl.Text = $"Cluster {RubikCube.ActiveCubie.ClusterIndex} / {RubikCube.ClustersCount}";
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-710-            SolvedLbl.Text = $"Solved {solved} / {RubikCube.ActiveCluster.Count}";
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-711-            // Coherence decomposition of the residual, as the METRIC sees it ("4+2", "2+1+1") - reported by the
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-712-            // evaluator itself, so it can never drift from the metric the way an eyeball reading does.
+RubikCube\Form1.cs-713-            StructureBox.Text = "Struct " + (Best == null ? "-" : TRubikGenome.DescribeStructure(Best.Structure, TAffine.N));
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-714-            //StructureBox.Refresh();
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Form1.cs-715-        }
+--
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Gpu.cs-326-        // EvaluateMicro). A field, not a define, so moving it costs no shader rebuild. 2 = the peel keeps its
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Gpu.cs-327-        // full gradient all the way down; the walking-floor plan is min(2*d_max, G) from the current cube.
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Gpu.cs-328-        // Both the GA and EvalZeroSpecimen read THIS value -- they must, or Fitness and Score are incomparable.
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Gpu.cs-329-        public static uint Floor = 4;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Gpu.cs-330-
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Gpu.cs-331-        static float noOpPenalty;   // reset to NaN in BuildShaders (Init + on N/SIZE change) -> measured on first ScoreCube
+RubikCube\Gpu.cs:332:        public static float ScoreCube(TRubikCube cube)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Gpu.cs-333-        {
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Gpu.cs-334-            var score = EvalZeroSpecimen(cube);
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Gpu.cs-335-            if (float.IsNaN(noOpPenalty))
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Gpu.cs-336-                noOpPenalty = EvalZeroSpecimen(new TRubikCube());
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Gpu.cs-337-            return score - noOpPenalty;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\Gpu.cs-338-        }
+--
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TChromosome.cs-32-            var clone = (TChromosome)Activator.CreateInstance(GetType());
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TChromosome.cs-33-            Array.Copy(Genes, clone.Genes, Genes.Length);
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TChromosome.cs-34-            clone.Fitness = Fitness;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TChromosome.cs-35-            return clone;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TChromosome.cs-36-        }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TChromosome.cs-37-
+RubikCube\TChromosome.cs:38:        public virtual void Correct() { }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TChromosome.cs-39-
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TChromosome.cs-40-        public virtual void MutateGene(int idx)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TChromosome.cs-41-        {
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TChromosome.cs-42-            float ratio = (float)Rnd.NextDouble();
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TChromosome.cs-43-            Genes[idx] = MinGenes[idx] + (MaxGenes[idx] - MinGenes[idx]) * ratio;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TChromosome.cs-44-        }
+--
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-10-namespace RubikCube
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-11-{
+RubikCube\TCubie.cs-12-    public class TCubie : TShape
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-13-    {
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-14-        public static TShape Cube;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-15-        public static TMatrix SizeMatrix;
+RubikCube\TCubie.cs:16:        public static int MaxScore;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-17-        //public double Error;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-18-        public int StartIndex;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-19-        int rotationCount;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-20-        public int RotationCount
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-21-        {
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-22-            get
+--
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-141-            int m = 0;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-142-            for (int k = 0; k < TAffine.N; k++)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-143-                if (Transform.M[k, k] < 0.1f) m++;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-144-            return m;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-145-        }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-146-
+RubikCube\TCubie.cs:147:        //public double Score
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-148-        //{
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-149-        //    get { return (double)State / MaxScore; }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-150-        //}
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-151-
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-152-        //public TVector GetStartPos()
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TCubie.cs-153-        //{
+--
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGA.cs-5-using System.Text;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGA.cs-6-
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGA.cs-7-namespace GA
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGA.cs-8-{
+RubikCube\TGA.cs-9-    public class TGA<T> where T : TChromosome, new()
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGA.cs-10-    {
+RubikCube\TGA.cs:11:        public double HighScore = double.MaxValue;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGA.cs-12-        public static int PopulationCount = 100;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGA.cs-13-        public double WinnerRatio = 0.3;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGA.cs-14-        public double MutationRatio = 0.01;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGA.cs-15-        public double MutationAuxRatio = 0;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGA.cs-16-        public static int GenerationsCount = 2000;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGA.cs-17-        public static int StallLimit;
+--
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGreedyDiversity.cs-521-            while (a == pa[0] || a == pa[1]) a++;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGreedyDiversity.cs-522-            return a;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGreedyDiversity.cs-523-        }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGreedyDiversity.cs-524-
+RubikCube\TGreedyDiversity.cs-525-        \ TRubikGenome.Correct's composition on a variable-length gene list: fold each move into the nearest
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGreedyDiversity.cs-526-        // preceding run of the same axis+plane (quarter-turns add mod 4; a 0 result cancels both).
+RubikCube\TGreedyDiversity.cs:527:        static void CorrectGenes(List<int> g)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGreedyDiversity.cs-528-        {
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGreedyDiversity.cs-529-            for (int idx = 0; idx < g.Count; idx++)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGreedyDiversity.cs-530-            {
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGreedyDiversity.cs-531-                var move = TMove.Decode(g[idx]);
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGreedyDiversity.cs-532-                for (int prev = idx - 1; prev >= 0; prev--)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TGreedyDiversity.cs-533-                {
+--
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-14-        public int StopPos;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-15-        public int BestMovesCount;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-16-        public uint Structure;                  // packed coherence piece histogram; 0 = not decomposed
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-17-        //public static List<int> FreeMoves;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-18-        public static TRubikCube RubikCube;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-19-        public static List<List<int>> RevSeqs;
+RubikCube\TRubikGenome.cs:20:        public static int HighScore;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-21-
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-22-        public void ReadBuffer(int[] buffer)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-23-        {
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-24-            Fitness = BitConverter.UInt32BitsToSingle((uint)buffer[0]);
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-25-            BestMovesCount = (int)buffer[1];
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-26-            for (int i = 0; i < BestMovesCount; i++)
+--
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-335-        //        if (angle > 0 && BestMovesCount < Genes.Length)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-336-        //            Genes[BestMovesCount++] = 3 * i + 3 - angle;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-337-        //    }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-338-        //}
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-339-
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-340-        //bool IsChecked;
+RubikCube\TRubikGenome.cs:341:        public override void Correct()
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-342-        {
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-343-            //var fitness = Evaluate();
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-344-            //var oldGenes = (double[])Genes.Clone();
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-345-            //if (IsChecked) return;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-346-            for (int idx = StartIndex; idx < BestMovesCount; idx++)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikGenome.cs-347-            {
+--
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-16-        public static float C;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-17-        public TCubie[] Cubies;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-18-        public TCubie ActiveCubie;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-19-        public List<TCubie> SolvedCubies = new List<TCubie>();
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-20-        public static List<int> EulerOrder;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-21-        public static bool IsEulerOrderReversed;
+RubikCube\TRubikCube.cs:22:        public float Score;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-23-
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-24-        //sbyte[] Transforms;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-25-        //public int[,] StateGrid2
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-26-        //{
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-27-        //    get
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-28-        //    {
+--
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-94-            RenumberClusters();
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-95-        }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-96-
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-97-        // The Index setter stamps each cubie with a sparse ORBIT index (linear index of its sorted |coords|
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-98-        // from the centre - a distance class), so values are non-contiguous and run into the thousands. Remap
+RubikCube\TRubikCube.cs-99-        \ them to a dense, sequential cluster rank 1,2,3,... in ascending orbit order: now ClusterIndex reads
+RubikCube\TRubikCube.cs:100:        // as a real "k-th cluster" and ClustersCount is the number of clusters. NextCluster (min ClusterIndex)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-101-        // and ActiveCluster (equality) depend only on order and equality - both preserved by this monotonic
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-102-        // remap - so the solve order is unchanged.
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-103-        private void RenumberClusters()
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-104-        {
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-105-            var byOrbit = new List<TCubie>(Cubies);
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-106-            byOrbit.Sort((a, b) => a.ClusterIndex.CompareTo(b.ClusterIndex));
+--
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-108-            foreach (var cubie in byOrbit)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-109-            {
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-110-                int orbit = cubie.ClusterIndex;                  // still the orbit index (not yet remapped)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-111-                if (orbit != prevOrbit) { rank++; prevOrbit = orbit; }   // 1, 2, 3, ...
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-112-                cubie.ClusterIndex = rank;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-113-            }
+RubikCube\TRubikCube.cs:114:            ClustersCount = rank;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-115-        }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-116-
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-117-        public TRubikCube(TRubikCube src)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-118-        {
+RubikCube\TRubikCube.cs:119:            ClustersCount = src.ClustersCount;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-120-            Cubies = new TCubie[src.Cubies.Length];
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-121-            for (int pos = 0; pos < Cubies.Length; pos++)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-122-            {
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-123-                var cubie = src.Cubies[pos].Copy();
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-124-                cubie.Parent = this;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-125-                Cubies[pos] = cubie;
+--
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-561-                //}
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-562-            }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-563-            return freeGenes;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-564-        }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-565-
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-566-
+RubikCube\TRubikCube.cs:567:        // Number of distinct clusters. After RenumberClusters, cubie ClusterIndex runs 1..ClustersCount in
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-568-        // solve order. Set once during cube construction; used for the UI "Cluster k / K" label.
+RubikCube\TRubikCube.cs:569:        public int ClustersCount;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-570-
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-571-        private List<TCubie> activeCluster;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-572-        public List<TCubie> ActiveCluster
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-573-        {
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-574-            get
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-575-            {
+--
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-582-                                activeCluster.Add(cubie);
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-583-                }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-584-                return activeCluster;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-585-            }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-586-        }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-587-
+RubikCube\TRubikCube.cs:588:        public void NextCluster()
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-589-        {
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-590-            if (ActiveCubie != null)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-591-                SolvedCubies.AddRange(ActiveCluster);
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-592-            ActiveCubie = null;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-593-            var minDist = int.MaxValue;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-594-            foreach (var cubie in Cubies)
+--
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-608-                RebuildFreeMoves();
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-609-                GetSolveSeq();
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-610-                Score = Gpu.ScoreCube(this);
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-611-            }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-612-        }
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-613-
+RubikCube\TRubikCube.cs:614:        public int ScrambledCount()
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-615-        {
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-616-            var scrambled = 0;
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-617-            for (int i = 0; i < Cubies.Length; i++)
+C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\RubikCube\TRubikCube.cs-618-                if (Cubies[i].State != 0) scrambled++;
+
+[Showing results with pagination = limit: 250]

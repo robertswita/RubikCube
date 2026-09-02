@@ -55,7 +55,7 @@ namespace TGL
         public static delegate* unmanaged[Stdcall]<uint, nint, nint, void*, void> GetBufferSubData;
         public static delegate* unmanaged[Stdcall]<uint, uint, int*, void> GetShaderiv;
         public static delegate* unmanaged[Stdcall]<uint, int, int*, uint*, void> GetAttachedShaders;
-        public static delegate* unmanaged[Stdcall]<uint, void> LinkProgram;
+        private static delegate* unmanaged[Stdcall]<uint, void> glLinkProgram;
         public static delegate* unmanaged[Stdcall]<MemoryBarrierFlags, void> MemoryBarrier;
         public static delegate* unmanaged[Stdcall]<uint, int, uint, int, int, void> RenderbufferStorageMultisample;
         private static delegate* unmanaged[Stdcall]<uint, int, byte**, int*, void> glShaderSource;
@@ -134,7 +134,7 @@ namespace TGL
             GetBufferSubData = (delegate* unmanaged[Stdcall]<uint, nint, nint, void*, void>)GetExt("GetBufferSubData");
             GetShaderiv = (delegate* unmanaged[Stdcall]<uint, uint, int*, void>)GetExt("GetShaderiv");
             GetAttachedShaders = (delegate* unmanaged[Stdcall]<uint, int, int*, uint*, void>)GetExt("GetAttachedShaders");
-            LinkProgram = (delegate* unmanaged[Stdcall]<uint, void>)GetExt("LinkProgram");
+            glLinkProgram = (delegate* unmanaged[Stdcall]<uint, void>)GetExt("LinkProgram");
             MemoryBarrier = (delegate* unmanaged[Stdcall]<MemoryBarrierFlags, void>)GetExt("MemoryBarrier");
             RenderbufferStorageMultisample = (delegate* unmanaged[Stdcall]<uint, int, uint, int, int, void>)GetExt("RenderbufferStorageMultisample");
             glShaderSource = (delegate* unmanaged[Stdcall]<uint, int, byte**, int*, void>)GetExt("ShaderSource");
@@ -160,10 +160,31 @@ namespace TGL
             byte* pSourcePtr = pSourceBytes;
             glShaderSource(shader, 1, &pSourceBytes, &length);
             glCompileShader(shader);
-            int status;
+            int status = 0;
             GetShaderiv(shader, OpenGL.GL_COMPILE_STATUS, &status);
             if (status == 0)
                 throw new Exception(GetShaderInfoLog(shader));
+        }
+
+        public static void LinkProgram(uint program)
+        {
+            glLinkProgram(program);
+            var glGetProgramiv = (delegate* unmanaged[Stdcall]<uint, uint, int*, void>)Win32.GetProcAddress("glGetProgramiv");
+            int status = 0;
+            glGetProgramiv(program, GL_LINK_STATUS, &status);
+            if (status == 0)
+                throw new Exception(GetProgramInfoLog(program));
+        }
+
+        private static string GetProgramInfoLog(uint program)
+        {
+            var glGetProgramiv = (delegate* unmanaged[Stdcall]<uint, uint, int*, void>)Win32.GetProcAddress("glGetProgramiv");
+            var glGetProgramInfoLog = (delegate* unmanaged[Stdcall]<uint, int, int*, byte*, void>)Win32.GetProcAddress("glGetProgramInfoLog");
+            int logLength = 0;
+            glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logLength);
+            byte* pLog = stackalloc byte[logLength];
+            glGetProgramInfoLog(program, logLength, null, pLog);
+            return Marshal.PtrToStringAnsi((IntPtr)pLog, logLength);
         }
 
         private static string GetShaderInfoLog(uint shader)
@@ -219,6 +240,7 @@ namespace TGL
         public const uint GL_VERTEX_SHADER = 0x8B31;
         public const uint GL_COMPUTE_SHADER = 0x91B9;
         public const uint GL_COMPILE_STATUS = 0x8B81;
+        public const uint GL_LINK_STATUS = 0x8B82;
         public const uint GL_INFO_LOG_LENGTH = 0x8B84;
         public const uint GL_ARRAY_BUFFER = 0x8892;
         public const uint GL_ELEMENT_ARRAY_BUFFER = 0x8893;
@@ -241,7 +263,7 @@ namespace TGL
         public const uint GL_uint = 0x1404;
         public const uint GL_FLOAT = 0x1406;
         //   PolygonMode
-        public const uint GL_POuint = 0x1B00;
+        public const uint GL_POINT = 0x1B00;
         public const uint GL_LINE = 0x1B01;
         public const uint GL_FILL = 0x1B02;
         //   DrawBufferMode

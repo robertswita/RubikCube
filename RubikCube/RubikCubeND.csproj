@@ -1,12 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows7.0</TargetFramework>
     <OutputType>WinExe</OutputType>
     <RootNamespace>RubikCube</RootNamespace>
     <AssemblyName>RubikCube</AssemblyName>
     <UseWindowsForms>True</UseWindowsForms>
     <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <OutputPath>bin\x64\Debug\</OutputPath>
@@ -21,9 +22,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Remove="Resources\Evaluate.glsl.old.c" />
-    <None Remove="Resources\Init.glsl.c" />
-    <None Remove="Resources\Setup.glsl.c" />
-    <None Remove="Resources\Variables.glsl.c" />
     <None Remove="Resources\Wall_Stone_018_basecolor.jpg" />
     <None Remove="Resources\Wall_Stone_018_normal.png" />
     <None Remove="Resources\Wall_Stone_018_roughness.png" />
@@ -31,17 +29,18 @@
     <None Remove="Resources\Arrow.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\EvaluateMacro.glsl.c" />
-    <EmbeddedResource Include="Resources\Evaluate.glsl.c" />
-    <EmbeddedResource Include="Resources\Init.glsl.c" />
-    <EmbeddedResource Include="Resources\SelCrossover.glsl.c" />
-    <EmbeddedResource Include="Resources\Setup.glsl.c" />
-    <EmbeddedResource Include="Resources\Sort.glsl.c" />
-    <EmbeddedResource Include="Resources\CubeVertex.glsl.c" />
-    <EmbeddedResource Include="Resources\CubeFragment.glsl.c" />
-    <EmbeddedResource Include="Resources\CompositeVertex.glsl.c" />
-    <EmbeddedResource Include="Resources\CompositeFragment.glsl.c" />
-    <EmbeddedResource Include="Resources\Variables.glsl.c" />
+    <EmbeddedResource Include="Resources\EvaluateMacro.glsl" />
+    <EmbeddedResource Include="Resources\Evaluate.glsl" />
+    <EmbeddedResource Include="Resources\Init.glsl" />
+    <EmbeddedResource Include="Resources\SeedMoves.glsl" />
+    <EmbeddedResource Include="Resources\SelCrossover.glsl" />
+    <EmbeddedResource Include="Resources\Setup.glsl" />
+    <EmbeddedResource Include="Resources\Sort.glsl" />
+    <EmbeddedResource Include="Resources\CubeVertex.glsl" />
+    <EmbeddedResource Include="Resources\CubeFragment.glsl" />
+    <EmbeddedResource Include="Resources\CompositeVertex.glsl" />
+    <EmbeddedResource Include="Resources\CompositeFragment.glsl" />
+    <EmbeddedResource Include="Resources\Variables.glsl" />
     <EmbeddedResource Include="Resources\Wall_Stone_018_basecolor.jpg" />
     <EmbeddedResource Include="Resources\Wall_Stone_018_normal.png" />
     <EmbeddedResource Include="Resources\Wall_Stone_018_roughness.png" />

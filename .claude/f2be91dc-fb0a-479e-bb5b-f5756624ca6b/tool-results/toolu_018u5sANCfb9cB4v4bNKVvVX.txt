@@ -1,0 +1,108 @@
+RubikCube\Gpu.cs:18:        public static Ssbo CubiesBuffer, FreeMovesBuffer, SolvedBuffer, ActiveBuffer, PlanesBuffer, SeedMovesBuffer;
+RubikCube\Gpu.cs:21:        static uint NumSeeds;   // specimens pre-seeded by Init (host-built SeedMoves)
+RubikCube\Gpu.cs:58:            SeedMovesBuffer = new Ssbo();                           // 7  Init seed sequences
+RubikCube\Gpu.cs:277:                var seedMoves = cube.BuildSeedMoves(TGA<TRubikGenome>.PopulationCount, TAffine.N - 1,
+RubikCube\Gpu.cs:279:                fixed (int* p = seedMoves) SeedMovesBuffer.Update(seedMoves.Length * sizeof(int), p);
+RubikCube\TRubikCube.cs:834:        public int[] BuildSeedMoves(int populationCount, int stride, int seedRatioPercent, out uint numSeeds)
+RubikCube\Resources\SelCrossover.glsl.c:57:        uint sbase = (hash(seed + 9u) % numSeeds) * SEED_STRIDE;
+RubikCube\Resources\SelCrossover.glsl.c:58:        for (uint g = 0u; g < SEED_STRIDE; g++) {
+RubikCube\Resources\SelCrossover.glsl.c:59:            uint code = SeedMoves[sbase + g];
+RubikCube\Resources\Setup.glsl.c:42:layout(std430, binding = 7) buffer SeedBuffer { uint SeedMoves[]; };   // Init: per-specimen seed sequences
+RubikCube\Resources\Setup.glsl.c:56:layout(location = 6) uniform uint numSeeds;   // Init: number of specimens pre-seeded from SeedMoves
+RubikCube\Resources\Init.glsl.c:13:    // active-cluster cubie (SeedMoves, one SEED_STRIDE-wide slot per specimen); 0xFFFFFFFF ends a
+RubikCube\Resources\Init.glsl.c:17:        uint base = specimenID * SEED_STRIDE;
+RubikCube\Resources\Init.glsl.c:18:        for (; g < SEED_STRIDE; g++) {
+RubikCube\Resources\Init.glsl.c:19:            uint code = SeedMoves[base + g];
+RubikCube\Resources\Variables.glsl.c:38:#define SEED_STRIDE (uint(N) - 1u)
+Docs\Konwersacja_RubikND.md:2244:Spłaszcz wyniki do nowego SSBO, np. `SeedMoves[numSeeds * SEED_STRIDE]` (stały skok `SEED_STRIDE = N−1`, wolne sloty = sentinel `0xFFFFFFFF`) — plus opcjonalnie `SeedLen[]`. `numSeeds = min(POPULATION_COUNT, |A|)`.
+Docs\Konwersacja_RubikND.md:2250:    uint base = specimenID * SEED_STRIDE;
+Docs\Konwersacja_RubikND.md:2251:    for (uint g = 0u; g < SEED_STRIDE; g++) {
+Docs\Konwersacja_RubikND.md:2252:        uint code = SeedMoves[base + g];
+Docs\Konwersacja_RubikND.md:2275:Jeśli chcesz, zaimplementuję Option A: dodam bufor `SeedMoves` (kolejny binding + rezerwacja w `Init`, wypełnienie w `CreateBuffers` z użyciem `GetEulerAngles`/śledzenia pozycji) oraz seedującą gałąź w `Init.glsl.c`. Powiedz tylko, czy seedować **jeden kubik na osobnika** (prościej, polecam na start), czy od razu z wariantami `order` dla różnorodności.
+Docs\Konwersacja_RubikND.md:2323:Wszystko to liczy host (QR już masz), a GPU tylko kopiuje z bufora `SeedMoves`. Chcesz, żebym rozpisał krok 3 (mapowanie plane→move z wariacją osi i śledzeniem warstwy) jako konkretny algorytm hosta, zanim cokolwiek zakodujemy?
+Docs\Konwersacja_RubikND.md:2405:Zgoda na taki kształt? Jeśli tak, rozpiszę host-owy generator: pętla po (kubik × droga × order × axis) z deduplikacją i śledzeniem `Slice`, zwracająca bufor `SeedMoves`.
+Docs\Konwersacja_RubikND.md:2415:Rozpisuję generator host-owy. Trzy osie różnorodności (droga × order × axis) plus filtr osi nieaktywnych i dedup; realizacja ruchów przez śledzenie pozycji symulowanego kubika. Wszystko liczy CPU, GPU tylko kopiuje `SeedMoves`.
+Docs\Konwersacja_RubikND.md:2419:Nowy SSBO `SeedMoves` — spłaszczone kody ruchów, stały skok `SEED_STRIDE = N-1` (maks. długość solve), wolne sloty = sentinel `0xFFFFFFFF`:
+Docs\Konwersacja_RubikND.md:2422:SeedMoves[numSeeds * SEED_STRIDE]      // numSeeds <= POPULATION_COUNT
+Docs\Konwersacja_RubikND.md:2455:        var moves = new List<int>(SEED_STRIDE);
+Docs\Konwersacja_RubikND.md:2467:            seeds.Add(PadToStride(moves));                 // dopełnij 0xFFFFFFFF do SEED_STRIDE
+Docs\Konwersacja_RubikND.md:2481:// Rozdziel numSeeds między kubiki wg VariantCeiling(m), sklej do SeedMoves.
+Docs\Konwersacja_RubikND.md:2485:// pool.Count -> numSeeds; upload SeedMoves (nowy binding, rezerwacja w Init jak inne bufory).
+Docs\Konwersacja_RubikND.md:2492:    uint base = specimenID * SEED_STRIDE;
+Docs\Konwersacja_RubikND.md:2493:    for (; g < SEED_STRIDE; g++) {
+Docs\Konwersacja_RubikND.md:2494:        uint code = SeedMoves[base + g];
+Docs\Konwersacja_RubikND.md:2510:Jeśli chcesz, mogę teraz przygotować konkretny szkielet `ToSolveSteps` + `ApplyRotation` (mapowanie `(cos,sin)`↔`Angle` i mnożenie przez `R(plane,angle)`), albo rezerwację bufora `SeedMoves` w `Gpu.Init`/`CreateBuffers` — powiedz, od czego zacząć.
+Docs\Konwersacja_RubikND.md:2579:Dzięki temu jedno losowanie `order` jest maksymalnie „wyciśnięte", a rozkład dróg jest gwarantowany, nie statystyczny. Chcesz, żebym dopisał `AxisCombos` (enumeracja/próbkowanie iloczynu z limitem) i `ToSolveSteps` (mapowanie `(cos,sin)`↔`Angle` dla obu dróg), czy wolisz najpierw wpiąć `SeedMoves` w `Gpu.Init`/`CreateBuffers`?
+Docs\Konwersacja_RubikND.md:2593:Mam wszystko. Bufor `SeedMoves` dostaje SSBO binding 7 (tworzony ostatni; namespace SSBO/UBO są rozłączne, więc UBO Planes zostaje na 6). Wprowadzam — najpierw shadery:
+Docs\Konwersacja_RubikND.md:2602:- `#define SEED_STRIDE (uint(N) - 1u)` — szerokość slotu jednego seeda (≤ N−1 ruchów).
+Docs\Konwersacja_RubikND.md:2603:- `layout(std430, binding = 7) buffer SeedBuffer { uint SeedMoves[]; };`
+Docs\Konwersacja_RubikND.md:2606:**`Init.glsl.c`** — gałąź seedująca: pierwszych `numSeeds` osobników bierze wiodące geny z `SeedMoves` (slot `SEED_STRIDE`, sentinel `0xFFFFFFFF` kończy krótszą sekwencję), ogon i pozostałe osobniki jak dotąd — losowo z `FreeMoves`.
+Docs\Konwersacja_RubikND.md:2609:- Pole `SeedMovesBuffer` + `static uint NumSeeds`.
+Docs\Konwersacja_RubikND.md:2610:- Rezerwacja `SeedMovesBuffer = new Ssbo()` w `Init` (binding 7).
+Docs\Konwersacja_RubikND.md:2648:Zamiast placeholdera w `CreateBuffers` — wypełnić `SeedMoves` sekwencjami z tej samej maszynerii (slot `SEED_STRIDE = N-1`, sentinel `-1`/`0xFFFFFFFF`, `NumSeeds` = liczba slotów).
+Docs\Konwersacja_RubikND.md:2745:Proponuję wdrożyć to tak: **faza 1 wspólna** (nowe `GetSolveSteps` + `ActiveAxisCount`), `GetReversedSeq` przepięte na nią (CPU bez zmiany zachowania), plus nowe `BuildSeedMoves(populationCount, stride)` dla GPU wpięte w `CreateBuffers` i `SeedRatio`. Twój CPU-owy `Genesis` zostaje nietknięty.
+Docs\Konwersacja_RubikND.md:2747:Wchodzę w implementację w tym kształcie? Jeśli tak — zaczynam od `ActiveAxisCount` + `GetSolveSteps` (refaktor `GetReversedSeq`), potem `BuildSeedMoves` i wpięcie w `CreateBuffers`.
+Docs\Konwersacja_RubikND.md:2765:Splice czysty — `GetSolveSteps` po `NonStandard`, `BuildSeedMoves` kończy się przed klamrą klasy. Całość gotowa.
+Docs\Konwersacja_RubikND.md:2777:- `BuildSeedMoves(populationCount, stride, seedRatio%, out numSeeds)` — **obie drogi per order**, wszystkie osie, dedup; save/restore statycznych `EulerOrder`/`IsEulerOrderReversed` (nie rusza Twojego przepływu w `Form1`); padding `-1`.
+Docs\Konwersacja_RubikND.md:2779:**`Gpu.CreateBuffers`** — placeholder zastąpiony przez `cube.BuildSeedMoves(PopulationCount, N-1, GetDefineValue("SEED_RATIO"), out NumSeeds)`.
+Docs\Konwersacja_RubikND.md:2784:- **`m`** jest wyznaczane i wystawione (`out` w `GetSolveSteps`), ale jeszcze nieużyte do budżetowania — pętla `BuildSeedMoves` sama się ogranicza `target`/`GUARD`. Jeśli chcesz ważyć liczbę wariantów per kubik wg `m`, mamy je pod ręką.
+Docs\Konwersacja_RubikND.md:2847:Dobra wiadomość: **mamy już bufor `SeedMoves`** — te same sekwencje można wstrzykiwać też w `SelCrossover` (odpowiednik CPU-owego `RevSeqs` w mutacji), nie tylko w `Init`.
+Docs\Konwersacja_RubikND.md:2852:2. Równolegle — **pozwól mi przeczytać `SelCrossover.glsl.c` oraz CPU-ową mutację/`Conjugate`/Genesis**, żebym wskazał *konkretną* różnicę operatora, a nie zgadywał. Wtedy dołożymy makro-mutację z `SeedMoves` wiernie do wersji CPU.
+Docs\Konwersacja_RubikND.md:2900:## Fix — makro-mutacja w SelCrossover (reużywamy `SeedMoves`)
+Docs\Konwersacja_RubikND.md:2903:1. wiodące geny = losowy slot `SeedMoves` (sekwencja rozwiązująca kubik),
+Docs\Konwersacja_RubikND.md:2946:| **Makro-mutacja** (wstrzyk `RevSeq`+`Conjugate`) | gałąź w `SelCrossover` z bufora `SeedMoves` | niska — bufor już jest |
+Docs\Konwersacja_RubikND.md:2952:1. **Makro-mutacja** — największy lewar, reużywa `SeedMoves`, samowystarczalne. Bez niej seedy giną po gen. 0 (to ustaliliśmy).
+Docs\Konwersacja_RubikND.md:3038:    uint sbase = (hash(seed+9u) % numSeeds) * SEED_STRIDE;
+Docs\Konwersacja_RubikND.md:3039:    for (g < SEED_STRIDE) { code = SeedMoves[sbase+g]; if sentinel break; child[g] = code; }
+Docs\Konwersacja_RubikND.md:3044:Reużywa bufora `SeedMoves` (binding 7) i `getRevCode`. Granice bezpieczne (`cStop ≤ GENES_COUNT/2`).
+Docs\Konwersacja_RubikND.md:3104:Weryfikuję, że nie zostały odwołania do `SEED_RATIO`/`SEED_MUT_RATIO` ani starej sygnatury `BuildSeedMoves`:
+Docs\Konwersacja_RubikND.md:3114:- **Init seeduje pełną populację** — `BuildSeedMoves` bez parametru `seedRatioPercent`, celuje w `populationCount` (tyle różnych sekwencji, ile znajdzie).
+Docs\Konwersacja_RubikND.md:3164:- **`SEED_RATIO`** (init seeding %, 80) — konsolidacja dotyczyła tylko `SEED_MUT_RATIO → MUTATION_RATIO`. `BuildSeedMoves` znów bierze `seedRatioPercent`, `CreateBuffers` czyta define. Dwa pokrętła: `SEED_RATIO` (start), `MUTATION_RATIO` (makro-mutacja co pokolenie).
+Docs\Konwersacja_RubikND.md:3326:W `GetEulerAngles` (rdzeń) dodać per-krok flagę pod/nad: dla „nad" bierzesz `a = A[axis2,axis2]`, `b = A[axis1,axis2]` i obracasz tak, by wyzerować `A[axis1,axis2]` (z odpowiednim znakiem sinusa). `GetSolveSteps`/`BuildSeedMoves` enumerują wtedy `order × modeVector × axis`. Sekwencja nadal musi układać kubik — Twój harness to zweryfikuje (część znakowa kąta dla „nad" jest drobiazgowa, tak jak była dla drogi Mᵀ).
+Docs\Konwersacja_RubikND.md:3328:Chcesz, żebym rozpisał zmodyfikowane `GetEulerAngles` (parametr `bool[] above` per płaszczyzna) + wpięcie w `BuildSeedMoves` (z porzuceniem osi `reversed`)? Mogę wcześniej dorzucić do skryptu weryfikacyjnego rekonstrukcję ruchów (nie tylko drzew), żeby potwierdzić, że mieszane sekwencje realnie zerują orientację — zanim dotkniemy C#.
+Docs\Konwersacja_RubikND.md:3371:`GetEulerAngles` dostaje dodatkowo **wektor pod/nad per płaszczyzna** (obok istniejącego `reversed`). Dla „nad" w płaszczyźnie `(axis1,axis2)`: pivot `A[axis2,axis2]`, zerujesz `A[axis1,axis2]`, z odpowiednim znakiem sinusa. `BuildSeedMoves` enumeruje wtedy `order × modeVector(pod/nad) × route × axis`, dedup po kodach ruchów.
+Docs\Konwersacja_RubikND.md:3373:Chcesz, żebym najpierw dorzucił do skryptu **rekonstrukcję ruchów** dla trybu „nad" (potwierdzenie, że mieszana sekwencja realnie zeruje orientację, ze znakami kąta), a potem rozpisał zmodyfikowane `GetEulerAngles` + `BuildSeedMoves`? To najbezpieczniejsza kolejność, bo część znakowa „nad" jest drobiazgowa.
+Docs\Konwersacja_RubikND.md:3401:Nie wolno mieszać „na ślepo" — **trzeba walidować**. I to już robimy: `BuildSeedMoves` symuluje sekwencję i sprawdza, czy kubik faktycznie się zeruje (assert `IsIdentity`). Nieważny mode-wektor → sekwencja nie układa kubika → odrzucona. Przy ~35% trafień, każde losowanie `(order, mode)` daje valid mniej więcej co trzeci raz, a że na jeden valid nakłada się jeszcze wariacja `axis`, wydajność jest w porządku.
+Docs\Konwersacja_RubikND.md:3438:To upraszcza `BuildSeedMoves`: wewnętrzna pętla staje się greedy-konstrukcją zamiast enumeracji z filtrem, a i tak pokrywa pełne 12 drzew.
+Docs\Konwersacja_RubikND.md:3517:- **Integracja**: `GetReversedSeq` i `BuildSeedMoves` konsumują to bez zmian (dalej `steps × axis` przez `AxisCombos`), ale **znikają** wymiary `route`/`reversed`, `perm`, oraz statyki `EulerOrder`/`IsEulerOrderReversed` z tej ścieżki. `AxisCombos` (wariacja osi) zostaje jako drugi, ortogonalny mnożnik.
+Docs\Konwersacja_RubikND.md:3520:Chcesz, żebym wpiął to w `TRubikCube.cs` (podmiana `GetSolveSteps`, `RotationCountAfter`, `FirstOrRandomAxisNotIn`) i uprościł `BuildSeedMoves` o zniknięcie `route`/`reversed`?
+Docs\Konwersacja_RubikND.md:3594:Chcesz, żebym teraz wpiął to w `TRubikCube.cs` (nowe `GetSolveSteps` + `ActiveAxesAfter` + `FirstOrRandomAxisNotIn`, uproszczone `BuildSeedMoves` bez `route`/`reversed`)?
+Docs\Konwersacja_RubikND.md:3604:Jasne — bierzemy pełne 12 (RotationCount), `m` zawsze podmienisz. Wpinam. Czytam aktualny stan `GetSolveSteps`/`GetReversedSeq`/`BuildSeedMoves`, żeby podmienić precyzyjnie:
+Docs\Konwersacja_RubikND.md:3606:Mam obraz. Czytam ogon `BuildSeedMoves` (restore `EulerOrder`), żeby go też usunąć:
+Docs\Konwersacja_RubikND.md:3626:**`BuildSeedMoves`** — usunięte przełączanie `route`/`reversed` i save/restore statyk; teraz po prostu losuje kolejne greedy-dekompozycje × `AxisCombos`.
+Docs\Konwersacja_RubikND.md:3727:Wpinam uproszczenie. Czytam aktualny `BuildSeedMoves`/`AxisCombos`:
+Docs\Konwersacja_RubikND.md:3739:**Uproszczenie `BuildSeedMoves`:**
+Docs\Konwersacja_RubikND.md:3770:Mam wszystko. Przepisuję `GetSolveSteps` na bezpośrednie składanie ruchów (losowa oś inline), `GetReversedSeq` staje się trywialne, `BuildSeedMoves` używa wprost:
+Docs\Konwersacja_RubikND.md:3785:**`BuildSeedMoves`** → wprost:
+Docs\Konwersacja_RubikND.md:3883:(z fallbackiem, gdy `ActiveCubie` jest null lub już ułożony). Wtedy wszystkie seedy i wszystkie mutanty w jednym `BuildSeedMoves`/GA celują w ten sam kubik — różnią się **jak** (drzewo greedy + oś + sprzężenie), nie **co** — a wariacja celu jest, jak u Ciebie, między przebiegami.
+Docs\Konwersacja_RubikND.md:3933:Zero pętli i mapowania. Jeśli `ActiveCubie` byłby akurat ułożony (`State == 0`), pętla greedy się nie wykona i zwróci pustą sekwencję, którą `BuildSeedMoves` pomija — więc żaden dodatkowy strażnik nie jest potrzebny. Fokus per przebieg działa wprost na wyznaczonym kubiku. Do przebudowy i testu.
+Docs\Konwersacja_RubikND.md:3960:Bo czas był zdominowany przez **host-owy koszt generacji seedów**, nie przez iteracje GPU. Przy `SEED_RATIO 100` `BuildSeedMoves` robił ~1024 wywołań `GetSolveSteps`, każde z pełnym klonem kostki — koszt niezależny od liczby generacji GA, więc iteracje nie korelowały z czasem. Po tej zmianie GPU powinno bardziej dominować i metryka iteracji powinna nabrać sensu (a czas spaść).
+Docs\Konwersacja_RubikND.md:3980:Mam bieżący stan. Wprowadzam: `GetSolveSteps` → `GetReversedSeq` (zwinięte w jedno, bez `out m` i `ActSeq`), `RotationCountAfter` przepięte na klon kubika (`Copy` + `RotationCount`, jak `GetReversedSeq`), i `BuildSeedMoves` na nową nazwę:
+Docs\Konwersacja_RubikND.md:3982:Teraz `BuildSeedMoves` — komentarz i wywołanie na `GetReversedSeq`:
+Docs\Konwersacja_RubikND.md:3989:- **Zwinięte w jedno**: `GetReversedSeq()` = greedy na klonie kubika (dawne `GetSolveSteps`), bez `out m` (nikt nie czytał) i bez pola `ActSeq`. `BuildSeedMoves` woła `GetReversedSeq()`.
+Docs\Konwersacja_RubikND.md:4251:`BuildSeedMoves` dąży do `target = populationCount * SEED_RATIO/100 = 1024` **różnych** seedów, a dostępne są ≤3 → pętla `while` kręci się aż `guard` dobije do `GUARD = 8*target+64 ≈ 8256`, wołając `GetSolveSeq` tysiące razy na pusto przy każdym GA. To marnuje czas hosta (ten, który wcześniej dominował). Warto przerwać po np. K kolejnych nietrafionych losowaniach (`seen.Add` zwróciło false), zamiast czekać na `guard`. Powiedz, jeśli mam to wpiąć.
+Docs\Konwersacja_RubikND.md:4261:Wpinam. Najpierw doczytam resztę `BuildSeedMoves`, żeby edytować dokładnie:
+Docs\Konwersacja_RubikND.md:4286:[Omitted long matching line]
+Docs\Konwersacja_RubikND.md:4291:Wszystko się spina — i to potwierdza obie prognozy: `#GAIter` przy 25% to **1554 vs 1541** (poprawka `BuildSeedMoves` jest behawioralnie neutralna — `numSeeds` bez zmian ✓), a czas runął (optymalizacja host-only ✓). Dobrze, że #GA okazał się czynnikiem ludzkim, nie regresją.
+Docs\Konwersacja_RubikND.md:4299:**Czasy 10% (2:23,9) i 25% (1:11,5) nie są porównywalne** — wygląda na to, że seria 10% (6 prób) była **sprzed** poprawki `BuildSeedMoves`, a 25% (1:11,5) już **po** niej (sam piszesz, że spadek jest „w związku z ostatnią poprawką"). Poprawka to host-only, więc ścięła czas obu reżimom równo, ale mierzyłeś je po różnych stronach tej zmiany. Żeby uczciwie porównać mutację 10% vs 25%, przemierz **10% po poprawce**.
+Docs\Konwersacja_RubikND.md:4327:Potwierdzone shaderem [Init.glsl.c:16-27](RubikCube/Resources/Init.glsl.c#L16) — **tak**: specimeny o `specimenID >= numSeeds` dostają wszystkie geny losowe z `FreeMoves`; tylko pierwsze `numSeeds` mają posiane geny wiodące (a i one mają losowy ogon po `SEED_STRIDE`).
+Docs\Konwersacja_RubikND.md:4334:[Omitted long matching line]
+Docs\Konwersacja_RubikND.md:4352:Przy zmianie na 4D pamiętaj tylko o spójnym ustawieniu `N`/`SIZE`/`CUBIES_COUNT` w Setupie i `TAffine.N` po stronie hosta; packing (`BITS_FOR_COL = N<=4?2:3`) i `SEED_STRIDE = N-1` skalują się same. Powodzenia z testami — jak 4D zacznie sprawiać trudności (podejrzewam domykanie ostatniego klastra, jak wspominałeś), wróć z liczbami, to podłubiemy.
+Docs\Konwersacja_RubikND.md:5390:- Tabela buforów **0→8** (SeedMoves=7, ScoreBuffer=8) i lista shaderów o `ScoreCube.glsl.c`
+Docs\Konwersacja_RubikND.md:5393:- **6.1** kara unikalności w sorcie; **6.3** makro-mutacja (zamiast usuniętej mutacji jednogenowej); **NOWA 6.4** seedowanie (`GetSolveSeq` + `BuildSeedMoves`)
+Docs\Konwersacja_RubikND.md:5467:- `GetSolveSeq`/`BuildSeedMoves` muszą emitować nowe wartości kątów,
+Docs\Konwersacja_RubikND.md:6085:Powiedz, jak przejdzie test — to zrobię ten cleanup w jednym lockstepie (łącznie z bindingiem 8, żeby licznik `Ssbo` się zgadzał: `SeedMoves` zostaje ostatni, na 7).
+Docs\Konwersacja_RubikND.md:6122:> **Jeden scorer — ewaluator.** Ani `scoreState`, ani osobnego kernela. `cube.Score` liczy się tą samą maszynerią co fitness osobników, a kara odejmowana jest **zmierzona**, nie zaszyta. Zero duplikatu, zero magicznej stałej, zero dryfu host↔GPU. Bindingi wróciły do **0–7** (SeedMoves ostatni na 7), licznik `Ssbo` się zgadza z Setupem.
+Docs\Konwersacja_RubikND.md:6160:Host, jasne. Znalazłem główny problem — i to **łamie ocenę**. Ale najpierw doczytam `CreateBuffers`/`BuildSeedMoves`, bo `EvalZeroSpecimen` teraz je woła (na świeżej kostce), i chcę sprawdzić drugą pułapkę:
+Docs\Konwersacja_RubikND.md:6162:Sprawdziłem. Sprzątanie jest w większości **ładne** — `new TRubikCube()` jako referencja ułożonej kostki (czyściej niż moje hostowe pakowanie tożsamości), reużycie `CreateBuffers`, i mądry guard `if (cube.ActiveCubie != null)` wokół seedów, dzięki czemu świeża kostka nie wywala `BuildSeedMoves` NRE. Ale jest **jeden realny błąd**:
+Docs\Konwersacja_RubikND.md:6205:- **reużycie `CreateBuffers`** + guard `if (cube.ActiveCubie != null)` wokół FreeMoves/seedów — dzięki temu świeża kostka (ActiveCubie null) nie wywala `BuildSeedMoves`. Ładnie pomyślane.
+Docs\Konwersacja_RubikND.md:6207:[Omitted long matching line]
+Docs\Konwersacja_RubikND.md:7403:- Prawdziwa różnorodność rozkładu bierze się z (a) **permutacji osi** `perm` sprzęgającej macierz przed QR: `A[y,x] = M[perm[y], perm[x]]` = PᵀMP, i (b) **transpozycji** (`IsEulerOrderReversed`, czyli `M.Transpose()` w `GetEulerAngles`). To właśnie sampluje `GetSolveSteps`, a `BuildSeedMoves` losuje `GetOrder` i przełącza `reversed` co iterację.
+Docs\Konwersacja_RubikND.md:7488:I jest **konkretny sygnał praktyczny**: `BuildSeedMoves` **przełącza** `IsEulerOrderReversed` co iterację i unionuje sekwencje przez `seen` (dedup). Jeśli zbiory `reversed=true` i `false` **są równe**, to ten toggle jest **czystym marnotrawstwem** (wszystkie reversed-seedy i tak wypadają w dedupie) — czyli kandydat do usunięcia, w duchu naszego minimalizmu. Jeśli różne — toggle zarabia na siebie. Tak czy siak, odpowiedź ma namacalny skutek dla kodu.
+Docs\Konwersacja_RubikND.md:7559:[Omitted long matching line]
+Docs\Konwersacja_RubikND.md:7670:[Omitted long matching line]
+Docs\Konwersacja_RubikND.md:7815:Praktyczny wniosek jest teraz jednoznaczny: **`GetSolveSeq` powinien brać losowy prawidłowy order (`GetOrder`) na wywołanie** dla miary `RotationCount`, zamiast stałego `GetEulerAngles(null)`. Maszyneria już jest — stary `BuildSeedMoves` losował `GetOrder`; tylko nowy greedy tego nie wykorzystuje. Zmiana mała, brak utknięć, zysk udowodniony i rosnący z N.
+Docs\Konwersacja_RubikND.md:7911:- `Init`: tworzy render-Ssbo (8/9) po `SeedMovesBuffer`, oraz program+VS/FS+VAO/bufory.
+Docs\Konwersacja_RubikND.md:8823:        // moves with any axis: random (GetReversedSeq) or enumerated (BuildSeedMoves). m = active axes.
+Docs\Konwersacja_RubikND.md:8915:Teraz mam **całą** maszynerię permutacji osi — dzięki. Z tego snapshotu (`2026_07_10`) kluczowe jest `GetSolveSteps`: losowy `perm`, `A[y,x]=M[perm[y],perm[x]]` (PᵀMP), `GetEulerAngles(EulerOrder, IsEulerOrderReversed)`, i back-map płaszczyzn przez `perm` (`axis1=perm[rot[2]]`, sort, `angle→4-angle`). Plus `AxisCombos` i `BuildSeedMoves` mnożące różnorodność przez `order × reversed × axis`.
+Docs\Konwersacja_RubikND.md:9113:2. **Wpiąć permutację w produkcję.** Przypomnijmy: stara `GetSolveSteps` **miała** `perm × order × reversed` — refaktor na czysty greedy to **wyrzucił**, i to jest te −72% (4D) różnorodności seedów. Odzyskanie: w pętli seedującej (`BuildSeedMoves`/greedy) losować `perm` per pobranie (per-cubie hak `GivensOrder` już jest). To dokładnie Twój pomysł „permutuj osie w metryce, odwróć przy emisji".

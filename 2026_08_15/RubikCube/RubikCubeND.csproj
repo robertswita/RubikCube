@@ -1,0 +1,64 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>RubikCube</RootNamespace>
+    <AssemblyName>RubikCube</AssemblyName>
+    <UseWindowsForms>True</UseWindowsForms>
+    <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <OutputPath>bin\x64\Debug\</OutputPath>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <OutputPath>bin\x64\Release\</OutputPath>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="OpenGL.old.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Resources\Evaluate.glsl.old.c" />
+    <None Remove="Resources\Init.glsl.c" />
+    <None Remove="Resources\Setup.glsl.c" />
+    <None Remove="Resources\Variables.glsl.c" />
+    <None Remove="Resources\Wall_Stone_018_basecolor.jpg" />
+    <None Remove="Resources\Wall_Stone_018_normal.png" />
+    <None Remove="Resources\Wall_Stone_018_roughness.png" />
+    <None Remove="Resources\Wall_Stone_018_ambientOcclusion.jpg" />
+    <None Remove="Resources\Arrow.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\EvaluateMacro.glsl.c" />
+    <EmbeddedResource Include="Resources\Evaluate.glsl.c" />
+    <EmbeddedResource Include="Resources\Init.glsl.c" />
+    <EmbeddedResource Include="Resources\SelCrossover.glsl.c" />
+    <EmbeddedResource Include="Resources\Setup.glsl.c" />
+    <EmbeddedResource Include="Resources\Sort.glsl.c" />
+    <EmbeddedResource Include="Resources\CubeVertex.glsl.c" />
+    <EmbeddedResource Include="Resources\CubeFragment.glsl.c" />
+    <EmbeddedResource Include="Resources\CompositeVertex.glsl.c" />
+    <EmbeddedResource Include="Resources\CompositeFragment.glsl.c" />
+    <EmbeddedResource Include="Resources\Variables.glsl.c" />
+    <EmbeddedResource Include="Resources\Wall_Stone_018_basecolor.jpg" />
+    <EmbeddedResource Include="Resources\Wall_Stone_018_normal.png" />
+    <EmbeddedResource Include="Resources\Wall_Stone_018_roughness.png" />
+    <EmbeddedResource Include="Resources\Wall_Stone_018_ambientOcclusion.jpg" />
+    <EmbeddedResource Include="Resources\Arrow.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+    <PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0" />
+    <PackageReference Include="WinForms.DataVisualization" Version="1.10.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Update="TGLView.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadata Include="Connected Services\" />
+  </ItemGroup>
+</Project>

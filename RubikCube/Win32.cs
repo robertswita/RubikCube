@@ -41,8 +41,16 @@ namespace TGL
             return wglGetProcAddress(pNameBytes);
         }
 
+        [DllImport("nvapi64.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr nvapi_QueryInterface(uint id);
+
         static Win32()
         {
+            try
+            {
+                nvapi_QueryInterface(0);
+            }
+            catch { }
             // Funkcje z gdi32.dll
             GdiAsm = NativeLibrary.Load("gdi32.dll");
             ChoosePixelFormat = (delegate* unmanaged[Stdcall]<IntPtr, PIXELFORMATDESCRIPTOR*, int>)GetGdi("ChoosePixelFormat");

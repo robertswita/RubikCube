@@ -1,0 +1,1200 @@
+11:## 🧑 Robert
+12-
+13-Verify GPU implementation of the Genetic Algorithm.
+14-
+--
+70:## 🧑 Robert
+71-
+72-fix found problems
+73-
+--
+86:## 🧑 Robert
+87-
+88-[Request interrupted by user for tool use]
+89-
+--
+96:## 🧑 Robert
+97-
+98-strategia rozwiązania problemu 5
+99-
+--
+151:## 🧑 Robert
+152-
+153-[Request interrupted by user]
+154-
+--
+161:## 🧑 Robert
+162-
+163-Czy aktualne zmiany w kodzie rozwiązują problemy z działu A?
+164-
+--
+221:## 🧑 Robert
+222-
+223-A teraz?
+224-
+--
+274:## 🧑 Robert
+275-
+276-Wprowadź
+277-
+--
+311:## 🧑 Robert
+312-
+313-Chwileczkę, PLANES_COUNT mógł być jednak liczony normalnie, niepotrzebne jest raczej ustawianie tej wartości w SetDefineValue!
+314-
+--
+329:## 🧑 Robert
+330-
+331-Poprawiłeś tylko na githubie?
+332-
+--
+343:## 🧑 Robert
+344-
+345-[Request interrupted by user for tool use]
+346-
+--
+378:## 🧑 Robert
+379-
+380-Podoba mi się zwłaszcza definicja BITS_PER_ROW zamiast drugiej zmiennej globalnej. Poza tym jest jeszcze lepiej, kostka Rubika wymaga N >= 3
+381-
+--
+402:## 🧑 Robert
+403-
+404-Dziwnie piszesz #define BITS_FOR_COL (N <= 4 ? 2 : (N <= 8 ? 3 : 4)) // Skoro N zawsze <=8, to  #define BITS_FOR_COL (N <= 4 ? 2 :3)
+405-
+--
+416:## 🧑 Robert
+417-
+418-Pozmieniałeś znaki diakrytyczne języka polskiego w "krzaki" w komentarzach. Możesz przekonwertować komentarze w edytowanych plikach na język angielski?
+419-
+--
+438:## 🧑 Robert
+439-
+440-Tak, przekonwertuj oba i przejdźmy do działu B
+441-
+--
+514:## 🧑 Robert
+515-
+516-Chyba nie warto kopiować wszystkich genów matki, wystarczy do startPos-1
+517-
+--
+530:## 🧑 Robert
+531-
+532-funkcja hash() jest wspólna dla INit i SelCrossover, może przesuńmy ją do Setup
+533-
+--
+544:## 🧑 Robert
+545-
+546-Zmień binding dla NewPopulation. Skoro Population to 0, NewPopulation niech będzie następne, równe 1
+547-
+--
+569:## 🧑 Robert
+570-
+571-Nie jestem pewien, czy bufor Best jest w ogóle potrzebny. Po posortowaniu populacji, to po prostu pierwszy osobnik z Population
+572-
+--
+601:## 🧑 Robert
+602-
+603-Nie, możemy przejść dalej
+604-
+--
+630:## 🧑 Robert
+631-
+632-[Request interrupted by user]
+633-
+--
+670:## 🧑 Robert
+671-
+672-Coś nie tak, maxCubieState to tym razem maksymalna wartość cubieL1(cubieMatrix) a więc cubieL1(maxCubieState). Oczywiście nie ma sensu tego ciągle liczyć w GetActiveCubieError()
+673-
+--
+694:## 🧑 Robert
+695-
+696-Coś nie tak, w cubieL1 sumujemy bezwzględne różnice pomiędzy spakowanymi indeksami kolumn, ale ze znakiem na pierwszym bicie - różnica może być 2 razy większa
+697-
+--
+715:## 🧑 Robert
+716-
+717-Dlaczego maxClusterState to N(N-1) dzielone przez 2, w każdym wierszu błąd może wynosić N-1 + kara za znak (1), czyli całkowita odległość N(N-1) + N = N*N. Nie chodzi tylko o dominację, maxClusterState musi być większy od największego L1
+718-
+--
+735:## 🧑 Robert
+736-
+737-Po co tworzyć  funkcję maxCubieState równą N*N, zróbmy z niej #define
+738-
+--
+755:## 🧑 Robert
+756-
+757-Tak się zastanawiam, czy dodając tak małą karę za zmianę kierunku osi nie mówimy, że dwie całkowicie różne orientacje mogą dawać ten sam błąd L1. Może jednak trzeba było uwzględniać ten najstarszy bit znaku, jako "największa różnica". Kod L1 będzie prostszy, ale maxCubieState większy, tak jak mówiłem 2 razy, czyli 2 * N * (N - 1)
+758-
+--
+775:## 🧑 Robert
+776-
+777-Sprawa z upperboundem jest bardziej skomplikowana niż mi się wydawało, bo rzeczywiście na wszystkie możliwe macierze orientacji, tylko N-1 maksymalnie elementów na osi jest zerami (dowolną orientację można złożyć z N-1 niezerowych obrotów). Oznacza to brak różnicy po indeksie kolumny. Może nie ma to tak dużego znaczenia dla znalezienia nieco większego upperboundu, ale wskazuje na możliwość dalszej kompresji zapisu macierzy orientacji
+778-
+--
+802:## 🧑 Robert
+803-
+804-Nie piszmy kodu byle jak, upper bound musi z czegoś wynikać a nie dopasowywać się tylko do ograniczeń. Powinienem poprawniej go policzyć. Dla każdego wiersza różnica nie wynosi 2(N-1) ale N-1 + 2^BITS_FOR_COL=N-1+(N-1)+1=2N-1. Czyli dla całej macierzy N(2N-1) i taki limit zastosujmy
+805-
+--
+836:## 🧑 Robert
+837-
+838-Mój błąd, stosujemy rygorystyczne
+839-
+--
+854:## 🧑 Robert
+855-
+856-Wszyscy osobnicy startują z tej samej pokręconej kostki, ale wykonują na niej GENES_COUNT ruchów, po każdym ewaluując kostkę. Jeśli obliczenia dla różnych osobników są wykonywane równolegle to jak możemy używać wspólnej tablicy?
+857-
+--
+885:## 🧑 Robert
+886-
+887-Oczywiście, super, wchodzimy w A
+888-
+--
+935:## 🧑 Robert
+936-
+937-Reinterpretacja jest już chyba zrobiona. Jeśli chodzi o indeksy binding - chyba wszystkie bufory mogłyby być tworzone przez klasę Ssbo (nawet, ubo, może należałoby umożliwić przekazywanie bufora do konstruktora). Można byłoby wówczas wykorzystać indeksy wyprodukowane przez klasę i odpowiednio zmodyfikować shader Setup
+938-
+--
+961:## 🧑 Robert
+962-
+963-ok, A
+964-
+--
+1020:## 🧑 Robert
+1021-
+1022-weryfikacji
+1023-
+--
+1041:## 🧑 Robert
+1042-
+1043-[Request interrupted by user for tool use]
+1044-
+--
+1065:## 🧑 Robert
+1066-
+1067-Dla kostki N=3, size=3, pierwszy klastek to pojedyncza kostka. Jej ułożenie nie powinno sprawiać algorytmowi żadnej trudności, ale fitness besta pozostaje stale na 1024
+1068-
+--
+1089:## 🧑 Robert
+1090-
+1091-[Request interrupted by user for tool use]
+1092-
+--
+1118:## 🧑 Robert
+1119-
+1120-Fitness pierwszego spada teraz  do zera w pierwszej generacji. Po ułożeniu tego klastra czas na następny. I tu mam problem, bo highScore = best.Fitness spadł do zera i muszę ustawić go na ocenę aktualną kostki przy zmienionym ActiveCluster a funkcja oceny działa inaczej na cpu niż na gpu.
+1121-
+--
+1160:## 🧑 Robert
+1161-
+1162-Popraw, i zmień RubikCube.Score na bez inicjalizacji (będzie 0), przed uruchomieniem Solve, Highscore jest ustawiany na 0, więc wejdzie do warunku wyznaczającego nowy Aktywny klaster i przeliczenia (po poprawce) oceny kostki
+1163-
+--
+1188:## 🧑 Robert
+1189-
+1190-Coś mi się wydaje, że Highscore do niczego nie służy i można go zastąpić RubikCube.Sorce
+1191-
+--
+1223:## 🧑 Robert
+1224-
+1225-NIe ,sam sprawdzę
+1226-
+--
+1233:## 🧑 Robert
+1234-
+1235-Funkcja NextCluster() korzysta z cubie.State, które nie jest ustawiane. Chyba powinienem użyć CubieL1 zamiast State
+1236-
+--
+1268:## 🧑 Robert
+1269-
+1270-Przede wszystkim: jeśli chodzi o tablice M i P to powstały jako próba wykorzystania instrukcji SIMD na CPU do szybkiej ewaluacji. Miały być więc przyspieszoną wersją transformacji pamiętanych w Transform. Zakładam, że na GPU implementacja będzie jednak znacznie szybsza (chyba?) i efektywniejsza. NIe ma sensu chyba zatem , mimo ograniczeń sprzętowych jakie założyłem dla kostki (i tak są one niewielkie) trzymać obu implementacji. Najbardziej uniwersalna i czytelna jest jednak Transform, a nie SOA z M i P z których należałoby zrezygnować w ogóle. Co do NextCluster() (i podobnych warunków z cubie.State != 0) warto chyba wprowadzić stała wartość IDENTITY i z nią porówywać CubieL1
+1271-
+--
+1293:## 🧑 Robert
+1294-
+1295-Plan A jak najbardziej, Evaluate() w RubikCube na razie zostawmy (i tak chyba będzie miała 0 referencji), Plan B jednak chyba będzie zbędny. POnieważ używamy NextCluster i podobnych w nim warunków na cubie.State bardzo rzadko, równie dobrze mozemy w Turn obliczać state na podstawie EulerAngles, tym bardziej, że przyda się on jednak do określania początkowych genów osobników (z użyciem GetRevSeq i bufora przekazującego te ruchy, które układają aktywny kubik )
+1296-
+--
+1333:## 🧑 Robert
+1334-
+1335-Usuń je
+1336-
+--
+1347:## 🧑 Robert
+1348-
+1349-[Request interrupted by user]
+1350-
+--
+1357:## 🧑 Robert
+1358-
+1359-Zawiesza się podczas ewaluacji kostki dla Size == 2
+1360-
+--
+1400:## 🧑 Robert
+1401-
+1402-Access Violation
+1403-
+--
+1431:## 🧑 Robert
+1432-
+1433-Poczekaj, źle powiedziałem, nie zawiesza się, tylko przerywa pracę zgłaszając Access Violation
+1434-
+--
+1449:## 🧑 Robert
+1450-
+1451-Dobre zmiany w TGLContext i bez ingerencji do shaderów bezpośrednio w sterowaniu UI - super, ale wykłada się dla size=2, choć nie od razu
+1452-
+--
+1472:## 🧑 Robert
+1473-
+1474-Błąd występuje przy drugim uruchomieniu GA, gdy szuka poprawienia klastra dla kostki, która ma tylko jeden klaster (size = 2, solvedCubies = 0, actualCubies = size^N)
+1475-
+--
+1507:## 🧑 Robert
+1508-
+1509-Miejsce: Dispatch Ewaluacji, błąd w 1 iteracji drugiej próby ułożenia kostki
+1510-
+--
+1533:## 🧑 Robert
+1534-
+1535-[Request interrupted by user for tool use]
+1536-
+--
+1569:## 🧑 Robert
+1570-
+1571-Sprawcą są linie 123/124 w Setup:     uint shift = col < uint(N) ? N - 1u - col : 0u; // guard: a stray col must not underflow the shift
+1572-    if (SIZE == 2) return (cubieID >> shift) & 1u; // Fast bitwise op for SIZE = 2
+--
+1592:## 🧑 Robert
+1593-
+1594-Nie ma problemu przy:     uint shift = N - 1u - col;
+1595-    if (SIZE == 2)
+--
+1623:## 🧑 Robert
+1624-
+1625-Nie bardzo rozumiem dlaczego, ale powodem nie był twój strażnik. Wszystko działa dopiero poprawnie wówczas, jeśli kod domyślny umieścimy w sekcji else. Jeśli return ucieka z funkcji tuż po if - crash. Być może błąd wynika z wycieku pamięci gdzieś indziej. Czy moglibyśmy się zastanowić czy nie warto utworzyć jakiejś statycznej klasy przechowującej wszystkie programy, bufory i elementy potrzebne do potoku GPU? Kontekst jest związany z oknem (których teoretycznie mogłoby być kilka patrzących na tą samą scenę), poza tym jakoś nie pasują one do reszty, są wszystkie statyczne
+1626-
+--
+1651:## 🧑 Robert
+1652-
+1653-Nazwa: Gpu, przenieśmy również ExecuteGA, będzie piękniej. Zrób refaktor, ja przebuduję i sprawdzę
+1654-
+--
+1694:## 🧑 Robert
+1695-
+1696-Opisz architekturę, sposób działania i implementację użytego algorytmu genetycznego na GPU w pliku pdf i zapisz w podkatalogu Docs projektu pod nazwą GpuGA.pdf
+1697-
+--
+1704:## 🧑 Robert
+1705-
+1706-Base directory for this skill: C:\Users\robert.swita\AppData\Roaming\Claude\local-agent-mode-sessions\skills-plugin\0c063698-aa8b-4e91-8ac7-5d14401be0a4\31d5028a-8a4e-4b18-87ae-3f8b292c6136\skills\pdf
+1707-
+--
+2045:## 🧑 Robert
+2046-
+2047-Jak rozumiem, w metodzie CreateBuffers, kod w warunku: if (PopulationBuffer[0] == null) wykonywany jest tylko za pierwszym razem. Czy możemy w związku z tym przenieść go do RebuildShaders (może zmieńmy nazwę na BuildShaders, bo już ich nie przebudowywujemy). Przy okazji zmieńmy definicję konstruktoa buforów ssbo, by nie inicjalizował danymi, a jedynie ustalił Id i Size. Update w CreateBuffers załatwi resztę
+2048-
+--
+2091:## 🧑 Robert
+2092-
+2093-Zdaje się, że przy tworzeniu Ssbo nie musimy podawać rozmiaru, i tak go podajemy w Update - tam go będziemy zapamiętywać. W BuildShaders chyba możemy tworzyć bufory przed programami i warunek zamienić np. na if (InitProgram == null)
+2094-
+--
+2126:## 🧑 Robert
+2127-
+2128-W związku z tym przerzućmy cały blok inicjalizacji buforów do procedury Init, zanim wywołamy po raz pierwszy BuildShaders (oczywiście już bez żadnych warunków). Zastanawiam się, czy w CreateBuffers powinnyśmy wywoływać właśnie BuildShaders do ponownej rekompilacji. Chyba nie powinniśmy budować od początku wszystkich programów i shaderów, a tylko je rekompilować i linkować. Nie jestem pewien, ale czy nie lepiej w Init utworzyć programy i ich shadery, podłączyć ze sobą, a w BuildShaders tylko kompilowac i linkować? NIe byłoby zamieszania ze zwalnianiem pamięci programów i shaderów
+2129-
+--
+2166:## 🧑 Robert
+2167-
+2168-Czy nie lepiej użyć glGetAttachedShaders do ich odczytania, zamiast pamiętania uchwytów - trochę ich tam za dużo w deklaracji klasy
+2169-
+--
+2201:## 🧑 Robert
+2202-
+2203-W katalogu Docs znajduje się plik kosta_n_wymiarow.pdf, który opisuje algorytm układania kostki na CPU. Przeczytaj dokument i zasugeruj jak inicjalizować pierwsze geny populacji początkowej na GPU, aby zawierały one ruchy cofające transformacje kubików z aktywnego klastra
+2204-
+--
+2278:## 🧑 Robert
+2279-
+2280-Rozumiem, że rwiesz się do pracy, ale może zastanówmy się jak skutecznie seedować. Różnorodność faktoryzacji jest według mnie kluczowa. Powinienem rzeczywiście chyba dla każdego aktywnego kubika przeanalizować jego macierz obrotu, odrzucić płaszczyzny obrotu, które wynikają z jedynek (a właściwie elementów dodatnich, bo kubiki są jednorodnie skalowane) i składać obroty z macierzy Givensa z pozostałych płaszczyzn w różnych kolejnościach. Potrafię jednak tylko zamieniać osie przed QR lub odwracać kolejność płaszczyzn. Na podstawie zbioru płaszczyzn obrotu nie tak łatwo chyba byłoby znaleźć receptę na jej dekompozycje tymi metodami. Dodatkowo niektóre płaszczyzny są komutowalne, a więc kolejność tych obrotów nie ma znaczenia
+2281-
+--
+2326:## 🧑 Robert
+2327-
+2328-Prawie ze wszystkim zgoda, ale GetOrder nie generuje wszystkich możliwych ścieżek rozkładu macierzy. Sprawdź to. Odwrócona kolejność uzyskana z GetOrder nie zawsze jest dla niego poprawną kolejnością, bo nie rozłożymy nią macierzy M standardowych QR nawet z permutacjami. Można natomiast tego dokonać na macierzy transponowanej i na podstawie kątów obrotów tego rozkładu ustalić prawidłowe kąty obrotu przy rozkładzie macierzy M
+2329-
+--
+2368:## 🧑 Robert
+2369-
+2370-Wyciągnąłeś błędne wnioski. Rozkład macierzy transponowanej do M odbywa się również za pomocą standardowego QR (z możliwą wcześniej permutacją osi) i jest tak samo "obciążony". Chodzi o to, że te dwa podejścia się uzupełniają, a dla każdego, jak słusznie zauważyłeś istnieje jeszcze różnorodność wyboru Axis
+2371-
+--
+2408:## 🧑 Robert
+2409-
+2410-Ok
+2411-
+--
+2513:## 🧑 Robert
+2514-
+2515-Losowanie drogi via Rnd.nextBool, czyli losowa jakoś mnie nie przekonuje, bo jak mielibyśmy "pecha" to zawsze mogłaby losować się jedna droga (choć statystyka mówi co innego). Jak myślisz, czy nie warto dla wylosowanego porządku Order wygenerować obie możliwości M i M transp. oraz wszystkie możliwe Axis?
+2516-
+--
+2582:## 🧑 Robert
+2583-
+2584-Zacznijmy od GPU
+2585-
+--
+2622:## 🧑 Robert
+2623-
+2624-Ok, działa
+2625-
+--
+2660:## 🧑 Robert
+2661-
+2662-W mojej implementacji brakuje określenia liczby osi niezależnych m, poza tym osie Axis są losowane. Możemy na podstawie naszych rozważań coś udoskonalić? Ogon losowy chciałbym mieć sterowany jakąś zmienną
+2663-
+--
+2750:## 🧑 Robert
+2751-
+2752-Tak, ale uwaga na check w AciveAxisCount, jak wspominałem kubiki są skalowane (zdaje się o 0.45f) więc próg musi być niższy (np. 0.1). SeedRatio chciałbym mieć jako parametr w Setup #define podobnie jak inne parametry GA
+2753-
+--
+2790:## 🧑 Robert
+2791-
+2792-Wszystko wygląda dobrze, seedy wchodzą, sekwencje odwracają orientację kubika, a jednak... sama kostka nie bardzo chce układać klastry tak, jak to robiła wersja na CPU. Jest to być może kwestia doszlifowania kodu, ale obawiam się, że może tu wchodzić w grę precyzja ewaluacji kostki
+2793-
+--
+2830:## 🧑 Robert
+2831-
+2832-Dla N=3
+2833-
+--
+2857:## 🧑 Robert
+2858-
+2859-ok
+2860-
+--
+2911:## 🧑 Robert
+2912-
+2913-Ostatnio miałem problemy z mutacją bo (zakomentowany w  środku funkcji) zaimplementowałem histogram zliczający powtarzające się ruchy tak, by po mutacji zachować go jako makroruch, a gdy obracamy o 180 stopni i później znowu, to nie próbować tego cofać, bo obroty się znoszą. Właśnie - CPU ma również procedurę Correct(), która optymalizuje chromosom składając ruchy (te które można) w jeden. Była ona wywoływana podczas selekcji, tylko na rodzicach w procedurze SelectUnique, która była domyślym algorytmem selekcji CPU. Selekcja Unique pomija przy wyborze osobniki o takich samych dopasowaniach jak poprzednie
+2914-
+--
+2961:## 🧑 Robert
+2962-
+2963-Na razie wstrzymajmy się z Correct a tym bardziej z SelectUnique. Makro-mutację jak najbardziej powinniśmy wdrożyć, ale po zastanowieniu myślę że największa zmiana będzie widoczna po uzupełnieniu metryki o informację o m (licznie aktywnych osi) bo mówi ona ile potrzebuje kubik ruchów, by go ułożyć. To kluczowa informacja, a dodatkowo zwiększa rozróżnialność orientacji
+2964-
+--
+3013:## 🧑 Robert
+3014-
+3015-To chyba jednak nie to, dodajmy zmianę w mutacji
+3016-
+--
+3057:## 🧑 Robert
+3058-
+3059-E tam, coś i tak kiepsko. Czy SelectUnique nie jest tak prawdę mówiąc związany z odpowiednim sortowaniem? Gdyby podczas porównania oba osobniki okazały się takie same, można by nadać jednemu z nich karę wielkości całej populacji
+3060-
+--
+3093:## 🧑 Robert
+3094-
+3095-O niebo lepiej, i oto chodziło! Właśnie ułożyłem kostkę 6^3 w 10 minut bez używania zapamiętanych makroruchów kończących układanie klastra. Jest chyba nawet ciut lepiej niż dotychczas na CPU (nie chodzi o czas, ale kończenie szybkie klastrów). Zwykły mutate ze zmianą losową genu moim zdaniem zupełnie odpada - będzie tylko psuł, a potężną mutację i tak zawsze robię gdy uruchamiam następny algorytm GA - liczba generacji nie jest duża. Nie chcę też mieć dziesięciu pokręteł - MUTATION_RATIO (oznaczający SEED_RATIO) będzie chyba wystarczający. Chyba na razie zostawimy Correct(). Wywołuję go po stronie CPU na osobniku best.
+3096-
+--
+3131:## 🧑 Robert
+3132-
+3133-Właściwie to miałem na myśli tylko Seed_MUT_RATIO, a nie jak napisałem SEED_RATIO. Ten jest chyba jednak potrzebny. Nie znajdujemy wszystkich możliwych dekompozycji, więc coś tam losowego by się jednak przydało. Wyzwaniem do układania są kostki o N > 3. Po stronie CPU funkcja Evaluate() zmienia ocenę kostki, jeśli liczba kubików nieułożonych jest <= N i od tego momentu nie przejmuje się już liczbą nieułożonych kubików - układy z tyloma kubikami nie są wcale prostsze do ułożenia - a już z mono-twista bardzo ciężko uciec
+3134-
+--
+3180:## 🧑 Robert
+3181-
+3182-Tak, chodzi raczej już o kostkę 2^4. Ponieważ podczas sortowania karę duplikatowi dodajemy do Fitness, to czy nie lepiej jest dodać CubiesCount (max Fitness)?
+3183-
+--
+3200:## 🧑 Robert
+3201-
+3202-Projekt ostatnio przerobiłem z .NETFramework 4.8 na .NET 8, zamieniłem wrapper OpenGL, który używał DLL Import z opengl32.dll na funkcje używające wkaźników niezarządzanych na delegaty funkcji. Miało być znacznie szybciej, tymczasem rysowanie w OpenGL realizowane w zasadzie na funkcjach OpenGL 1.1 mam wrażenie znacznie spowolniło. Może to jednak nie wina OpenGl.
+3203-
+--
+3235:## 🧑 Robert
+3236-
+3237-A zajrzyj wszędzie
+3238-
+--
+3286:## 🧑 Robert
+3287-
+3288-Odłóżmy to na razie.  Standardowy QR dokonuje redukcji macierzy poprzez uzyskiwanie zer poniżej przekątnej, od lewej strony do prawej, używając do tego celu rotacji Givensa. Ponieważ nasza macierz jest ortogonalna, moglibyśmy również używać obrotów, które zerują elementy powyżej przekątnej - po orthogonalizacji macierz jest diagonalna. Zwiększa to chyba możliwość budowy poprawnych drzew rozkładu
+3289-
+--
+3331:## 🧑 Robert
+3332-
+3333-Ale coś mi się nie wydaje, aby uzyskiwanie wszystkich zer powyżej przekątnej było np. równoważne z analizą M transponowane, kolejność jest inna. Moim zdaniem te podejścia znowu się raczej uzupełniają a nie zastępują
+3334-
+--
+3376:## 🧑 Robert
+3377-
+3378-Czekaj, to trzeba sprawdzić. Coś mi się wydaje, że jak będziemy stosowali redukcję raz pod, raz nad, to możemy popsuć uzyskane wcześniej zera
+3379-
+--
+3412:## 🧑 Robert
+3413-
+3414-Jestem ciekaw czy Greedy da tyle samo drzew co mieszana (w twoim przykładzie 12)?
+3415-
+--
+3443:## 🧑 Robert
+3444-
+3445-jasne1
+3446-
+--
+3523:## 🧑 Robert
+3524-
+3525-Niezłe, niezłe. Czy RotationCount możemy zastąpić liczbą niedodatnich elementów na przekątnej macierzy? Nic właściwie nie musielibyśmy liczyć, tylko odczytać po obrocie
+3526-
+--
+3597:## 🧑 Robert
+3598-
+3599-Chcę mieć jednak wszystkie drzewa - podmienić na m zawsze zdążę, i wpinamy
+3600-
+--
+3641:## 🧑 Robert
+3642-
+3643-Czekaj, przecież funkcja RotationCount(cubie) robi to samo, co pamięta cubie.RotationCount
+3644-
+--
+3673:## 🧑 Robert
+3674-
+3675-Stwórz w języku angielskim dokument w formacie artykułu naukowego o układaniu kostki n-wymiarowej opracowaną metodą i informacjami z plików pdf z foleru Docs. Zapisz pod nazwą RubikNDSolver
+3676-
+--
+3709:## 🧑 Robert
+3710-
+3711-Skoro analizujemy każdy możliwy obrót zmniejszający RotationCount, to wariacja Axis już chyba nic nie wnosi. Sprawdź to. Zdziwiłbym się, jeśli bez tego i tek nie pokryjemy wszystkich drzew
+3712-
+--
+3749:## 🧑 Robert
+3750-
+3751-Tak, chyba jest lepiej, choć dopiero się zorientowałem, że przecież wiedzieliśmy, że zmiana Axis nie dodaje żadnych drzew, test był niepotrzebny. Przecież dlatego nie sprawdzaliśmy czy zmiana Axis zminiejsza RotationCount - bo musiała
+3752-
+--
+3761:## 🧑 Robert
+3762-
+3763-Po co w takim razie GetSolveSteps buduje "kroki". Przecież może poznaje ruchy cofające orientacje, trzeba je tylko zapamiętać. Oczywiście tym razem z losowym, prawidłowym Axis
+3764-
+--
+3798:## 🧑 Robert
+3799-
+3800-W GetSolveSteps losujemy aktywny kubik z aktywnego klastra (aby pokryć wszystkie możliwości poprawienia konfiguracji kostki). Wydaje się jednak, że mutacja, która raz stara się ułożyć jeden kubik, a raz drugi, zamiast się zbiegać będzie powodowała rozbieganie algorytmu. Z drugiej strony - to mutacja - normalnie jej zadaniem byłoby wybijać algorytm z minimum lokalnego - ale wówczas musi być wywoływana bardzo rzadko
+3801-
+--
+3826:## 🧑 Robert
+3827-
+3828-Nie bardzo wierzę w "nieśmiertelnych". Nasz algorytm znajdowania ruchów cofających orientację kubika zakłada, że w każdej płaszczyźnie obracamy tylko raz. Oczywiście w kostce Rubika taka zasada nie obowiązuje. Ale uwzględnienie tego jest trudne, wcześniejsze ruchy w tej samej płaszczyźnie musiałyby być właśnie takimi "przygotowującymi". Pętla po zmniejszającym się RotationCount nie miałaby zastosowania
+3829-
+--
+3854:## 🧑 Robert
+3855-
+3856-Tak się dopytuję, bo dotychczasowa strategia była taka, że (ponieważ algorytmy GA są krótkie, rzędu 50 generacji) dla pojedynczego GA wybierany był Aktywny kubik i jego tylko cofające ruchy wstrzykiwane do mutacji. Jeśli algorytm nie znalazł rozwiązania - następny próbował z inny kubikiem aktywnego klastra
+3857-
+--
+3890:## 🧑 Robert
+3891-
+3892-Tak mi się z doświadczenia wydaje, że fokus jest lepszy. Szukamy nie całego rozwiązania, tylko polepszenia konfiguracji. Oczywiście prawdziwe schody zaczynają się przy kończeniu klastrów, a zwłaszcza ostatniego, mimo, że to mocno ograniczony klaster kubików narożnych. Z MUTATIO_RATIO eksperymentowałem, zapomniałem też że oba etapy są razem i operują dokładnie na tych samych osobnikach. Oczywiście obniżamy
+3893-
+--
+3916:## 🧑 Robert
+3917-
+3918-Przy tworzeniu kopii kostki ActiveCubie dla niej jest już ustawiany. Zwróć uwagę, że niepotrzebna jest żadna pętla. Tablica Cubies pamięta zawsze kubiki na tych samych miejscach (podczas ruchów zmienia się tylko ich transformacja)
+3919-
+--
+3936:## 🧑 Robert
+3937-
+3938-Zrobiłem testy dla Mutacji kostki 6^3 od 0% do 25% ze skokiem co 5. Czasy: 11:46, 11:19, 10:42, 11:31, 13:50, 14:06. Policzyłem również sumę iteracji wszystkich GA, ale może coś robię nie tak, bo wyniki wyszły meaningless: 1018, 1576, 1046, 1218, 996, 1541. Tak więc z czasów wynikałoby ładne minimum przy ok. 10%. Utworzyłem funkcje obracającą kubik TCubie.Rotate. Unieważnia ona flagę ValidState. Używana jest w Turn, ale również zastąpiłem wywołanie funkcji RotationCountAfter przez jej użycie. Pytanie: dlaczego kopiujemy całą kostkę przy GetSolveSteps. Wystarczy chyba tylko Aktywny kubik, tym bardziej z nową metodą
+3939-
+--
+3969:## 🧑 Robert
+3970-
+3971-Nie wiem dlaczego przywróciłeś RotationCountAfter, było już zastąpione kodem używającym TCubie.Rotate. Zrób porządek również z funkcją GetReversedSeq - przecież to po prostu twoja GetSolvedSteps
+3972-
+--
+3998:## 🧑 Robert
+3999-
+4000-Nie bardzo rozumiem tłumaczenie rozbieżności dla liczby GA - przecież ona jest niezależna od czasu seedowania i tak prawdę mówiąc od żadnych czasów przetwarzania nie zależy
+4001-
+--
+4032:## 🧑 Robert
+4033-
+4034-Testy na drzewa robiłeś na kostce 4D, bo widziałem 192 orientacje, ale jaki rozmiar? Czy policzone drzewa uwzględniają, że niektóre kombinacje płaszczyzn różnią się komutowalnymi sąsiednimi płaszczyznami obrotu? (kolejność wykonania tych obrotów nie ma znaczenia)
+4035-
+--
+4064:## 🧑 Robert
+4065-
+4066-No ale kolejność wykonywania obrotów (na określonych płaszczyznach) ma kapitalne znaczenie...
+4067-
+--
+4092:## 🧑 Robert
+4093-
+4094-uff, a możesz sprawdzić wariant 5D?
+4095-
+--
+4118:## 🧑 Robert
+4119-
+4120-Wniosek nr 3 powoduje, że posłużenie się miarą m w GetReversedSeq (którą nawiasem mówiąc przemianowałem na GetSolveSeq) nie daje wszystkich drzew, ale takie obroty zdarzają się tylko chyba dla kątów obrotu 180 stopni
+4121-
+--
+4156:## 🧑 Robert
+4157-
+4158-Obroty w płaszczyznach zawierających osie już ustawione chyba nie mogą zmniejszyć c.RotationCount?
+4159-
+--
+4190:## 🧑 Robert
+4191-
+4192-ale płaszczyznę utworzoną z obu osi to na pewno możemy odrzucić
+4193-
+--
+4222:## 🧑 Robert
+4223-
+4224-Sprawdź, czy czegoś nie popsułem w getSolveSeq, coś za dużo mam iteracji przy 25% mutacji
+4225-
+--
+4254:## 🧑 Robert
+4255-
+4256-Jasne, wepnij. Ostatnia poprawka dot. obracania 1 kubika zamiast kostki 6^3 skróciła obliczenia 4-krotnie (a nie jest to realny czas uwzgl. m. in. animację ruchów, a tylko czas obliczeń). Przy 25% mutacji (ale była to tylko 1 próba, różnie być mogło) liczba iteracji #GAIter wynosiła 1541, teraz jest > 2600
+4257-
+--
+4284:## 🧑 Robert
+4285-
+4286-Jeśli ActiveCubie jest null, to kostka jest cała ułożona (i nie ma mowy o wywoływaniu GetSolveSeq). Oczywiście zawsze ActiveCubie należy do aktywnego, układanego klastra. Wszystko jasne z #GA: zawiódł czynnik ludzki - zamiast zmieniać Mutation_RATIO zmieniałem WINNERS_RATIO. Dla mutacji 10% średnia z 6 prób: 02:23,9 czas, stddev.p = 00:05,2 s, #GAiter = 1191,6 stddev.p = 194,3744839. Dla 25% - może później zrobię wiecej prób; wcześniej było #GAIter 1541, teraz mam 1554. Czas znów drastycznie spadł (w związku zapewne z ostanią poprawką w BuildSeedMoves) do 1:11,5
+4287-
+--
+4304:## 🧑 Robert
+4305-
+4306-Moja uwaga o ActiveCube == null była tego rodzaju, że nie należy w ogóle się przejmować, że taka ewentualność wystąpi, bo nie wystąpi. To tylko sygnał tego w programie, że kostka jest ułożona i żaden GA nie jest uruchamiany. Nie róbmy zbędnych zabezpieczeń, bo ukryjemy błędy. Nawet często lepiej by program się "wysypał" bo wskazuje to błąd
+4307-
+--
+4318:## 🧑 Robert
+4319-
+4320-Po poprawce, mimo mojego SEED_RATIO 100% ogon (bo BuildSeeds szybko przerywa) populacji uzyskuje losowe początki genów, tak?
+4321-
+--
+4339:## 🧑 Robert
+4340-
+4341-Komentarz do SEED_RATIO w Setupie mówi co innego. Wypełnianie seedów tymi samymi wartościami (jak przed poprawką) ma duży impact na wydajność po stronie CPU. Jeślibyśmy się decydowali na taki krok to raczej po stronie GPU (np. modulo z liczby seedów). Ponieważ twierdzisz, że nie warto - zostawmy jak jest. Muszę trochę jeszcze potestować, bo kostka układa się już dość sprawnie dla 3D i chyba pora na 4D
+4342-
+--
+4355:## 🧑 Robert
+4356-
+4357-Czy uważasz, że wielkość populacji powinna zależeć od N? (teoretycznie)
+4358-
+--
+4383:## 🧑 Robert
+4384-
+4385-Pamiętaj, że N/SIZE/CUBIE_COUNT to tylko stuby, nie zobaczysz z jaką kostką aktualnie pracuję, bo zmieniam dynamicznie w UI i przebudowuję shadery nie zapisując niczego na dysk. Ale masz rację - patrzyłem jak dla kostki 6^3 rozmiar populacji wpływa na prędkość ułożenia - dla 512 i 1024 tak samo: 52s, dla 4096 już gorzej - 1:28 (oczywiście mniej #GA, 550)
+4386-
+--
+4409:## 🧑 Robert
+4410-
+4411-Kostka 4D to zupełnie inne zwierzę. Dla kostki 2^4, która jest pojedynczym klastrem, liczby ułożenia wynoszą: 00:08,9	855
+4412-01:17,0	22626
+--
+4455:## 🧑 Robert
+4456-
+4457-rozrysuj #2
+4458-
+--
+4521:## 🧑 Robert
+4522-
+4523-Nie wiem, czy dobrze rozumiem, gdy mówisz o niezmienniku B. Wiesz o tym, że w 4D dokładnie jeden kubik narożny może być ułożony, tak? - to mono-twist. Na budowe modelu - zgoda
+4524-
+--
+4577:## 🧑 Robert
+4578-
+4579-Chyba nie ma sensu. Wprowadziłem przecież do oceny podbijanie wartości układów z nieułożonymi <=N kubikami. Mono-twist jest tak słabo oceniany, że kostka łatwo aktualnie z niego wychodzi. Opcja z komutatorem naruszającym jedynie 4 kubiki brzmi lepiej.
+4580-
+--
+4623:## 🧑 Robert
+4624-
+4625-#1
+4626-
+--
+4670:## 🧑 Robert
+4671-
+4672-Proponuję coś prostszego, może nawet banalnego, ale tym bardziej łatwego do przetestowania. Jeśli po kilkunastu uruchomieniach GA (parametr definiowalny w Setup) nadal nie posunęliśmy się do przodu, użyj ostatnio znalezionego besta, który psuje kostkę
+4673-
+--
+4714:## 🧑 Robert
+4715-
+4716-Dla Stall=8, początek był bardzo obiecujący, a potem utknął jak zwykle. Problemem jest to, że Best jest za dobry - nic nie robi, ma ten sam fitness co aktualna kostka. Rozwiązanie narzucające się - popsuć trochę Besta
+4717-
+--
+4751:## 🧑 Robert
+4752-
+4753-Zmodyfikowałem ExecuteGA w GPU.cs tak, by jeśli nie znajduje rozwiązania, zwracała nie najlepszego, ale drugiego co do oceny osobnika. Sprawdź czy dobrze
+4754-
+--
+4792:## 🧑 Robert
+4793-
+4794-Second best ma fitness ponad 16? Coś nie tak
+4795-
+--
+4815:## 🧑 Robert
+4816-
+4817-O czym ty opowiadasz, przecież sam powiedziałeś, że cała populacja to duplikaty aktualnego stanu kostki
+4818-
+--
+4840:## 🧑 Robert
+4841-
+4842-Poczekaj, poczekaj. A może oceniać inaczej. Chromosom, który stanowi no-op nie jest dobrym rozwiązaniem
+4843-
+--
+4894:## 🧑 Robert
+4895-
+4896-Czekaj, czekaj. Nie warto z tego zbudować jakiejś funkcji która w buforze zwróci mi wynik ewaluacji kostki na początku? Już dawno trapi mnie problem podwójnego, lustrzanego źródła prawdy dla oceny kubika po stronie GPU i CPU. Tobie to łatwo, ale ja wolę to mieć w jednym miejscu
+4897-
+--
+4947:## 🧑 Robert
+4948-
+4949-Mógłbyś całą naszą konwersację zapisać w pliku tekstowym lub pdf w katalogu Docs?
+4950-
+--
+4961:## 🧑 Robert
+4962-
+4963-Może utwórz również pdf, będzie łatwiejszy w przeglądaniu, bez osadzania czcionek, po co, są systemowe
+4964-
+--
+4975:## 🧑 Robert
+4976-
+4977-[Request interrupted by user for tool use]
+4978-
+--
+5018:## 🧑 Robert
+5019-
+5020-Widzę prawdziwą walkę. Jak kostka wpada w minimum, to nie aż tak łatwo jeden kop ją zawraca. Widziałem oceny second besta na poziomie ponad 1600 (mnożę błąd przez 100, żeby mieć w %) a to oznacza, że od czasu do czasu nadal populacja się degeneruje. Ale jest lepiej - wyszedł po 0:44s i 8500 #GA
+5021-
+--
+5044:## 🧑 Robert
+5045-
+5046-Uruchomiłem program, więc wszystko zapisane, możesz działać
+5047-
+--
+5085:## 🧑 Robert
+5086-
+5087-Coś nie tak z rozpoznawaniem no-op, bo wykonuje jakieś obroty o 180 stopni, które nie zmieniają układu
+5088-
+--
+5095:## 🧑 Robert
+5096-
+5097-GPU się przegrzał -> laptop wyłączył. Mam w komputerze 2 karty graficzne - Intel HD Graphics 4600 i NVidia GeForce GTX 850M. OpenGL używa tej pierwszej. Wolałbym NVidię, nie przegrzewałaby się chyba tak szybko, najwyżej oraniczy się zużycie gdzieś w ustawieniach, ale jak zmienić używaną kartę - też w Systemie, czy programowo?
+5098-
+--
+5140:## 🧑 Robert
+5141-
+5142-Pierwszą rzeczą rano było rozkręcenie laptopa i porządne odkurzenie - nie było tego dużo "na oko" - ale zawsze. Pierwszą rzeczą po zakupie, mimo że to udany model (ASUS N550JK), było ograniczenie zużywania energii przez CPU do max 80% - po prostu laptop stawał się zbyt gorący. Ale to CPU, potem nie miałem żadnych z nim problemów. Ponieważ rzadko męczę GPU, nie mam doświadczenia. Zobaczymy jak będzie na karcie dedykowanej NVidia, jak będzie gorąco (sprawdzam z CPUID) ograniczę zużycie energii. Jeśli chodzi o no-op, to za chwilę się jeszcze przyjrzę - to że sprawdzasz tylko aktywny klaster to bardzo dobrze - reszta nas nie interesuje, solved dla no-op muszą być takie same
+5143-
+--
+5160:## 🧑 Robert
+5161-
+5162-No ale gdzie jest .exe z mojego Release w Visual Studio, to jest poza mną. W katalogu bin jest podkatalog Release i x64 (choć w ustawieniach projektu mam Any CPU - widocznie coś wcześniejszego). Żaden z tych .exe zawartych w tych folderach nie jest nowy. Nowy jest tylko w Debug - dlaczego? Sprawdziałem w Task Manager - rzeczywiście uruchamiany jest z Debug - Bug?
+5163-
+--
+5187:## 🧑 Robert
+5188-
+5189-Problem w tym, że jestem ustawiony na Release
+5190-
+--
+5228:## 🧑 Robert
+5229-
+5230-Teraz za dobrze działa, by się przegrzewał, bo "kop" jednak jest całkiem sprawny - więc ciągle kręci kostką, a mój program odpoczywa, kiedy kręci kostką - jest 1-wątkowy na CPU
+5231-
+--
+5244:## 🧑 Robert
+5245-
+5246-Teraz zaczynam wątpić czy sprawcą był przegrzany GPU. Nasza mutacja na poziomie pomiędzy różnymi GA - czyli "kop", już działała, system zachowuje się dokładnie tak, jak opisałeś - zużycie GPU z 85% po chwili spada do 2%, bo kostka animuje ruchy - temp. na GPU to marne 50 stopni. Laptop już jest stary, windows ciągle odczytuje Flash BIOS-a, który się zużywa, dopóki Microsoft robił poprawki do Systemu, regularnie musiałem go reflashować, bo przestawał się budzić z uśpienia (ze stanu S3). W Podglądzie zdarzeń nie ma żadnych sensownych inf. oprócz tego że się zamknął bo zabrakło prądu
+5247-
+--
+5260:## 🧑 Robert
+5261-
+5262-Przejrzałem ewaluację, rzeczywiście sprawdzenie, czy kubik się obrócił czy nie jest prawie darmowa - to porównanie stanu (macierzy orientacji) kubika przed GA i po ruchu. Układ się zmienił jeśli którykolwiek z aktywnych kubików zmienił orientację. Oczywiście jest to dużo dokładniejsze od liczenia samego fitnessu i dokładnie to o co nam chodzi - kubik z aktywnego klastra na pewno zmienił swoją orientację. Brawo! Podoba mi się, że implementacja okazała się tak prosta i minimalna (np. wł., wył. stalla to tylko 1 wbudowany warunek), ale jeszcze za chwilę o możliwych zmianach. W Stallu bardzo często kostka dochodzi do minimalnego fitnessu (coś koło 24,162582 bo mnożę przez 100) i fitness potrafi się nie zmienić, ale układ kostki tak. I jeszcze dowód na poparcie - wyniki dla Stall=8: 00:00:10.2149515	931
+5263-00:00:12.6292283	3766
+--
+5294:## 🧑 Robert
+5295-
+5296-Czasy nie uwzględniają animacji - jest to czysty czas obliczeń wszystkich GA + obliczenia na CPU bez rysowania. Rozrzut stosunku pomierzonych czasów do #GaIters jest trochę zaskakujący, ale pewnie by się unormował, gdyby czasy były dłuższe. Mówiłem, byś nie sugerował się stubami w Setupie, Stall był przeprowadzany na kostce 2^4. Jeśli chodzi o zmiany - porozmawiajmy na razie teoretycznie. Wolałbym, mianowicie, aby ocena kostki potrzebna CPU odbywała się drogą zwykłej ewaluacji 1 osobnika o zerowej długości. Problem w tym, że będzie on wówczas obciążony karą - którą teoretycznie można oczywiście cofnąć. Jak zapatrujesz się na taki pomysł?
+5297-
+--
+5318:## 🧑 Robert
+5319-
+5320-Oczywiście, masz rację, nie przewidziałem konsekwencji takiego kroku. Nie ma osobników, którzy nic nie robią, i bardzo dobrze, bo kodowanie takiego osobnika jest krótsze, mniejsza liczba bitów potrzebna do zapisu jego stanu. Niech zostanie jak jest (na razie). Oczywiście moglibyśmy traktować osobnika o długości 0 specjalnie - ale taki if, jak mówiłeś to kij w szprychy GPU. Dobra wiadomość: nasz stall działa nie tylko na endGame, ale na każdym etapie kończenia układania klastra (chyba nie intencjonalnie, ale OK). Ułożyłem właśnie po raz pierwszy kostkę 3^4 w imponującym tempie: 00:02:00.5877569, #GA: 12055
+5321-
+--
+5334:## 🧑 Robert
+5335-
+5336-Prosiłbym o wygenerowanie nowych dokumentów GPUGA i RubikNDSolver z uzupełnieniem informacji o zmianach
+5337-
+--
+5411:## 🧑 Robert
+5412-
+5413-Przy tworzeniu poprzednich dokumentów sugerowałeś osadzenie czcionek - i wszystko działało. Za drugim razem prosiłem byś nie osadzał, bo myślałem, że czcionki systemowe to i tak udźwigną. Może niepotrzebnie się wtrącałem, ale nie ma to znaczenia. Najważniejsze, że widok jest OK, poza tym sprawdziłem, że Word natychmiast je importuje z diakrytykami, a na pewno nie używa do tego OCR - za szybko mu poszło. Dziękuję
+5414-
+--
+5425:## 🧑 Robert
+5426-
+5427-A wiesz, Claude, że to nieprawda, że nie mamy ruchu o 0 stopni?
+5428-
+--
+5450:## 🧑 Robert
+5451-
+5452-Nie, nie o to chodzi. To po stronie CPU przede wszystkim warto byłoby przekodować właśnie te nasze cztery kąty na wielokrotności 90 stopni - żadnych Angle + 1, tylko po prostu Angle. Kodowanie ruchu pozostało po gęstym kodowaniu, które teoretycznie jest słuszniejsze - ale przydział bitów zawsze jest optymalniejszy do wyciągania z kodu parametrów ruchu, a wielokrotność 90 w kodzie czyta się (i niekiedy nawet liczy! - np. w procedurze Correct() - w której składamy kąty i po złożeniu znowu musimy je zakodować) o niebo lepiej
+5453-
+--
+5476:## 🧑 Robert
+5477-
+5478-Correct - linia 313 w TRubikGenome, GetFreeMoves - 464 w TRubikCube (tu chyba tylko na końcu do freeGenes dodajemy do każdego kodu o 1 więcej). Nie zapomnij o GetRevCode w TMove - to teraz chyba (4 - code)&3
+5479-
+--
+5525:## 🧑 Robert
+5526-
+5527-Nie, dzięki, jeszcze wiele się zmieni, to dopiero początek. Zrobiłem szybki test, działa
+5528-
+--
+5537:## 🧑 Robert
+5538-
+5539-A co teraz sądzisz o ewaluacji pojedynczym osobnikiem 0 (teoretycznie)
+5540-
+--
+5563:## 🧑 Robert
+5564-
+5565-Tak, zgadzam się ze wszystkim co mówisz. Ale: (bo zawsze musi być jakieś ale) kara - to osobna bajka, wynika z naszego sposobu rozwiązania problemu Stall. Stała w #define nie jest magiczna bo może być wspólna dla host i GPU jak N i Size (np.). Najbardziej mi się w tym podejściu nie podoba wypełnianie bufora Populacji, który przez cały czas układania kostki jest aktualnie stały (pomijajac zgrabny ping-pong), ale to chyba jednak nie ma znaczenia - przed GA ustawiamy rozmiar Populacji za pomocą Update w CreateBuffers, to chyba żadan koszt
+5566-
+--
+5585:## 🧑 Robert
+5586-
+5587-To mi się podoba - nowe pomysły - nowe możliwości. Tak nawiasem mówiąc to nie wiem czy jest o czym rozmawiać, jeśli chodzi o wydajność tego rozwiązania - bo chodzi o ewaluację kostki po ułożeniu klastra, czyli bardzo rzadko. Ułożenie klastra to święto, które warto byłoby uczcić kilkoma cyklami zegarowymi
+5588-
+--
+5601:## 🧑 Robert
+5602-
+5603-Taak, a wiesz że ja dopiero teraz zrozumiałem dlaczego układanie się tak polepszyło - mówiłeś o tym, ale ja myślałem o usunięciu no-opów z ewaluacji pod kątem Stallu - ale to ich usunięcie uleczyło GA. Przecież one zawsze były bestami! A więc no-opy to głębsza sprawa i ewaluacja 0-osobnikiem trochę w moich oczach zbladła
+5604-
+--
+5621:## 🧑 Robert
+5622-
+5623-To brzmiało w moich uszach jak poezja. Zgadzam się tym razem kropka w kropkę. Ale zawsze coś z tych rozważań wyniknęło - choćby zmiana kodowania kąta
+5624-
+--
+5637:## 🧑 Robert
+5638-
+5639-Już raz karamy osobniki za identyczność fitnessu, kara no-op powinna być chyba większa, ale po co brać "z sufitu" 1e6, może 2 * CUBIES_COUNT?
+5640-
+--
+5659:## 🧑 Robert
+5660-
+5661-Tak, nie wiem tylko skąd Ci się bierze CUBIES_COUNT + N. Największy fitness to CUBIES_COUNT. Zwróć uwagę, że Solved.Count + ActiveCluster.Count = CUBIES_COUNT, więc (ponieważ ActiveCluster,Count >=1) max wychodzi nawet nieco mniejszy: CUBIES_COUNT -1 + maxState/fMAX <= CUBIES_COUNT
+5662-
+--
+5680:## 🧑 Robert
+5681-
+5682-Teoretycznie procedura Correct() mogłaby przekształcać większość no-opów w prawdziwych, ale jest kosztowna obliczeniowo
+5683-
+--
+5698:## 🧑 Robert
+5699-
+5700-Czekaj, a właściwie to po znalezieniu besta z fitness 0, domykającego klaster, w GPU jako Cubies pamiętamy kostkę sprzed tego ruchu, tak? A nie wystarczy podmienić Solved i Active i wykonać GA jeszcze raz na beście żeby przekonać się jaki jest score kostki? Eureka!
+5701-
+--
+5718:## 🧑 Robert
+5719-
+5720-A mnie całkiem jeszcze nie przekonałeś. Pewnie, że to mało kosztuje obliczeniowo. ale ja lubię wykorzystywać zbudowaną maszynerię do końca. Źródeł prawdy jak najmniej. A besta nie trzeba ciąć, wystarczy na chwilę zmienić GENES_COUNT
+5721-
+--
+5738:## 🧑 Robert
+5739-
+5740-To też nie do końca tak jak mówisz, że Eureka zależy od alfabetu genów / kolejności klastrów / logiki minimum. To raczej na odwrót, to ta logika wymusza ponowne przeliczenie Scora kostki, który jest w ten sposób zdefiniowany, że zmienia się wówczas, gdy ułoży się klaster. Jeśli zmieni się logika, musi zmienić się również sposób liczenia Score
+5741-
+--
+5760:## 🧑 Robert
+5761-
+5762-Pokaż jak wyglądałaby Eureka jako Gpu.ReScore(TRubikGenome best). Załóż, że klasa TCubie posuada funkcję pakującą transformację Pack()
+5763-
+--
+5830:## 🧑 Robert
+5831-
+5832-Nie moglibyśmy zamiast tablicy Population[2] mieć oddzielnie Population i Children i zamieniać im ID?
+5833-
+--
+5884:## 🧑 Robert
+5885-
+5886-tak
+5887-
+--
+5909:## 🧑 Robert
+5910-
+5911-Z pack() coś mi się pomyliło, chodziło mi o zapisanie besta z zerowymi genami po MovesCount i zapisanie go jako populacji
+5912-
+--
+5963:## 🧑 Robert
+5964-
+5965-A wpinaj
+5966-
+--
+6015:## 🧑 Robert
+6016-
+6017-To proste: Ustaw kostkę ułożoną i przekaż jako besta osobnika który ją układa do danego popsutego układu początkowego. Ale tak na serio - coś w tym jest, tzn. można policzyć fitness 0-osobnika i odjąć od jego fitnessu wartość fitnessu tego osobnika dla kostki ułożonej (czyli karę no-op)
+6018-
+--
+6046:## 🧑 Robert
+6047-
+6048-Po pierwsze: wystarczy nam wersja z 0-osobnikiem. Wersja z bestem była jednak niewypałem. Po drugi nie utworzyłem funkcji Pack(), ale to wnętrze for-a w PackCubies
+6049-
+--
+6088:## 🧑 Robert
+6089-
+6090-Układa się tak samo szybko. Dla 6^3 to aktualnie ok.15s obliczeń. Kręci nią tak szybko, że nie można zauważyć, czy nie oszukuje
+6091-
+--
+6129:## 🧑 Robert
+6130-
+6131-Dziękuję. Możesz uzupełnić naszą konwersację do tego miejsca dołączając od ostatniego razu do pliku *.md w Docs?
+6132-
+--
+6139:## 🧑 Robert
+6140-
+6141-Trochę za dużo tych warunków na no-op penalty jak na mój gust. Starałem się trochę posprzątać, zobacz czy nadal OK
+6142-
+--
+6149:## 🧑 Robert
+6150-
+6151-[Request interrupted by user]
+6152-
+--
+6181:## 🧑 Robert
+6182-
+6183-[Request interrupted by user]
+6184-
+--
+6212:## 🧑 Robert
+6213-
+6214-Napisałem też Pack() w TAffine (wywoływany przez TRubikCube,PackCubies - właściwie to ta funkcja do niczego nie służy, tylko do wywołania w CreateBuffers, ale OK.
+6215-
+--
+6230:## 🧑 Robert
+6231-
+6232-Wszystko gra, miałem na myśli, że zamiast wywoływać funkcję, która przedstawia sobą pętlę for po kubikach, można w CreateBuffers napisać taką pętlę i wywoływać TAffine.Pack(). Nie lubię tworzenia nadmiarowej liczby metod. Ale jak mówiłem - niech na razie zostanie, są inne rzeczy to sprzątania
+6233-
+--
+6246:## 🧑 Robert
+6247-
+6248-Jedna uwaga: (nie robię z tego żadnego case). Mówisz, że: Gpu nie musi wiedzieć o tablicy Cubies, Transform ani formacie pakowania. A tymczasem TRubikCube nie potrzebuje żadnego pakowania swoich kubików - to GPU jest potrzebna taka odpowiednia forma zapisu transformacji
+6249-
+--
+6262:## 🧑 Robert
+6263-
+6264-Tak właściwie, to rzeczywiście Pack() nie pasuje do TAffine, bo zakłada, że ta transformacja nie tylko jest afiniczna, ale że jest macierzą obrotu - z drugiej strony zauważ, że niezależnie od tego, co chce GPU, taki format zapisu macierzy ortogonalnej jest najbardziej kompaktowy (i szybki do dekodowania) - a więc to jest cecha klasy - wystarczy zmienić nazwę - i tak zrobię - na OrthoPack()
+6265-
+--
+6282:## 🧑 Robert
+6283-
+6284-I dobrze mówiłeś o serializacji kostki - to też uniwersalna funkcja - ale serializator prawdopodobnie powinien zapisywać transformacje kubików do jakiegoś strumienia, a po stronie GPU.cs można byłoby wczytywać ten strumień do tablicy uint[] - ale już łatwiej (a przynajmniej na to samo wychodzi) zrobić pętlę for w CreateBuffers. Ale tak tylko mówię, na razie bez zmian
+6285-
+--
+6306:## 🧑 Robert
+6307-
+6308-Tak, a powiedz, jak to jest z tymi pustymi buforami ssbo, jeśli przekazujemy ich długość przez uniforma. Pętle w shaderach nie chodzą wówczas po length(), tylko dla pustego bufora się nie wykonują - i dobrze. Po co zwiększać ich rozmiar do 1?
+6309-
+--
+6329:## 🧑 Robert
+6330-
+6331-A co myślisz o tych statycznych polach RubikCube i FreeGenes w TRubikGene. Właściwie to chyba każdy chromosom powinien mieć uchwyt do instancji kostki ustawiany w momencie jego tworzenia, a FreeGenes mogłoby być property, które się przebudowuje po ustawieniu na null - ale wszystkie chromosomy mają ten sam wskaźnik do tej samej kostki, więc zmienna statyczna jest chyba jak najbardziej uzasadniona
+6332-
+--
+6363:## 🧑 Robert
+6364-
+6365-Jeśli FreeMoves miałoby być statyczną właściwością TRubikCube, to GetFreeMoves musiałaby być również statyczna
+6366-
+--
+6395:## 🧑 Robert
+6396-
+6397-Wyrzuciłem z rozwiązania projekt crossplatformowy oparty o MAUI, ale VS nadal widzi powiązania do niego i nie chce się kompilować
+6398-
+--
+6434:## 🧑 Robert
+6435-
+6436-Kompiluje się ale nie mogę załadować formatki designera do Form1
+6437-
+--
+6484:## 🧑 Robert
+6485-
+6486-Instances of this error (1)  
+6487- 
+--
+6556:## 🧑 Robert
+6557-
+6558-Nie wiem o czym mówisz, to chyba chodziło o tę ostatnią linię Microsofta, przyznająca się do tego, że sami nie wiedzą o co chodzi: Instances of this error (1)  
+6559- 
+--
+6622:## 🧑 Robert
+6623-
+6624-pada
+6625-
+--
+6648:## 🧑 Robert
+6649-
+6650-Czekaj, tym razem zadziałało po usunięciu wszystkiego i przebudowaniu, dzięki
+6651-
+--
+6662:## 🧑 Robert
+6663-
+6664-Czy przy zamykaniu okna muszę wykonywać:         private unsafe void TRubikForm_FormClosed(object sender, FormClosedEventArgs e)
+6665-        {
+--
+6719:## 🧑 Robert
+6720-
+6721-Bardzo ładnie, zrób może za mnie - co do wycieku, to chyba go nie ma bo okno jest specjalnego rodzaju - z prywatnym kontekstem, żyjącym tak długo jak okno
+6722-
+--
+6753:## 🧑 Robert
+6754-
+6755-W zasadzie symetrycznie byłoby budować kontekst w CreateHandle, a nie dziwnym pytaniem w OnPaint
+6756-
+--
+6783:## 🧑 Robert
+6784-
+6785-Usunąłem strażnika na przypadek design, bo z doświadczenia wiem, że nawet w trybie design da się odpalić okno GL. Pytanie jest inne - wybrałeś Handlery zdarzeń OnHandleCreate / Destroyed, ja przeważ nie nadpisuję metody chronione CreateHandle / DestroyHandle, uważasz, że to ma jakieś znaczenie?
+6786-
+--
+6808:## 🧑 Robert
+6809-
+6810-Czy w Create może zajść if (HRC != IntPtr.Zero)
+6811-
+--
+6834:## 🧑 Robert
+6835-
+6836-Chcę ustalić po prostu sposób swojego postępowania, moją filozofię znasz, ale nie powiedziane i wcale nie twierdzę że nie być może błędna (bo choćby symetria by na to wskazywała). Ja również daję się przekonywać, tylko drażni mnie często martwy kod, nie lubię go pisać, nie lubię go czytać, im mniej kodu tym lepiej, a najszybszy kod to taki, którego nie ma
+6837-
+--
+6865:## 🧑 Robert
+6866-
+6867-Ok, teraz do OnDestroyHandle, czy wglDeleteContext(0) jest niebezpieczne?
+6868-
+--
+6886:## 🧑 Robert
+6887-
+6888-Wiesz co ja widzę czytając taki kod? Funkcję która sprawdza czy argument jest null (0) wywołującą funkcję która sprawdza czy on jest null, która...
+6889-
+--
+6921:## 🧑 Robert
+6922-
+6923-Nie, sam wepnę. A po co ustawiać HRC i HDC na zero? Create i tak by podmienił - choć tego nie zrobi, bo okna już nie ma
+6924-
+--
+6949:## 🧑 Robert
+6950-
+6951-Jeszcze jedno: Nie zrozumiałem do końca tłumaczenia o OnHandleDestroyed w stosunku do funkcji DestroyHandle - twierdzisz, że system może zwolnić uchwyt, którego nie wychwyci DestroyHandle i uchwyt związany z oknem przestanie być aktualny? To się chyba nie może zdarzyć przy prywatnym kontekście
+6952-
+--
+6981:## 🧑 Robert
+6982-
+6983-@"C:\_Moje Dane\_Lectures\Metody Wizualizacji Danych\cw07 - Shaders\Shaders\TGLContext.cs"
+6984-Zgoda, pytałem z ciekawości. Przejdźmy zatem do optymalizacji rysowania za pomocą shaderów GLSL. Ładnie, że mamy już część maszynerii - tworzenie programów, shaderów, pakowanie transformacji. Brakuje przekazania informacji o wierzchołkach i ścianach. Co sądzisz o modyfikacji kodu funkcji DrawObject, który spróbuję załączyć. Myślę jednak, że obiekty powinny być trzymane w płaskiej strukturze SOA. Ja wiem, że obiekty są proste i nie jest ich wiele, ale chciałbym się przygotować do tworzenia złożonego graficznie silnika, w którym modele są złożone i intensywnie animowane
+--
+7024:## 🧑 Robert
+7025-
+7026-@"C:\_Moje Dane\_Lectures\Metody Wizualizacji Danych\cw07 - Shaders\Shaders\Resources\Vertex.glsl.c"
+7027-Tak, nie ma jednak co przesadzać, rysujemy tylko hiperkostki, już skinning to gruba przesada, idziemy ścieżką 1-3, skinning w vertexShaderze, podrzucę w załączniku też shader, albo możesz sam podejrzeć w katalogu. DrawScene oczywiście jest w tej samej klasie TGLContext, linia 86
+--
+7035:## 🧑 Robert
+7036-
+7037-[Request interrupted by user]
+7038-
+--
+7067:## 🧑 Robert
+7068-
+7069-Od początku: nic mi nie mówią słowa takie jak "nierigidny", ale ładnie tłumaczysz. Wg mnie mylisz tu rzutowanie perspektywiczne z ortogonalnym, którego ja tu używam, i które niczego nie deformuje, to po prostu odrzucenie części współrzędnych wierzchołka po transformacji. Proste jak drut. Po drugie - nawet nie myślałem o niczym innym jak podejście B. Dalej - kolory naklejek, mówmy materiały, bo pamiętajmy, że układamy superkostkę, właściwie to powinna być jakaś tekstura, po której będzie widać, że każdy kubiczek odobrócił się idealnie do pozycji początkowej (obraz trójkąta, strzałki). Po trzecie - przezroczystość - nie drobiazg ani gadżet - realny wymóg - kostka jest pełna, oglądam ją najczęściej w trybie częściowej przezroczystości kubików nieułożonych. Fajnie byłoby to ulepszyć. Sortowanie po środkach kubików, które jest aktualnie nie działa najlepiej
+7070-
+--
+7103:## 🧑 Robert
+7104-
+7105-Wydaje mi się, że normalnych to i tak nie warto przesyłać, bo to kostki - wektor normalny może być policzony z cross-produktu wektorów tworzących ścianę. I celujemy od razu w OIT, ale przybliż mi to trochę, chodzi o rysowanie najpierw nieprzezroczystych, a później przezroczystych?
+7106-
+--
+7151:## 🧑 Robert
+7152-
+7153-Czekaj, a dlaczego normalną chcesz w ogóle liczyć w shaderze fragmentów, przecież można ją policzyć w shaderze wierzchołków
+7154-
+--
+7174:## 🧑 Robert
+7175-
+7176-Nie wiem co ja plotę, jaka normalna w N > 3? przecież w 4D są 2, itd. Dzięki za oświecenie. Oczywiście wybieram FS z pochodnych
+7177-
+--
+7195:## 🧑 Robert
+7196-
+7197-A wiesz co, fajnie było o tym pogadać, ale dzięki, że się zatrzymałeś. Nie chcę oświetlenia, jest ono tu całkowicie zbędne
+7198-
+--
+7236:## 🧑 Robert
+7237-
+7238-tak
+7239-
+--
+7297:## 🧑 Robert
+7298-
+7299-default
+7300-
+--
+7357:## 🧑 Robert
+7358-
+7359-Przepraszam, że Ci na razie przerwę (p.1 działa ale jeszcze zerknę dokładniej na źródła), trapi mnie jeszcze pewna myśl odnośnie GetSolveSeq i algorytmu greedy, który używa standardowego rozkładu QR do określenia liczby ruchów potrzebnych kubikowi do ułożenia. Chodzi o to, że ogólnie rzecz biorąc standardowy QR zakłada pewną kolejność wykonywanych obrotów. Jeśli zmienimy tą kolejność, to liczba koniecznych obrotów może być inna, tak?
+7360-
+--
+7378:## 🧑 Robert
+7379-
+7380-Jak najbardziej, bo już myślałem, i chyba tak dałeś do zrozumienia, że greedy daje nam wszystkie możliwości, które dawały różne order, transpozycje, zerowanie nad/pod, a tu nagle okazuje się, że greedy zależy od order ( a to znaczy, że od wszystkiego innego również)
+7381-
+--
+7390:## 🧑 Robert
+7391-
+7392-[Request interrupted by user for tool use]
+7393-
+--
+7414:## 🧑 Robert
+7415-
+7416-<task-notification>
+7417-<task-id>b0o6l7xma</task-id>
+--
+7432:## 🧑 Robert
+7433-
+7434-Pamiętam, że mówiłeś o znalezieniu wszystkich 16 drzew dla 4D. Wg mnie jest ich znacznie więcej. Jest ich na pewno mniej, bo nie wszystkie prowadzą do różnych możliwości, ale ogólnie rzecz biorąc wybieramy z P = N(N-1)/2 płaszczyzn N-1 (operator Newtona) i permutujemy, co dla4D daje 120
+7435-
+--
+7466:## 🧑 Robert
+7467-
+7468-Co mnie interesuje: czy jeśli State kubika określny był np. przez GetEulerAngles z parametrem reversed = true, to czy zbiór sekwencji układających kubik z GetSolveSeq będzie taki sam
+7469-
+--
+7495:## 🧑 Robert
+7496-
+7497-Czekaj, bo coś zamieszałem. Chodzi o to, że RotationCount w GetSolveSeq odczytujemy poprzez wywołanie gettera State obróconego kubika, który z kolei wywołuje GetEulerAngles(null). Jeśli zamiast tego wywoływałby GetEulerAngles(null, true), to czy po takiej zmianie zbioy sekwencji w obu przypadkach się różnią
+7498-
+--
+7530:## 🧑 Robert
+7531-
+7532-tak
+7533-
+--
+7566:## 🧑 Robert
+7567-
+7568-Dla orientacji pojedynczego kubika nasza funkcja zwraca zawsze sekwencje tej samej długości (RotationCount), ale przecież istnieją chyba sekwencje dłuższe lub krótsze niż RotationCount, tyle że wykonywane w innej kolejności płaszczyzn, np. w 3D: Rz^2Rx^2 = Ry^2, tzn. mogę tą orientację cofnąć jednym ruchem wokół osi Y lub 2 obrotami po 180 stopni wokół Z potem X
+7569-
+--
+7603:## 🧑 Robert
+7604-
+7605-Nie szukamy wcale minimum. Chodzi o wszystkie takie obroty (które się przełożą na ruchy warstw kostki) które układają kubik. Zwróć uwagę, że różne sekwencje to różne ruchy, zmieniające różne inne kubiki, ale układające nasz kubik, którego orientację analizujemy
+7606-
+--
+7630:## 🧑 Robert
+7631-
+7632-Pewnie wiesz na co liczyłem - że wywołanie GetEulerAngles z różnymi parametrami da nam większe pokrycie różnorodności, bo RotationCount będzie inny. Nie zadziałało na transpozycji - nieszkodzi, może nawet lepiej - ale spróbuj wygenerować jakiś losowy order, użyć go w GetEuler i porównaj sekwencje. Coś mi się wydaje, że rzadko będą tej samej długości
+7633-
+--
+7640:## 🧑 Robert
+7641-
+7642-[Request interrupted by user for tool use]
+7643-
+--
+7677:## 🧑 Robert
+7678-
+7679-Chcę się jeszcze dopytać: wydaje mi się, że greedy próbuje wykonać obrót zupełnie w dowolnej płaszczyźnie i kącie, a więc nawet: w płaszczyźnie, w której przed chwilą obracał lub obracał wcześniej, tak?
+7680-
+--
+7702:## 🧑 Robert
+7703-
+7704-Chodzi mi o coś jeszcze innego: greedy umożliwia znalezienie sekwencji typu R0R1R0' które są bardzo dobrymi macro-ruchami. Tego moje poprzednie algorytmy nie przewidywały (wykorzystywały płaszczyzny tylko raz), zostawiałem na później, bo takich możliwości jest dużo. Nic dziwnego że greedy generował więcej różnych seedów, ale on nie zastępuje starych metod. One raczej znów mogą się uzupełniać. Zmiana samego orderu nie mówi jeszcze wszystkiego. RotationCount to oczywiście niekoniecznie liczba ćwierćobrotów, to dokładnie liczba różnych płaszczyzn w których dokonuje się obrót po rozkładzie QR
+7705-
+--
+7730:## 🧑 Robert
+7731-
+7732-Jasne! Tylko sprecyzuję obrót 2x-90 czy obrót 2x90 w tej samej pł. kostki daje dokładnie ten sam efekt dla wszystkich obracanych kubików - obrót o 180 st. i jest oczywiście redundantny
+7733-
+--
+7758:## 🧑 Robert
+7759-
+7760-Nie ma co nawet badać, seedowanie jest kluczowe dla naszego GA, które nie jest standardowe, zauważ, że ani krzyżowanie, ani mutacja praktycznie ich nie zmienia. Bardziej jestem ciekaw tego wyniku z liczbą koniugatorów
+7761-
+--
+7789:## 🧑 Robert
+7790-
+7791-Sprawdźmy jeszcze dla N=5. Dziwię się, że robiłeś dla N=3 (sam mówiłeś RotationCount=2, nie ma miejsca na 3 obroty).
+7792-
+--
+7799:## 🧑 Robert
+7800-
+7801-[Request interrupted by user for tool use]
+7802-
+--
+7824:## 🧑 Robert
+7825-
+7826-Sam to zrobię, dzięki. Wróćmy do renderingu. krok 1 chodzi. Chciałbym tylko chyba bardziej to zintegrować z klasą GPU. Co proponujesz?
+7827-
+--
+7864:## 🧑 Robert
+7865-
+7866-Nie rozumiem, co to za różnica, jakie bindingi mają VS i FS, nie mogą mieć kolejnych? (albo Bufory GA nie moga się zaczynać po tamtych?)
+7867-
+--
+7886:## 🧑 Robert
+7887-
+7888-Tak
+7889-
+--
+7931:## 🧑 Robert
+7932-
+7933-Dołącz dzisiejszą konwersację do pliku w Docs
+7934-
+--
+7945:## 🧑 Robert
+7946-
+7947-Cześć, Claude. Nie poprawiaj na razie niczego, ale wydaje mi się, że poprawiłeś deklarację konwencji wywołań rozszerzeń OpenGL z oprawionej Stdcall na wcześniejszą Cdecl (a może się nie zapisała przed zwieszką), ale ma być Stdcall, prawda?
+7948-
+--
+7972:## 🧑 Robert
+7973-
+7974-Zmieniłem trochę GPU.cs, możesz popatrzeć. Zmienne przeniosłem do pliku Variables includowanym przez Setup i VS, getDefine i setDefine korzystają z niego (dodatkowo łatwiej zamieniać w krótszym łańcuchu). Drobne zmiany z strukturze funkcji Create i Compile programów
+7975-
+--
+8010:## 🧑 Robert
+8011-
+8012-Utwardź getDefine i setDefine oraz popraw komentarz ale nie dodawał wyjątku
+8013-
+--
+8028:## 🧑 Robert
+8029-
+8030-Zmieniłem w klasie TShape tablicę Colors na tablicę z materiałami typu TMAterial, ale kolory w kostce teraz się dublują
+8031-
+--
+8078:## 🧑 Robert
+8079-
+8080-Nie buduję już w MAUI, projekt został wykluczony z rozwiązania (nie przejmuj się już nim więcej). Dodałem też tablicę wsp. UV do TShape, możesz je wykorzystać w GPU.cs?
+8081-
+--
+8096:## 🧑 Robert
+8097-
+8098-Dodałem klasę TScene i TLight. TGLContext ma teraz uchwyt do sceny TScene, a ta do Root typu TShape. W formatce tworzę światło (które dziedziczy po tShape bo podlega transformacjom afinicznym) i staje się dzieckiem Root. Trochę problem stanowi to, że światło ma domyślnie tylko 3 współrzędne w transformacji. Chyba trzeba przebudowować tą transformacię w UpdateView formatki?
+8099-
+--
+8158:## 🧑 Robert
+8159-
+8160-Przenieś to do TScene
+8161-
+--
+8172:## 🧑 Robert
+8173-
+8174-Ok, możemy już chyba przekazać do shadera dane świateł ze sceny (nie zakładajmy, że akurat jest jedno, jakiś MAX_LIGHTS byłby OK). Pewnie jakiś bufor UBO będzie do tego potrzebny
+8175-
+--
+8224:## 🧑 Robert
+8225-
+8226-Zadaje się, że shader nie zrozumiał normalize(cross(dFdx(fPos), dFdy(fPos))); a zwłaszcza dFdx/y jak mi się zdaje
+8227-
+--

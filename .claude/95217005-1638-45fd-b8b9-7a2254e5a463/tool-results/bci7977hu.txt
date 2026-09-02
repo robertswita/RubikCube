@@ -1,0 +1,700 @@
+42:## 🧑 Robert
+43-
+44-System.Exception: '0(81) : error C0000: syntax error, unexpected integer constant, expecting ';' or '(' at token "<int-const>"
+45-0(82) : error C1031: swizzle mask element not present in operand "z"
+--
+83:## 🧑 Robert
+84-
+85-obiecywałeś coś, że wyznaczymy TBN ze wsp. tekstur, aha musimy przekazać materiał
+86-
+--
+145:## 🧑 Robert
+146-
+147-Wgrałem 5 tekstur do Resources projektu. Mapa height to zapewne displacement map a roughness to chyba specular, a basecolor - diffuse?
+148-
+--
+194:## 🧑 Robert
+195-
+196-Tak
+197-
+--
+245:## 🧑 Robert
+246-
+247-Ładnie, tekstury są rozmiaru 1024x1024, to chyba stanowczo za dużo na nasze kubiki. Jak myślisz, 128x128 wystarczy? Chyba mogę je normalnie wszystkie przeskalować jak zwykły obraz?
+248-
+--
+276:## 🧑 Robert
+277-
+278-OK, przeskalowałem
+279-
+--
+297:## 🧑 Robert
+298-
+299-Wszystko chyba jest OK, efekt jest dość delikatny, ale to nie szkodzi. Chciałbym jeszcze zmienić, ale chyba wystarczy na diffuse dorysowanie strzałki lub obrysu trójkąta?
+300-
+--
+313:## 🧑 Robert
+314-
+315-Czekaj, bo nie podoba mi się grzebanie w shaderze - i tak już jest za bardzo pod kostkę. Myślałem o zrobieniu tylu tekstur co ścian, ale myślałem w 3D, w 4D - to już 24 ściany, itd. NIe..., zróbmy obrazek ze strzałką i składajmy te dwa obrazy proceduralnie, podmieniając kolory w czarno-białym obrazie strzałki - biały - przezroczysty, czarny - dopełnienie koloru ścianki
+316-
+--
+354:## 🧑 Robert
+355-
+356-Ale super to wygląda! Lepiej niż myślałem!
+357-
+--
+374:## 🧑 Robert
+375-
+376-Pierwsze 2 można od razu - to niewiele roboty, ale nie jestem pewien parallaxy - przecież nie zmieniam pozycji kamerkamery, nie mam nawet zooma - nie - jak będziemy robić poważniejszy projekt graficzny
+377-
+--
+422:## 🧑 Robert
+423-
+424-Wszystko OK, lecimy dalej z planem?
+425-
+--
+490:## 🧑 Robert
+491-
+492-Wygląda super, również przy obrotach. MSAA chyba w tym projekcie nie jest odpalony, ale to byłaby kwestia w OpenGL ponownego utworzenia kontextu z odpowiednią flagą, gdzieś to już robiłem
+493-
+--
+514:## 🧑 Robert
+515-
+516-Chciałbym zobaczyć efekt FXAA na kostce
+517-
+--
+540:## 🧑 Robert
+541-
+542-Wygląda bardzo dobrze. Jeśli chodzi o stronę graficzną to wydaje mi się on zakończona. Może potem obejrzę jeszcze źródła, ale wszystko wyglądało OK. Wróćmy do jednego punktu, który nie wydaje mi się jeszcze dopracowany - algorytmu greedy. Ustaliliśmy, że ma duży potencjał, bo potrafi znajdować koniunkcje i komutatory, w sumie - makroruchy. Co prawda nie to dokładnie zawsze jest jego zadaniem - pamiętajmy, że ruchy są odbijane podczas krzyżowania, tworząc komutator, ale w ten sposób otrzymujemy chyba komutator zagnieżdżony. Sama zmiana order w GetEulerAngles niewiele zmienia - bo kolejność uzyskana z GetOrder wynika z możliwych propagacji zer od lewej strony rozkładanej macierzy. Stąd permutacje osi. Czy dałoby się zrobić test porównujący liczbę możliwych do uzyskania różnych sekwencji układających kubik ze standardowego QR w greed i używającego permutacji osi (order standardowy spermutowanej macierzy)?
+543-
+--
+578:## 🧑 Robert
+579-
+580-Nie, nie rozumiemy się. Skup się, bo dla mnie to też niełatwe zadanie. W greedy wybieramy ruch, który obniża RotationCount, a to czy ruch go obniża, zależy od kolejności założonych obrotów w QR (Czekaj, może zmienię definicję RotationCount w TCubie, aby było to wyraźniejsze - już). Zatem spróbujmy tą kolejność zmienić - i porównać. Może brakuje Ci metod już skasowanych, permutujących osie? Bo trzeba by było podzcas analizy RotateCount (czyli w getterze TCubie.State) zamieniać osie macierzy Transformacji (zgodnie z wcześniej ustaloną permutacją), dokonać standardowego QR i sprawdzić RotationAngle. Po wybraniu kandydata trzeba przy tworzeniu ruchu odwrócić permutację osi
+581-
+--
+592:## 🧑 Robert
+593-
+594-// Random active cubie + random axis-permutation, decomposed (EulerOrder / route) into the
+595-        // (plane, moveAngle) solve steps, recording the cubie's coord vector before each step. The
+--
+682:## 🧑 Robert
+683-
+684-@"C:\_Moje Dane\_Dokumenty\Praca\Publikacje\2026\RubikCubeND\2026_07_10\RubikCube\TRubikCube.cs"
+685-
+--
+709:## 🧑 Robert
+710-
+711-Nie rozumiem p.2 GreedyUnderPerm - permutujemy tylko osie macierzy - dalej macierz jest rozkładana standardowo - oczywiście, że znajdą się kandydaci tak samo jak dla permutacji tożsamościowej. Po co mówić o aktywnych kubikach - mówimy po prostu o różnych macierzach orientacji, test dla 4D - 192 możliwości
+712-
+--
+795:## 🧑 Robert
+796-
+797-Dołóż histogram długości, potem odpalę N=4. Czy z tego MessageBox nie mógłbym kopiować tylko tekstu, czy Ci wszystko jedno?
+798-
+--
+830:## 🧑 Robert
+831-
+832-Greedy decomposition diversity  (N = 3)
+833-  cubie orientations (rotation group) : 24
+--
+892:## 🧑 Robert
+893-
+894-Czekaj, nie spiesz się. To nie do końca tak. Standardowy greedy np. nie znalazł jednego obrotu wokół Y o 180 ale znalazł 2 obroty po 90 stopni - to to samo, sekwencja zmieniająca wszystkie kubiki w ten sam sposób. Trzeba by to jakoś odfiltrować. Szukamy sekwencji, które się różnią w efekcie na innej orientacji niż nasza (bo ta sprowadzana jest do identity). Ale to marny test. Coś proponujesz?
+895-
+--
+929:## 🧑 Robert
+930-
+931-1.  Dla ciekawości - oba, 2. Ale oś nie ma tu kompletnie nic do rzeczy, musimy wybierać po prostu tą samą oś dla porównywanych sekwencji, więc jeśli będziemy zawsze wybierać pierwszą możliwą - będzie OK. 3. Chyba może być, choć w realnej kostce narożny nie może mieć wszystkich możliwych orientacji, bo jest np. dla 3D w klastrze o liczności 8 (liczba rogów kostki - 2^N)
+932-
+--
+971:## 🧑 Robert
+972-
+973-Greedy decomposition diversity  (N = 3)
+974-  cubie orientations (rotation group) : 24
+--
+1039:## 🧑 Robert
+1040-
+1041-Zmierz najpierw transpozycję reversed względem standardowego QR, niczego nie wpinaj jeszcze
+1042-
+--
+1073:## 🧑 Robert
+1074-
+1075-Greedy decomposition diversity  (N = 3)
+1076-  cubie orientations (rotation group) : 24
+--
+1142:## 🧑 Robert
+1143-
+1144-Zmierz jeszcze order, potem wepniemy permutację. Zachowaj też klasę TGreedy Diversity i jej wpięcia w menu
+1145-
+--
+1186:## 🧑 Robert
+1187-
+1188-Greedy decomposition diversity  (N = 3)
+1189-  cubie orientations (rotation group) : 24
+--
+1264:## 🧑 Robert
+1265-
+1266-Rzeczywiście prościej. Ale po pierwsze: założenie, że Slice == 0, to błąd, Correct zależy od Slice. To zaniża wyniki. Powinno być Slice = c.GetPos(axis)
+1267-
+--
+1284:## 🧑 Robert
+1285-
+1286-Lepiej chyba zamiast kubika narożnego wybrać jakiś kubik w Slice = N - 2 (zakładając, że Size >=7)
+1287-
+--
+1306:## 🧑 Robert
+1307-
+1308-Każdy kubik ma przypisywany numer klastra. Zrób test, który pozwoli określić klaster o liczności możliwych orientacji. Wybierzemy z niego jakiś kubik
+1309-
+--
+1342:## 🧑 Robert
+1343-
+1344-Miałeś rację, może być: clusterIndex 2334   example StartIndex 66   coords (0,1,2,3)
+1345-
+--
+1367:## 🧑 Robert
+1368-
+1369-Greedy decomposition diversity  (N = 3)
+1370-  cubie orientations (rotation group) : 24
+--
+1427:## 🧑 Robert
+1428-
+1429-Nie widzę problemu. Skoro ten kubik należy do klastra max, to może przyjmować wszystkie orientacje. Przecież nie musi mieć wsp. 0,1,..N-1
+1430-
+--
+1472:## 🧑 Robert
+1473-
+1474-OK, namieszałem. Ale zyskałem fajne narzędzie z histogramem klastrów i przykładowym kubikiem z klastra max. Co do greedy - Nasze rozwiązanie nadal mi się nie podoba, mimo, że nie można mu odmówić pewnej elegancji. Pamiętasz, że rozmawialiśmy o możliwości redukowania macierzy za pomocą zer nad i pod przekątną? Pewnie, że niektóre z nich nie prowadzą do prawidłowego rozkładu - zastępują wcześniej uzyskane zera, ale większość powinna działać. Jestem strasznie ciekaw, jak taka polityka mieszania redukcji porównuje się do perm
+1475-
+--
+1499:## 🧑 Robert
+1500-
+1501-Sprawdźmy p.1, bo wcale nie jestem pewien. A.Rotate dokonuje zdaje się obrotu Givensa mnożąc macierz z lewej strony, ale czy żeby uzyskać zero nad przekątną, czy nie mnożymy z prawej strony? Wówczas jeśli macierz M zredukuje się do jednostkowej, otrzymujemy prawidłowy rozkład orginalnej M złożony ze złożeń obrotów lewych i prawych
+1502-
+--
+1537:## 🧑 Robert
+1538-
+1539-Kurczę, nie, to chyba jest jeszcze nowa możliwość. Sprawdźmy, czy używając zakomentowanego kodu nie możemy uzyskać zera nad przekątną mnożąc z lewej strony
+1540-
+--
+1568:## 🧑 Robert
+1569-
+1570-Oczywiście masz rację, ruchy kostki to mnożenie orientacji z lewej strony, a więc mierzymy mode {pod, nad-L} vs perm. Znak przy sin ujemny
+1571-
+--
+1598:## 🧑 Robert
+1599-
+1600-A po co ustawiać Size? Przecież wróciliśmy chyba do poprzednich metod, porzucając obroty kubika na rzecz możliwych orientacji dla Slice == 0. Poza tym nie jestem pewien tak szybkiego usuwania Order - on daje jednak nowe możliwości, podczas pisania artykułu o układaniu kostki muszę pokazać i udowodnić wyższość/efektywność różnych metod.
+1601-
+--
+1647:## 🧑 Robert
+1648-
+1649-Greedy decomposition diversity  (N = 3, Size = 3)
+1650-  cubie orientations (rotation group) : 24
+--
+1722:## 🧑 Robert
+1723-
+1724-A kto powiedział, że życie jest uczciwe? GA stosuje dobór naturalny - najlepszy wygrywa. To świetnie, że mode znajduje jeszcze dłuższe sekwencje. Przecież to może oznaczać znalezienie makroruchów nawet dla N=3 !!!
+1725-
+--
+1751:## 🧑 Robert
+1752-
+1753-tak
+1754-
+--
+1776:## 🧑 Robert
+1777-
+1778-Greedy decomposition diversity  (N = 3, Size = 3)
+1779-  cubie orientations (rotation group) : 24
+--
+1856:## 🧑 Robert
+1857-
+1858-Tak, zróbmy weryfikację
+1859-
+--
+1901:## 🧑 Robert
+1902-
+1903-distinct macro-moves mogą wynikać z narożnego kubika?Manoeuvre verification  (N = 4, Size = 3)
+1904-  target cubie StartIndex             : 0
+--
+1943:## 🧑 Robert
+1944-
+1945-Manoeuvre verification  (N = 3, Size = 3)
+1946-  target cubie StartIndex             : 0
+--
+1989:## 🧑 Robert
+1990-
+1991-Zanim dołożysz: dlaczego twierdzisz, że Turn obraca Angle + 1? Moim zdaniem powinieneś używać Turn. Dołóż, dzięki
+1992-
+--
+2029:## 🧑 Robert
+2030-
+2031-Różnica w distinct wynika chyba z niejednoznaczności określenia orientacji przez złożenie ruchów w różnych płaszczyznach (to jak Gimbal Lock i lerp z kątami Eulera)
+2032-
+--
+2059:## 🧑 Robert
+2060-
+2061-Manoeuvre verification  (N = 3, Size = 5)
+2062-  target cubie (generic)              : StartIndex 7, coords (0,1,2)
+--
+2116:## 🧑 Robert
+2117-
+2118-Sprawdzamy czy sekwencje są distinct poprzez porównanie całej konfiguracji kostki po tych ruchach? To dlatego dla  N=3 sekwencje Rz^2Rx^2 i Ry^2 są różne?
+2119-
+--
+2149:## 🧑 Robert
+2150-
+2151-To tak ważne odkrycia, że prosiłbym na początek o uzupełnienie naszej konwersacji do pliku w Docs. Zawsze mogę do niego wrócić
+2152-
+--
+2183:## 🧑 Robert
+2184-
+2185-Fajnie, dziękuję, ale poprosiłbym też o uzupełnienie Konwersacja_RubikND.md, miałeś gdzieś skrypt do tego
+2186-
+--
+2200:## 🧑 Robert
+2201-
+2202-Świetnie, i wrzuć, pewnie się przyda
+2203-
+--
+2232:## 🧑 Robert
+2233-
+2234-Czy muszę pamiętać, by sesja, która dla mnie nieoczekiwanie się skończyła i jak nie zrobię zapisu to pominie te tury, czy przypomnisz tan koniec sesji (ale w następnej już nie będziesz pamiętał by przypomnieć - jak to jest?) - i sesja to ten Context pokazywany w prawym dolnym rogu z procentami i wielkością do 1M?
+2235-
+--
+2268:## 🧑 Robert
+2269-
+2270-Chciałbym aby to działało na razie tylko dla tego projektu. Jak go skończymy, to i tak jeśli bym chciał to powtórzyć to na pewno do innego pliku
+2271-
+--
+2318:## 🧑 Robert
+2319-
+2320-Już wiem co to sesja i context, a co to dla ciebie projekt i jak nazywa się aktualny?
+2321-
+--
+2343:## 🧑 Robert
+2344-
+2345-Wszystko jasne, czas chyba sprawdzić jak mode zachowuje się w realu. Na pytanie czy losujemy (nie każda się da, ale możemy losować do upadłego), czy generujemy wszystkie możliwości - 2^P (szybko rośnie z N)  - odp. losowo, będzie szybciej, możliwość powtórzeń, ale duplikaty powstają tak, czy tak (choć pewnie można byłoby się pozbyć dzięki Twojej świetnej obserwacji). Tylko że jak losujemy, to czy ograniczamy się wielkością populacji, czy estymatą możliwości generowania sekwencji? Ja bym chyba był za populacją, tylko martwię się o wydajność - greedy jest powolny
+2346-
+--
+2419:## 🧑 Robert
+2420-
+2421-3^4: 00:03:42.0609916, GA: 15066. We could talk in english, but i feel more comfortable in polish. Pogubiłem się trochę. W RotCountMode(A, modeMask) wykonujemy obrót lewostronny albo o kąt związany ze strategią "pod" lub "nad", tak? Z tego muszą wyjść dwa <b>różne</b> kąty? (przy okazji - świetny ruch z kopią macierzy M)
+2422-
+--
+2472:## 🧑 Robert
+2473-
+2474-Nadal trapi mnie to, że badamy RotationCount mnożąc z lewej strony przez macierz obrotu o kąt wynikający ze strategi "pod" lub "nad". Żeby się różniły, to kąty muszą być różne. Standardowy QR ("pod") zeruje pod przekątną ponieważ mnożymy przez macierz obrotu w płaszczyźnie axis1, axis2, gdzie axis1 < axis2. Oczywiście to to samo co obrót w płaszczyźnie axis2, axis1 - ale dla strategii "nad" my wywołujemy Rotate nadal z tą samą kolejnością osi
+2475-
+--
+2527:## 🧑 Robert
+2528-
+2529-Widzisz, sam coś wymyślę i nie wiem do końca jak to działa. Dzięki za słuszną korektę (zresztą po to pytałem), ale - jak to jest, że pytamy się o RotationCount dla określonego kubika po dodatkowym obrocie w płaszczyźnie plane o określony kąt angle, a potem w strategii "nad" nagle sobie ten kąt zmieniamy?
+2530-
+--
+2577:## 🧑 Robert
+2578-
+2579-Tak, jak nacisnąłem enter, to zorientowałem się, że palnąłem głupstwo, bo my już złożyliśmy dotychczasowe obroty kubika z kandydatem i teraz próbujemy rozłożyć tą wynikową macierz (orientację) na sekwencje obrotów płaszczyzn w określonej kolejności - a obroty? - jak słusznie zauważyłeś w analogii - powinny prowadzić do celu
+2580-
+--
+2594:## 🧑 Robert
+2595-
+2596-Każdy wewnętrzny Givens jest ćwierćobrotem nie dlatego, że macierz składa się z 0, 1 i -1, bo wówczas kąt mógłby być wielokrotnością 90 stopni, ale dlatego, że szukamy RotationCount, które spada o 1
+2597-
+--
+2633:## 🧑 Robert
+2634-
+2635-Nie zrozumieliśmy się. Dla mnie ćwierćobrót to wyłącznie obrót o 90 lub -90 stopni. Sam poprawiłeś ćwierćobroty na wielokrotność 90 stopni i jest OK. Moja dalsza część zdania była tylko próbą znalezienia wytłumaczenia twojej pomyłki, której nie popełniłeś. Wszystko się spina i wygląda to na papierze świetnie, ale kostka lepiej się nie układa. Co z tymi dodatkowymi statystykami?
+2636-
+--
+2677:## 🧑 Robert
+2678-
+2679-Do output wysyłałeś przy okazji, a do UI wpinałeś się przez MenuItem w Menu. Gdzie tego szukać? Nie widzę nic w CreateBuffers
+2680-
+--
+2726:## 🧑 Robert
+2727-
+2728-[BuildSeedMoves]  N=3  stride=3  target=1024  (SEED_RATIO% of population)
+2729-accepted = 3     draws=63  stuck=24  dupes=36
+--
+2770:## 🧑 Robert
+2771-
+2772-[BuildSeedMoves]  N=3  stride=3  target=1024  (SEED_RATIO% of population)
+2773-accepted = 3     draws=65  stuck=17  dupes=45
+--
+2820:## 🧑 Robert
+2821-
+2822-Właśnie, przydałoby się w interfejsie pokazać tak podstawowe dane (jako etykiety) jak: Cluster {ActCluster.No/Clusters.Count} i Solved { CubiesSolvedInaActCluster/ActCluster.Count} tylko Clusters to ja w zasadzie nie liczę - ale wystarczy określić max z cubie.ClusterIndex (przy tworzeniu kubików)
+2823-
+--
+2852:## 🧑 Robert
+2853-
+2854-Zamiast być leniwym i obliczać w kółko MaxClusterCount, zadeklaruj go jako proste pole, liczone tylko raz podczas budowy kostki, tak jak mówiłem.
+2855-
+--
+2868:## 🧑 Robert
+2869-
+2870-[BuildSeedMoves]  N=3  stride=3  target=1024  (SEED_RATIO% of population)
+2871-accepted = 3     draws=65  stuck=31  dupes=31
+--
+2908:## 🧑 Robert
+2909-
+2910-Chciałem osiągnąć klaster ze 192 orientacjami dla kostki 7^4. Powoli, bo powoli, ale w 4D układa klastry. Pierwszy miał chyba 24 kubiki/orientacje, drugi 32, a teraz trzeci 16. Ale skąd numery Clustrów to jakieś ponad 1600?, coś mam źle z tą numeracją klastrów w kubikach? - są zdaje się liczone na podstawie orbity - odległości L1 od środka kostki - ach, rozumiem, to nie jest dokładnie numer klastra w tablicy klastrów, tylko index liniowy w pewnej tablicy (nawiasem mówiąc mój wynalazek). Trochę się maszyna grzeje - ok 70 stopni. Ciekawe, że nie bardzo sobie radzi z domknięciem niewielkiego klastra o 16 kubikach, gdzie ruchy są mocno ograniczone - powinny być one łatwiejsze w ułożeniu. 16 kubików - a więc to klaster kończący ułożenie kostki wewnętrznej (narożniki). 24,162582 - najniżej do tego scoru dochodzi, czyli tak samo jak dla kostki 2^4, ale ma większe problemy, bo kostka wewnętrzna ma rozmiary 3^4. dOBRA, NIE MA CO CZEKAĆ:[BuildSeedMoves]  N=4  stride=6  target=1024  (SEED_RATIO% of population)
+2911-accepted = 1024     draws=8902  stuck=0  dupes=7878
+--
+2951:## 🧑 Robert
+2952-
+2953-Chciałbym zacząć od fixu numeracji klastrów, bo w tej formie jakiej jest, niewiele mówi ponad to, że pozwalał budować klastry z kubików o tym samym ClusterIndex. Równie dobrze możemy to zrobić oczywiście po prawdziwym indeksie w tablicy klastrów, i tak chciałbym aby to wyglądało - więc po utworzeniu kubików i policzeniu, w konstruktorze kostki należy przejrzeć jeszcze raz wszystkie kubiki, wpisując do jakiejś tymczasowej tablicy dynamicznej. Potem ją posortować po ClusterIndex, jeszcze raz przejrzeć podmieniając ClusterIndex na kolejny numer zmieniającego się indeksu - chyba, że masz lepszy pomysł
+2954-
+--
+2980:## 🧑 Robert
+2981-
+2982-Nie mamy jednak tablicy klastrów, bo nam do niczego nie potrzebna. POnumerujmy od razu ClusterIndex od 1, a MaxCusterIndex przemianujmy na ClustersCount
+2983-
+--
+3003:## 🧑 Robert
+3004-
+3005-Tak, wszystko OK, nareszcie sensowne indeksy. Wepnijmy przełącznik, ale testować wolałbym na 3^4, zresztą pod koniec powinno wyjść na to samo
+3006-
+--
+3041:## 🧑 Robert
+3042-
+3043-W 4D część 12 ścian po projekcji 3D jest "zewnętrznych" a pozostałe 24 ukryte. Nie ma problemu dla ułożonych kubików, ale nieułożone, mimo półprzezroczystości, ze względu na liczbę ścian są już mało przezroczyste. Nie wiem czy zwiększać przezroczystość zależnie od N, czy też dałoby się nie rysować tych "wewnętrznych" ścian - chyba, że może być tak, że nie "widać" po zewnętrznych ścianach , że kubik jest ułożony czy nie - no ale dlatego też mamy przezroczystośc?
+3044-
+--
+3093:## 🧑 Robert
+3094-
+3095-Na przedostatnim klastrze (24 kubiki): [BuildSeedMoves]  N=4  SEED_MODE=1  stride=6  target=1024  (SEED_RATIO% of population)
+3096-accepted = 2     draws=51  stuck=0  dupes=49
+--
+3129:## 🧑 Robert
+3130-
+3131-Myślałem, że CULL_FACE coś wytnie w TGLContext.Init() ale albo nic nie robi, albo ignoruje
+3132-
+--
+3164:## 🧑 Robert
+3165-
+3166-nie chciałbym , aby shader za dużo wiedział o tym, co rysuje. Z tego co mówisz, możemy policzyć a także po stronie CPU jako Transparent zależny od faceCount
+3167-
+--
+3194:## 🧑 Robert
+3195-
+3196-FaceCount to chyba Materials.Count
+3197-
+--
+3211:## 🧑 Robert
+3212-
+3213-Nasz mode nie radzi sobie z dojściem do ostatniego clustra 3^4 (GA to już 29266). Czekać?
+3214-
+--
+3231:## 🧑 Robert
+3232-
+3233-[BuildSeedMoves]  N=4  SEED_MODE=1  stride=6  target=1024  (SEED_RATIO% of population)
+3234-accepted = 11     draws=206  stuck=102  dupes=93
+--
+3293:## 🧑 Robert
+3294-
+3295-Wszystkie pomiary były dokonane na narożnym klastrze (ostatnim), który zaczął się układać od 3000 GA, delty to offset, kiedy robiłem pomiary
+3296-
+--
+3327:## 🧑 Robert
+3328-
+3329-Nie róbmy roboty za GA, my tylko seedujemy
+3330-
+--
+3344:## 🧑 Robert
+3345-
+3346-Chyba przeseedowywuję, tak jak mówiłem, standard dochodzi do ostatniego clustra dużo szybciej: 7600 GA [BuildSeedMoves]  N=4  SEED_MODE=0  stride=6  target=1024  (SEED_RATIO% of population)
+3347-accepted = 12     draws=173  stuck=0  dupes=161
+--
+3401:## 🧑 Robert
+3402-
+3403-A powiedz, dlaczego ustawiałeś base.Transparent, a nie Transparent?
+3404-
+--
+3425:## 🧑 Robert
+3426-
+3427-ClusterStart: ok. 8000
+3428-
+--
+3477:## 🧑 Robert
+3478-
+3479-SeedMode 0, seedRatio 50%, szedł jak burza (wypłaszczył się błąd przy ok 1600) aż do momentu konieczności domknięcia przedostatniego klastra (18370). Total: 36006
+3480-
+--
+3516:## 🧑 Robert
+3517-
+3518-Powinieneś znać kilka algorytmów układania zwykłej kostki Rubika. jedna z popularnych metod również kończy się układaniem ostatniego kastra - narożników. Ostatni klaster układa się kubik po kubiku układając każdy taką samą sekwencją makroruchów złożonych z naprzemiennych obrotów w dwóch płaszczyznach aż do ułożenia kubika, nie przejmując się stanem kostki, potem setup - przesunięcie następnego kubika i znowu te same makroruchy. To znamienne, że próbujemy robić podonie, nie sądzisz?
+3519-
+--
+3550:## 🧑 Robert
+3551-
+3552-SeedRatio 0% 57734 GA
+3553-
+--
+3587:## 🧑 Robert
+3588-
+3589-SeedMode 1 SeedRatio 10% cluster 4: 11100, cluster 5(Total): 26284. Poszukam sweet pointu gdzieś koło 75%, może wokół niego bedzie trochę szybciej, to wtedy zbadam wariancję
+3590-
+--
+3620:## 🧑 Robert
+3621-
+3622-Batch przegrzeje mi sprzęt. Poza tym nie sądzę, żebyśmy wyciągnęli jakieś daleko idące wnioski poza: działa, ale słabo. Dopóki nie będzie szybciej działać nie ma co uruchamiać wielkich eksperymentów. Trzeba zastanowić się jeszcze teoretycznie nad możliwością poprawy - istnieje wiele kierunków, nie tylko seedowanie, jest funkcja oceny, mutacja, inne parametry - jak STALL, wielkość populacji. Z batchem zdążymy, nie mówię nie, pobawmy się jeszcze w zgadywanie. Projekt kostki nie ma tak na prawdę za wszelką cenę ją ułożyć - wiem jak wygląda ułożona kostka. NIe chcę traktować ostatnich clusterów specjalnie. Nawet niechętnie patrzę na możliwość łączenia GA z innymi podejściami. Dla wariantu 3D traktuję go jako światlny przykład dla studentów. Dla N > 4 jak gimnastykę wyobraźni
+3623-
+--
+3659:## 🧑 Robert
+3660-
+3661-Osobiście najbardziej ciekawią mnie dwie rzeczy: udoskonalenie algorytmu greedy - bo moim zdaniem jest jeszcze na to miejsce, a obok no-opów to chyba największe odkrycie  - oraz funkcja oceny. Wiele razy próbowałem uwzględniać w ocenie histogramy powtarzania się wsp. kubików aktywnych tak, by nagradzać układy o wspólnych współrzędnych wzgl, rozproszonych, ale nie udało mi się tego dobrze sformalizować. Aktualna funkcja zachowuje się dobrze w tym sensie, że prowadzi do znanego stanu - stanu wymagającego makroruchów - bo tylko parę kubików jest nieułożonych w klastrze. Dla 75 % ukończył w 22934 GA. Puszczę 30%.
+3662-
+--
+3696:## 🧑 Robert
+3697-
+3698-Przede wszystkim doprecyzowanie, bo już wcześniej mówiłeś o 3 możliwościach i pokazywałeś tabelę: pod-left, nad-left i nad-right. Oczywiście jest też nad-left. Kierunek "pod" niczym nie góruje nad "nad". Możliwości są 4, tyle, że wydawało mi się, że prawe odrzucamy jako nierealizowalne jako ruchy kostki, ale być może masz rację. Przychodzi mi na myśl ciągle ten obraz z mnożeniem macierzy M z lewej i prawej strony. Po uzyskaniu z M identity dostajemy rokład macierzyM, bo: np. R2R1R0MR3R4 = I, więc M =R0'R1'R2'R4'R3', który możemy uzyskać w wyniku obrotów z lewej strony (lub prawej gdyby to były ruchy kostki)
+3699-
+--
+3739:## 🧑 Robert
+3740-
+3741-Jestem szczęśliwy, nawet jak nic z tego nie wyjdzie. Pięknie wyłożone. Pamiętaj, że z prawej strony sinus ze znakiem +! trzymam kciuki za test
+3742-
+--
+3797:## 🧑 Robert
+3798-
+3799-30% - 38076 GA. Greedy decomposition diversity  (N = 3, Size = 3)
+3800-  cubie orientations (rotation group) : 24
+--
+3869:## 🧑 Robert
+3870-
+3871-Przeprowadźmy najpierw Verify manouvers dla sekwencji LR
+3872-
+--
+3901:## 🧑 Robert
+3902-
+3903-Manoeuvre verification  (N = 3, Size = 5)
+3904-  target cubie (generic)              : StartIndex 7, coords (0,1,2)
+--
+3956:## 🧑 Robert
+3957-
+3958-Manoeuvre verification  (N = 3, Size = 5)
+3959-  target cubie (generic)              : StartIndex 7, coords (0,1,2)
+--
+4053:## 🧑 Robert
+4054-
+4055-a nie wpinamy do greedy?
+4056-
+--
+4082:## 🧑 Robert
+4083-
+4084-Próbowałem ułożyć 3^4 dla SEED_RATIO = 80 (w raporcie poniżej powinno się podmienić - ale ponieważ raport działa pod CPU #define nie działa) i jest fatalnie. To może być szum, ale w ogóle nie chce ułożyć już przedostatniego klastra: [BuildSeedMoves]  N=4  SEED_MODE=1  stride=6  target=819  (SEED_RATIO% of population)
+4085-accepted = 12     draws=230  stuck=71  dupes=147
+--
+4128:## 🧑 Robert
+4129-
+4130-Dlaczego twierdzisz, że: (rc0 < min) → gwarantowany stuck. Stąd ~30–37% jałowych losowań (stuck 71–111 z ~250). To marnuje czas hosta, ale nie psuje seedów (martwe mody nic nie wnoszą do puli). Zakładasz, że krótkie ruchy scramblują za bardzo kostkę, ale pamiętaj, że przy krzyżowaniu zamieniane są one na prawdziwe makroruchy. To są prawidłowe ruchy, układające aktualny kubik
+4131-
+--
+4165:## 🧑 Robert
+4166-
+4167-To nie był zarzut. Kiedy to ty piszesz jakiś fragment kodu, ja łatwo się gubię, bo nie nadążam. Oczywiście stuck nie produkuje seeda - ale to nie wpływa na pulę, sloty wypełniają się tylko seedami, a ile czasu zmarnuje na to host nie jest kluczowe. Seedowanie sekwencjami niepełnymi - hm... Chyba jeszcze gorzej - wypełniamy sloty wówczas sekwencjami właściwie losowymi
+4168-
+--
+4183:## 🧑 Robert
+4184-
+4185-Chciałbym, abyśmy zbadali, czy oś LR wchłania perm lub order. Ciągle nie mogę do końca zrozumieć, dlaczego pod-left wyeliminował reverse - spodziewałbym się tego dopiero po wprowadzeniu nad-right
+4186-
+--
+4225:## 🧑 Robert
+4226-
+4227-tak
+4228-
+--
+4249:## 🧑 Robert
+4250-
+4251-Greedy decomposition diversity  (N = 3, Size = 3)
+4252-  cubie orientations (rotation group) : 24
+--
+4358:## 🧑 Robert
+4359-
+4360-Dzięki za wyjaśnienia. Może zablokowalibyśmy na razie liczenie sum i spróbowali policzyć częściowy cross z oboma
+4361-
+--
+4372:## 🧑 Robert
+4373-
+4374-Czekaj "z oboma" ale oddzielnie
+4375-
+--
+4398:## 🧑 Robert
+4399-
+4400-Czy uciągnie 4D?
+4401-
+--
+4423:## 🧑 Robert
+4424-
+4425-Greedy decomposition diversity  (N = 3, Size = 3)
+4426-  cubie orientations (rotation group) : 24
+--
+4489:## 🧑 Robert
+4490-
+4491-Dodajmy composite, dla N=3 pociągnie
+4492-
+--
+4511:## 🧑 Robert
+4512-
+4513-Greedy decomposition diversity  (N = 3, Size = 3)
+4514-  cubie orientations (rotation group) : 24
+--
+4581:## 🧑 Robert
+4582-
+4583-Tak, nic nie komentowałem, chciałem żebyś to zobaczył. Chcę jakieś śladu potwierdzenia w 4D, próbkujemy - może z losową grupą 20 orientacji?
+4584-
+--
+4601:## 🧑 Robert
+4602-
+4603-zgoda, przecież moge uruchomić zawsze parę razy
+4604-
+--
+4623:## 🧑 Robert
+4624-
+4625-Czy nie uważasz, że podczas szukania kandydatów, powinniśmy założyć, że następny obrót nie jest wykonywany w tej samej płaszczyźnie? Mając tak szeroką przestrzeń przeszukiwań powinniśmy znaleźć również ruch, który jest ich złożeniem. Poza tym - nasza przestrzeń poszukiwań strasznie się rozrosła - jest dużo większa od prawdziwej przestrzeni możliwości.
+4626-
+--
+4694:## 🧑 Robert
+4695-
+4696-Masz rację, nie ma co zgadywać, spróbujmy potwierdzić moją tezę na dobry początek
+4697-
+--
+4727:## 🧑 Robert
+4728-
+4729-Greedy decomposition diversity  (N = 3, Size = 3)
+4730-  cubie orientations (rotation group) : 24
+--
+4809:## 🧑 Robert
+4810-
+4811-"Teza upadła" - no nie do końca. Sprawdźmy z composite dla 4D (oczywiście bez crossa tylko z perm dla przyspieszenia obliczeń, chyba, że go wykorzystujesz do composite)
+4812-
+--
+4837:## 🧑 Robert
+4838-
+4839-Greedy decomposition diversity  (N = 4, Size = 3)
+4840-  cubie orientations (rotation group) : 20
+--
+4892:## 🧑 Robert
+4893-
+4894-Nie, spróbujmy czegoś innego. Wydaje mi się, że powód dla którego w 4D się nie potwierdza, to losowy wybór kilku płaszczyzn. Zawęźmy bardziej liczbę orientacji, a zwiększmy zakres płaszczyzn
+4895-
+--
+4917:## 🧑 Robert
+4918-
+4919-Warto byłoby próbować zawęzić jakoś naszą przestrzeń eksploracji ruchów, nie tracąc cennych seedów. Ograniczenie sąsiedniej płaszczyzny obrotu może i tak niewiele pomóc
+4920-
+--
+4950:## 🧑 Robert
+4951-
+4952-Długo liczy wszystkie możliwe permxorder dla każdej orientacji. Sprawdź jeszcze, czy skończy za mniej powiedzmy niż godzinę te 5 orientacji, bo uruchomiłem w Release aby mu było łatwiej (obliczenia na CPU, nie przegrzeje się bo jest ograniczany energetycznie do 80% mocy) i nie mam jak sprawdzić jak jest daleko
+4953-
+--
+4989:## 🧑 Robert
+4990-
+4991-Greedy decomposition diversity  (N = 4, Size = 3)
+4992-  cubie orientations (rotation group) : 5
+--
+5055:## 🧑 Robert
+5056-
+5057-NIe sprzątaj na razie diagnostyki, nie wpływa ona specjalnie na normalną pracę chyba? Co do moich prób - nawet nie chodziło tak bardzo o przyspieszenie obliczeń (bo na przestrzeń, jak wspomniałeś najwyzej nie wpływa) ale raczej o potwierdzenie dla mnie przypuszczenia, że wszystkie nasze osie nie dają prawdopodobnie wszystkich możliwości (a już i tak są niesłychanie rozdmuchane). Pewnie istnieje jakaś lepsza "oś" - i to jest być może najciekawsze z całej kostki Rubika. Wepnijmy synergię, przetestuję
+5058-
+--
+5109:## 🧑 Robert
+5110-
+5111-Dobrze, że robimy wszystko powoli. Chyba coś mam: GetOrder() zwraca prawidłowy porządek <b>tylko dla strategii "left"</b> . Dla right on po prostu nie jest "right"
+5112-
+--
+5144:## 🧑 Robert
+5145-
+5146-Pewnie że tak. Zobacz, jak to się pięknie wszystko domyka: nie tylko sprawdzimy czy wzrośnie wpływ osi Order, prawdopodobnie będziemy nawet w stanie sprawdzić, czy pokrywamy całą przestrzeń. Trzeba będzie sprawdzić, czy przypadkiem (bardzo wątpliwe) cross strategy x Order nie pokrywa wszystkiego i nie wchłania perm przy prawidłowym działaniu
+5147-
+--
+5166:## 🧑 Robert
+5167-
+5168-Coś mi tu nie pasuje. Przecież wiemy, czy wybraliśmy right, czy left i odpowiednio do tego należałoby... - aha, no tym razem nie cały order, musimy... Dobra, masz rację. Na razie weźmy WSZYSTKIE.
+5169-
+--
+5190:## 🧑 Robert
+5191-
+5192-Czekaj, a dodajesz faktycznie WSZYSTKIE wszystkie kolejności, czy tylko GetOrderLeft() + GetOrderRight()?
+5193-
+--
+5219:## 🧑 Robert
+5220-
+5221-Greedy decomposition diversity  (N = 3, Size = 3)
+5222-  cubie orientations (rotation group) : 24
+--
+5287:## 🧑 Robert
+5288-
+5289-Powiedz Claude, czy takie jak nasza konwersacje zmieniają twój model, który już jest inny po zakończeniu sesji, czy też jest to tryb, w którym wykorzystujesz to, czego nauczyłeś się wcześniej i od początku sesji? (może to niedyskretne pytanie?). W każdym razie wyniki: Greedy decomposition diversity  (N = 4, Size = 3)
+5290-  cubie orientations (rotation group) : 5
+--
+5366:## 🧑 Robert
+5367-
+5368-Czyli losujemy tylko Order, a chyba dałoby się zrobić i porównać teraz pełny cross strategy x perm ze strategy x order, podejrzewam, że order wchłania perm, który nie ma nic więcej do zaofiarowania
+5369-
+--
+5394:## 🧑 Robert
+5395-
+5396-Nie czekaj, suma to nie to samo co iloczyn kartezjański, tak nie zbadamy. Powiedz wyraźnie, czy strategy x order było liczone dla wszystkich P! możliwości i tylko komposite losował próbkę, czy oba były  z próbek
+5397-
+--
+5432:## 🧑 Robert
+5433-
+5434-Dlatego mówiłem o pełnym crossie strategy i order, dla wszystkich P! (720 dla 4D) możliwości. Dopiero wówczas, jeśli okaże się, że taki cross daje mniej niż composite, będzie można wykluczyć, że perm jest nadmiarowy. Nie powie to do końca, czy jest zbędny, ale powie czy jest niezbędny
+5435-
+--
+5485:## 🧑 Robert
+5486-
+5487-Permutacja osi vs permutacja płaszczyzn obrotu... To chyba jednak nie to samo - zmienimy osie i nagle płaszczyzny z komutowalnych stają się niekomutowalne i odwrotnie...
+5488-
+--
+5520:## 🧑 Robert
+5521-
+5522-Ale jakiś progress mamy: 3286,9% w stosunku do base to imponujący wynik. Jeśli mamy pokrycie całej przestrzeni, to wytłumacz jeszcze raz, dlaczego chcesz zachować tak dużo losowych genów w populacji inicjalizującej (SEED_RATIO <= 50 %)?
+5523-
+--
+5559:## 🧑 Robert
+5560-
+5561-Pamiętaj tylko, że trzymamy "focus" na jednym kubiku, i GA ma za zadanie ułożyć ten kubik i nie popsuć innych. GA są krótkie - ok. 50 generacji. Następny GA losuje inny kubik z aktywnego klastra (bo poprzedniemu nie udało się znaleźć rozwiązania) i próbuje tego samego
+5562-
+--
+5589:## 🧑 Robert
+5590-
+5591-Materiał do collateralu powinien być wystarczający - seedy są krótkie, a chromosomy mają 32 geny - swoją drogą można by było popróbować z jeszcze dłuższymi, bo oceniamy wszystkie podciągi
+5592-
+--
+5615:## 🧑 Robert
+5616-
+5617-Diagnostyka się liczy, dlatego możemy sobie porozmawiać teoretycznie. Tak Cię prostuję i nakierowuję, ale twój instynkt też był prawidłowy - bo z tym zadaniem o którym mówiłem - ułożeniem pojedynczego kubika ciąg moich GA świetnie sobie radzi. Problem jest przy domykaniu klastera, kiedy musi ułożyć kilka naraz - no i tu jest problem, bo musi je ułożyć i nie posuć innych - trudne zadanie - zwłaszcza próbując losowo, lub tylko 1 kubik (dla liczby aktywnych nieułożonych kubików <= N dodawana jest "kara" do oceny kostki i wszystkie układy są oceniane równorzędnie - szukamy dokładnie ciągu układającego o scorze zero)
+5618-
+--
+5663:## 🧑 Robert
+5664-
+5665-Zapamiętam to, bo to obiecujące, ale na razie jeszcze nie ruszamy oceny
+5666-
+--
+5678:## 🧑 Robert
+5679-
+5680-Greedy decomposition diversity  (N = 4, Size = 3)
+5681-  cubie orientations (rotation group) : 5
+--
+5752:## 🧑 Robert
+5753-
+5754-Nie chce mi się czekać na diagnostykę - kiedyś jeszcze powtórzę, ale to jest dyskusja czysto akademicka - jeśli perm nawet nie byłby całkowicie wchłonięty - to i tak jego wkład byłby minimalny. Zamieniamy perm->order w produkcji. I coś jeszcze mówiłeś o usuwaniu seedów z rc0 < min, a już nie pamiętam, czy w końcu BuildSeedMove je odrzuca czy nie - bo przecież one zwracały null i były stuck-ami. Możesz zdefiniwać jakąś zmienną oznaczającą Diagnostykę, która będzie uruchamiać SolveModeDfs kiedy będę diagnozował, a liczyć t
+5755-
+--
+5815:## 🧑 Robert
+5816-
+5817-Wepnij od razu rc0 < min
+5818-
+--
+5843:## 🧑 Robert
+5844-
+5845-Tylko dlaczego mówisz "standardowy QR = prawdziwe minimum" - a inne QR kłamią?
+5846-
+--

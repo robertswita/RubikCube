@@ -64,20 +64,18 @@ namespace RubikCube
 
         public TRubikCube()
         {
-            var size = 1;
             var scale = new TVector(TAffine.N);
             TCubie.Scaling = new TVector(TAffine.N);
             var dimSizes = new int[TAffine.N];
             var s = 0.9f / (TAffine.N - 1);// / (TAffine.N - 2);
             for (int dim = 0; dim < TAffine.N; dim++)
             {
-                size *= Size;
                 dimSizes[dim] = Size;
                 scale[dim] = 1f / Size;
                 TCubie.Scaling[dim] = s;
             }
-            Cubies = new TCubie[size];
             TCubie.DimsSizes = new TDims(dimSizes);
+            Cubies = new TCubie[TCubie.DimsSizes.TotalLinearSize];
             TCubie.MaxScore = 1 << 2 * TAffine.Planes.Length;
             //TCubie.Cube = CreateHyperCube();
             //TMove.UpdateSizeMatrix();
@@ -87,9 +85,8 @@ namespace RubikCube
             {
                 var cubie = new TCubie();
                 cubie.Transform = TAffine.CreateScale(TCubie.Scaling);
-                cubie.GivensOrder = TVector.Uniform(TAffine.N);
-                //cubie.Index = i;                 // setter stamps the sparse orbit-based ClusterIndex
-                cubie.StartIndex = i;
+                cubie.GivensOrder = TVector.Uniform(TAffine.N);               
+                cubie.StartIndex = i; // setter stamps the sparse orbit-based ClusterIndex
                 cubie.Parent = this;
                 Cubies[i] = cubie;
             }
@@ -159,29 +156,6 @@ namespace RubikCube
                 foreach (var cubie in Cubies)
                     cubie.State = value[i++];
             }
-        }
-
-        public List<TCubie> SelectSlice(TMove move)
-        {
-            var selection = new List<TCubie>();
-            //var planeAxes = TAffine.Planes[move.Plane];
-            //for (int segNo = 0; segNo < Size; segNo++)
-            //    for (int i = 0; i < Size; i++)
-            //        for (int j = 0; j < Size; j++)
-            //        {
-            //            var v = new int[] { segNo, segNo, segNo, segNo };
-            //            v[planeAxes[0]] = i;
-            //            v[planeAxes[1]] = j;
-            //            v[move.Axis] = move.Slice;
-            //            selection.Add(Cubies[v[3], v[2], v[1], v[0]]);
-            //        }
-            foreach (var cubie in Cubies)
-            {
-                var v = cubie.GetPos(move.Axis);
-                if (v == move.Slice)
-                    selection.Add(cubie);
-            }
-            return selection;
         }
 
         // Applies a move by rotating the Transform of every cubie in the slice. Transform is the
@@ -454,6 +428,21 @@ namespace RubikCube
                 }
             }
             return clusterMoves;
+        }
+
+        // Scrambles the cube with a reliable number of random cluster-moves — enough that the result is
+        // indistinguishable from a uniformly random reachable state. The move count is an internal detail;
+        // callers just ask for "a scramble", not a specific dose.
+        public void Scramble()
+        {
+            const int movesPerCubie = 200;   // empirically enough for a well-mixed cube; tune here only
+            var rnd = TChromosome.Rnd;
+            for (int i = 0; i < movesPerCubie * Cubies.Length; i++)
+            {
+                var cubie = Cubies[rnd.Next(Cubies.Length)];
+                var all = GetClusterMoves(cubie);
+                Turn(TMove.Decode(all[rnd.Next(all.Count)]));
+            }
         }
 
         // The SEARCH state and machinery moved to TRubikSolver: the active-cluster/target (ActiveCubie,

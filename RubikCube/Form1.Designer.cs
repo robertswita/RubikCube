@@ -29,17 +29,17 @@
         private void InitializeComponent()
         {
             components = new System.ComponentModel.Container();
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea3 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Series series3 = new System.Windows.Forms.DataVisualization.Charting.Series();
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea4 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Series series4 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea2 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            System.Windows.Forms.DataVisualization.Charting.Series series2 = new System.Windows.Forms.DataVisualization.Charting.Series();
             MoveTimer = new System.Windows.Forms.Timer(components);
             panel1 = new System.Windows.Forms.Panel();
+            ErrorBox = new System.Windows.Forms.TextBox();
             ItersBox = new System.Windows.Forms.TextBox();
             TimeBox = new System.Windows.Forms.TextBox();
             chart2 = new System.Windows.Forms.DataVisualization.Charting.Chart();
             SeqCountLbl = new System.Windows.Forms.Label();
-            label13 = new System.Windows.Forms.Label();
             DimsBox = new System.Windows.Forms.NumericUpDown();
             label12 = new System.Windows.Forms.Label();
             MovesLbl = new System.Windows.Forms.Label();
@@ -58,7 +58,7 @@
             chart1 = new System.Windows.Forms.DataVisualization.Charting.Chart();
             label4 = new System.Windows.Forms.Label();
             ClusterLbl = new System.Windows.Forms.Label();
-            SolvedLbl = new System.Windows.Forms.Label();
+            ScrambledLbl = new System.Windows.Forms.Label();
             StructureBox = new System.Windows.Forms.TextBox();
             label3 = new System.Windows.Forms.Label();
             button2 = new System.Windows.Forms.Button();
@@ -83,7 +83,7 @@
             tRubikCubeBindingSource = new System.Windows.Forms.BindingSource(components);
             saveFileDialog1 = new System.Windows.Forms.SaveFileDialog();
             tglView1 = new TGL.TGLView();
-            ErrorBox = new System.Windows.Forms.TextBox();
+            TrajectoryBox = new System.Windows.Forms.CheckBox();
             panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)chart2).BeginInit();
             ((System.ComponentModel.ISupportInitialize)DimsBox).BeginInit();
@@ -102,12 +102,12 @@
             // 
             // panel1
             // 
+            panel1.Controls.Add(TrajectoryBox);
             panel1.Controls.Add(ErrorBox);
             panel1.Controls.Add(ItersBox);
             panel1.Controls.Add(TimeBox);
             panel1.Controls.Add(chart2);
             panel1.Controls.Add(SeqCountLbl);
-            panel1.Controls.Add(label13);
             panel1.Controls.Add(DimsBox);
             panel1.Controls.Add(label12);
             panel1.Controls.Add(MovesLbl);
@@ -126,7 +126,7 @@
             panel1.Controls.Add(chart1);
             panel1.Controls.Add(label4);
             panel1.Controls.Add(ClusterLbl);
-            panel1.Controls.Add(SolvedLbl);
+            panel1.Controls.Add(ScrambledLbl);
             panel1.Controls.Add(StructureBox);
             panel1.Controls.Add(label3);
             panel1.Controls.Add(button2);
@@ -137,6 +137,13 @@
             panel1.Name = "panel1";
             panel1.Size = new System.Drawing.Size(498, 851);
             panel1.TabIndex = 8;
+            // 
+            // ErrorBox
+            // 
+            ErrorBox.Location = new System.Drawing.Point(77, 108);
+            ErrorBox.Name = "ErrorBox";
+            ErrorBox.Size = new System.Drawing.Size(103, 27);
+            ErrorBox.TabIndex = 42;
             // 
             // ItersBox
             // 
@@ -154,17 +161,17 @@
             // 
             // chart2
             // 
-            chartArea3.AxisX.Title = "iteration";
-            chartArea3.AxisY.Title = "error";
-            chartArea3.Name = "ChartArea1";
-            chart2.ChartAreas.Add(chartArea3);
+            chartArea1.AxisX.Title = "iteration";
+            chartArea1.AxisY.Title = "error";
+            chartArea1.Name = "ChartArea1";
+            chart2.ChartAreas.Add(chartArea1);
             chart2.Location = new System.Drawing.Point(250, 165);
             chart2.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             chart2.Name = "chart2";
-            series3.ChartArea = "ChartArea1";
-            series3.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
-            series3.Name = "Series1";
-            chart2.Series.Add(series3);
+            series1.ChartArea = "ChartArea1";
+            series1.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
+            series1.Name = "Series1";
+            chart2.Series.Add(series1);
             chart2.Size = new System.Drawing.Size(244, 293);
             chart2.TabIndex = 37;
             chart2.Text = "chart2";
@@ -177,15 +184,6 @@
             SeqCountLbl.Size = new System.Drawing.Size(76, 20);
             SeqCountLbl.TabIndex = 36;
             SeqCountLbl.Text = "SeqCount:";
-            // 
-            // label13
-            // 
-            label13.AutoSize = true;
-            label13.Location = new System.Drawing.Point(338, 18);
-            label13.Name = "label13";
-            label13.Size = new System.Drawing.Size(98, 20);
-            label13.TabIndex = 35;
-            label13.Text = "Transparency:";
             // 
             // DimsBox
             // 
@@ -241,11 +239,12 @@
             // TransparencyBox
             // 
             TransparencyBox.AutoSize = true;
-            TransparencyBox.Location = new System.Drawing.Point(442, 16);
+            TransparencyBox.Location = new System.Drawing.Point(362, 14);
             TransparencyBox.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             TransparencyBox.Name = "TransparencyBox";
-            TransparencyBox.Size = new System.Drawing.Size(18, 17);
+            TransparencyBox.Size = new System.Drawing.Size(117, 24);
             TransparencyBox.TabIndex = 29;
+            TransparencyBox.Text = "Transparency";
             TransparencyBox.UseVisualStyleBackColor = true;
             TransparencyBox.CheckedChanged += TransparencyBox_CheckedChanged;
             // 
@@ -336,17 +335,17 @@
             // 
             // chart1
             // 
-            chartArea4.AxisX.Title = "iteration";
-            chartArea4.AxisY.Title = "error";
-            chartArea4.Name = "ChartArea1";
-            chart1.ChartAreas.Add(chartArea4);
+            chartArea2.AxisX.Title = "iteration";
+            chartArea2.AxisY.Title = "error";
+            chartArea2.Name = "ChartArea1";
+            chart1.ChartAreas.Add(chartArea2);
             chart1.Location = new System.Drawing.Point(0, 165);
             chart1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             chart1.Name = "chart1";
-            series4.ChartArea = "ChartArea1";
-            series4.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
-            series4.Name = "Series1";
-            chart1.Series.Add(series4);
+            series2.ChartArea = "ChartArea1";
+            series2.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
+            series2.Name = "Series1";
+            chart1.Series.Add(series2);
             chart1.Size = new System.Drawing.Size(244, 293);
             chart1.TabIndex = 14;
             chart1.Text = "chart1";
@@ -369,20 +368,20 @@
             ClusterLbl.TabIndex = 40;
             ClusterLbl.Text = "Cluster -/-";
             // 
-            // SolvedLbl
+            // ScrambledLbl
             // 
-            SolvedLbl.AutoSize = true;
-            SolvedLbl.Location = new System.Drawing.Point(373, 535);
-            SolvedLbl.Name = "SolvedLbl";
-            SolvedLbl.Size = new System.Drawing.Size(76, 20);
-            SolvedLbl.TabIndex = 41;
-            SolvedLbl.Text = "Solved -/-";
-            //
+            ScrambledLbl.AutoSize = true;
+            ScrambledLbl.Location = new System.Drawing.Point(373, 535);
+            ScrambledLbl.Name = "ScrambledLbl";
+            ScrambledLbl.Size = new System.Drawing.Size(76, 20);
+            ScrambledLbl.TabIndex = 41;
+            ScrambledLbl.Text = "Solved -/-";
+            // 
             // StructureBox
-            //
+            // 
             StructureBox.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             StructureBox.Location = new System.Drawing.Point(373, 560);
-            StructureBox.Multiline = true;                 // a scattered gateway is "1+1+..." x16 (x32 on 2^6) - must wrap
+            StructureBox.Multiline = true;
             StructureBox.Name = "StructureBox";
             StructureBox.ReadOnly = true;
             StructureBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
@@ -442,85 +441,85 @@
             // openToolStripMenuItem
             // 
             openToolStripMenuItem.Name = "openToolStripMenuItem";
-            openToolStripMenuItem.Size = new System.Drawing.Size(216, 26);
+            openToolStripMenuItem.Size = new System.Drawing.Size(222, 26);
             openToolStripMenuItem.Text = "Open";
             openToolStripMenuItem.Click += openToolStripMenuItem_Click;
             // 
             // saveToolStripMenuItem
             // 
             saveToolStripMenuItem.Name = "saveToolStripMenuItem";
-            saveToolStripMenuItem.Size = new System.Drawing.Size(216, 26);
+            saveToolStripMenuItem.Size = new System.Drawing.Size(222, 26);
             saveToolStripMenuItem.Text = "Save";
             saveToolStripMenuItem.Click += saveToolStripMenuItem_Click;
             // 
             // saveClustersToolStripMenuItem
             // 
             saveClustersToolStripMenuItem.Name = "saveClustersToolStripMenuItem";
-            saveClustersToolStripMenuItem.Size = new System.Drawing.Size(216, 26);
+            saveClustersToolStripMenuItem.Size = new System.Drawing.Size(222, 26);
             saveClustersToolStripMenuItem.Text = "Save Clusters";
             saveClustersToolStripMenuItem.Click += saveClustersToolStripMenuItem_Click;
             // 
             // showClusterToolStripMenuItem
             // 
             showClusterToolStripMenuItem.Name = "showClusterToolStripMenuItem";
-            showClusterToolStripMenuItem.Size = new System.Drawing.Size(216, 26);
+            showClusterToolStripMenuItem.Size = new System.Drawing.Size(222, 26);
             showClusterToolStripMenuItem.Text = "Show Cluster";
             showClusterToolStripMenuItem.Click += showClusterToolStripMenuItem_Click;
             // 
             // makeMovesToolStripMenuItem
             // 
             makeMovesToolStripMenuItem.Name = "makeMovesToolStripMenuItem";
-            makeMovesToolStripMenuItem.Size = new System.Drawing.Size(216, 26);
+            makeMovesToolStripMenuItem.Size = new System.Drawing.Size(222, 26);
             // 
             // undoMovesToolStripMenuItem
             // 
             undoMovesToolStripMenuItem.Name = "undoMovesToolStripMenuItem";
-            undoMovesToolStripMenuItem.Size = new System.Drawing.Size(216, 26);
+            undoMovesToolStripMenuItem.Size = new System.Drawing.Size(222, 26);
             undoMovesToolStripMenuItem.Text = "Undo Moves";
             undoMovesToolStripMenuItem.Click += undoMovesToolStripMenuItem_Click;
             // 
             // greedyTestToolStripMenuItem
             // 
             greedyTestToolStripMenuItem.Name = "greedyTestToolStripMenuItem";
-            greedyTestToolStripMenuItem.Size = new System.Drawing.Size(216, 26);
+            greedyTestToolStripMenuItem.Size = new System.Drawing.Size(222, 26);
             greedyTestToolStripMenuItem.Text = "Greedy Diversity";
             greedyTestToolStripMenuItem.Click += greedyTestToolStripMenuItem_Click;
             // 
             // orientClusterToolStripMenuItem
             // 
             orientClusterToolStripMenuItem.Name = "orientClusterToolStripMenuItem";
-            orientClusterToolStripMenuItem.Size = new System.Drawing.Size(216, 26);
+            orientClusterToolStripMenuItem.Size = new System.Drawing.Size(222, 26);
             orientClusterToolStripMenuItem.Text = "Orientation Cluster";
             orientClusterToolStripMenuItem.Click += orientClusterToolStripMenuItem_Click;
             // 
             // verifyManoeuvresToolStripMenuItem
             // 
             verifyManoeuvresToolStripMenuItem.Name = "verifyManoeuvresToolStripMenuItem";
-            verifyManoeuvresToolStripMenuItem.Size = new System.Drawing.Size(216, 26);
+            verifyManoeuvresToolStripMenuItem.Size = new System.Drawing.Size(222, 26);
             verifyManoeuvresToolStripMenuItem.Text = "Verify Manoeuvres";
             verifyManoeuvresToolStripMenuItem.Click += verifyManoeuvresToolStripMenuItem_Click;
             // 
             // seedStatsToolStripMenuItem
             // 
             seedStatsToolStripMenuItem.Name = "seedStatsToolStripMenuItem";
-            seedStatsToolStripMenuItem.Size = new System.Drawing.Size(216, 26);
+            seedStatsToolStripMenuItem.Size = new System.Drawing.Size(222, 26);
             seedStatsToolStripMenuItem.Text = "Seed Pool Stats";
             seedStatsToolStripMenuItem.Click += seedStatsToolStripMenuItem_Click;
-            //
+            // 
             // batch10ToolStripMenuItem
-            //
+            // 
             batch10ToolStripMenuItem.Name = "batch10ToolStripMenuItem";
-            batch10ToolStripMenuItem.Size = new System.Drawing.Size(216, 26);
+            batch10ToolStripMenuItem.Size = new System.Drawing.Size(222, 26);
             batch10ToolStripMenuItem.Text = "Batch 10 Solves";
             batch10ToolStripMenuItem.Click += batch10ToolStripMenuItem_Click;
-            //
+            // 
             // verifyClustersToolStripMenuItem
-            //
+            // 
             verifyClustersToolStripMenuItem.Name = "verifyClustersToolStripMenuItem";
-            verifyClustersToolStripMenuItem.Size = new System.Drawing.Size(216, 26);
+            verifyClustersToolStripMenuItem.Size = new System.Drawing.Size(222, 26);
             verifyClustersToolStripMenuItem.Text = "Verify Cluster Orbits";
             verifyClustersToolStripMenuItem.Click += verifyClustersToolStripMenuItem_Click;
-            //
+            // 
             // openFileDialog1
             // 
             openFileDialog1.FileName = "openFileDialog1";
@@ -546,12 +545,17 @@
             tglView1.MouseDown += tglView1_MouseDown;
             tglView1.MouseMove += tglView1_MouseMove;
             // 
-            // ErrorBox
+            // TrajectoryBox
             // 
-            ErrorBox.Location = new System.Drawing.Point(77, 108);
-            ErrorBox.Name = "ErrorBox";
-            ErrorBox.Size = new System.Drawing.Size(103, 27);
-            ErrorBox.TabIndex = 42;
+            TrajectoryBox.AutoSize = true;
+            TrajectoryBox.Location = new System.Drawing.Point(362, 46);
+            TrajectoryBox.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            TrajectoryBox.Name = "TrajectoryBox";
+            TrajectoryBox.Size = new System.Drawing.Size(125, 24);
+            TrajectoryBox.TabIndex = 43;
+            TrajectoryBox.Text = "Trajectory Log";
+            TrajectoryBox.UseVisualStyleBackColor = true;
+            TrajectoryBox.CheckedChanged += TrajectoryBox_CheckedChanged;
             // 
             // TRubikForm
             // 
@@ -589,7 +593,7 @@
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.Label label4;
         private System.Windows.Forms.Label ClusterLbl;
-        private System.Windows.Forms.Label SolvedLbl;
+        private System.Windows.Forms.Label ScrambledLbl;
         private System.Windows.Forms.TextBox StructureBox;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Button button2;
@@ -628,7 +632,6 @@
         private System.Windows.Forms.PictureBox StateBox;
         private System.Windows.Forms.Label MovesLbl;
         private System.Windows.Forms.Label label11;
-        private System.Windows.Forms.Label label13;
         private System.Windows.Forms.NumericUpDown DimsBox;
         private System.Windows.Forms.Label label12;
         private System.Windows.Forms.SaveFileDialog saveFileDialog1;
@@ -638,6 +641,7 @@
         private System.Windows.Forms.TextBox ItersBox;
         private System.Windows.Forms.TextBox TimeBox;
         private System.Windows.Forms.TextBox ErrorBox;
+        private System.Windows.Forms.CheckBox TrajectoryBox;
     }
 }
 

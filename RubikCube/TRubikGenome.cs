@@ -14,7 +14,7 @@ namespace RubikCube
         public int StopPos;
         public int BestMovesCount;
         public uint Structure;                  // packed coherence piece histogram; 0 = not decomposed
-        public uint Ladder;                     // integer structure value the coherence accept compares -- computed on the GPU (see Setup: Ladder)
+        public float Ladder;                     // integer structure value the coherence accept compares -- computed on the GPU (see Setup: Ladder)
         public uint SeedLen;
         //public static List<int> FreeMoves;
         public static TRubikCube RubikCube;
@@ -28,7 +28,7 @@ namespace RubikCube
             for (int i = 0; i < BestMovesCount; i++)
                 Genes[i] = buffer[i + 2];
             Structure = (uint)buffer[GenesLength + 2];   // appended after Moves[] - see struct Specimen
-            Ladder = (uint)buffer[GenesLength + 3];      // and the ladder value after it
+            Ladder = BitConverter.Int32BitsToSingle(buffer[GenesLength + 3]);      // and the ladder value after it
             SeedLen = (uint)buffer[GenesLength + 4];
         }
 

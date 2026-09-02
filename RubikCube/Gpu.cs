@@ -1,7 +1,6 @@
 using GA;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.Metrics;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -15,12 +14,18 @@ namespace RubikCube
     // Init() must be called once while a GL context is current (TGLContext.Create does that).
     public static unsafe class Gpu
     {
-        public static uint InitProgram, EvaluateProgram, SortProgram, SelCrossoverProgram;
+        public static uint InitProgram, EvaluateProgram, SortProgram, SelCrossoverProgram, SeedMovesProgram;
         public static Ssbo Population, Children;   // parents (binding 0) / crossover output (binding 1); ping-ponged in ExecuteGA
         public static Ssbo ClusterBuffer, FreeMovesBuffer, SolvedPosBuffer, ActivePosBuffer, PlanesBuffer, SeedMovesBuffer;
         static string Setup, Variables;
         static int CompiledN, CompiledSize;
-        static uint NumSeeds;   // specimens pre-seeded by Init (host-built SeedMoves)
+        public static int SeedRatio;
+        static uint NumSeeds;   // specimens pre-seeded by Init (host- or GPU-built SeedMoves)
+        // coherence fine-measure target orientation (the seeds' block D) is no longer stored here; the evaluator
+        // should obtain its target via other means if needed.
+        public static bool GpuSeed = true;   // true -> fill SeedMoves on the GPU (SeedMovesProgram); false -> host BuildSeedMoves
+        public static int SeedPerturbPercent = 0;    // INERT: the GPU seeder now UNIFORMLY samples the decomposition tree
+                                                    // (SeedMoves.glsl) -- this knob no longer has any effect. Remove when convenient.
         //public static int GenerationNo;
 
         // --- Instanced cube render (Gpu owns the GL resources; TGLContext gathers the scene). ---
@@ -43,11 +48,11 @@ namespace RubikCube
         // not yet compiled), then compile them for the current cube. Call once with a current GL context.
         public static void Init()
         {
-            Variables = ReadManifestText("Resources.Variables.glsl.c");
+            Variables = ReadManifestText("Resources.Variables.glsl");
             Variables = Variables.Replace("#define uint unsigned int", "");
-            Setup = ReadManifestText("Resources.Setup.glsl.c");
+            Setup = ReadManifestText("Resources.Setup.glsl");
 
-            // Reserve the buffers once, in binding order (0..7 as declared in Setup.glsl.c). The
+            // Reserve the buffers once, in binding order (0..7 as declared in Setup.glsl). The
             // constructor only reserves id + binding; CreateBuffers sizes and fills them per run via Update.
             Ssbo.ResetBinding();
             Population = new Ssbo();                                // 0
@@ -69,6 +74,7 @@ namespace RubikCube
             EvaluateProgram = CreateComputeProgram();
             SortProgram = CreateComputeProgram();
             SelCrossoverProgram = CreateComputeProgram();
+            SeedMovesProgram = CreateComputeProgram();
 
             // Render program is VS+FS (not compute), so create/attach both shaders here; BuildShaders
             // sources and compiles them (with N injected) alongside the compute programs.
@@ -155,11 +161,11 @@ namespace RubikCube
 
         static void SetDefineValue(string defineName, int value)
         {
-            var oldValue = GetDefineValue(defineName);
-            if (oldValue == -1)   // no integer define by that name -> nothing to replace (no-op)
-                return;
+            var oldValue = TryGetDefine(defineName);
+            //if (oldValue == -1)   // no integer define by that name -> nothing to replace (no-op)
+            //    return;
             var defineLine = "#define " + defineName + " ";
-            Variables = Variables.Replace(defineLine + oldValue, defineLine + value);
+            Variables = Variables.Replace(defineLine + oldValue, defineLine + value + "u");
         }
 
         // Endgame coherence LATCH. Coherence is a compile-time #if in the evaluator, but it must be a PHASE, not a
@@ -172,14 +178,14 @@ namespace RubikCube
         {
             if (GetDefineValue("COHERENCE") == value) return;
             SetDefineValue("COHERENCE", value);
-            CompileComputeProgram(EvaluateProgram, "Resources.EvaluateMicro.glsl.c");
+            CompileComputeProgram(EvaluateProgram, "Resources.EvaluateMicro.glsl");
             noOpPenalty = float.NaN;   // recompiled evaluator -> re-measure the no-op baseline on next ScoreCube
         }
 
         // Injects N/SIZE from the current cube as compile-time defines (the shader arrays are sized by
         // them) and (re)compiles + links the existing programs so they match the cube. Called from Init
         // and again by CreateBuffers whenever N/SIZE change. Population / genes / generations stay as
-        // authored in Setup.glsl.c.
+        // authored in Setup.glsl.
         public static void BuildShaders()
         {
             SetDefineValue("N", TAffine.N);
@@ -189,19 +195,22 @@ namespace RubikCube
             SetDefineValue("BITS_PER_ROW", TAffine.BitsPerRow);
             // Coherence scratch is sized by the largest cluster, NOT the whole cube (SIZE-independent, tiny for Macro).
             SetDefineValue("MAX_CLUSTER", TCluster.MaxSize);
+            SetDefineValue("IDENTITY", (int)new TAffine().OrthoPack());
             TChromosome.GenesLength = GetDefineValue("GENES_COUNT");
             TGA<TRubikGenome>.PopulationCount = GetDefineValue("POPULATION_COUNT");
             TGA<TRubikGenome>.GenerationsCount = GetDefineValue("GENERATIONS_COUNT");
             TGA<TRubikGenome>.StallLimit = GetDefineValue("STALL_LIMIT");
             MaxLights = GetDefineValue("MAX_LIGHTS");
+            SeedRatio = GetDefineValue("SEED_RATIO");
             CompiledN = TAffine.N;
             CompiledSize = TRubikCube.Size;
             noOpPenalty = float.NaN;
 
-            CompileComputeProgram(InitProgram, "Resources.Init.glsl.c");
-            CompileComputeProgram(EvaluateProgram, "Resources.Evaluate.glsl.c");
-            CompileComputeProgram(SortProgram, "Resources.Sort.glsl.c");
-            CompileComputeProgram(SelCrossoverProgram, "Resources.SelCrossover.glsl.c");
+            CompileComputeProgram(InitProgram, "Resources.Init.glsl");
+            CompileComputeProgram(EvaluateProgram, "Resources.Evaluate.glsl");
+            CompileComputeProgram(SortProgram, "Resources.Sort.glsl");
+            CompileComputeProgram(SelCrossoverProgram, "Resources.SelCrossover.glsl");
+            CompileComputeProgram(SeedMovesProgram, "Resources.SeedMoves.glsl");
 
             // Render program (VS+FS) + base mesh - same rebuild path as the GA on N/SIZE change.
             CompileRenderProgram();
@@ -252,8 +261,8 @@ namespace RubikCube
         // The composite shaders take no #include (no N, no Variables), so they are sourced verbatim.
         static void CompileCompositeProgram()
         {
-            OpenGL.CompileShader(compositeVs, ReadManifestText("Resources.CompositeVertex.glsl.c"));
-            OpenGL.CompileShader(compositeFs, ReadManifestText("Resources.CompositeFragment.glsl.c"));
+            OpenGL.CompileShader(compositeVs, ReadManifestText("Resources.CompositeVertex.glsl"));
+            OpenGL.CompileShader(compositeFs, ReadManifestText("Resources.CompositeFragment.glsl"));
             OpenGL.LinkProgram(CompositeProgram);
         }
 
@@ -266,14 +275,14 @@ namespace RubikCube
             int count;
             OpenGL.GetAttachedShaders(program, 1, &count, &shader);
             var setup = Setup;
-            setup = setup.Replace("#include \"Variables.glsl.c\"", Variables);
-            var code = ReadManifestText(dotPath).Replace("#include \"Setup.glsl.c\"", setup);
+            setup = setup.Replace("#include \"Variables.glsl\"", Variables);
+            var code = ReadManifestText(dotPath).Replace("#include \"Setup.glsl\"", setup);
             OpenGL.CompileShader(shader, code);
             OpenGL.LinkProgram(program);
         }
 
         // Size of one Specimen in ints - the SINGLE place that knows the layout, which must match
-        // `struct Specimen` in Setup.glsl.c: Fitness, MovesCount, Moves[GENES_COUNT], Structure.
+        // `struct Specimen` in Setup.glsl: Fitness, MovesCount, Moves[GENES_COUNT], Structure.
         static int SpecimenInts => TChromosome.GenesLength + 5;   // Fitness, MovesCount, Moves[], Structure, Ladder
 
         // Uploads the per-run data into the buffers reserved in Init (0 Population, 1 NewPopulation,
@@ -317,11 +326,52 @@ namespace RubikCube
                 // Per-specimen seed sequences for Init: reverse-transform moves that undo active-cluster
                 // cubies. SEED_RATIO % of the population is seeded (rest random); stride = plane count P =
                 // N*(N-1)/2 genes, matching SEED_STRIDE (mixed-Givens seeds can be longer than N-1 moves).
-                var seedMoves = solver.BuildSeedMoves(TGA<TRubikGenome>.PopulationCount, TAffine.Planes.Length,
-                                                    GetDefineValue("SEED_RATIO"), GetDefineValue("SEED_MODE") != 0,
-                                                    SeedFast(solver.Coherent), out NumSeeds);
-                fixed (int* p = seedMoves) SeedMovesBuffer.Update(seedMoves.Length * sizeof(int), p);
+                if (GpuSeed)
+                    DispatchSeedMoves(solver);          // GPU producer fills SeedMoves (binding 7)
+                else
+                {
+                    var seedMoves = solver.BuildSeedMoves(TGA<TRubikGenome>.PopulationCount, TAffine.Planes.Length,
+                                                        SeedRatio, GetDefineValue("SEED_MODE") != 0,
+                                                        SeedFast(solver.Coherent), out NumSeeds);
+                    fixed (int* p = seedMoves) SeedMovesBuffer.Update(seedMoves.Length * sizeof(int), p);
+                }
             }
+        }
+
+        // GPU seed producer: dispatch SeedMovesProgram to fill SeedMoves (binding 7) -- one thread per seed does a
+        // random SEATING descent of the active cubie's orientation (Resources/SeedMoves.glsl). Replaces the host
+        // BuildSeedMoves on the GpuSeed path. ClusterCubies(2)/ActivePos(5) are already uploaded and bound; the shader
+        // reads ClusterCubies[activeIndex] and writes SeedMoves[tid*SEED_STRIDE..]. Descent only (target=identity).
+        static void DispatchSeedMoves(TRubikSolver solver)
+        {
+            int stride = TAffine.Planes.Length;                          // = SEED_STRIDE
+            int target = TGA<TRubikGenome>.PopulationCount * SeedRatio / 100;
+            uint startM = solver.SeedStartM(out int targetCubieId, out uint collAxis);
+            if (target <= 0)
+            {
+                NumSeeds = 0;
+                SeedMovesBuffer.Update(stride * sizeof(int), null);      // never a zero-size SSBO
+                return;
+            }
+            NumSeeds = (uint)target;
+            SeedMovesBuffer.Update(target * stride * sizeof(int), null); // allocate; the shader writes it
+            uint timeSeed = (uint)Random.Shared.Next() | (Random.Shared.Next(2) == 0 ? 0x80000000u : 0u);
+            OpenGL.UseProgram(SeedMovesProgram);
+            OpenGL.Uniform1ui(0, timeSeed);                             // TimeSeed
+            OpenGL.Uniform1ui(1, (uint)targetCubieId);                       // activeIndex (rep, for the collateral slice)
+            OpenGL.Uniform1ui(9, startM);                               // startM (relative X to decompose)
+            OpenGL.Uniform1ui(11, collAxis);                           // preferred collateral axis (keep rep's block together)
+            OpenGL.Uniform1ui(6, NumSeeds);                            // numSeeds
+            OpenGL.DispatchCompute((NumSeeds + 63u) / 64u, 1, 1);
+            OpenGL.MemoryBarrier(OpenGL.MemoryBarrierFlags.ShaderStorage);
+            //var seeds = new uint[target * stride];
+            //fixed (uint* pa = seeds)
+            //{
+            //    SeedMovesBuffer.GetBufferData(pa);
+            //}
+            //for (int i = 0; i < seeds.Length; i++)
+            //    if (seeds[i] == 0xAAAAAAAA)
+            //        ;
         }
 
         // On-demand seed-pool telemetry (File menu). Builds the pool TWICE on the SAME cubie -- once fast, once
@@ -335,7 +385,7 @@ namespace RubikCube
         {
             if (solver == null || solver.ActiveCubie == null)
                 return "No active cubie - start a solve first (the seed pool is built for the active cluster's target).";
-            int ratio = GetDefineValue("SEED_RATIO");
+            int ratio = SeedRatio;
             bool mixed = GetDefineValue("SEED_MODE") != 0;
             var sb = new System.Text.StringBuilder();
             TRubikSolver.Diagnostic = true;                      // enable the census + report for these calls only
@@ -369,24 +419,25 @@ namespace RubikCube
         // the backtracking pool rescues the long macro/commutator sequences the fast path throws away, and its
         // dedup re-weights the pool toward them (distinct short solutions are few, distinct long ones many).
         // SEED_FAST still gates the descent half, so setting it to 0 means "backtracking in BOTH phases".
-        static bool SeedFast(uint coherent) => GetDefineValue("SEED_FAST") != 0 && coherent == 0;
+        static bool SeedFast(uint coherent) => GetDefineValue("SEED_FAST") != 0;// && coherent == 0;
 
         static float noOpPenalty;   // reset to NaN in BuildShaders (Init + on N/SIZE change) -> measured on first ScoreCube
         public static uint LastScoreStructure;   // piece histogram of the cube ScoreCube just evaluated -- decode with TRubikGenome.DescribeStructure
-        public static uint LastScoreLadder;       // integer ladder value of that cube -- the coherence accept baseline (read from the GPU, not re-derived)
+        public static float LastScoreLadder;       // integer ladder value of that cube -- the coherence accept baseline (read from the GPU, not re-derived)
         public static float ScoreCube(TRubikSolver solver)
         {
-            var score = EvalZeroSpecimen(solver, out LastScoreStructure, out LastScoreLadder);
-            if (float.IsNaN(noOpPenalty))
-                // solved-cube baseline: a throwaway solver on a fresh (solved) cube -> null target, no seeds; same coherent so Fitness/Score stay comparable
-                noOpPenalty = EvalZeroSpecimen(new TRubikSolver(new TRubikCube()) { Coherent = solver.Coherent }, out _, out _);
-            return score - noOpPenalty;
+            //var score = EvalZeroSpecimen(solver, out LastScoreStructure, out LastScoreLadder);
+            //if (float.IsNaN(noOpPenalty))
+            //    // solved-cube baseline: a throwaway solver on a fresh (solved) cube -> null target, no seeds; same coherent so Fitness/Score stay comparable
+            //    noOpPenalty = EvalZeroSpecimen(new TRubikSolver(new TRubikCube()) { Coherent = solver.Coherent }, out _, out _);
+            //return score - noOpPenalty;
+            return EvalZeroSpecimen(solver, out LastScoreStructure, out LastScoreLadder);
         }
 
         // Evaluates ONE all-zero specimen (identity
         // moves) and returns its fitness = the cube's raw score PLUS the no-op penalty (a zero specimen
         // never changes the active cluster, so the penalty always fires).
-        static float EvalZeroSpecimen(TRubikSolver solver, out uint structure, out uint ladder)
+        static float EvalZeroSpecimen(TRubikSolver solver, out uint structure, out float ladder)
         {
             CreateBuffers(solver);
             //var micro = TRubikCube.MaxClusterSize <= 82;   // UNIFIED Micro holds only the LARGEST CLUSTER now (not the whole cube), so gate on MaxClusterSize, not Cubies.Length -> big cubes (6^3: MaxClusterSize~24) run the coherence eval on Micro. Still admits 3^4/4^3 (clusters ~32/24).
@@ -398,6 +449,7 @@ namespace RubikCube
             OpenGL.Uniform1ui(5, (uint)(solver.ActiveCluster?.Cubies.Count ?? 0));
             OpenGL.Uniform1ui(7, TRubikSolver.Floor);   // latch threshold + endgame normalizer base -- MUST match the GA's
             OpenGL.Uniform1ui(8, solver.Coherent);      // MUST match the GA's latch, or Score and Fitness differ
+            //OpenGL.Uniform1ui(13, TargetD);             // coherence fine-measure target orientation (the seeds' block D)
             OpenGL.BindBufferBase(Population.Type, 0, Population.Id);
             OpenGL.DispatchCompute(1, 1, 1);                        // one specimen: 1 thread (micro) / 1 block (macro)
             OpenGL.MemoryBarrier(OpenGL.MemoryBarrierFlags.ShaderStorage);
@@ -406,7 +458,7 @@ namespace RubikCube
             fixed (int* rp = result)
                 OpenGL.GetBufferSubData(Population.Type, 0, SpecimenInts * sizeof(int), rp);
             structure = (uint)result[TChromosome.GenesLength + 2];            // Structure, then Ladder are the last two ints (see Setup: Fitness, MovesCount, Moves[], Structure, Ladder)
-            ladder = (uint)result[TChromosome.GenesLength + 3];
+            ladder = BitConverter.Int32BitsToSingle(result[TChromosome.GenesLength + 3]);
             return BitConverter.Int32BitsToSingle(result[0]);
         }
 
@@ -457,6 +509,7 @@ namespace RubikCube
                     OpenGL.Uniform1ui(5, activeCount);
                     OpenGL.Uniform1ui(7, TRubikSolver.Floor);
                     OpenGL.Uniform1ui(8, solver.Coherent);
+                    //OpenGL.Uniform1ui(13, TargetD);   // coherence fine-measure target orientation (the seeds' block D)
                     OpenGL.BindBufferBase(parent.Type, 0, parent.Id);
                     OpenGL.DispatchCompute(genGroups, 1, 1);
                     OpenGL.MemoryBarrier(OpenGL.MemoryBarrierFlags.ShaderStorage);
@@ -507,11 +560,11 @@ namespace RubikCube
         // FS needs MAX_LIGHTS for the Lights UBO), not the Setup header the compute shaders use.
         static void CompileRenderProgram()
         {
-            var dotPath = "Resources.CubeVertex.glsl.c";
-            var code = ReadManifestText(dotPath).Replace("#include \"Variables.glsl.c\"", Variables);
+            var dotPath = "Resources.CubeVertex.glsl";
+            var code = ReadManifestText(dotPath).Replace("#include \"Variables.glsl\"", Variables);
             OpenGL.CompileShader(renderVs, code);
-            dotPath = "Resources.CubeFragment.glsl.c";
-            code = ReadManifestText(dotPath).Replace("#include \"Variables.glsl.c\"", Variables);
+            dotPath = "Resources.CubeFragment.glsl";
+            code = ReadManifestText(dotPath).Replace("#include \"Variables.glsl\"", Variables);
             OpenGL.CompileShader(renderFs, code);
             OpenGL.LinkProgram(RenderProgram);
         }

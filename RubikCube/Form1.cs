@@ -20,7 +20,7 @@ namespace RubikCube
         TimeSpan IterElapsed;
         TimeSpan Time;
         int MovesCount;
-        List<TMove> Moves = new List<TMove>();
+        //List<TMove> Moves = new List<TMove>();
         Dictionary<string, List<TMove>> Solutions = new Dictionary<string, List<TMove>>();
         int MoveNo;
         public TRubikCube RubikCube;// = new TRubikCube();
@@ -30,6 +30,7 @@ namespace RubikCube
         //TGA<TRubikGenome> Ga;
         TScene Scene = new TScene();
         TLight Light = new TLight();
+        TRubikAnimator Animator = new TRubikAnimator();
         //int Scrambled;
         public TRubikForm()
         {
@@ -79,110 +80,38 @@ namespace RubikCube
                 StartPos = e.Location;
             }
         }
-        int FrameNo;
-        int FrameCount = 10;
-        bool IsPaused = true;
-
-        TShape ActSlice;
-        public void Group(List<TCubie> selection)
-        {
-            if (ActSlice?.Parent != null)
-                UnGroup();
-            ActSlice = new TShape();
-            for (int i = 0; i < selection.Count; i++)
-                selection[i].Parent = ActSlice;
-            ActSlice.Parent = RubikCube;
-        }
-        public void UnGroup()
-        {
-            for (int i = ActSlice.Children.Count - 1; i >= 0; i--)
-                ActSlice.Children[i].Parent = RubikCube;
-            ActSlice.Parent = null;
-        }
 
         private void timer1_Tick(object sender, EventArgs e)
         {
-            if (MoveNo < Moves.Count)
+            switch (Animator.State)
             {
-                TMove move = Moves[MoveNo];
-                if (FrameNo == 0)
-                    Group(RubikCube.SelectSlice(move));
-                FrameNo++;
-                if (FrameNo <= FrameCount)
-                {
-                    double angle = 90 * move.Angle;
-                    if (angle > 180) angle -= 360;
-                    angle *= (double)FrameNo / FrameCount;
-                    ActSlice.Transform = TAffine.CreateRotation(move.Plane, angle);
-                    //ActSlice.Transform = new TAffine();
-                    //ActSlice.Rotate(move.Plane, angle);
-                }
-                else
-                {
-                    UnGroup();
-                    RubikCube.Turn(move);
-                    FrameNo = 0;
-                    MoveNo++;
-                }
-                tglView1.Invalidate();
-            }
-            else if (MoveNo > 0)
-            {
-                MoveNo = 0;
-                Moves.Clear();
-                //label2.Text = HighScore.ToString();
-                //var scrambled = RubikCube.Code.Count(x => x != '\0');
-                label4.Text = Solver.Scrambled.ToString();
-                //Scrambled = scrambled;
-                MovesLbl.Text = MovesCount.ToString();
-                UpdateClusterInfo();
-                RubikCube.StateGrid = null;
-                StateBox.Invalidate();
-                //if (RubikCube.ActiveCubie != null)
-                //    RubikCube.ActiveCubie.Selected = false;
-                //RubikCube.GetActCubie();
-                //HighScore = RubikCube.Evaluate();
-                //if (HighScore > 0 && !IsPaused)
-                //{
-                //    RubikCube.ActiveCubie.Selected = true;
-                //    Solve();
-                //}
-                //else
-                //    IsPaused = true;
-                //if (Ga != null)
-                //{
-                //    Solve();
-                //}
-            }
-            else
-            {
-                TimeBox.Text = Time.ToString();
-                //SeqCountLbl.Text = "SeqCount:" +Ga.Best.MoveCount.ToString();
-                MoveTimer.Stop();
-                // (target re-pick moved into PeelStep, the shared decision core)
-                //if (Best.Fitness < RubikCube.Score)
-                //{ 
-                //    RubikCube.Score = Best.Fitness;
-                //}
-                //else
-                //{
-                //    //if (!TRubikCube.IsEulerOrderReversed)
-                //    TRubikCube.EulerOrder = RubikCube.GetOrder();
-                //    //TRubikCube.IsEulerOrderReversed = !TRubikCube.IsEulerOrderReversed;// RubikCube.ActiveCubie.IsReversedSeq;
-                //    //RubikCube.ActiveCubie.IsReversedSeq = !RubikCube.ActiveCubie.IsReversedSeq;
-                //    foreach (var cubie in RubikCube.ActiveCluster)
-                //        cubie.ValidState = false;
-                //    //HighScore = RubikCube.Evaluate();
-                //}
-                //RubikCube.GetSolveSeq();
-                ErrorBox.Text = (100 * Solver.Score).ToString();
-                ErrorBox.Refresh();
-                if (Solver.Best != null)
-                    Solve();
+                case TAnimState.Running:
+                    Animator.Tick();
+                    tglView1.Invalidate();
+                    break;
+
+                case TAnimState.JustFinished:
+                    // Celowa przerwa jednego ticku między animacją a Solve():
+                    // 1) daje WinForms szansę odmalować ostatnią klatkę i etykiety,
+                    // 2) daje GPU chwilę wytchnienia między rundami GA.
+                    // NIE scalać z gałęzią Idle poniżej.
+                    Animator.Reset();
+                    label4.Text = Solver.TotalScrambled.ToString();
+                    MovesLbl.Text = MovesCount.ToString();
+                    UpdateClusterInfo();
+                    TimeBox.Text = Time.ToString();
+                    ErrorBox.Text = (100 * Solver.Score).ToString();
+                    RubikCube.StateGrid = null;
+                    StateBox.Invalidate();
+                    break;
+
+                case TAnimState.Idle:
+                    MoveTimer.Stop();
+                    if (Solver.Best != null)
+                        Solve();
+                    break;
             }
         }
-
-        //int ActIdx;
 
         void DisplayState(Graphics gc)
         {
@@ -228,14 +157,17 @@ namespace RubikCube
             // Thin pale-red grid, one line per cubie-matrix cell, to help locate a cubie's block. Low alpha so
             // the dense grid stays light and doesn't glare (raise the alpha in the Pen if you want it stronger).
             var rect = StateBox.ClientRectangle;
-            using (var gridPen = new Pen(Color.FromArgb(70, 210, 40, 40)))
-                for (int k = 0; k <= gridSize; k++)
-                {
-                    float gx = rect.X + rect.Width * k / (float)gridSize;
-                    float gy = rect.Y + rect.Height * k / (float)gridSize;
-                    gc.DrawLine(gridPen, gx, rect.Y, gx, rect.Bottom);
-                    gc.DrawLine(gridPen, rect.X, gy, rect.Right, gy);
-                }
+            if (gridSize < rect.Width / 2)
+            {
+                using (var gridPen = new Pen(Color.FromArgb(70, 210, 40, 40)))
+                    for (int k = 0; k <= gridSize; k++)
+                    {
+                        float gx = rect.X + rect.Width * k / (float)gridSize;
+                        float gy = rect.Y + rect.Height * k / (float)gridSize;
+                        gc.DrawLine(gridPen, gx, rect.Y, gx, rect.Bottom);
+                        gc.DrawLine(gridPen, rect.X, gy, rect.Right, gy);
+                    }
+            }
         }
 
         void OnProgress(TRubikGenome specimen)
@@ -282,7 +214,7 @@ namespace RubikCube
             if (moves.Count > 0)                              // a move was accepted
             {
                 OnProgress(Solver.Best);
-                Moves.AddRange(moves);
+                Animator.Animate(RubikCube, moves);
                 TrySolutions = true;
             }
             // Solutions cache probe -- DISABLED during the "search state -> solver" refactor. It scored a
@@ -322,9 +254,9 @@ namespace RubikCube
                 }
             }
 #endif
-            if (Moves.Count == 0)
+            if (Animator.Moves.Count == 0)
                 TrySolutions = false;
-            MovesCount += Moves.Count;
+            MovesCount += Animator.Moves.Count;
             Time = Solver.ComputeTime.Elapsed;   // authoritative compute time now lives in the solver (works headless too)
             MoveTimer.Start();
         }
@@ -335,27 +267,15 @@ namespace RubikCube
             MovesCount = 0;
             Time = TimeSpan.Zero;
             IterElapsed = TimeSpan.Zero;
-            IsPaused = false;
             Solver = new TRubikSolver(RubikCube);   // fresh solver bound to the current cube (construction IS the reset)
+            Solver.TrackTrajectory = TrajectoryBox.Checked;
             Solve();
         }
 
         private void button2_Click(object sender, EventArgs e)
         {
             if (MoveTimer.Enabled) return;
-            IsPaused = true;
-            var size = TRubikCube.Size;
-            var rnd = TChromosome.Rnd;
-            for (int i = 0; i < 200 * RubikCube.Cubies.Length; i++)
-            {
-                var cubie = RubikCube.Cubies[rnd.Next(RubikCube.Cubies.Length)];   // scramble scratch: geometry only, no solver target
-                var allMoves = RubikCube.GetClusterMoves(cubie);
-                var code = allMoves[rnd.Next(allMoves.Count)];
-                var move = TMove.Decode(code);
-                //Moves.Add(move);
-                RubikCube.Turn(move);
-            }
-            //MoveTimer.Start();
+            RubikCube.Scramble();
             RubikCube.StateGrid = null;
             StateBox.Invalidate();
             tglView1.Invalidate();
@@ -526,21 +446,15 @@ namespace RubikCube
 
                 tglView1.Invalidate();
                 StateBox.Invalidate();
-                Moves.Clear();
+                Animator.State = TAnimState.Idle;
+                MoveTimer.Stop();
             }
         }
 
         private void button3_Click_1(object sender, EventArgs e)
         {
-            //Solver = null;
-            IsPaused = !IsPaused;
-            PauseBtn.BackColor = Color.Red;
-            if (!IsPaused)
-            {
-                PauseBtn.BackColor = DefaultBackColor;
-                chart1.Series[0].Points.Clear();
-                MoveTimer.Start();
-            }
+            MoveTimer.Enabled = !MoveTimer.Enabled;
+            PauseBtn.BackColor = MoveTimer.Enabled ? DefaultBackColor : Color.Red;
         }
 
         private void saveClustersToolStripMenuItem_Click(object sender, EventArgs e)
@@ -644,7 +558,7 @@ namespace RubikCube
         const int BATCH_RUNS = 10;
         const int BATCH_CAP = 30000;
         static readonly string BatchFile =
-            @"C:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\Docs\batch_results.txt";
+            @"D:\_Moje Dane\_Moje Programy\Visual C#\RubikCubeND\Docs\batch_results.txt";
 
         private void batch10ToolStripMenuItem_Click(object sender, EventArgs e)
         {
@@ -654,13 +568,23 @@ namespace RubikCube
             var hung = new bool[BATCH_RUNS];
             var times = new double[BATCH_RUNS];             // per-run GA compute time (ms) -- the cost the gen count hides
             List<string> worstTraj = null; int worstResult = -1, worstRun = -1;
+
+            var cube = new TRubikCube();
             for (int r = 0; r < BATCH_RUNS; r++)
             {
                 Text = $"BATCH {r + 1}/{BATCH_RUNS} ...";
-                Application.DoEvents();                     // let the title repaint; no input is processed meaningfully
-                results[r] = SolveOnceHeadless(out hung[r], out var traj, out times[r]);
-                if (results[r] > worstResult) { worstResult = results[r]; worstTraj = traj; worstRun = r; }   // keep only the worst
+                Application.DoEvents();
+
+                cube.Scramble();
+                var solver = new TRubikSolver(cube) { TrackTrajectory = true };
+                var result = solver.RunHeadless(BATCH_CAP);
+
+                results[r] = result.Iterations;
+                hung[r] = result.Hung;
+                times[r] = result.ComputeMs;
+                if (results[r] > worstResult) { worstResult = results[r]; worstTraj = result.Trajectory; worstRun = r; }
             }
+
             Text = title;
             tglView1.Invalidate();
 
@@ -711,47 +635,6 @@ namespace RubikCube
             ShowTextDialog("Batch " + BATCH_RUNS, report);
         }
 
-        // One full solve of a FRESH random scramble, headless (no animation). Drives the SAME GaStep decision core
-        // the interactive Solve() uses -- so the batch can no longer drift from what you watch on screen -- and
-        // just applies each accepted move immediately (Turn) instead of animating it. Returns the GA count; sets
-        // hung=true and returns the cap if the run fails to close within BATCH_CAP.
-        private int SolveOnceHeadless(out bool hung, out List<string> traj, out double computeMs)
-        {
-            traj = new List<string>();                      // per-step trajectory (gen, scrambled, structure, fitness, moves, stepMs) -- always tracked
-            // Fresh cube + scramble (identical to Load + the Shuffle button, so no state carries between runs).
-            var rubikCube = new TRubikCube();
-            //RubikCube.Parent = Scene.Root;
-            var rnd = TChromosome.Rnd;
-            for (int i = 0; i < 200 * rubikCube.Cubies.Length; i++)
-            {
-                var cubie = rubikCube.Cubies[rnd.Next(rubikCube.Cubies.Length)];   // scramble scratch: geometry only
-                var all = rubikCube.GetClusterMoves(cubie);
-                rubikCube.Turn(TMove.Decode(all[rnd.Next(all.Count)]));
-            }
-            // Fresh solver bound to this run's cube (construction IS the reset -- matches button1_Click; the
-            // solver's Coherent latch starts 0 and resets to 0 on each NextCluster, exactly as interactive).
-            var solver = new TRubikSolver(rubikCube);
-            hung = false;
-            double prevMs = 0;                              // for per-step compute ms (delta of the solver's ComputeTime)
-            while (true)
-            {
-                var moves = solver.GetNextMoves();         // SAME decision core as interactive (re-pick, cluster
-                if (solver.Best == null)                            // advance, GA, STALL) -- one source of truth now
-                {
-                    computeMs = solver.ComputeTime.Elapsed.TotalMilliseconds;
-                    return solver.IterationsCount;                          // whole cube solved
-                }
-                foreach (var m in moves)                   // apply immediately: batch = no animation
-                    rubikCube.Turn(m);
-                int scrNow = 0;                             // RESULTING scrambled (AFTER the move) -- consistent with Score
-                foreach (var c in solver.ActiveCluster.Cubies) if (c.State != 0) scrNow++;
-                double nowMs = solver.ComputeTime.Elapsed.TotalMilliseconds;
-                double stepMs = nowMs - prevMs; prevMs = nowMs;   // compute time of THIS step alone
-                traj.Add($"{solver.IterationsCount}\t{scrNow}\t{TRubikGenome.DescribeStructure(solver.Best.Structure, TAffine.N)}\t{solver.Best.Fitness:F4}\t{solver.Score:F4}\t{moves.Count}\t{stepMs:F1}");
-                if (solver.IterationsCount >= BATCH_CAP) { hung = true; computeMs = solver.ComputeTime.Elapsed.TotalMilliseconds; return BATCH_CAP; }
-            }
-        }
-
         // Status labels: which cluster is being solved (by ClusterIndex, 1-based) out of the total, and how
         // many of the active cluster's cubies are already solved. ActiveCubie == null means the cube is solved.
         private void UpdateClusterInfo()
@@ -759,14 +642,14 @@ namespace RubikCube
             if (RubikCube == null || RubikCube.Cubies == null) return;
             if (Solver == null || Solver.ActiveCubie == null)
             {
-                ClusterLbl.Text = $"Cluster - / {RubikCube.Clusters.Count}";
-                SolvedLbl.Text = "Solved - / -";
+                ClusterLbl.Text = $"Cluster {RubikCube.Clusters.Count}";
+                ScrambledLbl.Text = "Scrambled -";
                 StructureBox.Text = "Struct -";
                 return;
             }
-            int solved = Solver.ActiveCluster.Cubies.Count - Solver.Scrambled;
-            ClusterLbl.Text = $"Cluster {Solver.ActiveCubie.ClusterIndex} / {RubikCube.Clusters.Count}";
-            SolvedLbl.Text = $"Solved {solved} / {Solver.ActiveCluster.Cubies.Count}";
+            int scrambled = Solver.ActiveCluster.ScrambledCount;
+            ClusterLbl.Text = $"Cluster {RubikCube.Clusters.Count - Solver.ActiveCubie.ClusterIndex}";
+            ScrambledLbl.Text = $"Scrambled {scrambled}";
             // Coherence decomposition of the residual, as the METRIC sees it ("4+2", "2+1+1") - reported by the
             // evaluator itself, so it can never drift from the metric the way an eyeball reading does.
             StructureBox.Text = "Struct " + (Solver.Best == null ? "-" : TRubikGenome.DescribeStructure(Solver.Best.Structure, TAffine.N));
@@ -829,6 +712,11 @@ namespace RubikCube
         }
 
         private void label12_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void TrajectoryBox_CheckedChanged(object sender, EventArgs e)
         {
 
         }
